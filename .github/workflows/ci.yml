@@ -12,10 +12,6 @@ permissions:
 env:
   MISE_ENV: ci
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   hygiene:
     name: hygiene
