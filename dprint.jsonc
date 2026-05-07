@@ -18,6 +18,8 @@
     "docs/api/c/templates/**",
     "**/*-lock.yaml",
     "**/*.lock.yaml",
+    "**/*-lock.yml",
+    "**/*.lock.yml",
     "uv.lock",
   ],
   "json": { "preferSingleLine": true },

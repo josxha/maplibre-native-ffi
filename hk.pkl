@@ -30,14 +30,16 @@ local commonSteps = new Mapping<String, Step> {
   }
   ["ruff"] {
     glob = List("**/*.py")
+    exclude = List("third_party/**")
     profiles = commonProfiles
     check = "uv run ruff check {{files}} && uv run ruff format --check {{files}}"
     fix = "uv run ruff check --fix {{files}} && uv run ruff format {{files}}"
   }
   ["ty"] {
     glob = List("**/*.py")
+    exclude = List("third_party/**")
     profiles = commonProfiles
-    check = "uv run ty check --error-on-warning ."
+    check = "uv run ty check --error-on-warning .mise"
   }
   ["zig-ast-check"] {
     glob = List("**/*.zig")
