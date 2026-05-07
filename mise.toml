@@ -27,6 +27,7 @@ node = "24.11.0"
 python = "3.14.4"
 uv = "0.11.11"
 usage = "3.3.0"
+xcodes = "1.6.2"
 
 [env]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
@@ -48,7 +49,6 @@ postinstall = [
 ]
 
 [tasks.configure]
-env = { CC = "clang", CXX = "clang++" }
 run = [
   "pixi run cmake -S . -B \"$MLN_FFI_BUILD_DIR\" -G Ninja ${MLN_FFI_RENDER_BACKEND:+-DMLN_FFI_RENDER_BACKEND=$MLN_FFI_RENDER_BACKEND}",
   "mkdir -p build/clangd && ln -sfn \"$MLN_FFI_BUILD_DIR/compile_commands.json\" build/clangd/compile_commands.json",
