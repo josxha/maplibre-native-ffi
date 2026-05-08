@@ -27,9 +27,9 @@ where FFM is unavailable or undesirable are covered by the separate
 Owned long-lived native objects use a `Handle` suffix:
 
 ```text
-org.maplibre.native.ffm.RuntimeHandle
-org.maplibre.native.ffm.MapHandle
-org.maplibre.native.ffm.RenderSessionHandle
+org.maplibre.nativekit.ffm.RuntimeHandle
+org.maplibre.nativekit.ffm.MapHandle
+org.maplibre.nativekit.ffm.RenderSessionHandle
 ```
 
 `Handle` means the object wraps a closeable native object with an identity used
@@ -56,13 +56,13 @@ namespace clarity benefits.
 Separate generated FFM access from the safe public binding.
 
 ```text
-org.maplibre.native.ffm.internal.c
+org.maplibre.nativekit.ffm.internal.c
   Generated FFM bindings from the public C headers.
 
-org.maplibre.native.ffm.internal
+org.maplibre.nativekit.ffm.internal
   Status conversion, diagnostics, handle state, arenas, and callback bridging.
 
-org.maplibre.native.ffm
+org.maplibre.nativekit.ffm
   Safe low-level Java API.
 ```
 
