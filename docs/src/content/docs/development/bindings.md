@@ -9,7 +9,7 @@ Language bindings sit directly above the public C API. They preserve the C API's
 core model while adding language-appropriate ownership, memory, error, and
 threading rules.
 
-See the language-specific binding notes in this section for implementation
+See the language-specific binding conventions in this section for implementation
 choices in each target language.
 
 Code fragments in this page are representative pseudocode. They show API shape
@@ -43,10 +43,10 @@ MapProjectionHandle
 RenderSessionHandle
 ```
 
-`Handle` means the object wraps an explicitly releasable native object with an
-identity used across multiple operations. Language-owned values, descriptors,
-events, copied data, and one-shot snapshots omit the suffix. Keep public names
-close to C concepts, and rename when the target language gains clarity or avoids
+`Handle` means the object wraps an explicitly releasable native object with
+identity across operations. Language-owned values, descriptors, events, copied
+data, and one-shot snapshots omit the suffix. Keep public names close to C
+concepts, and rename them when the target language gains clarity or avoids
 namespace collisions.
 
 ## Binding Layers
@@ -70,17 +70,25 @@ Keep C binding-generator types internal. Public APIs expose target-language
 values, descriptors, errors, and handle wrappers rather than raw ABI structs or
 generated layout classes.
 
+Rust-based native-extension bindings may share internal Rust crates. A generated
+`-sys` crate mirrors the C ABI and contains no binding policy. A support crate
+holds shared implementation glue such as status checking, diagnostic copying,
+string and descriptor helpers, memory guards, callback-boundary utilities, and
+native-pointer utilities. The support crate is not the public safety layer;
+public Rust, Python, and Node packages keep their own language-facing ownership,
+errors, callbacks, and packaging.
+
 ## Status And Diagnostics
 
-Status-returning C calls become target-language calls that either complete
-normally or report an error through the language's ordinary mechanism, such as
-exceptions, error values, typed results, or error unions.
+Status-returning C calls either complete normally or report errors through the
+language's ordinary mechanism: exceptions, error values, typed results, or error
+unions.
 
 Map each C status category to a stable, idiomatic public error representation.
-The spelling and mechanism follow the target language, while the category stays
-visible to callers. When a native call returns a non-OK status, read the C
-thread-local diagnostic immediately on the same thread and include it in the
-reported error. Another C call on that thread may replace the diagnostic.
+Use target-language spelling and mechanics, but keep the category visible to
+callers. When a native call returns a non-OK status, read the C thread-local
+diagnostic immediately on the same thread and include it in the reported error.
+Another C call on that thread may replace the diagnostic.
 
 Let the C API validate native arguments and native state. The binding validates
 language-owned state such as released wrappers, active callback-scoped borrows,
@@ -309,6 +317,11 @@ threads, so implementations return quickly and avoid map or runtime methods from
 the callback. Custom geometry source callbacks marshal work to the map owner
 thread before calling thread-affine map APIs. Borrowed request fields are copied
 before the callback returns when the binding needs them later.
+
+Resource-provider bindings use native-owned routing rules before crossing into
+language code. Non-matching requests return pass-through immediately. Matching
+requests copy request data, own the provider's request handle, and complete
+inline or later according to the language's callback model.
 
 A handled resource request owns the provider's reference to the C request
 handle. It enforces one-shot completion and exactly-once release. Completion and
