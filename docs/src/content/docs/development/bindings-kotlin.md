@@ -1,6 +1,6 @@
 ---
-title: Kotlin Multiplatform Binding Conventions
-description: Language-specific implementation conventions for Kotlin Multiplatform bindings.
+title: Kotlin Binding Conventions
+description: Language-specific implementation conventions for Kotlin bindings.
 ---
 
 Resources:
