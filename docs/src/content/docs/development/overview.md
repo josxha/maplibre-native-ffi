@@ -96,6 +96,11 @@ This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
 model.
 
+Project-managed dependency state keeps builds reproducible. Pixi supplies native
+build dependencies instead of Homebrew, apt, or other machine-global package
+managers. Platform SDKs such as Xcode, Visual Studio, and the Android SDK remain
+pragmatic external exceptions.
+
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
 tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
 common workflows: build, test, check, fix, and examples. Mise also provides
