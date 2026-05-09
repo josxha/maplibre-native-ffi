@@ -20,8 +20,7 @@ values, and a clear NativeAOT and trimming compatibility target.
 
 Generate the internal native import layer from the public C headers with
 ClangSharp. Treat successful generation and compilation as the header
-bindability check for this path. Verbose generated declarations are fine because
-they stay private; the public C# layer is handwritten.
+bindability check for this path. The public C# layer is handwritten.
 
 Public handle types are classes. They implement `IDisposable` for deterministic
 cleanup and expose explicit `Close()` or `Destroy()` methods that report native
