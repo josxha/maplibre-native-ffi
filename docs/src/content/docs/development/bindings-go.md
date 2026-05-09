@@ -13,10 +13,9 @@ Resources:
 The Go binding uses `cgo` over the public C headers and keeps raw C declarations
 private.
 
-Use the repository's supported Go toolchain when adding the package. Go 1.21 is
-the interop floor because it provides `runtime.Pinner`; newer baselines are fine
-when they match CI. `cgo` gives direct header checking, struct layout, callback
-exports, and C compiler diagnostics.
+The Go binding targets Go 1.21 or newer. Go 1.21 provides `runtime.Pinner`, the
+interop floor for retained Go pointers. `cgo` gives direct header checking,
+struct layout, callback exports, and C compiler diagnostics.
 
 Represent public handles as structs with explicit `Close() error` methods. Use
 Go finalizers for leak reporting. Use them for cleanup only for native resources
