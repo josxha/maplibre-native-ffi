@@ -14,9 +14,6 @@ Resources:
 The Vala binding exposes a handwritten GLib/GObject-style low-level API over a
 private raw `.vapi` for the public C headers.
 
-Use stable Vala 0.56.x. Rely on established GLib and GObject features rather
-than development-only Vala features.
-
 Public handle types are `GLib.Object` wrappers. Each stores the native handle
 privately and exposes explicit `close()` methods that throw
 `MapLibreNative.Error`. Use `dispose` to release managed references. Use
