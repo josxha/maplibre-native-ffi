@@ -23,10 +23,12 @@ Go finalizers for leak reporting. Use them for cleanup only for native resources
 whose release function is documented as thread-independent and infallible,
 because finalizers run on GC threads.
 
-Document that callers can use `runtime.LockOSThread` when they need
-deterministic owner-thread affinity. The low-level binding preserves caller
-execution: ordinary calls run on the calling goroutine and are not silently
-marshaled to another goroutine.
+Document that Go goroutines do not preserve OS-thread identity. Callers use
+`runtime.LockOSThread` when they need deterministic owner-thread affinity. The
+low-level binding preserves caller execution: ordinary calls run on the calling
+goroutine and return the native wrong-thread error when the call reaches the
+wrong owner thread. The binding does not silently marshal ordinary calls to a
+different goroutine or OS thread.
 
 Follow cgo pointer rules strictly. Pin Go pointers for the full retention period
 before C stores them. Use C-owned storage for retained strings and buffers, and
