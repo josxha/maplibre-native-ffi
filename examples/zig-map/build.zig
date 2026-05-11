@@ -12,15 +12,12 @@ const RenderBackend = enum {
     vulkan,
 };
 
-fn renderBackend(b: *std.Build, target: std.Build.ResolvedTarget) RenderBackend {
+fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
         "render-backend",
         "Render backend built into the CMake artifact: metal or vulkan",
-    ) orelse switch (target.result.os.tag) {
-        .macos, .ios => "metal",
-        else => "vulkan",
-    };
+    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
 
     if (std.mem.eql(u8, value, "metal")) return .metal;
     if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
@@ -48,10 +45,32 @@ fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: s
     module.link_libc = true;
 }
 
+fn pixiIncludeDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return switch (target.result.os.tag) {
+        .windows => b.path("../../.pixi/envs/default/Library/include"),
+        else => b.path("../../.pixi/envs/default/include"),
+    };
+}
+
+fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return switch (target.result.os.tag) {
+        .windows => b.path("../../.pixi/envs/default/Library/lib"),
+        else => b.path("../../.pixi/envs/default/lib"),
+    };
+}
+
+fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
+    return switch (target.result.os.tag) {
+        .windows => "vulkan-1",
+        else => "vulkan",
+    };
+}
+
 fn isSupportedTarget(options: BuildOptions) bool {
     return switch (options.render_backend) {
         .metal => options.target.result.os.tag == .macos,
-        .vulkan => options.target.result.os.tag == .macos or options.target.result.os.tag == .linux,
+        .vulkan => options.target.result.os.tag == .macos or options.target.result.os.tag == .linux or
+            options.target.result.os.tag == .windows,
     };
 }
 
@@ -75,9 +94,9 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
     example.root_module.addOptions("build_options", build_options);
     linkMapLibreC(b, example.root_module, options.cmake_artifact_dir);
-    example.root_module.addIncludePath(b.path("../../.pixi/envs/default/include"));
-    example.root_module.addLibraryPath(b.path("../../.pixi/envs/default/lib"));
-    example.root_module.addRPath(b.path("../../.pixi/envs/default/lib"));
+    example.root_module.addIncludePath(pixiIncludeDir(b, options.target));
+    example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
+    example.root_module.addRPath(pixiLibraryDir(b, options.target));
     example.root_module.linkSystemLibrary("SDL3", .{});
     if (options.render_backend == .metal) {
         const zig_objc = b.dependency("zig_objc", .{
@@ -90,7 +109,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         example.root_module.linkFramework("QuartzCore", .{});
     } else if (options.render_backend == .vulkan) {
         example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        example.root_module.linkSystemLibrary("vulkan", .{});
+        example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
     } else {
         failUnsupportedTarget();
     }
@@ -104,7 +123,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmakeArtifactDir(b),
-        .render_backend = renderBackend(b, target),
+        .render_backend = renderBackend(b),
     };
 
     const run_step = b.step("run", "Run Zig map example");
