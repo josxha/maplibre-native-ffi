@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -110,7 +109,7 @@ final class RenderSessionHandleTest {
   }
 
   @Test
-  void metalOwnedTextureFrameReleasesAfterCallbackFailure() throws Exception {
+  void metalOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
@@ -124,19 +123,14 @@ final class RenderSessionHandleTest {
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       activeSession.renderUpdate();
 
-      var escaped = new AtomicReference<MetalOwnedTextureFrame>();
-      var failure =
-          assertThrows(
-              IllegalStateException.class,
-              () ->
-                  activeSession.withMetalOwnedTextureFrame(
-                      (Consumer<MetalOwnedTextureFrame>)
-                          frame -> {
-                            escaped.set(frame);
-                            throw new IllegalStateException("boom");
-                          }));
-      assertEquals("boom", failure.getMessage());
-      assertThrows(IllegalStateException.class, () -> escaped.get().width());
+      MetalOwnedTextureFrame frame;
+      try (var frameHandle = activeSession.acquireMetalOwnedTextureFrame()) {
+        frame = frameHandle.frame();
+        assertEquals(32, frame.width());
+        assertFalse(frameHandle.isClosed());
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      }
+      assertThrows(IllegalStateException.class, frame::width);
       activeSession.renderUpdate();
     } finally {
       if (session != null) {
@@ -148,7 +142,7 @@ final class RenderSessionHandleTest {
   }
 
   @Test
-  void vulkanOwnedTextureFrameReleasesAfterCallbackFailure() throws Exception {
+  void vulkanOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
@@ -162,19 +156,14 @@ final class RenderSessionHandleTest {
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       activeSession.renderUpdate();
 
-      var escaped = new AtomicReference<VulkanOwnedTextureFrame>();
-      var failure =
-          assertThrows(
-              IllegalStateException.class,
-              () ->
-                  activeSession.withVulkanOwnedTextureFrame(
-                      (Consumer<VulkanOwnedTextureFrame>)
-                          frame -> {
-                            escaped.set(frame);
-                            throw new IllegalStateException("boom");
-                          }));
-      assertEquals("boom", failure.getMessage());
-      assertThrows(IllegalStateException.class, () -> escaped.get().width());
+      VulkanOwnedTextureFrame frame;
+      try (var frameHandle = activeSession.acquireVulkanOwnedTextureFrame()) {
+        frame = frameHandle.frame();
+        assertEquals(32, frame.width());
+        assertFalse(frameHandle.isClosed());
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      }
+      assertThrows(IllegalStateException.class, frame::width);
       activeSession.renderUpdate();
     } finally {
       if (session != null) {

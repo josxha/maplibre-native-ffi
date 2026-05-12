@@ -5,8 +5,6 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.geo.Feature;
@@ -318,70 +316,54 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  public void withMetalOwnedTextureFrame(Consumer<MetalOwnedTextureFrame> callback) {
-    Objects.requireNonNull(callback, "callback");
-    withMetalOwnedTextureFrame(
-        frame -> {
-          callback.accept(frame);
-          return null;
-        });
-  }
-
-  public <T> T withMetalOwnedTextureFrame(Function<MetalOwnedTextureFrame, T> callback) {
+  /**
+   * Acquires an explicit Metal session-owned texture frame handle.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned
+   * texture and need to release it after that work completes. The returned handle must be closed on
+   * the render session owner thread after GPU work using {@link MetalOwnedTextureFrame#texture()}
+   * has completed. While the handle is open, the native session rejects resize, render, detach,
+   * destroy, and second-acquire operations.
+   */
+  public MetalOwnedTextureFrameHandle acquireMetalOwnedTextureFrame() {
     NativeAccess.ensureLoaded();
-    Objects.requireNonNull(callback, "callback");
-    try (var arena = Arena.ofConfined()) {
-      var frameSegment = RenderStructs.metalOwnedTextureFrame(arena);
+    var arena = Arena.ofConfined();
+    var frameSegment = RenderStructs.metalOwnedTextureFrame(arena);
+    try {
       Status.check(
           MapLibreNativeC.mln_metal_owned_texture_acquire_frame(state.requireLive(), frameSegment));
       var scope = new FrameScope();
-      Throwable callbackFailure = null;
-      try {
-        return callback.apply(metalOwnedTextureFrame(frameSegment, scope));
-      } catch (Throwable throwable) {
-        callbackFailure = throwable;
-        throw throwable;
-      } finally {
-        try {
-          releaseMetalFrame(frameSegment, callbackFailure);
-        } finally {
-          scope.close();
-        }
-      }
+      return new MetalOwnedTextureFrameHandle(
+          this, arena, frameSegment, scope, metalOwnedTextureFrame(frameSegment, scope));
+    } catch (Throwable throwable) {
+      arena.close();
+      throw throwable;
     }
   }
 
-  public void withVulkanOwnedTextureFrame(Consumer<VulkanOwnedTextureFrame> callback) {
-    Objects.requireNonNull(callback, "callback");
-    withVulkanOwnedTextureFrame(
-        frame -> {
-          callback.accept(frame);
-          return null;
-        });
-  }
-
-  public <T> T withVulkanOwnedTextureFrame(Function<VulkanOwnedTextureFrame, T> callback) {
+  /**
+   * Acquires an explicit Vulkan session-owned texture frame handle.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned image
+   * and need to release it after an external fence signals. The returned handle must be closed on
+   * the render session owner thread after GPU work using {@link VulkanOwnedTextureFrame#image()} or
+   * {@link VulkanOwnedTextureFrame#imageView()} has completed. While the handle is open, the native
+   * session rejects resize, render, detach, destroy, and second-acquire operations.
+   */
+  public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
     NativeAccess.ensureLoaded();
-    Objects.requireNonNull(callback, "callback");
-    try (var arena = Arena.ofConfined()) {
-      var frameSegment = RenderStructs.vulkanOwnedTextureFrame(arena);
+    var arena = Arena.ofConfined();
+    var frameSegment = RenderStructs.vulkanOwnedTextureFrame(arena);
+    try {
       Status.check(
           MapLibreNativeC.mln_vulkan_owned_texture_acquire_frame(
               state.requireLive(), frameSegment));
       var scope = new FrameScope();
-      Throwable callbackFailure = null;
-      try {
-        return callback.apply(vulkanOwnedTextureFrame(frameSegment, scope));
-      } catch (Throwable throwable) {
-        callbackFailure = throwable;
-        throw throwable;
-      } finally {
-        try {
-          releaseVulkanFrame(frameSegment, callbackFailure);
-        } finally {
-          scope.close();
-        }
-      }
+      return new VulkanOwnedTextureFrameHandle(
+          this, arena, frameSegment, scope, vulkanOwnedTextureFrame(frameSegment, scope));
+    } catch (Throwable throwable) {
+      arena.close();
+      throw throwable;
     }
   }
 
@@ -478,7 +460,7 @@ public final class RenderSessionHandle implements AutoCloseable {
         : NativePointer.scoped(segment.address(), scope);
   }
 
-  private void releaseMetalFrame(MemorySegment frameSegment, Throwable callbackFailure) {
+  void releaseMetalFrame(MemorySegment frameSegment, Throwable callbackFailure) {
     try {
       Status.check(
           MapLibreNativeC.mln_metal_owned_texture_release_frame(state.requireLive(), frameSegment));
@@ -491,7 +473,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  private void releaseVulkanFrame(MemorySegment frameSegment, Throwable callbackFailure) {
+  void releaseVulkanFrame(MemorySegment frameSegment, Throwable callbackFailure) {
     try {
       Status.check(
           MapLibreNativeC.mln_vulkan_owned_texture_release_frame(
