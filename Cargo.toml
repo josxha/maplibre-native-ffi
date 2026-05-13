@@ -1,0 +1,13 @@
+[workspace]
+resolver = "3"
+members = [
+  "bindings/rust/crates/maplibre-native",
+  "bindings/rust/crates/maplibre-native-support",
+  "bindings/rust/crates/maplibre-native-sys",
+  "examples/rust-map",
+]
+
+[workspace.package]
+edition = "2024"
+license = "BSD-2-Clause"
+repository = "https://github.com/maplibre/maplibre-native-ffi"

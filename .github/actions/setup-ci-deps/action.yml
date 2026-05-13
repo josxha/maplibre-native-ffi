@@ -21,11 +21,38 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
 
+    - name: Cache Cargo packages
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache Gradle
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-gradle-
+
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
         cache: true
+        cache_key_prefix: mise-v2
         install: true
+
+    # The mise action may restore a Rust toolchain without optional components.
+    # See https://github.com/jdx/mise-action/issues/184.
+    - name: Ensure Rust components
+      run: mise exec -- rustup component add rustfmt clippy
+      shell: bash
 
     - name: Trim Windows PATH before Pixi activation
       if: ${{ runner.os == 'Windows' }}

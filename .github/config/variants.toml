@@ -20,6 +20,10 @@ requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulk
 task = "//examples/lwjgl-map:build"
 requires = { platform = ["linux", "macos"], backend = ["vulkan"] }
 
+[examples.rust-map]
+task = "//examples/rust-map:ci"
+requires = { platform = ["linux"], backend = ["vulkan"] }
+
 [examples.zig-readback]
 task = "//examples/zig-readback:run"
 requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
@@ -32,4 +36,8 @@ requires = { platform = ["windows"], backend = ["vulkan"] }
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
 # The Java build task includes tests, which are runtime-broken on Windows for now.
+requires = { platform = ["linux", "macos"] }
+
+[bindings.rust]
+task = "//bindings/rust:ci"
 requires = { platform = ["linux", "macos"] }
