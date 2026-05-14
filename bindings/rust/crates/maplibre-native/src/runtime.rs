@@ -1,10 +1,10 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use maplibre_native_support as support;
+use maplibre_core::AmbientCacheOperation;
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 use crate::events::{
@@ -17,359 +17,15 @@ use crate::resource::{
     ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
 };
 use crate::{
-    Error, ErrorKind, Geometry, HandleOperationError, LatLngBounds, MapHandle, MapOptions,
-    ResourceProviderDecision, Result,
+    Error, ErrorKind, HandleOperationError, MapHandle, MapOptions, ResourceProviderDecision, Result,
 };
+#[cfg(test)]
+use crate::{Geometry, LatLngBounds};
 
-/// Options used when creating a runtime.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[non_exhaustive]
-pub struct RuntimeOptions {
-    /// Filesystem root for `asset://` URLs.
-    pub asset_path: Option<String>,
-    /// Cache database path.
-    pub cache_path: Option<String>,
-    /// Maximum ambient cache size in bytes.
-    pub maximum_cache_size: Option<u64>,
-}
-
-impl RuntimeOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_asset_path(mut self, asset_path: impl Into<String>) -> Self {
-        self.asset_path = Some(asset_path.into());
-        self
-    }
-
-    pub fn with_cache_path(mut self, cache_path: impl Into<String>) -> Self {
-        self.cache_path = Some(cache_path.into());
-        self
-    }
-
-    pub fn with_maximum_cache_size(mut self, maximum_cache_size: u64) -> Self {
-        self.maximum_cache_size = Some(maximum_cache_size);
-        self
-    }
-
-    pub fn clear_asset_path(mut self) -> Self {
-        self.asset_path = None;
-        self
-    }
-
-    pub fn clear_cache_path(mut self) -> Self {
-        self.cache_path = None;
-        self
-    }
-
-    pub fn clear_maximum_cache_size(mut self) -> Self {
-        self.maximum_cache_size = None;
-        self
-    }
-
-    fn to_native(&self) -> Result<NativeRuntimeOptions> {
-        support::validate_abi_version()?;
-        NativeRuntimeOptions::new(self)
-    }
-}
-
-#[derive(Debug)]
-struct NativeRuntimeOptions {
-    asset_path: Option<CString>,
-    cache_path: Option<CString>,
-    maximum_cache_size: Option<u64>,
-}
-
-/// Ambient cache maintenance operation for a runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum AmbientCacheOperation {
-    /// Reset the ambient cache database.
-    ResetDatabase,
-    /// Pack the ambient cache database.
-    PackDatabase,
-    /// Mark ambient cache resources as invalid.
-    Invalidate,
-    /// Clear ambient cache resources.
-    Clear,
-}
-
-impl AmbientCacheOperation {
-    const fn raw_value(self) -> u32 {
-        match self {
-            Self::ResetDatabase => sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE,
-            Self::PackDatabase => sys::MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE,
-            Self::Invalidate => sys::MLN_AMBIENT_CACHE_OPERATION_INVALIDATE,
-            Self::Clear => sys::MLN_AMBIENT_CACHE_OPERATION_CLEAR,
-        }
-    }
-
-    fn to_native(self) -> u32 {
-        self.raw_value()
-    }
-}
-
-/// Region descriptor used to create or inspect offline regions.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum OfflineRegionDefinition {
-    TilePyramid {
-        style_url: String,
-        bounds: LatLngBounds,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-    GeometryRegion {
-        style_url: String,
-        geometry: Geometry,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-}
-
-/// Offline region snapshot copied from native storage.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct OfflineRegionInfo {
-    pub id: i64,
-    pub definition: OfflineRegionDefinition,
-    pub metadata: Vec<u8>,
-}
-
-enum NativeOfflineRegionDefinition {
-    TilePyramid {
-        style_url: CString,
-        bounds: LatLngBounds,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-    GeometryRegion {
-        style_url: CString,
-        geometry: crate::geometry::NativeGeometry,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-}
-
-impl NativeOfflineRegionDefinition {
-    fn new(definition: &OfflineRegionDefinition) -> Result<Self> {
-        match definition {
-            OfflineRegionDefinition::TilePyramid {
-                style_url,
-                bounds,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => Ok(Self::TilePyramid {
-                style_url: support::string::c_string(style_url)?,
-                bounds: *bounds,
-                min_zoom: *min_zoom,
-                max_zoom: *max_zoom,
-                pixel_ratio: *pixel_ratio,
-                include_ideographs: *include_ideographs,
-            }),
-            OfflineRegionDefinition::GeometryRegion {
-                style_url,
-                geometry,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => Ok(Self::GeometryRegion {
-                style_url: support::string::c_string(style_url)?,
-                geometry: geometry.try_to_native()?,
-                min_zoom: *min_zoom,
-                max_zoom: *max_zoom,
-                pixel_ratio: *pixel_ratio,
-                include_ideographs: *include_ideographs,
-            }),
-        }
-    }
-
-    fn to_raw(&self) -> sys::mln_offline_region_definition {
-        match self {
-            Self::TilePyramid {
-                style_url,
-                bounds,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => sys::mln_offline_region_definition {
-                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-                type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-                data: sys::mln_offline_region_definition__bindgen_ty_1 {
-                    tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
-                        size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
-                            as u32,
-                        style_url: style_url.as_ptr(),
-                        bounds: bounds.to_native(),
-                        min_zoom: *min_zoom,
-                        max_zoom: *max_zoom,
-                        pixel_ratio: *pixel_ratio,
-                        include_ideographs: *include_ideographs,
-                    },
-                },
-            },
-            Self::GeometryRegion {
-                style_url,
-                geometry,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => sys::mln_offline_region_definition {
-                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-                type_: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
-                data: sys::mln_offline_region_definition__bindgen_ty_1 {
-                    geometry: sys::mln_offline_geometry_region_definition {
-                        size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>()
-                            as u32,
-                        style_url: style_url.as_ptr(),
-                        geometry: geometry.as_ptr(),
-                        min_zoom: *min_zoom,
-                        max_zoom: *max_zoom,
-                        pixel_ratio: *pixel_ratio,
-                        include_ideographs: *include_ideographs,
-                    },
-                },
-            },
-        }
-    }
-}
-
-fn empty_offline_region_info() -> sys::mln_offline_region_info {
-    sys::mln_offline_region_info {
-        size: std::mem::size_of::<sys::mln_offline_region_info>() as u32,
-        id: 0,
-        definition: sys::mln_offline_region_definition {
-            size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-            type_: 0,
-            data: sys::mln_offline_region_definition__bindgen_ty_1 {
-                tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
-                    size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
-                        as u32,
-                    style_url: std::ptr::null(),
-                    bounds: crate::map::empty_bounds(),
-                    min_zoom: 0.0,
-                    max_zoom: 0.0,
-                    pixel_ratio: 0.0,
-                    include_ideographs: false,
-                },
-            },
-        },
-        metadata: std::ptr::null(),
-        metadata_size: 0,
-    }
-}
-
-fn copy_offline_region_info(raw: &sys::mln_offline_region_info) -> Result<OfflineRegionInfo> {
-    Ok(OfflineRegionInfo {
-        id: raw.id,
-        definition: copy_offline_region_definition(&raw.definition)?,
-        metadata: copy_metadata(raw.metadata, raw.metadata_size)?,
-    })
-}
-
-fn copy_offline_region_definition(
-    raw: &sys::mln_offline_region_definition,
-) -> Result<OfflineRegionDefinition> {
-    match raw.type_ {
-        sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => {
-            // SAFETY: Active union member is selected by raw.type_.
-            let tile = unsafe { raw.data.tile_pyramid };
-            Ok(OfflineRegionDefinition::TilePyramid {
-                // SAFETY: Native snapshot/list storage owns a NUL-terminated style URL.
-                style_url: unsafe { support::string::copy_c_string(tile.style_url) }?,
-                bounds: LatLngBounds::from_native(tile.bounds),
-                min_zoom: tile.min_zoom,
-                max_zoom: tile.max_zoom,
-                pixel_ratio: tile.pixel_ratio,
-                include_ideographs: tile.include_ideographs,
-            })
-        }
-        sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => {
-            // SAFETY: Active union member is selected by raw.type_.
-            let geometry = unsafe { raw.data.geometry };
-            if geometry.geometry.is_null() {
-                return Err(Error::invalid_argument(
-                    "offline region geometry must not be null",
-                ));
-            }
-            Ok(OfflineRegionDefinition::GeometryRegion {
-                // SAFETY: Native snapshot/list storage owns a NUL-terminated style URL.
-                style_url: unsafe { support::string::copy_c_string(geometry.style_url) }?,
-                // SAFETY: geometry.geometry is non-null and borrowed from live snapshot/list storage.
-                geometry: unsafe { Geometry::from_native_with_depth(&*geometry.geometry, 0) }?,
-                min_zoom: geometry.min_zoom,
-                max_zoom: geometry.max_zoom,
-                pixel_ratio: geometry.pixel_ratio,
-                include_ideographs: geometry.include_ideographs,
-            })
-        }
-        type_ => Err(Error::invalid_argument(format!(
-            "unknown offline region definition type: {type_}"
-        ))),
-    }
-}
-
-fn copy_metadata(ptr: *const u8, len: usize) -> Result<Vec<u8>> {
-    if len == 0 {
-        return Ok(Vec::new());
-    }
-    if ptr.is_null() {
-        return Err(Error::invalid_argument(
-            "offline region metadata must not be null when size is nonzero",
-        ));
-    }
-    // SAFETY: Metadata is borrowed from live snapshot/list storage and copied immediately.
-    Ok(unsafe { std::slice::from_raw_parts(ptr, len) }.to_vec())
-}
-
-fn metadata_ptr(metadata: &[u8]) -> *const u8 {
-    if metadata.is_empty() {
-        std::ptr::null()
-    } else {
-        metadata.as_ptr()
-    }
-}
-
-impl NativeRuntimeOptions {
-    fn new(options: &RuntimeOptions) -> Result<Self> {
-        Ok(Self {
-            asset_path: support::string::optional_c_string(options.asset_path.as_deref())?,
-            cache_path: support::string::optional_c_string(options.cache_path.as_deref())?,
-            maximum_cache_size: options.maximum_cache_size,
-        })
-    }
-
-    fn to_raw(&self) -> sys::mln_runtime_options {
-        // SAFETY: Default constructor takes no arguments and initializes size,
-        // flags, and default values for this C ABI version.
-        let mut raw = unsafe { sys::mln_runtime_options_default() };
-        if let Some(asset_path) = &self.asset_path {
-            raw.asset_path = asset_path.as_ptr();
-        }
-        if let Some(cache_path) = &self.cache_path {
-            raw.cache_path = cache_path.as_ptr();
-        }
-        if let Some(maximum_cache_size) = self.maximum_cache_size {
-            raw.flags |= sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
-            raw.maximum_cache_size = maximum_cache_size;
-        }
-        raw
-    }
-}
+pub use maplibre_core::runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
+pub(crate) use maplibre_core::runtime::{
+    OfflineRegionDefinitionNativeExt, RuntimeOptionsNativeExt,
+};
 
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
@@ -436,7 +92,9 @@ impl RuntimeState {
         // user_data pointer to replacement, which remains alive on success. On
         // failure, native preserves the previous provider and replacement is
         // dropped below.
-        support::check(unsafe { sys::mln_runtime_set_resource_provider(runtime, &descriptor) })?;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_resource_provider(runtime, &descriptor)
+        })?;
         self.resource_provider.borrow_mut().replace(replacement);
         Ok(())
     }
@@ -454,7 +112,9 @@ impl RuntimeState {
         // user_data pointer to replacement, which remains alive on success. On
         // failure, native preserves the previous transform and replacement is
         // dropped below.
-        support::check(unsafe { sys::mln_runtime_set_resource_transform(runtime, &descriptor) })?;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_resource_transform(runtime, &descriptor)
+        })?;
         self.resource_transform.borrow_mut().replace(replacement);
         Ok(())
     }
@@ -467,7 +127,9 @@ impl RuntimeState {
         // SAFETY: runtime is live. The C ABI has no null clear operation, so a
         // no-op transform with static function state restores pass-through
         // behavior without retaining Rust callback state.
-        support::check(unsafe { sys::mln_runtime_set_resource_transform(runtime, &descriptor) })?;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_resource_transform(runtime, &descriptor)
+        })?;
         self.resource_transform.borrow_mut().take();
         Ok(())
     }
@@ -541,37 +203,6 @@ impl RuntimeState {
     }
 }
 
-fn copy_offline_region_snapshot(
-    ptr: std::ptr::NonNull<sys::mln_offline_region_snapshot>,
-) -> Result<OfflineRegionInfo> {
-    // SAFETY: ptr is an owned snapshot returned by the C API and released by the guard.
-    let snapshot = unsafe { support::handle::offline_region_snapshot(ptr.as_ptr()) }?;
-    let mut raw = empty_offline_region_info();
-    // SAFETY: snapshot is live and raw points to writable storage with size initialized.
-    support::check(unsafe { sys::mln_offline_region_snapshot_get(snapshot.as_ptr(), &mut raw) })?;
-    copy_offline_region_info(&raw)
-}
-
-fn copy_offline_region_list(
-    ptr: std::ptr::NonNull<sys::mln_offline_region_list>,
-) -> Result<Vec<OfflineRegionInfo>> {
-    // SAFETY: ptr is an owned list returned by the C API and released by the guard.
-    let list = unsafe { support::handle::offline_region_list(ptr.as_ptr()) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    support::check(unsafe { sys::mln_offline_region_list_count(list.as_ptr(), &mut count) })?;
-    let mut regions = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut raw = empty_offline_region_info();
-        // SAFETY: list is live, index is in range, and raw points to writable storage.
-        support::check(unsafe {
-            sys::mln_offline_region_list_get(list.as_ptr(), index, &mut raw)
-        })?;
-        regions.push(copy_offline_region_info(&raw)?);
-    }
-    Ok(regions)
-}
-
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
 pub struct RuntimeHandle {
     pub(crate) inner: Rc<RuntimeState>,
@@ -588,7 +219,7 @@ impl fmt::Debug for RuntimeHandle {
 impl RuntimeHandle {
     /// Creates a runtime on the current thread using native default options.
     pub fn new() -> Result<Self> {
-        support::validate_abi_version()?;
+        maplibre_core::validate_abi_version()?;
         Self::create_with_native_options_after_abi_validation(std::ptr::null())
     }
 
@@ -602,12 +233,12 @@ impl RuntimeHandle {
     fn create_with_native_options_after_abi_validation(
         options: *const sys::mln_runtime_options,
     ) -> Result<Self> {
-        let mut out = support::ptr::OutPtr::<sys::mln_runtime>::new();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_runtime>::new();
         // SAFETY: options is either null to request native defaults or points to
         // a materialized mln_runtime_options value whose backing strings live
         // for this call. out is a valid null-initialized out-pointer owned by
         // this call.
-        support::check(unsafe { sys::mln_runtime_create(options, out.as_mut_ptr()) })?;
+        maplibre_core::check(unsafe { sys::mln_runtime_create(options, out.as_mut_ptr()) })?;
         let ptr = out_handle(out, "mln_runtime")?;
 
         Ok(Self {
@@ -677,7 +308,7 @@ impl RuntimeHandle {
         let runtime = self.inner.as_ptr()?;
         // SAFETY: runtime is a live runtime handle owned by this wrapper, and
         // operation is materialized from the closed Rust enum domain.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_run_ambient_cache_operation(runtime, operation.to_native())
         })
     }
@@ -689,38 +320,48 @@ impl RuntimeHandle {
         metadata: &[u8],
     ) -> Result<OfflineRegionInfo> {
         let runtime = self.inner.as_ptr()?;
-        let definition = NativeOfflineRegionDefinition::new(definition)?;
-        let mut out = support::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let definition = definition.to_native()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let raw_definition = definition.to_raw();
         // SAFETY: runtime is live. raw_definition points into definition-owned
         // string and geometry storage, metadata storage is valid for this call,
         // and out is a null-initialized out-pointer.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_create(
                 runtime,
                 &raw_definition,
-                metadata_ptr(metadata),
+                maplibre_core::runtime::metadata_ptr(metadata),
                 metadata.len(),
                 out.as_mut_ptr(),
             )
         })?;
-        copy_offline_region_snapshot(out.into_non_null("mln_offline_region_snapshot")?)
+        // SAFETY: On success, the C API returns an owned offline-region
+        // snapshot handle; core copies and releases it.
+        unsafe {
+            maplibre_core::runtime::copy_offline_region_snapshot(
+                out.into_non_null("mln_offline_region_snapshot")?,
+            )
+        }
     }
 
     /// Gets an offline region snapshot by ID.
     pub fn offline_region(&self, region_id: i64) -> Result<Option<OfflineRegionInfo>> {
         let runtime = self.inner.as_ptr()?;
-        let mut out = support::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
         // SAFETY: runtime is live, out is a null-initialized out-pointer, and
         // found points to writable bool storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get(runtime, region_id, out.as_mut_ptr(), &mut found)
         })?;
         if found {
-            Ok(Some(copy_offline_region_snapshot(
-                out.into_non_null("mln_offline_region_snapshot")?,
-            )?))
+            // SAFETY: When found is true, the C API returns an owned
+            // offline-region snapshot handle; core copies and releases it.
+            Ok(Some(unsafe {
+                maplibre_core::runtime::copy_offline_region_snapshot(
+                    out.into_non_null("mln_offline_region_snapshot")?,
+                )
+            }?))
         } else {
             Ok(None)
         }
@@ -729,29 +370,41 @@ impl RuntimeHandle {
     /// Lists offline regions in this runtime's database.
     pub fn offline_regions(&self) -> Result<Vec<OfflineRegionInfo>> {
         let runtime = self.inner.as_ptr()?;
-        let mut out = support::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
         // SAFETY: runtime is live and out is a null-initialized out-pointer.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_list(runtime, out.as_mut_ptr())
         })?;
-        copy_offline_region_list(out.into_non_null("mln_offline_region_list")?)
+        // SAFETY: On success, the C API returns an owned offline-region list
+        // handle; core copies and releases it.
+        unsafe {
+            maplibre_core::runtime::copy_offline_region_list(
+                out.into_non_null("mln_offline_region_list")?,
+            )
+        }
     }
 
     /// Merges offline regions from another database path.
     pub fn merge_offline_regions_database(&self, path: &str) -> Result<Vec<OfflineRegionInfo>> {
         let runtime = self.inner.as_ptr()?;
-        let path = support::string::c_string(path)?;
-        let mut out = support::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        let path = maplibre_core::string::c_string(path)?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
         // SAFETY: runtime is live, path is a NUL-terminated string valid for
         // this call, and out is a null-initialized out-pointer.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_merge_database(
                 runtime,
                 path.as_ptr(),
                 out.as_mut_ptr(),
             )
         })?;
-        copy_offline_region_list(out.into_non_null("mln_offline_region_list")?)
+        // SAFETY: On success, the C API returns an owned offline-region list
+        // handle; core copies and releases it.
+        unsafe {
+            maplibre_core::runtime::copy_offline_region_list(
+                out.into_non_null("mln_offline_region_list")?,
+            )
+        }
     }
 
     /// Updates opaque metadata for an offline region.
@@ -761,48 +414,45 @@ impl RuntimeHandle {
         metadata: &[u8],
     ) -> Result<OfflineRegionInfo> {
         let runtime = self.inner.as_ptr()?;
-        let mut out = support::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         // SAFETY: runtime is live, metadata storage is valid for this call, and
         // out is a null-initialized out-pointer.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_update_metadata(
                 runtime,
                 region_id,
-                metadata_ptr(metadata),
+                maplibre_core::runtime::metadata_ptr(metadata),
                 metadata.len(),
                 out.as_mut_ptr(),
             )
         })?;
-        copy_offline_region_snapshot(out.into_non_null("mln_offline_region_snapshot")?)
+        // SAFETY: On success, the C API returns an owned offline-region
+        // snapshot handle; core copies and releases it.
+        unsafe {
+            maplibre_core::runtime::copy_offline_region_snapshot(
+                out.into_non_null("mln_offline_region_snapshot")?,
+            )
+        }
     }
 
     /// Gets the current completed/download status for an offline region.
     pub fn offline_region_status(&self, region_id: i64) -> Result<OfflineRegionStatus> {
         let runtime = self.inner.as_ptr()?;
-        let mut raw = sys::mln_offline_region_status {
-            size: std::mem::size_of::<sys::mln_offline_region_status>() as u32,
-            download_state: sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-            completed_resource_count: 0,
-            completed_resource_size: 0,
-            completed_tile_count: 0,
-            required_tile_count: 0,
-            completed_tile_size: 0,
-            required_resource_count: 0,
-            required_resource_count_is_precise: false,
-            complete: false,
-        };
+        let mut raw = maplibre_core::events::empty_offline_region_status_native();
         // SAFETY: runtime is live and raw points to initialized writable storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_status(runtime, region_id, &mut raw)
         })?;
-        Ok(OfflineRegionStatus::from_native(raw))
+        Ok(maplibre_core::events::offline_region_status_from_native(
+            raw,
+        ))
     }
 
     /// Enables or disables runtime events for an offline region.
     pub fn set_offline_region_observed(&self, region_id: i64, observed: bool) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         // SAFETY: runtime is live and values are passed by value.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_set_observed(runtime, region_id, observed)
         })
     }
@@ -814,18 +464,10 @@ impl RuntimeHandle {
         state: OfflineRegionDownloadState,
     ) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
-        let state = match state {
-            OfflineRegionDownloadState::Inactive => sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-            OfflineRegionDownloadState::Active => sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-            OfflineRegionDownloadState::Unknown(raw) => {
-                return Err(Error::invalid_argument(format!(
-                    "unknown offline region download state cannot be set: {raw}"
-                )));
-            }
-        };
+        let state = state.raw_for_set()?;
         // SAFETY: runtime is live, region_id is passed by value, and state is a
         // closed Rust enum domain mapped to the C ABI value.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_set_download_state(runtime, region_id, state)
         })
     }
@@ -834,21 +476,23 @@ impl RuntimeHandle {
     pub fn invalidate_offline_region(&self, region_id: i64) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         // SAFETY: runtime is live and region_id is passed by value.
-        support::check(unsafe { sys::mln_runtime_offline_region_invalidate(runtime, region_id) })
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_region_invalidate(runtime, region_id)
+        })
     }
 
     /// Deletes an offline region.
     pub fn delete_offline_region(&self, region_id: i64) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         // SAFETY: runtime is live and region_id is passed by value.
-        support::check(unsafe { sys::mln_runtime_offline_region_delete(runtime, region_id) })
+        maplibre_core::check(unsafe { sys::mln_runtime_offline_region_delete(runtime, region_id) })
     }
 
     /// Runs one pending owner-thread task for this runtime.
     pub fn run_once(&self) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         // SAFETY: runtime is a live runtime handle owned by this wrapper.
-        support::check(unsafe { sys::mln_runtime_run_once(runtime) })
+        maplibre_core::check(unsafe { sys::mln_runtime_run_once(runtime) })
     }
 
     /// Polls one queued runtime event and copies it into an owned Rust value.
@@ -859,7 +503,7 @@ impl RuntimeHandle {
 
         // SAFETY: runtime is live, event points to initialized writable storage
         // with a valid size field, and has_event points to writable bool storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event)
         })?;
         if !has_event {
@@ -883,7 +527,7 @@ impl RuntimeHandle {
         // with a valid size field, and has_event points to writable bool storage.
         // The event is intentionally not decoded because this method only
         // drains native storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event)
         })?;
         if has_event {

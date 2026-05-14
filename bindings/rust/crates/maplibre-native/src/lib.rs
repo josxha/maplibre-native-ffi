@@ -1,3 +1,10 @@
+//! Safe Rust binding for the MapLibre Native C API.
+//!
+//! This crate owns Rust-specific ergonomics and safety policy: thread-affine
+//! public handles, parent retention, owner-thread `Drop`, Rust errors,
+//! callback closure APIs, and lifetime-scoped render resources. Shared C ABI
+//! adaptation lives in `maplibre-native-core`.
+
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod camera;
@@ -16,7 +23,8 @@ mod resource;
 mod runtime;
 mod values;
 
-use maplibre_native_support as support;
+use crate::values::NativeValue;
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 pub use camera::{
@@ -25,26 +33,29 @@ pub use camera::{
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    MapId, OfflineRegionDownloadState, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderMode, RenderingStats, ResourceErrorReason, RuntimeEvent, RuntimeEventPayload,
-    RuntimeEventSource, RuntimeEventType, StyleImageMissingEvent, TileActionEvent, TileId,
-    TileOperation, UnknownRuntimeEventPayload,
+    MapId, OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent, TileActionEvent,
+    TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
 pub use logging::{
-    LogEvent, LogRecord, LogSeverity, LogSeverityMask, clear_log_callback,
-    restore_default_async_log_severity_mask, set_async_log_severity_mask, set_log_callback,
+    LogRecord, clear_log_callback, restore_default_async_log_severity_mask,
+    set_async_log_severity_mask, set_log_callback,
 };
 pub use map::{
     LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
     StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
-pub use options::{
-    ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
-    NorthOrientation, TileLodMode, ViewportMode,
+pub use maplibre_core::{
+    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
+    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
+    NorthOrientation, OfflineRegionDownloadState, RenderBackendMask, RenderMode,
+    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
+    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result, RuntimeEventType,
+    TileLodMode, TileOperation, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
 pub use render::{
@@ -57,15 +68,10 @@ pub use render::{
     VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
 };
 pub use resource::{
-    ByteRange, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceProviderDecision,
-    ResourceRequest, ResourceRequestHandle, ResourceResponse, ResourceResponseStatus,
-    ResourceStoragePolicy, ResourceTransformRequest, ResourceUsage,
+    ByteRange, ResourceProviderDecision, ResourceRequest, ResourceRequestHandle, ResourceResponse,
+    ResourceTransformRequest,
 };
-pub use runtime::{
-    AmbientCacheOperation, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
-    RuntimeOptions,
-};
-pub use support::{Error, ErrorKind, Result};
+pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle, RuntimeOptions};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
     UnitBezier, Vec3,
@@ -128,45 +134,6 @@ impl<T> std::fmt::Display for HandleOperationError<T> {
 
 impl<T: std::fmt::Debug> std::error::Error for HandleOperationError<T> {}
 
-bitflags::bitflags! {
-    /// Render backends compiled into the linked native library.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct RenderBackendMask: u32 {
-        const METAL = sys::MLN_RENDER_BACKEND_FLAG_METAL;
-        const VULKAN = sys::MLN_RENDER_BACKEND_FLAG_VULKAN;
-        const _ = !0;
-    }
-}
-
-/// Process-global network reachability state used by MapLibre Native.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum NetworkStatus {
-    Online,
-    Offline,
-    Unknown(u32),
-}
-
-impl NetworkStatus {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_NETWORK_STATUS_ONLINE => Self::Online,
-            sys::MLN_NETWORK_STATUS_OFFLINE => Self::Offline,
-            _ => Self::Unknown(raw),
-        }
-    }
-
-    fn raw(self) -> Result<u32> {
-        match self {
-            Self::Online => Ok(sys::MLN_NETWORK_STATUS_ONLINE),
-            Self::Offline => Ok(sys::MLN_NETWORK_STATUS_OFFLINE),
-            Self::Unknown(raw) => Err(Error::invalid_argument(format!(
-                "unknown network status values cannot be set: {raw}"
-            ))),
-        }
-    }
-}
-
 /// Returns the native C ABI contract version.
 pub fn c_version() -> u32 {
     // SAFETY: mln_c_version takes no arguments and returns the process-global C
@@ -190,7 +157,7 @@ pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeter
     };
     // SAFETY: coordinate is passed by value. out_meters points to valid
     // writable storage for one projected-meter value.
-    support::check(unsafe {
+    maplibre_core::check(unsafe {
         sys::mln_projected_meters_for_lat_lng(coordinate.to_native(), &mut raw_meters)
     })?;
     Ok(ProjectedMeters::from_native(raw_meters))
@@ -204,7 +171,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
     };
     // SAFETY: meters is passed by value. out_coordinate points to valid
     // writable storage for one coordinate value.
-    support::check(unsafe {
+    maplibre_core::check(unsafe {
         sys::mln_lat_lng_for_projected_meters(meters.to_native(), &mut raw_coordinate)
     })?;
     Ok(LatLng::from_native(raw_coordinate))
@@ -214,7 +181,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
 pub fn network_status() -> Result<NetworkStatus> {
     let mut raw_status = 0;
     // SAFETY: out_status points to valid writable storage for one u32.
-    support::check(unsafe { sys::mln_network_status_get(&mut raw_status) })?;
+    maplibre_core::check(unsafe { sys::mln_network_status_get(&mut raw_status) })?;
     Ok(NetworkStatus::from_raw(raw_status))
 }
 
@@ -226,7 +193,7 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
 fn set_network_status_raw(raw_status: u32) -> Result<()> {
     // SAFETY: The raw value is passed by value. The C API validates the enum
     // domain and reports invalid values as MLN_STATUS_INVALID_ARGUMENT.
-    support::check(unsafe { sys::mln_network_status_set(raw_status) })
+    maplibre_core::check(unsafe { sys::mln_network_status_set(raw_status) })
 }
 
 #[cfg(test)]
@@ -242,19 +209,6 @@ mod tests {
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
-    struct NetworkStatusRestore(NetworkStatus);
-
-    impl Drop for NetworkStatusRestore {
-        fn drop(&mut self) {
-            let _ = set_network_status(self.0);
-        }
-    }
-
-    #[test]
-    fn reports_c_abi_version() {
-        assert_eq!(c_version(), support::EXPECTED_C_ABI_VERSION);
-    }
-
     #[test]
     fn projected_meter_helpers_round_trip() {
         let coordinate = LatLng::new(45.0, -122.0);
@@ -263,18 +217,6 @@ mod tests {
 
         assert!((round_tripped.latitude - coordinate.latitude).abs() < 1e-9);
         assert!((round_tripped.longitude - coordinate.longitude).abs() < 1e-9);
-    }
-
-    #[test]
-    fn network_status_round_trips() {
-        let original = network_status().unwrap();
-        let _restore = NetworkStatusRestore(original);
-
-        set_network_status(NetworkStatus::Offline).unwrap();
-        assert_eq!(network_status().unwrap(), NetworkStatus::Offline);
-
-        set_network_status(NetworkStatus::Online).unwrap();
-        assert_eq!(network_status().unwrap(), NetworkStatus::Online);
     }
 
     #[test]

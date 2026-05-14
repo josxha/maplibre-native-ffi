@@ -77,18 +77,6 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
-fn source_type_preserves_raw_values() {
-    assert_eq!(SourceType::Unknown.raw_value(), 0);
-    assert_eq!(SourceType::from_raw(0), SourceType::Unknown);
-    assert_eq!(
-        SourceType::GeoJson.raw_value(),
-        sys::MLN_STYLE_SOURCE_TYPE_GEOJSON
-    );
-    assert_eq!(SourceType::from_raw(999_101), SourceType::Other(999_101));
-    assert_eq!(SourceType::Other(999_101).raw_value(), 999_101);
-}
-
-#[test]
 fn style_source_exists_and_remove_call_real_c_api() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
@@ -119,15 +107,7 @@ fn style_source_exists_and_remove_call_real_c_api() {
 }
 
 fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
-    PremultipliedRgba8Image {
-        info: TextureImageInfo {
-            width: 2,
-            height: 2,
-            stride: 8,
-            byte_length: data.len(),
-        },
-        data,
-    }
+    PremultipliedRgba8Image::new(TextureImageInfo::new(2, 2, 8, data.len()), data)
 }
 
 #[test]
@@ -360,7 +340,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
 
-    let source_id = maplibre_native_support::string::string_view("custom");
+    let source_id = maplibre_native_core::string::string_view("custom");
     let mut removed = false;
     // SAFETY: map is live, source_id is valid for this call, and removed
     // points to writable storage. This bypasses the binding cleanup path to

@@ -2,132 +2,11 @@ use std::ffi::{c_char, c_void};
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{Result, support, sys};
+use crate::{Result, sys};
+use maplibre_core::LogSeverityMask;
+use maplibre_native_core as maplibre_core;
 
-/// Severity for a MapLibre Native log record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LogSeverity {
-    Info,
-    Warning,
-    Error,
-    Unknown(u32),
-}
-
-impl LogSeverity {
-    /// Returns the raw C ABI value for this severity.
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::Info => sys::MLN_LOG_SEVERITY_INFO,
-            Self::Warning => sys::MLN_LOG_SEVERITY_WARNING,
-            Self::Error => sys::MLN_LOG_SEVERITY_ERROR,
-            Self::Unknown(raw) => raw,
-        }
-    }
-
-    pub(crate) fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_LOG_SEVERITY_INFO => Self::Info,
-            sys::MLN_LOG_SEVERITY_WARNING => Self::Warning,
-            sys::MLN_LOG_SEVERITY_ERROR => Self::Error,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-bitflags::bitflags! {
-    /// Mask of log severities that MapLibre Native may dispatch asynchronously.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct LogSeverityMask: u32 {
-        const INFO = sys::MLN_LOG_SEVERITY_MASK_INFO;
-        const WARNING = sys::MLN_LOG_SEVERITY_MASK_WARNING;
-        const ERROR = sys::MLN_LOG_SEVERITY_MASK_ERROR;
-        const DEFAULT = sys::MLN_LOG_SEVERITY_MASK_DEFAULT;
-        const ALL = sys::MLN_LOG_SEVERITY_MASK_ALL;
-    }
-}
-
-/// Category for a MapLibre Native log record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LogEvent {
-    General,
-    Setup,
-    Shader,
-    ParseStyle,
-    ParseTile,
-    Render,
-    Style,
-    Database,
-    HttpRequest,
-    Sprite,
-    Image,
-    OpenGl,
-    Jni,
-    Android,
-    Crash,
-    Glyph,
-    Timing,
-    Unknown(u32),
-}
-
-impl LogEvent {
-    /// Returns the raw C ABI value for this event category.
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::General => sys::MLN_LOG_EVENT_GENERAL,
-            Self::Setup => sys::MLN_LOG_EVENT_SETUP,
-            Self::Shader => sys::MLN_LOG_EVENT_SHADER,
-            Self::ParseStyle => sys::MLN_LOG_EVENT_PARSE_STYLE,
-            Self::ParseTile => sys::MLN_LOG_EVENT_PARSE_TILE,
-            Self::Render => sys::MLN_LOG_EVENT_RENDER,
-            Self::Style => sys::MLN_LOG_EVENT_STYLE,
-            Self::Database => sys::MLN_LOG_EVENT_DATABASE,
-            Self::HttpRequest => sys::MLN_LOG_EVENT_HTTP_REQUEST,
-            Self::Sprite => sys::MLN_LOG_EVENT_SPRITE,
-            Self::Image => sys::MLN_LOG_EVENT_IMAGE,
-            Self::OpenGl => sys::MLN_LOG_EVENT_OPENGL,
-            Self::Jni => sys::MLN_LOG_EVENT_JNI,
-            Self::Android => sys::MLN_LOG_EVENT_ANDROID,
-            Self::Crash => sys::MLN_LOG_EVENT_CRASH,
-            Self::Glyph => sys::MLN_LOG_EVENT_GLYPH,
-            Self::Timing => sys::MLN_LOG_EVENT_TIMING,
-            Self::Unknown(raw) => raw,
-        }
-    }
-
-    pub(crate) fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_LOG_EVENT_GENERAL => Self::General,
-            sys::MLN_LOG_EVENT_SETUP => Self::Setup,
-            sys::MLN_LOG_EVENT_SHADER => Self::Shader,
-            sys::MLN_LOG_EVENT_PARSE_STYLE => Self::ParseStyle,
-            sys::MLN_LOG_EVENT_PARSE_TILE => Self::ParseTile,
-            sys::MLN_LOG_EVENT_RENDER => Self::Render,
-            sys::MLN_LOG_EVENT_STYLE => Self::Style,
-            sys::MLN_LOG_EVENT_DATABASE => Self::Database,
-            sys::MLN_LOG_EVENT_HTTP_REQUEST => Self::HttpRequest,
-            sys::MLN_LOG_EVENT_SPRITE => Self::Sprite,
-            sys::MLN_LOG_EVENT_IMAGE => Self::Image,
-            sys::MLN_LOG_EVENT_OPENGL => Self::OpenGl,
-            sys::MLN_LOG_EVENT_JNI => Self::Jni,
-            sys::MLN_LOG_EVENT_ANDROID => Self::Android,
-            sys::MLN_LOG_EVENT_CRASH => Self::Crash,
-            sys::MLN_LOG_EVENT_GLYPH => Self::Glyph,
-            sys::MLN_LOG_EVENT_TIMING => Self::Timing,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Copied MapLibre Native log record delivered to a Rust log callback.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LogRecord {
-    pub severity: LogSeverity,
-    pub event: LogEvent,
-    pub code: i64,
-    pub message: String,
-}
+pub use maplibre_core::LogRecord;
 
 type LogCallback = dyn Fn(LogRecord) -> bool + Send + Sync + 'static;
 
@@ -168,7 +47,9 @@ where
     // SAFETY: log_callback_trampoline has the C callback ABI. user_data points
     // at replacement, which is retained for the process lifetime below so native
     // and in-flight callbacks never observe a dangling pointer.
-    support::check(unsafe { sys::mln_log_set_callback(Some(log_callback_trampoline), user_data) })?;
+    maplibre_core::check(unsafe {
+        sys::mln_log_set_callback(Some(log_callback_trampoline), user_data)
+    })?;
 
     let mut state = lock_log_callback_state();
     state.current = Some(replacement.clone());
@@ -180,7 +61,7 @@ where
 pub fn clear_log_callback() -> Result<()> {
     // SAFETY: mln_log_clear_callback takes no arguments and clears native's
     // process-global callback slot.
-    support::check(unsafe { sys::mln_log_clear_callback() })?;
+    maplibre_core::check(unsafe { sys::mln_log_clear_callback() })?;
 
     lock_log_callback_state().current = None;
     Ok(())
@@ -190,7 +71,7 @@ pub fn clear_log_callback() -> Result<()> {
 pub fn set_async_log_severity_mask(mask: LogSeverityMask) -> Result<()> {
     // SAFETY: mask is passed by value. The C API validates unknown bits and
     // reports them as MLN_STATUS_INVALID_ARGUMENT.
-    support::check(unsafe { sys::mln_log_set_async_severity_mask(mask.bits()) })
+    maplibre_core::check(unsafe { sys::mln_log_set_async_severity_mask(mask.bits()) })
 }
 
 /// Restores MapLibre Native's default async log severity mask.
@@ -226,14 +107,10 @@ fn invoke_callback(
     // SAFETY: message is supplied by the C logging callback contract as a
     // null-terminated string pointer. Invalid strings are treated as not
     // consumed.
-    let Ok(message) = (unsafe { support::string::copy_c_string(message) }) else {
+    let Ok(record) = (unsafe {
+        maplibre_core::logging::copy_log_record(raw_severity, raw_event, code, message)
+    }) else {
         return 0;
-    };
-    let record = LogRecord {
-        severity: LogSeverity::from_raw(raw_severity),
-        event: LogEvent::from_raw(raw_event),
-        code,
-        message,
     };
 
     match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(record))) {
@@ -250,6 +127,7 @@ mod tests {
 
     use super::*;
     use crate::ErrorKind;
+    use maplibre_core::{LogEvent, LogSeverity};
 
     static LOGGING_TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -336,6 +214,30 @@ mod tests {
             0
         );
         assert_eq!(calls.load(Ordering::SeqCst), baseline_calls + 1);
+    }
+
+    #[test]
+    fn invalid_utf8_log_messages_are_not_consumed() {
+        let _guard = LoggingTestGuard::new();
+        set_log_callback(|_| true).unwrap();
+        let invalid = b"\xff\0";
+        let current = {
+            let state = lock_log_callback_state();
+            state.current.as_ref().unwrap().clone()
+        };
+
+        assert_eq!(
+            invoke_callback(
+                &current,
+                sys::MLN_LOG_SEVERITY_ERROR,
+                sys::MLN_LOG_EVENT_GENERAL,
+                0,
+                invalid.as_ptr().cast(),
+            ),
+            0
+        );
+
+        clear_log_callback().unwrap();
     }
 
     #[test]
