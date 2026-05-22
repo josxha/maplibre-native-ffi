@@ -17,6 +17,7 @@ public sealed interface RuntimeEventPayload
         RuntimeEventPayload.OfflineRegionStatusChanged,
         RuntimeEventPayload.OfflineRegionResponseError,
         RuntimeEventPayload.OfflineRegionTileCountLimit,
+        RuntimeEventPayload.OfflineOperationCompleted,
         RuntimeEventPayload.Unknown {
   None NONE = new None();
 
@@ -44,6 +45,16 @@ public sealed interface RuntimeEventPayload
       implements RuntimeEventPayload {}
 
   record OfflineRegionTileCountLimit(long regionId, long limit) implements RuntimeEventPayload {}
+
+  record OfflineOperationCompleted(
+      long operationId,
+      OfflineOperationKind operationKind,
+      int rawOperationKind,
+      OfflineOperationResultKind resultKind,
+      int rawResultKind,
+      int resultStatus,
+      boolean found)
+      implements RuntimeEventPayload {}
 
   record Unknown(int rawPayloadType, long payloadSize) implements RuntimeEventPayload {}
 }
