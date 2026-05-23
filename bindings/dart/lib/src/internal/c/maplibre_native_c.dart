@@ -493,9 +493,47 @@ final class MaplibreNativeCApi {
     Pointer<Uint32> outOptions,
   ) => _raw.mln_map_get_debug_options(map, outOptions).value;
 
+  /// Enables or disables the rendering stats overlay.
+  int mapSetRenderingStatsViewEnabled(Pointer<raw.mln_map> map, bool enabled) =>
+      _raw.mln_map_set_rendering_stats_view_enabled(map, enabled).value;
+
+  /// Copies whether the rendering stats overlay is enabled.
+  int mapGetRenderingStatsViewEnabled(
+    Pointer<raw.mln_map> map,
+    Pointer<Bool> outEnabled,
+  ) => _raw.mln_map_get_rendering_stats_view_enabled(map, outEnabled).value;
+
+  /// Copies whether the map is fully loaded.
+  int mapIsFullyLoaded(Pointer<raw.mln_map> map, Pointer<Bool> outLoaded) =>
+      _raw.mln_map_is_fully_loaded(map, outLoaded).value;
+
   /// Dumps map debug logs through native logging.
   int mapDumpDebugLogs(Pointer<raw.mln_map> map) =>
       _raw.mln_map_dump_debug_logs(map).value;
+
+  /// Returns default camera fitting options.
+  raw.mln_camera_fit_options cameraFitOptionsDefault() =>
+      _raw.mln_camera_fit_options_default();
+
+  /// Returns default map bound options.
+  raw.mln_bound_options boundOptionsDefault() =>
+      _raw.mln_bound_options_default();
+
+  /// Returns default free camera options.
+  raw.mln_free_camera_options freeCameraOptionsDefault() =>
+      _raw.mln_free_camera_options_default();
+
+  /// Returns default projection mode options.
+  raw.mln_projection_mode projectionModeDefault() =>
+      _raw.mln_projection_mode_default();
+
+  /// Returns default viewport options.
+  raw.mln_map_viewport_options mapViewportOptionsDefault() =>
+      _raw.mln_map_viewport_options_default();
+
+  /// Returns default tile options.
+  raw.mln_map_tile_options mapTileOptionsDefault() =>
+      _raw.mln_map_tile_options_default();
 
   /// Sets the map style URL.
   int mapSetStyleUrl(Pointer<raw.mln_map> map, Pointer<Char> url) =>
@@ -818,6 +856,119 @@ final class MaplibreNativeCApi {
   int mapCancelTransitions(Pointer<raw.mln_map> map) =>
       _raw.mln_map_cancel_transitions(map).value;
 
+  /// Copies live map viewport options.
+  int mapGetViewportOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_map_viewport_options> outOptions,
+  ) => _raw.mln_map_get_viewport_options(map, outOptions).value;
+
+  /// Applies live map viewport options.
+  int mapSetViewportOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_map_viewport_options> options,
+  ) => _raw.mln_map_set_viewport_options(map, options).value;
+
+  /// Copies map tile options.
+  int mapGetTileOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_map_tile_options> outOptions,
+  ) => _raw.mln_map_get_tile_options(map, outOptions).value;
+
+  /// Applies map tile options.
+  int mapSetTileOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_map_tile_options> options,
+  ) => _raw.mln_map_set_tile_options(map, options).value;
+
+  /// Copies map camera bounds constraints.
+  int mapGetBounds(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_bound_options> outOptions,
+  ) => _raw.mln_map_get_bounds(map, outOptions).value;
+
+  /// Applies map camera bounds constraints.
+  int mapSetBounds(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_bound_options> options,
+  ) => _raw.mln_map_set_bounds(map, options).value;
+
+  /// Copies free camera options.
+  int mapGetFreeCameraOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_free_camera_options> outOptions,
+  ) => _raw.mln_map_get_free_camera_options(map, outOptions).value;
+
+  /// Applies free camera options.
+  int mapSetFreeCameraOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_free_camera_options> options,
+  ) => _raw.mln_map_set_free_camera_options(map, options).value;
+
+  /// Copies projection mode options.
+  int mapGetProjectionMode(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_projection_mode> outMode,
+  ) => _raw.mln_map_get_projection_mode(map, outMode).value;
+
+  /// Applies projection mode options.
+  int mapSetProjectionMode(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_projection_mode> mode,
+  ) => _raw.mln_map_set_projection_mode(map, mode).value;
+
+  /// Computes camera options fitting geographic bounds.
+  int mapCameraForLatLngBounds(
+    Pointer<raw.mln_map> map,
+    raw.mln_lat_lng_bounds bounds,
+    Pointer<raw.mln_camera_fit_options> fitOptions,
+    Pointer<raw.mln_camera_options> outCamera,
+  ) => _raw
+      .mln_map_camera_for_lat_lng_bounds(map, bounds, fitOptions, outCamera)
+      .value;
+
+  /// Computes camera options fitting geographic coordinates.
+  int mapCameraForLatLngs(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_lat_lng> coordinates,
+    int coordinateCount,
+    Pointer<raw.mln_camera_fit_options> fitOptions,
+    Pointer<raw.mln_camera_options> outCamera,
+  ) => _raw
+      .mln_map_camera_for_lat_lngs(
+        map,
+        coordinates,
+        coordinateCount,
+        fitOptions,
+        outCamera,
+      )
+      .value;
+
+  /// Computes camera options fitting geometry.
+  int mapCameraForGeometry(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_geometry> geometry,
+    Pointer<raw.mln_camera_fit_options> fitOptions,
+    Pointer<raw.mln_camera_options> outCamera,
+  ) => _raw
+      .mln_map_camera_for_geometry(map, geometry, fitOptions, outCamera)
+      .value;
+
+  /// Computes wrapped geographic bounds for camera options.
+  int mapLatLngBoundsForCamera(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_camera_options> camera,
+    Pointer<raw.mln_lat_lng_bounds> outBounds,
+  ) => _raw.mln_map_lat_lng_bounds_for_camera(map, camera, outBounds).value;
+
+  /// Computes unwrapped geographic bounds for camera options.
+  int mapLatLngBoundsForCameraUnwrapped(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_camera_options> camera,
+    Pointer<raw.mln_lat_lng_bounds> outBounds,
+  ) => _raw
+      .mln_map_lat_lng_bounds_for_camera_unwrapped(map, camera, outBounds)
+      .value;
+
   /// Converts a geographic coordinate to a screen point.
   int mapPixelForLatLng(
     Pointer<raw.mln_map> map,
@@ -831,6 +982,26 @@ final class MaplibreNativeCApi {
     raw.mln_screen_point point,
     Pointer<raw.mln_lat_lng> outCoordinate,
   ) => _raw.mln_map_lat_lng_for_pixel(map, point, outCoordinate).value;
+
+  /// Converts geographic coordinates to screen points.
+  int mapPixelsForLatLngs(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_lat_lng> coordinates,
+    int coordinateCount,
+    Pointer<raw.mln_screen_point> outPoints,
+  ) => _raw
+      .mln_map_pixels_for_lat_lngs(map, coordinates, coordinateCount, outPoints)
+      .value;
+
+  /// Converts screen points to geographic coordinates.
+  int mapLatLngsForPixels(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_screen_point> points,
+    int pointCount,
+    Pointer<raw.mln_lat_lng> outCoordinates,
+  ) => _raw
+      .mln_map_lat_lngs_for_pixels(map, points, pointCount, outCoordinates)
+      .value;
 
   /// Counts IDs in a style ID list.
   int styleIdListCount(

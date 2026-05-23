@@ -1338,6 +1338,220 @@ final class MapHandle {
     _check(_c.mapCancelTransitions(_pointer));
   }
 
+  /// Enables or disables the rendering stats overlay.
+  void setRenderingStatsViewEnabled(bool enabled) {
+    _check(_c.mapSetRenderingStatsViewEnabled(_pointer, enabled));
+  }
+
+  /// Copies whether the rendering stats overlay is enabled.
+  bool renderingStatsViewEnabled() {
+    return withNativeArena((arena) {
+      final outEnabled = arena<Bool>();
+      _check(_c.mapGetRenderingStatsViewEnabled(_pointer, outEnabled));
+      return outEnabled.value;
+    });
+  }
+
+  /// Copies whether MapLibre currently considers the map fully loaded.
+  bool isFullyLoaded() {
+    return withNativeArena((arena) {
+      final outLoaded = arena<Bool>();
+      _check(_c.mapIsFullyLoaded(_pointer, outLoaded));
+      return outLoaded.value;
+    });
+  }
+
+  /// Copies live map viewport and render-transform controls.
+  MapViewportOptions viewportOptions() {
+    return withNativeArena((arena) {
+      final outOptions = arena<raw.mln_map_viewport_options>();
+      outOptions.ref.size = sizeOf<raw.mln_map_viewport_options>();
+      _check(_c.mapGetViewportOptions(_pointer, outOptions));
+      return native_struct.mapViewportOptionsFromNative(outOptions.ref);
+    });
+  }
+
+  /// Applies selected live map viewport and render-transform controls.
+  void setViewportOptions(MapViewportOptions options) {
+    withNativeArena((arena) {
+      final nativeOptions = arena<raw.mln_map_viewport_options>();
+      nativeOptions.ref = native_struct.mapViewportOptionsToNative(options);
+      _check(_c.mapSetViewportOptions(_pointer, nativeOptions));
+    });
+  }
+
+  /// Copies tile prefetch and LOD tuning controls.
+  MapTileOptions tileOptions() {
+    return withNativeArena((arena) {
+      final outOptions = arena<raw.mln_map_tile_options>();
+      outOptions.ref.size = sizeOf<raw.mln_map_tile_options>();
+      _check(_c.mapGetTileOptions(_pointer, outOptions));
+      return native_struct.mapTileOptionsFromNative(outOptions.ref);
+    });
+  }
+
+  /// Applies selected tile prefetch and LOD tuning controls.
+  void setTileOptions(MapTileOptions options) {
+    withNativeArena((arena) {
+      final nativeOptions = arena<raw.mln_map_tile_options>();
+      nativeOptions.ref = native_struct.mapTileOptionsToNative(options);
+      _check(_c.mapSetTileOptions(_pointer, nativeOptions));
+    });
+  }
+
+  /// Copies map camera constraint options.
+  BoundOptions bounds() {
+    return withNativeArena((arena) {
+      final outOptions = arena<raw.mln_bound_options>();
+      outOptions.ref.size = sizeOf<raw.mln_bound_options>();
+      _check(_c.mapGetBounds(_pointer, outOptions));
+      return native_struct.boundOptionsFromNative(outOptions.ref);
+    });
+  }
+
+  /// Applies selected map camera constraint options.
+  void setBounds(BoundOptions options) {
+    withNativeArena((arena) {
+      final nativeOptions = arena<raw.mln_bound_options>();
+      nativeOptions.ref = native_struct.boundOptionsToNative(options);
+      _check(_c.mapSetBounds(_pointer, nativeOptions));
+    });
+  }
+
+  /// Copies the current free camera position and orientation.
+  FreeCameraOptions freeCameraOptions() {
+    return withNativeArena((arena) {
+      final outOptions = arena<raw.mln_free_camera_options>();
+      outOptions.ref.size = sizeOf<raw.mln_free_camera_options>();
+      _check(_c.mapGetFreeCameraOptions(_pointer, outOptions));
+      return native_struct.freeCameraOptionsFromNative(outOptions.ref);
+    });
+  }
+
+  /// Applies selected free camera position and orientation fields.
+  void setFreeCameraOptions(FreeCameraOptions options) {
+    withNativeArena((arena) {
+      final nativeOptions = arena<raw.mln_free_camera_options>();
+      nativeOptions.ref = native_struct.freeCameraOptionsToNative(options);
+      _check(_c.mapSetFreeCameraOptions(_pointer, nativeOptions));
+    });
+  }
+
+  /// Copies the current axonometric rendering options.
+  ProjectionModeOptions projectionMode() {
+    return withNativeArena((arena) {
+      final outMode = arena<raw.mln_projection_mode>();
+      outMode.ref.size = sizeOf<raw.mln_projection_mode>();
+      _check(_c.mapGetProjectionMode(_pointer, outMode));
+      return native_struct.projectionModeOptionsFromNative(outMode.ref);
+    });
+  }
+
+  /// Applies selected axonometric rendering option fields.
+  void setProjectionMode(ProjectionModeOptions mode) {
+    withNativeArena((arena) {
+      final nativeMode = arena<raw.mln_projection_mode>();
+      nativeMode.ref = native_struct.projectionModeOptionsToNative(mode);
+      _check(_c.mapSetProjectionMode(_pointer, nativeMode));
+    });
+  }
+
+  /// Computes a camera that fits geographic bounds in the current viewport.
+  CameraOptions cameraForLatLngBounds(
+    LatLngBounds bounds, {
+    CameraFitOptions fitOptions = const CameraFitOptions(),
+  }) {
+    return withNativeArena((arena) {
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      final nativeFitOptions = arena<raw.mln_camera_fit_options>();
+      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(fitOptions);
+      _check(
+        _c.mapCameraForLatLngBounds(
+          _pointer,
+          native_struct.latLngBoundsToNative(bounds),
+          nativeFitOptions,
+          outCamera,
+        ),
+      );
+      return native_struct.cameraOptionsFromNative(outCamera.ref);
+    });
+  }
+
+  /// Computes a camera that fits geographic coordinates in the current viewport.
+  CameraOptions cameraForLatLngs(
+    List<LatLng> coordinates, {
+    CameraFitOptions fitOptions = const CameraFitOptions(),
+  }) {
+    return withNativeArena((arena) {
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      final nativeFitOptions = arena<raw.mln_camera_fit_options>();
+      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(fitOptions);
+      _check(
+        _c.mapCameraForLatLngs(
+          _pointer,
+          _latLngArray(coordinates, arena),
+          coordinates.length,
+          nativeFitOptions,
+          outCamera,
+        ),
+      );
+      return native_struct.cameraOptionsFromNative(outCamera.ref);
+    });
+  }
+
+  /// Computes a camera that fits a geometry in the current viewport.
+  CameraOptions cameraForGeometry(
+    Geometry geometry, {
+    CameraFitOptions fitOptions = const CameraFitOptions(),
+  }) {
+    return withNativeArena((arena) {
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      final nativeFitOptions = arena<raw.mln_camera_fit_options>();
+      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(fitOptions);
+      final nativeGeometry = native_geometry.nativeGeometry(geometry, arena);
+      _check(
+        _c.mapCameraForGeometry(
+          _pointer,
+          nativeGeometry.pointer,
+          nativeFitOptions,
+          outCamera,
+        ),
+      );
+      return native_struct.cameraOptionsFromNative(outCamera.ref);
+    });
+  }
+
+  /// Computes wrapped geographic bounds for a camera.
+  LatLngBounds latLngBoundsForCamera(CameraOptions camera) =>
+      _latLngBoundsForCamera(camera, unwrapped: false);
+
+  /// Computes unwrapped geographic bounds for a camera.
+  LatLngBounds latLngBoundsForCameraUnwrapped(CameraOptions camera) =>
+      _latLngBoundsForCamera(camera, unwrapped: true);
+
+  LatLngBounds _latLngBoundsForCamera(
+    CameraOptions camera, {
+    required bool unwrapped,
+  }) {
+    return withNativeArena((arena) {
+      final nativeCamera = _nativeCamera(camera, arena);
+      final outBounds = arena<raw.mln_lat_lng_bounds>();
+      _check(
+        unwrapped
+            ? _c.mapLatLngBoundsForCameraUnwrapped(
+                _pointer,
+                nativeCamera,
+                outBounds,
+              )
+            : _c.mapLatLngBoundsForCamera(_pointer, nativeCamera, outBounds),
+      );
+      return native_struct.latLngBoundsFromNative(outBounds.ref);
+    });
+  }
+
   /// Converts a geographic world coordinate to a screen point.
   ScreenPoint pixelForLatLng(LatLng coordinate) {
     return withNativeArena((arena) {
@@ -1365,6 +1579,54 @@ final class MapHandle {
         ),
       );
       return native_struct.latLngFromNative(outCoordinate.ref);
+    });
+  }
+
+  /// Converts geographic coordinates to screen points.
+  List<ScreenPoint> pixelsForLatLngs(List<LatLng> coordinates) {
+    return withNativeArena((arena) {
+      final outPoints = coordinates.isEmpty
+          ? nullptr.cast<raw.mln_screen_point>()
+          : arena<raw.mln_screen_point>(coordinates.length);
+      _check(
+        _c.mapPixelsForLatLngs(
+          _pointer,
+          _latLngArray(coordinates, arena),
+          coordinates.length,
+          outPoints,
+        ),
+      );
+      return [
+        for (var index = 0; index < coordinates.length; index += 1)
+          native_struct.screenPointFromNative(outPoints[index]),
+      ];
+    });
+  }
+
+  /// Converts screen points to geographic coordinates.
+  List<LatLng> latLngsForPixels(List<ScreenPoint> points) {
+    return withNativeArena((arena) {
+      final nativePoints = points.isEmpty
+          ? nullptr.cast<raw.mln_screen_point>()
+          : arena<raw.mln_screen_point>(points.length);
+      for (var index = 0; index < points.length; index += 1) {
+        nativePoints[index] = native_struct.screenPointToNative(points[index]);
+      }
+      final outCoordinates = points.isEmpty
+          ? nullptr.cast<raw.mln_lat_lng>()
+          : arena<raw.mln_lat_lng>(points.length);
+      _check(
+        _c.mapLatLngsForPixels(
+          _pointer,
+          nativePoints,
+          points.length,
+          outCoordinates,
+        ),
+      );
+      return [
+        for (var index = 0; index < points.length; index += 1)
+          native_struct.latLngFromNative(outCoordinates[index]),
+      ];
     });
   }
 

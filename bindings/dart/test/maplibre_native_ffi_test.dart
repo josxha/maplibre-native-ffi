@@ -139,6 +139,42 @@ void main() {
       final camera = map.camera();
       expect(camera.center, const LatLng(0, 0));
       expect(camera.zoom, closeTo(1, 0.0001));
+      map.setRenderingStatsViewEnabled(true);
+      expect(map.renderingStatsViewEnabled(), isTrue);
+      map.setRenderingStatsViewEnabled(false);
+      expect(map.isFullyLoaded(), isA<bool>());
+      map.setViewportOptions(
+        const MapViewportOptions(viewportMode: ViewportMode.defaultMode),
+      );
+      expect(map.viewportOptions().viewportMode, isNotNull);
+      map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0));
+      expect(map.tileOptions().prefetchZoomDelta, isNotNull);
+      map.setBounds(const BoundOptions(minZoom: 0, maxZoom: 24));
+      expect(map.bounds().minZoom, isNotNull);
+      final projectionMode = map.projectionMode();
+      expect(projectionMode.axonometric, isNotNull);
+      map.setProjectionMode(const ProjectionModeOptions(axonometric: false));
+      expect(map.freeCameraOptions(), isA<FreeCameraOptions>());
+      expect(
+        map
+            .cameraForLatLngBounds(
+              const LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
+            )
+            .zoom,
+        isNotNull,
+      );
+      expect(
+        map.cameraForLatLngs(const [LatLng(-1, -1), LatLng(1, 1)]).zoom,
+        isNotNull,
+      );
+      expect(
+        map
+            .latLngBoundsForCamera(const CameraOptions(center: LatLng(0, 0)))
+            .southwest
+            .latitude
+            .isFinite,
+        isTrue,
+      );
       map.moveBy(1, 1);
       map.scaleBy(1.01, anchor: const ScreenPoint(128, 128));
       map.rotateBy(const ScreenPoint(0, 0), const ScreenPoint(1, 1));
@@ -148,6 +184,8 @@ void main() {
       final centerPixel = map.pixelForLatLng(const LatLng(0, 0));
       expect(centerPixel.x.isFinite, isTrue);
       expect(map.latLngForPixel(centerPixel).latitude.isFinite, isTrue);
+      expect(map.pixelsForLatLngs(const [LatLng(0, 0)]), hasLength(1));
+      expect(map.latLngsForPixels([centerPixel]), hasLength(1));
       final projection = map.createProjection();
       final projectionCamera = projection.camera();
       expect(projectionCamera.center, isNotNull);

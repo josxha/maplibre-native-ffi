@@ -116,6 +116,172 @@ final class CameraFitOptions {
   final double? pitch;
 }
 
+/// Map north orientation values.
+final class NorthOrientation {
+  const NorthOrientation._(this.rawValue, this.name);
+
+  /// North points up.
+  static const up = NorthOrientation._(0, 'up');
+
+  /// North points right.
+  static const right = NorthOrientation._(1, 'right');
+
+  /// North points down.
+  static const down = NorthOrientation._(2, 'down');
+
+  /// North points left.
+  static const left = NorthOrientation._(3, 'left');
+
+  /// Creates a north orientation from a raw native value.
+  factory NorthOrientation.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => up,
+    1 => right,
+    2 => down,
+    3 => left,
+    _ => NorthOrientation._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+}
+
+/// Map camera constraint mode.
+final class ConstrainMode {
+  const ConstrainMode._(this.rawValue, this.name);
+
+  /// No constraints.
+  static const none = ConstrainMode._(0, 'none');
+
+  /// Height-only constraints.
+  static const heightOnly = ConstrainMode._(1, 'heightOnly');
+
+  /// Width-and-height constraints.
+  static const widthAndHeight = ConstrainMode._(2, 'widthAndHeight');
+
+  /// Screen constraints.
+  static const screen = ConstrainMode._(3, 'screen');
+
+  /// Creates a constrain mode from a raw native value.
+  factory ConstrainMode.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => none,
+    1 => heightOnly,
+    2 => widthAndHeight,
+    3 => screen,
+    _ => ConstrainMode._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+}
+
+/// Viewport orientation mode.
+final class ViewportMode {
+  const ViewportMode._(this.rawValue, this.name);
+
+  /// Default viewport orientation.
+  static const defaultMode = ViewportMode._(0, 'default');
+
+  /// Flipped-Y viewport orientation.
+  static const flippedY = ViewportMode._(1, 'flippedY');
+
+  /// Creates a viewport mode from a raw native value.
+  factory ViewportMode.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => defaultMode,
+    1 => flippedY,
+    _ => ViewportMode._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+}
+
+/// Tile LOD algorithm.
+final class TileLodMode {
+  const TileLodMode._(this.rawValue, this.name);
+
+  /// Native default algorithm.
+  static const defaultMode = TileLodMode._(0, 'default');
+
+  /// Distance-based LOD algorithm.
+  static const distance = TileLodMode._(1, 'distance');
+
+  /// Creates a tile LOD mode from a raw native value.
+  factory TileLodMode.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => defaultMode,
+    1 => distance,
+    _ => TileLodMode._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+}
+
+/// Optional live map viewport and render-transform controls.
+final class MapViewportOptions {
+  /// Creates viewport options.
+  const MapViewportOptions({
+    this.northOrientation,
+    this.constrainMode,
+    this.viewportMode,
+    this.frustumOffset,
+  });
+
+  /// Optional north orientation.
+  final NorthOrientation? northOrientation;
+
+  /// Optional constraint mode.
+  final ConstrainMode? constrainMode;
+
+  /// Optional viewport mode.
+  final ViewportMode? viewportMode;
+
+  /// Optional frustum offset.
+  final EdgeInsets? frustumOffset;
+}
+
+/// Optional tile prefetch and LOD tuning controls.
+final class MapTileOptions {
+  /// Creates tile options.
+  const MapTileOptions({
+    this.prefetchZoomDelta,
+    this.lodMinRadius,
+    this.lodScale,
+    this.lodPitchThreshold,
+    this.lodZoomShift,
+    this.lodMode,
+  });
+
+  /// Optional prefetch zoom delta.
+  final int? prefetchZoomDelta;
+
+  /// Optional LOD minimum radius.
+  final double? lodMinRadius;
+
+  /// Optional LOD scale.
+  final double? lodScale;
+
+  /// Optional LOD pitch threshold.
+  final double? lodPitchThreshold;
+
+  /// Optional LOD zoom shift.
+  final double? lodZoomShift;
+
+  /// Optional LOD mode.
+  final TileLodMode? lodMode;
+}
+
 /// Optional map camera constraint fields.
 final class BoundOptions {
   /// Creates bound options.
