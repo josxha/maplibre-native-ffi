@@ -63,8 +63,9 @@ final class RuntimeHandle {
     return count;
   }
 
-  /// Creates a map owned by this runtime using native default map options.
-  MapHandle createMap() => MapHandle.create(this);
+  /// Creates a map owned by this runtime.
+  MapHandle createMap({MapOptions options = const MapOptions()}) =>
+      MapHandle.create(this, options: options);
 
   /// Explicitly destroys this runtime.
   void close() {
@@ -113,20 +114,70 @@ final class RuntimeEvent {
   final String? message;
 }
 
+/// Map rendering mode used when creating a map.
+final class MapMode {
+  const MapMode._(this.rawValue, this.name);
+
+  /// Continuously updates as data arrives and map state changes.
+  static const continuous = MapMode._(0, 'continuous');
+
+  /// Produces one-off still images of an arbitrary viewport.
+  static const staticMap = MapMode._(1, 'static');
+
+  /// Produces one-off still images for a single tile.
+  static const tile = MapMode._(2, 'tile');
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+}
+
+/// Map creation options.
+final class MapOptions {
+  /// Creates map options.
+  const MapOptions({
+    this.width = 256,
+    this.height = 256,
+    this.scaleFactor = 1,
+    this.mapMode = MapMode.continuous,
+  });
+
+  /// Initial map width in logical pixels.
+  final int width;
+
+  /// Initial map height in logical pixels.
+  final int height;
+
+  /// Initial map scale factor.
+  final double scaleFactor;
+
+  /// Map rendering mode.
+  final MapMode mapMode;
+}
+
 /// Owner-thread map handle bound to a retained runtime.
 final class MapHandle {
   MapHandle._(this._runtime, Pointer<raw.mln_map> pointer)
     : _state = NativeHandleState(pointer, 'MapHandle');
 
-  /// Creates a map owned by [runtime] using native default map options.
-  factory MapHandle.create(RuntimeHandle runtime) {
+  /// Creates a map owned by [runtime].
+  factory MapHandle.create(
+    RuntimeHandle runtime, {
+    MapOptions options = const MapOptions(),
+  }) {
     return withNativeArena((arena) {
-      final options = arena<raw.mln_map_options>();
-      options.ref = _c.mapOptionsDefault();
+      final nativeOptions = arena<raw.mln_map_options>();
+      nativeOptions.ref = _c.mapOptionsDefault();
+      nativeOptions.ref.width = options.width;
+      nativeOptions.ref.height = options.height;
+      nativeOptions.ref.scale_factor = options.scaleFactor;
+      nativeOptions.ref.map_mode = options.mapMode.rawValue;
       final outMap = arena<Pointer<raw.mln_map>>();
       outMap.value = nullptr;
 
-      _check(_c.mapCreate(runtime._pointer, options, outMap));
+      _check(_c.mapCreate(runtime._pointer, nativeOptions, outMap));
       return MapHandle._(runtime, outMap.value);
     });
   }
