@@ -192,6 +192,20 @@ typedef enum {
   MLN_VALA_SOURCE_FEATURE_QUERY_OPTION_FIELDS_SOURCE_LAYER_IDS = 1u << 0u,
 } MlnValaSourceFeatureQueryOptionFields;
 
+typedef enum {
+  MLN_VALA_QUERIED_FEATURE_FIELDS_SOURCE_ID = 1u << 0u,
+  MLN_VALA_QUERIED_FEATURE_FIELDS_SOURCE_LAYER_ID = 1u << 1u,
+  MLN_VALA_QUERIED_FEATURE_FIELDS_STATE = 1u << 2u,
+} MlnValaQueriedFeatureFields;
+
+typedef enum {
+  MLN_VALA_FEATURE_IDENTIFIER_TYPE_NULL = 0,
+  MLN_VALA_FEATURE_IDENTIFIER_TYPE_UINT = 1,
+  MLN_VALA_FEATURE_IDENTIFIER_TYPE_INT = 2,
+  MLN_VALA_FEATURE_IDENTIFIER_TYPE_DOUBLE = 3,
+  MLN_VALA_FEATURE_IDENTIFIER_TYPE_STRING = 4,
+} MlnValaFeatureIdentifierType;
+
 /**
  * MlnValaResourceTransformCallback:
  * @kind: resource kind.
@@ -437,6 +451,35 @@ typedef struct {
 
 typedef struct _MlnValaJsonValue MlnValaJsonValue;
 typedef struct _MlnValaJsonSnapshotHandle MlnValaJsonSnapshotHandle;
+typedef struct _MlnValaGeometry MlnValaGeometry;
+
+typedef struct {
+  MlnValaStringView key;
+  const MlnValaJsonValue* value;
+} MlnValaJsonMember;
+
+typedef struct {
+  uint32_t size;
+  const MlnValaGeometry* geometry;
+  const MlnValaJsonMember* properties;
+  size_t property_count;
+  MlnValaFeatureIdentifierType identifier_type;
+  union {
+    uint64_t uint_value;
+    int64_t int_value;
+    double double_value;
+    MlnValaStringView string_value;
+  } identifier;
+} MlnValaFeature;
+
+typedef struct {
+  uint32_t size;
+  MlnValaQueriedFeatureFields fields;
+  MlnValaFeature feature;
+  MlnValaStringView source_id;
+  MlnValaStringView source_layer_id;
+  const MlnValaJsonValue* state;
+} MlnValaQueriedFeature;
 
 typedef struct {
   uint32_t size;
@@ -571,8 +614,6 @@ typedef struct {
   MlnValaLatLng southwest;
   MlnValaLatLng northeast;
 } MlnValaLatLngBounds;
-
-typedef struct _MlnValaGeometry MlnValaGeometry;
 
 typedef struct {
   uint32_t size;
@@ -957,6 +998,21 @@ mln_vala_render_session_handle_query_source_features(
  */
 gboolean mln_vala_feature_query_result_handle_count(
   MlnValaFeatureQueryResultHandle* self, size_t* out_count, GError** error
+);
+
+/**
+ * mln_vala_feature_query_result_handle_get:
+ * @self: a feature query result handle.
+ * @index: result index.
+ * @out_feature: (out): return location for queried feature view.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_feature_query_result_handle_get(
+  MlnValaFeatureQueryResultHandle* self, size_t index,
+  MlnValaQueriedFeature* out_feature, GError** error
 );
 void mln_vala_feature_query_result_handle_close(
   MlnValaFeatureQueryResultHandle* self

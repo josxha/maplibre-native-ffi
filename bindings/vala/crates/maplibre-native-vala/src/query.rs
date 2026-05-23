@@ -142,6 +142,22 @@ pub extern "C" fn mln_vala_feature_query_result_handle_count(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_query_result_handle_get(
+    handle: *mut FeatureQueryResultHandle,
+    index: usize,
+    out_feature: *mut sys::mln_queried_feature,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match feature_query_result_get(handle, index, out_feature) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_feature_query_result_handle_close(
     handle: *mut FeatureQueryResultHandle,
 ) {
@@ -300,6 +316,25 @@ fn feature_query_result_count(
     // SAFETY: `native` is live and output storage is valid.
     error::check(unsafe { sys::mln_feature_query_result_count(native, &mut count) })?;
     glib::clear_optional_out_pointer(out_count, count)
+}
+
+fn feature_query_result_get(
+    handle: *mut FeatureQueryResultHandle,
+    index: usize,
+    out_feature: *mut sys::mln_queried_feature,
+) -> error::Result<()> {
+    let native = feature_query_result_native(handle)?;
+    if out_feature.is_null() {
+        return Err(Error::invalid_argument(
+            "queried feature output pointer is null",
+        ));
+    }
+    // SAFETY: `out_feature` is valid output storage by the null check above.
+    unsafe {
+        (*out_feature).size = std::mem::size_of::<sys::mln_queried_feature>() as u32;
+    }
+    // SAFETY: `native` is live and output storage has the required size field.
+    error::check(unsafe { sys::mln_feature_query_result_get(native, index, out_feature) })
 }
 
 fn close_feature_query_result(handle: *mut FeatureQueryResultHandle) {

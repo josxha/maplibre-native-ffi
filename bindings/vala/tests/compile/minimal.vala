@@ -87,6 +87,8 @@ void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws
   var rendered_result = session.query_rendered_features(geometry, rendered_options);
   size_t rendered_count;
   rendered_result.count(out rendered_count);
+  MaplibreNative.QueriedFeature queried_feature;
+  rendered_result.get(0, out queried_feature);
   rendered_result.close();
   var source_result = session.query_source_features("fixture-source", source_options);
   size_t source_count;
