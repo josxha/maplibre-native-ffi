@@ -294,7 +294,7 @@ export interface ResourceResponseInput {
 
 export type ResourceProviderCallback = (
   request: ResourceProviderRequest,
-) => void;
+) => void | PromiseLike<void>;
 
 export declare class ResourceRequestHandle {
   private constructor(nativeHandle: unknown);

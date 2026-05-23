@@ -523,6 +523,9 @@ function completeResourceRequestWithProviderError(handle, error) {
 }
 
 class ResourceRequestHandle {
+  #handleId;
+  #closed = false;
+
   constructor(token, handleId) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
@@ -531,39 +534,44 @@ class ResourceRequestHandle {
       );
     }
     recordHandleEnvironment(this);
-    this.handleId = handleId;
-    this.closed = false;
+    this.#handleId = handleId;
     resourceRequestFinalizer?.register(this, handleId, this);
+    Object.preventExtensions(this);
+  }
+
+  get closed() {
+    assertHandleEnvironment(this);
+    return this.#closed;
   }
 
   complete(response = {}) {
     assertHandleEnvironment(this);
-    if (this.closed) {
+    if (this.#closed) {
       throw new InvalidStateError(null, "ResourceRequestHandle is closed");
     }
     translateNativeErrors(() =>
-      native.nativeResourceRequestComplete(this.handleId, response),
+      native.nativeResourceRequestComplete(this.#handleId, response),
     );
-    this.closed = true;
+    this.#closed = true;
     resourceRequestFinalizer?.unregister(this);
   }
 
   cancelled() {
     assertHandleEnvironment(this);
     return translateNativeErrors(() =>
-      native.nativeResourceRequestCancelled(this.handleId),
+      native.nativeResourceRequestCancelled(this.#handleId),
     );
   }
 
   close() {
     assertHandleEnvironment(this);
-    if (this.closed) {
+    if (this.#closed) {
       return;
     }
     translateNativeErrors(() =>
-      native.nativeResourceRequestClose(this.handleId),
+      native.nativeResourceRequestClose(this.#handleId),
     );
-    this.closed = true;
+    this.#closed = true;
     resourceRequestFinalizer?.unregister(this);
   }
 

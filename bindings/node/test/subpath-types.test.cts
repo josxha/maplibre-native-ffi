@@ -55,6 +55,8 @@ const route: ResourceRoute = { urlPrefix: "custom://", kind: "source" };
 const providerCallback: ResourceProviderCallback = (request) => {
   request.handle.complete(response);
 };
+// @ts-expect-error provider callbacks complete through request.handle, not return values.
+const invalidProviderCallback: ResourceProviderCallback = () => response;
 RuntimeHandle.prototype.setResourceProviderRoutes.call(
   {} as RuntimeHandle,
   [route],
@@ -86,6 +88,7 @@ void geometry;
 void response;
 void route;
 void providerCallback;
+void invalidProviderCallback;
 void transformRule;
 void invalidTransformRuleMissingPrefix;
 void invalidTransformRuleBothReplacements;

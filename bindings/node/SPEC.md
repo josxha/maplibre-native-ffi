@@ -130,7 +130,7 @@ Implemented tasks:
 | `mise run //bindings/node:test`  | Build the add-on and run Node tests against the real native library.                                         |
 | `mise run //bindings/node:ci`    | Run tests and TypeScript checking.                                                                           |
 | `pnpm build`                     | Run `napi build --platform --manifest-path Cargo.toml`.                                                      |
-| `pnpm test`                      | Run `node --test test/*.test.cjs` after the add-on exists.                                                   |
+| `pnpm test`                      | Run `node --test test/*.test.cjs` and `node test/esm-smoke.mjs` after the add-on exists.                     |
 
 The add-on links `maplibre-native-c` through `maplibre-native-sys`, which uses
 `MLN_FFI_BUILD_DIR` and the repository native-library search policy.

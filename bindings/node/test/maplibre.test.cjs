@@ -531,12 +531,12 @@ test("resource provider routes validate Node handoff shape", async () => {
       [{ urlPrefix: "custom://" }],
       (request) => {
         thenableHandle = request.handle;
-        return {
-          /** @param {(value?: unknown) => void} _resolve @param {(reason?: unknown) => void} reject */
+        return /** @type {PromiseLike<void>} */ ({
           then(_resolve, reject) {
-            setImmediate(() => reject(new Error("thenable rejected")));
+            setImmediate(() => reject?.(new Error("thenable rejected")));
+            return /** @type {any} */ (this);
           },
-        };
+        });
       },
     );
     await new Promise((resolve) => setImmediate(resolve));
@@ -549,6 +549,37 @@ test("resource provider routes validate Node handoff shape", async () => {
         status: "error",
         errorReason: "other",
         errorMessage: "thenable rejected",
+      },
+    });
+
+    /** @type {any} */
+    let mutatedHandle;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(null, fakeResourceProviderRequest("5", "custom://mutate"));
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        mutatedHandle = request.handle;
+        /** @type {any} */ (request.handle).closed = true;
+        /** @type {any} */ (request.handle).handleId = "wrong";
+        throw new Error("mutated provider boom");
+      },
+    );
+    assert.ok(mutatedHandle);
+    assert.equal(mutatedHandle.closed, true);
+    assert.equal(mutatedHandle.handleId, undefined);
+    assert.deepEqual(completions[3], {
+      handleId: "5",
+      response: {
+        status: "error",
+        errorReason: "other",
+        errorMessage: "mutated provider boom",
       },
     });
   } finally {

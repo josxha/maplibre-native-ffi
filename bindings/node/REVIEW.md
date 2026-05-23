@@ -345,3 +345,38 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Post-redesign review round 5
+
+Review evidence:
+
+- Ran three independent review agents after broadening resource API smoke and
+  type coverage:
+  - FFI/threading/resource-lifetime review.
+  - JavaScript/TypeScript API, declaration, export, and test review.
+  - SPEC/REVIEW record-conformance review.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `mise run fix`, and `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. `ResourceRequestHandle` exposed writable `handleId` and `closed` properties
+   that user code could mutate to interfere with exact-once cleanup.
+   - Action: native request ID and closed state are now private class fields,
+     `closed` is a getter, the wrapper is non-extensible, and cleanup paths use
+     private state.
+   - Test action: provider wrapper tests now attempt to mutate `closed` and
+     `handleId` before throwing and verify the original request still receives
+     the error completion.
+2. `ResourceProviderCallback` returned contextual `void`, which TypeScript still
+   permits callbacks to return arbitrary ignored values.
+   - Action: the provider callback type now returns
+     `undefined | PromiseLike<void>` and the type fixture rejects a callback
+     that returns a resource response.
+3. The SPEC task map understated `pnpm test` by omitting the ESM smoke test.
+   - Action: the `pnpm test` row now records both `node --test test/*.test.cjs`
+     and `node test/esm-smoke.mjs`.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.
