@@ -96,7 +96,8 @@ The scaffold implements one proof slice in Rust:
 - Resource response descriptors, resource transform callbacks, and
   `ResourceRequestHandle` one-shot completion/cancellation/release methods are
   visible in generated Vala.
-- Basic style-source operations for GeoJSON URL sources are exposed through
+- Basic style-source operations for GeoJSON URL sources, tile source URL
+  sources, source metadata, and source lifecycle are exposed through
   `MapHandle`.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.

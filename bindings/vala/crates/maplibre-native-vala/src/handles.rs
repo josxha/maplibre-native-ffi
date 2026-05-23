@@ -305,6 +305,20 @@ pub extern "C" fn mln_vala_map_tile_options_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_tile_source_options_default(
+    out_options: *mut sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_style_tile_source_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_new(
     runtime: *mut RuntimeHandle,
     width: u32,
@@ -886,6 +900,57 @@ pub extern "C" fn mln_vala_map_handle_set_geojson_source_url(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_vector_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    options: *const sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_tile_source_url(handle, source_id, url, options, TileSourceKind::Vector) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_raster_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    options: *const sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_tile_source_url(handle, source_id, url, options, TileSourceKind::Raster) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_raster_dem_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    options: *const sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_tile_source_url(handle, source_id, url, options, TileSourceKind::RasterDem) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_style_source_exists(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -893,6 +958,40 @@ pub extern "C" fn mln_vala_map_handle_style_source_exists(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match style_source_exists(handle, source_id, out_exists) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_style_source_type(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_source_type: *mut u32,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_style_source_type(handle, source_id, out_source_type, out_found) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_style_source_info(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_info: *mut sys::mln_style_source_info,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_style_source_info(handle, source_id, out_info, out_found) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -1019,6 +1118,14 @@ fn default_map_viewport_options(
 fn default_map_tile_options(out_options: *mut sys::mln_map_tile_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_map_tile_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_style_tile_source_options(
+    out_options: *mut sys::mln_style_tile_source_options,
+) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_style_tile_source_options_default() };
     glib::clear_optional_out_pointer(out_options, options)
 }
 
@@ -1345,6 +1452,13 @@ fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> erro
     error::check(unsafe { sys::mln_map_set_style_json(map, json) })
 }
 
+#[derive(Clone, Copy)]
+enum TileSourceKind {
+    Vector,
+    Raster,
+    RasterDem,
+}
+
 fn add_geojson_source_url(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -1371,6 +1485,39 @@ fn set_geojson_source_url(
     error::check(unsafe { sys::mln_map_set_geojson_source_url(map, source_id, url) })
 }
 
+fn add_tile_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    options: *const sys::mln_style_tile_source_options,
+    kind: TileSourceKind,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let url = string_view_from_c(url, "tile source URL")?;
+    if options.is_null() {
+        return Err(Error::invalid_argument(
+            "style tile source options are null",
+        ));
+    }
+    // SAFETY: `map` is live, string views borrow caller strings for this call,
+    // and options points to caller-owned options borrowed for this call.
+    let status = unsafe {
+        match kind {
+            TileSourceKind::Vector => {
+                sys::mln_map_add_vector_source_url(map, source_id, url, options)
+            }
+            TileSourceKind::Raster => {
+                sys::mln_map_add_raster_source_url(map, source_id, url, options)
+            }
+            TileSourceKind::RasterDem => {
+                sys::mln_map_add_raster_dem_source_url(map, source_id, url, options)
+            }
+        }
+    };
+    error::check(status)
+}
+
 fn style_source_exists(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -1383,6 +1530,61 @@ fn style_source_exists(
     // and `exists` is valid output storage.
     error::check(unsafe { sys::mln_map_style_source_exists(map, source_id, &mut exists) })?;
     glib::clear_optional_out_pointer(out_exists, if exists { GTRUE } else { GFALSE })
+}
+
+fn get_style_source_type(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_source_type: *mut u32,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_source_type.is_null() {
+        return Err(Error::invalid_argument(
+            "source type output pointer is null",
+        ));
+    }
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let mut source_type = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+    let mut found = false;
+    // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
+    // and output pointers refer to writable storage.
+    error::check(unsafe {
+        sys::mln_map_get_style_source_type(map, source_id, &mut source_type, &mut found)
+    })?;
+    glib::clear_optional_out_pointer(out_source_type, source_type)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
+fn get_style_source_info(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_info: *mut sys::mln_style_source_info,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_info.is_null() {
+        return Err(Error::invalid_argument(
+            "source info output pointer is null",
+        ));
+    }
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let mut info = sys::mln_style_source_info {
+        size: std::mem::size_of::<sys::mln_style_source_info>() as u32,
+        type_: sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
+        id_size: 0,
+        is_volatile: false,
+        has_attribution: false,
+        attribution_size: 0,
+    };
+    let mut found = false;
+    // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
+    // and output pointers refer to writable storage.
+    error::check(unsafe {
+        sys::mln_map_get_style_source_info(map, source_id, &mut info, &mut found)
+    })?;
+    glib::clear_optional_out_pointer(out_info, info)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
 }
 
 fn remove_style_source(
@@ -1915,6 +2117,40 @@ mod tests {
             GTRUE
         );
         assert_eq!(exists, GTRUE);
+        let mut source_type = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+        let mut found = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_get_style_source_type(
+                map,
+                c"fixture-source".as_ptr(),
+                &mut source_type,
+                &mut found,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(found, GTRUE);
+        assert_eq!(source_type, sys::MLN_STYLE_SOURCE_TYPE_GEOJSON);
+        let mut source_info = sys::mln_style_source_info {
+            size: std::mem::size_of::<sys::mln_style_source_info>() as u32,
+            type_: sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
+            id_size: 0,
+            is_volatile: false,
+            has_attribution: false,
+            attribution_size: 0,
+        };
+        assert_eq!(
+            mln_vala_map_handle_get_style_source_info(
+                map,
+                c"fixture-source".as_ptr(),
+                &mut source_info,
+                &mut found,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(found, GTRUE);
+        assert_eq!(source_info.type_, sys::MLN_STYLE_SOURCE_TYPE_GEOJSON);
         assert_eq!(
             mln_vala_map_handle_set_geojson_source_url(
                 map,
@@ -1935,6 +2171,31 @@ mod tests {
             GTRUE
         );
         assert_eq!(removed, GTRUE);
+
+        let mut tile_options = unsafe { sys::mln_style_tile_source_options_default() };
+        assert_eq!(
+            mln_vala_style_tile_source_options_default(&mut tile_options, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_add_vector_source_url(
+                map,
+                c"vector-source".as_ptr(),
+                c"asset://vector-source.json".as_ptr(),
+                &tile_options,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"vector-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

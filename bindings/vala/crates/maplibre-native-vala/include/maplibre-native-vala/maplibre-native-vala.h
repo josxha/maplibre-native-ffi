@@ -97,6 +97,44 @@ typedef enum {
   MLN_VALA_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
 } MlnValaResourceProviderDecision;
 
+typedef enum {
+  MLN_VALA_STYLE_SOURCE_TYPE_UNKNOWN = 0,
+  MLN_VALA_STYLE_SOURCE_TYPE_VECTOR = 1,
+  MLN_VALA_STYLE_SOURCE_TYPE_RASTER = 2,
+  MLN_VALA_STYLE_SOURCE_TYPE_RASTER_DEM = 3,
+  MLN_VALA_STYLE_SOURCE_TYPE_GEOJSON = 4,
+  MLN_VALA_STYLE_SOURCE_TYPE_IMAGE = 5,
+  MLN_VALA_STYLE_SOURCE_TYPE_VIDEO = 6,
+  MLN_VALA_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
+  MLN_VALA_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8,
+} MlnValaStyleSourceType;
+
+typedef enum {
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_MIN_ZOOM = 1u << 0u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_MAX_ZOOM = 1u << 1u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_ATTRIBUTION = 1u << 2u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_SCHEME = 1u << 3u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_BOUNDS = 1u << 4u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_TILE_SIZE = 1u << 5u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_VECTOR_ENCODING = 1u << 6u,
+  MLN_VALA_STYLE_TILE_SOURCE_OPTION_FIELDS_RASTER_ENCODING = 1u << 7u,
+} MlnValaStyleTileSourceOptionFields;
+
+typedef enum {
+  MLN_VALA_STYLE_TILE_SCHEME_XYZ = 0,
+  MLN_VALA_STYLE_TILE_SCHEME_TMS = 1,
+} MlnValaStyleTileScheme;
+
+typedef enum {
+  MLN_VALA_STYLE_VECTOR_TILE_ENCODING_MVT = 0,
+  MLN_VALA_STYLE_VECTOR_TILE_ENCODING_MLT = 1,
+} MlnValaStyleVectorTileEncoding;
+
+typedef enum {
+  MLN_VALA_STYLE_RASTER_DEM_ENCODING_MAPBOX = 0,
+  MLN_VALA_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
+} MlnValaStyleRasterDemEncoding;
+
 /**
  * MlnValaResourceTransformCallback:
  * @kind: resource kind.
@@ -424,6 +462,29 @@ typedef struct {
   MlnValaTileLodMode lod_mode;
 } MlnValaMapTileOptions;
 
+typedef struct {
+  uint32_t size;
+  MlnValaStyleSourceType type;
+  size_t id_size;
+  bool is_volatile;
+  bool has_attribution;
+  size_t attribution_size;
+} MlnValaStyleSourceInfo;
+
+typedef struct {
+  uint32_t size;
+  MlnValaStyleTileSourceOptionFields fields;
+  double min_zoom;
+  double max_zoom;
+  const char* attribution;
+  size_t attribution_size;
+  MlnValaStyleTileScheme scheme;
+  MlnValaLatLngBounds bounds;
+  uint32_t tile_size;
+  MlnValaStyleVectorTileEncoding vector_encoding;
+  MlnValaStyleRasterDemEncoding raster_encoding;
+} MlnValaStyleTileSourceOptions;
+
 /**
  * mln_vala_camera_options_default:
  * @out_options: (out): return location for initialized camera options.
@@ -462,6 +523,9 @@ gboolean mln_vala_map_viewport_options_default(
 );
 gboolean mln_vala_map_tile_options_default(
   MlnValaMapTileOptions* out_options, GError** error
+);
+gboolean mln_vala_style_tile_source_options_default(
+  MlnValaStyleTileSourceOptions* out_options, GError** error
 );
 
 #define MLN_VALA_TYPE_NATIVE_POINTER (mln_vala_native_pointer_get_type())
@@ -1333,6 +1397,54 @@ gboolean mln_vala_map_handle_set_geojson_source_url(
 );
 
 /**
+ * mln_vala_map_handle_add_vector_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @url: (not nullable): tile source URL.
+ * @options: (not nullable): tile source options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_vector_source_url(
+  MlnValaMapHandle* self, const char* source_id, const char* url,
+  const MlnValaStyleTileSourceOptions* options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_add_raster_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @url: (not nullable): tile source URL.
+ * @options: (not nullable): tile source options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_raster_source_url(
+  MlnValaMapHandle* self, const char* source_id, const char* url,
+  const MlnValaStyleTileSourceOptions* options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_add_raster_dem_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @url: (not nullable): tile source URL.
+ * @options: (not nullable): tile source options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_raster_dem_source_url(
+  MlnValaMapHandle* self, const char* source_id, const char* url,
+  const MlnValaStyleTileSourceOptions* options, GError** error
+);
+
+/**
  * mln_vala_map_handle_style_source_exists:
  * @self: a map handle.
  * @source_id: (not nullable): source identifier.
@@ -1345,6 +1457,38 @@ gboolean mln_vala_map_handle_set_geojson_source_url(
 gboolean mln_vala_map_handle_style_source_exists(
   MlnValaMapHandle* self, const char* source_id, gboolean* out_exists,
   GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_style_source_type:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @out_source_type: (out): return location for source type.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_style_source_type(
+  MlnValaMapHandle* self, const char* source_id,
+  MlnValaStyleSourceType* out_source_type, gboolean* out_found, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_style_source_info:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @out_info: (out): return location for source info.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_style_source_info(
+  MlnValaMapHandle* self, const char* source_id,
+  MlnValaStyleSourceInfo* out_info, gboolean* out_found, GError** error
 );
 
 /**
