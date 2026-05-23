@@ -24,18 +24,17 @@ restating their rules.
 - [Rust binding conventions](../../docs/src/content/docs/development/bindings-rust.md):
   `maplibre-native-sys`, `maplibre-native-core`, status conversion, copied
   native results, and bridge binding boundaries.
-- [Rust bridge binding plan](../rust/PLAN.md): bridge crate ownership and the
-  first shared-core proof slice.
+- [Rust bridge binding plan](../rust/PLAN.md): bridge crate ownership and
+  shared-core adapter placement.
 - [Java FFM binding conventions](../../docs/src/content/docs/development/bindings-java-ffm.md)
   and
   [Java JNI binding conventions](../../docs/src/content/docs/development/bindings-java-jni.md):
   parity targets for low-level public concepts, exception taxonomy, handle
   names, and JNI bridge responsibilities.
 
-The scaffold style follows the Kotlin/Native binding scaffold in PR #179 and the
-Swift binding scaffold in PR #180: one proof slice, package/module markers,
-shared error and pointer types, binding-local tasks, and an implementation map
-that records future coverage.
+The implementation keeps package/module markers, shared error and pointer types,
+binding-local tasks, and this implementation map aligned with the current Python
+API surface.
 
 When this spec and a convention document appear to overlap, the convention
 contains the rule and this spec names the concrete Python implementation points.
@@ -156,18 +155,19 @@ The current implementation includes these completed slices:
 - `maplibre_native.json` provides JSON value trees that preserve numeric shape,
   ordering, and duplicate object members.
 - `maplibre_native.geo` provides geographic, geometry, and GeoJSON value trees
-  for later native source/query APIs.
-- Concept modules exist so future changes land in stable package locations.
+  for native source, query, camera, projection, and offline APIs.
+- Concept modules provide stable package locations for the implemented binding
+  surface.
 
 ## Build artifacts and tasks
 
-| Artifact                 | Path                         | Contents                                                                                                                         |
-| ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Python project           | `bindings/python`            | Public Python package, PyO3 crate, tests, maturin metadata.                                                                      |
-| PyO3 extension crate     | `bindings/python/Cargo.toml` | `maplibre-native-python` cdylib compiled as `maplibre_native._native`.                                                           |
-| Public Python package    | `python/maplibre_native`     | Typed public facade, exceptions, values, handles, and concept modules.                                                           |
-| Private extension module | `maplibre_native._native`    | Proof-slice bridge functions, native status conversion, runtime/map handle state, copied events, and later callback trampolines. |
-| Test suite               | `tests`                      | Python tests against the real native C library.                                                                                  |
+| Artifact                 | Path                         | Contents                                                                                                                          |
+| ------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Python project           | `bindings/python`            | Public Python package, PyO3 crate, tests, maturin metadata.                                                                       |
+| PyO3 extension crate     | `bindings/python/Cargo.toml` | `maplibre-native-python` cdylib compiled as `maplibre_native._native`.                                                            |
+| Public Python package    | `python/maplibre_native`     | Typed public facade, exceptions, values, handles, and concept modules.                                                            |
+| Private extension module | `maplibre_native._native`    | Native status conversion, runtime/map/render handle state, copied events/results, callback trampolines, and PyO3 bridge adapters. |
+| Test suite               | `tests`                      | Python tests against the real native C library.                                                                                   |
 
 Implemented tasks:
 
@@ -189,17 +189,16 @@ the native library exists before maturin invokes Cargo.
 
 ### `maplibre_native._native`
 
-`_native` is private. The current scaffold exposes proof-slice bridge functions,
-status-converting network status entry points, runtime/map/render-session handle
-state, copied event adapters, render target descriptor materialization, texture
-readback, texture frame guards, resource callback trampolines, closeable
-one-shot resource request handles, and queued custom geometry source callbacks
-needed by the Python package. As coverage grows, `_native` owns PyO3-specific
-conversion, GIL handling, Python exception construction, buffer guards, callback
-queues, and free-threaded synchronization.
+`_native` is private. It exposes status-converting process-global entry points,
+runtime/map/render-session handle state, copied event/result adapters, render
+target descriptor materialization, texture readback, texture frame guards,
+resource callback trampolines, closeable one-shot resource request handles, and
+queued custom geometry source callbacks needed by the Python package. `_native`
+owns PyO3-specific conversion, GIL handling, Python exception construction,
+buffer guards, callback queues, and free-threaded synchronization.
 
-`_native` may call `maplibre-native-sys` directly only for the initial proof
-slice or host-runtime trampoline code. Repeated C ABI adaptation moves into
+`_native` calls `maplibre-native-sys` directly for host-runtime trampoline code
+and small bridge operations. Repeated C ABI adaptation lives in
 `maplibre-native-core`.
 
 ### `maplibre_native`
@@ -428,7 +427,7 @@ covered by C ABI tests.
 Coverage targets:
 
 - wheel build and import of `maplibre_native._native`;
-- ABI version and supported backend proof slice;
+- ABI version and supported backend entry points;
 - exception mapping and copied diagnostics;
 - context-manager cleanup and close-once handle release;
 - wrong-thread propagation;
@@ -442,9 +441,9 @@ Coverage targets:
 ## Rollout checklist
 
 - [x] Add Python binding project, maturin metadata, and mise tasks.
-- [x] Add private PyO3 extension scaffold using the shared Rust crates.
-- [x] Add public package modules, error classes, `NativePointer`, and first
-      process-global proof slice.
+- [x] Add private PyO3 extension using the shared Rust crates.
+- [x] Add public package modules, error classes, `NativePointer`, and
+      process-global entry points.
 - [x] Move repeated direct `sys` sequences from `_native` into
       `maplibre-native-core` as bridge-neutral adapters for network status.
 - [x] Implement native status-to-Python exception conversion in `_native`.
@@ -457,7 +456,7 @@ Coverage targets:
 - [x] Add render session descriptors, writable-buffer readback, and texture
       frame handles.
 - [x] Add resource transform and provider callbacks with bounded queue policy.
-- [x] Add custom geometry callback scaffolding.
+- [x] Add custom geometry callback queues and source data operations.
 - [ ] Add package publication metadata once artifact policy is chosen.
 - [ ] Add the Python binding to the CI binding matrix after the first native
       status-converting vertical slice passes on Linux and macOS.

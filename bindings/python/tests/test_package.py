@@ -1,6 +1,7 @@
 import math
 from pathlib import Path
 import threading
+import warnings
 
 import pytest
 
@@ -1353,6 +1354,53 @@ def test_resource_values_preserve_native_shape() -> None:
     assert (
         response.to_native()["error_reason"] == resource.ResourceErrorReason.NOT_FOUND
     )
+
+
+def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> None:
+    class FakeNativeRequest:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def complete(self, response: dict[str, object]) -> None:
+            raise AssertionError(response)
+
+        def is_cancelled(self) -> bool:
+            return False
+
+        def close(self) -> None:
+            self.closed = True
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        assert request.url == "https://example.test/tile.pbf"
+        assert handle.closed is False
+        return resource.ResourceProviderDecision.PASS_THROUGH
+
+    native = FakeNativeRequest()
+    adapted = resource.adapt_resource_provider_callback(provider)
+
+    raw_request = {
+        "url": "https://example.test/tile.pbf",
+        "kind": resource.ResourceKind.TILE.native_code,
+        "loading_method": resource.ResourceLoadingMethod.NETWORK_ONLY,
+        "priority": resource.ResourcePriority.LOW,
+        "usage": resource.ResourceUsage.ONLINE,
+        "storage_policy": resource.ResourceStoragePolicy.VOLATILE,
+        "range": None,
+        "prior_modified_unix_ms": None,
+        "prior_expires_unix_ms": None,
+        "prior_etag": None,
+        "prior_data": None,
+    }
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always", ResourceWarning)
+        decision = adapted(raw_request, native)
+
+    assert decision == resource.ResourceProviderDecision.PASS_THROUGH.native_code
+    assert native.closed is True
+    assert not captured
 
 
 def test_resource_request_handle_close_context_and_completion_state() -> None:

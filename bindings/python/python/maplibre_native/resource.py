@@ -332,11 +332,13 @@ def adapt_resource_provider_callback(
     """Adapt a public resource provider callback for the native bridge."""
 
     def adapted(raw_request: dict[str, Any], native_handle: Any) -> int:
-        decision = callback(
-            ResourceRequest.from_native(raw_request),
-            ResourceRequestHandle(native_handle),
+        handle = ResourceRequestHandle(native_handle)
+        decision = ResourceProviderDecision(
+            callback(ResourceRequest.from_native(raw_request), handle)
         )
-        return ResourceProviderDecision(decision).native_code
+        if decision is not ResourceProviderDecision.HANDLE and not handle.closed:
+            handle.close()
+        return decision.native_code
 
     return adapted
 
