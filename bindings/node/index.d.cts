@@ -217,6 +217,8 @@ export declare class MapHandle {
   jumpTo(camera: CameraOptions): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
+  pixelsForLatLngs(coordinates: LatLng[]): ScreenPoint[];
+  latLngsForPixels(points: ScreenPoint[]): LatLng[];
   addStyleSourceJson(sourceId: string, source: JsonValue): void;
   styleSourceExists(sourceId: string): boolean;
   removeStyleSource(sourceId: string): boolean;

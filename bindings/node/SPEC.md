@@ -550,7 +550,7 @@ area instead of retesting all native C validation rules.
    remains.)_
 8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
    descriptor, camera movement commands, standalone projection handle, screen
-   projection helper, URL/image source values, style JSON/list/metadata/layer/
+   projection helpers, URL/image source values, style JSON/list/metadata/layer/
    light/property helpers, and style probe proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_

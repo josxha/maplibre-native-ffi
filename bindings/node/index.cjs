@@ -449,6 +449,16 @@ class MapHandle {
     return translateNativeErrors(() => this.native.latLngForPixel(point));
   }
 
+  pixelsForLatLngs(coordinates) {
+    return translateNativeErrors(() =>
+      this.native.pixelsForLatLngs(coordinates),
+    );
+  }
+
+  latLngsForPixels(points) {
+    return translateNativeErrors(() => this.native.latLngsForPixels(points));
+  }
+
   get renderingStatsViewEnabled() {
     return translateNativeErrors(() => this.native.renderingStatsViewEnabled);
   }

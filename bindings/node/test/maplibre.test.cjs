@@ -365,10 +365,16 @@ test("map screen projection helpers copy point values", () => {
     map.jumpTo({ center: coordinate, zoom: 2 });
     const point = map.pixelForLatLng(coordinate);
     const roundTripped = map.latLngForPixel(point);
+    const points = map.pixelsForLatLngs([coordinate]);
+    const coordinates = map.latLngsForPixels(points);
     assert.equal(typeof point.x, "number");
     assert.equal(typeof point.y, "number");
+    assert.equal(points.length, 1);
+    assert.equal(coordinates.length, 1);
     assert.ok(Math.abs(roundTripped.latitude - coordinate.latitude) < 1e-9);
     assert.ok(Math.abs(roundTripped.longitude - coordinate.longitude) < 1e-9);
+    assert.ok(Math.abs(coordinates[0].latitude - coordinate.latitude) < 1e-9);
+    assert.ok(Math.abs(coordinates[0].longitude - coordinate.longitude) < 1e-9);
   } finally {
     map.close();
     runtime.close();

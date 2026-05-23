@@ -291,6 +291,44 @@ impl NativeMapHandle {
         Ok(LatLng::from_native(raw_coordinate))
     }
 
+    #[napi(js_name = "pixelsForLatLngs")]
+    pub fn pixels_for_lat_lngs(&self, coordinates: Vec<LatLng>) -> Result<Vec<ScreenPoint>> {
+        let coordinates = lat_lngs_to_native(coordinates);
+        let mut points = vec![sys::mln_screen_point { x: 0.0, y: 0.0 }; coordinates.len()];
+        core::check(unsafe {
+            sys::mln_map_pixels_for_lat_lngs(
+                self.state.as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                points.as_mut_ptr(),
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(points.into_iter().map(ScreenPoint::from_native).collect())
+    }
+
+    #[napi(js_name = "latLngsForPixels")]
+    pub fn lat_lngs_for_pixels(&self, points: Vec<ScreenPoint>) -> Result<Vec<LatLng>> {
+        let points = screen_points_to_native(points);
+        let mut coordinates = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            };
+            points.len()
+        ];
+        core::check(unsafe {
+            sys::mln_map_lat_lngs_for_pixels(
+                self.state.as_ptr(),
+                points.as_ptr(),
+                points.len(),
+                coordinates.as_mut_ptr(),
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(coordinates.into_iter().map(LatLng::from_native).collect())
+    }
+
     #[napi(js_name = "getDebugOptionsRaw")]
     pub fn get_debug_options_raw(&self) -> Result<u32> {
         let mut options = 0;
@@ -1091,6 +1129,10 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
 
 fn lat_lngs_to_native(coordinates: Vec<LatLng>) -> Vec<sys::mln_lat_lng> {
     coordinates.into_iter().map(LatLng::into_native).collect()
+}
+
+fn screen_points_to_native(points: Vec<ScreenPoint>) -> Vec<sys::mln_screen_point> {
+    points.into_iter().map(ScreenPoint::into_native).collect()
 }
 
 fn json_snapshot_to_string(snapshot: *mut sys::mln_json_snapshot) -> Result<Option<String>> {
