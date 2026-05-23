@@ -1115,6 +1115,23 @@ pub extern "C" fn mln_vala_map_handle_camera_for_lat_lngs(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_camera_for_geometry(
+    handle: *mut MapHandle,
+    geometry: *const sys::mln_geometry,
+    fit_options: *const sys::mln_camera_fit_options,
+    out_camera: *mut sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match camera_for_geometry(handle, geometry, fit_options, out_camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_lat_lng_bounds_for_camera(
     handle: *mut MapHandle,
     camera: *const sys::mln_camera_options,
@@ -2755,6 +2772,29 @@ fn camera_for_lat_lngs(
             fit_options,
             &mut camera,
         )
+    })?;
+    glib::clear_optional_out_pointer(out_camera, camera)
+}
+
+fn camera_for_geometry(
+    handle: *mut MapHandle,
+    geometry: *const sys::mln_geometry,
+    fit_options: *const sys::mln_camera_fit_options,
+    out_camera: *mut sys::mln_camera_options,
+) -> error::Result<()> {
+    if geometry.is_null() {
+        return Err(Error::invalid_argument("geometry is null"));
+    }
+    if out_camera.is_null() {
+        return Err(Error::invalid_argument("camera output pointer is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut camera = unsafe { sys::mln_camera_options_default() };
+    // SAFETY: `map` is live, geometry and fit options are borrowed for this
+    // call, and local output storage has the required size.
+    error::check(unsafe {
+        sys::mln_map_camera_for_geometry(map, geometry, fit_options, &mut camera)
     })?;
     glib::clear_optional_out_pointer(out_camera, camera)
 }

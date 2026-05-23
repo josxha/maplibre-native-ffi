@@ -97,6 +97,22 @@ pub extern "C" fn mln_vala_map_projection_handle_set_visible_coordinates(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_projection_handle_set_visible_geometry(
+    handle: *mut MapProjectionHandle,
+    geometry: *const sys::mln_geometry,
+    padding: *const sys::mln_edge_insets,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_visible_geometry(handle, geometry, padding) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_projection_handle_pixel_for_lat_lng(
     handle: *mut MapProjectionHandle,
     coordinate: *const LatLng,
@@ -234,6 +250,25 @@ fn set_visible_coordinates(
             coordinate_count,
             *padding,
         )
+    })
+}
+
+fn set_visible_geometry(
+    handle: *mut MapProjectionHandle,
+    geometry: *const sys::mln_geometry,
+    padding: *const sys::mln_edge_insets,
+) -> error::Result<()> {
+    if geometry.is_null() {
+        return Err(Error::invalid_argument("geometry is null"));
+    }
+    if padding.is_null() {
+        return Err(Error::invalid_argument("padding is null"));
+    }
+    let projection = projection_native(handle)?;
+    // SAFETY: `projection` is live, geometry and padding are borrowed for this call.
+    let padding = unsafe { *padding };
+    error::check(unsafe {
+        sys::mln_map_projection_set_visible_geometry(projection, geometry, padding)
     })
 }
 

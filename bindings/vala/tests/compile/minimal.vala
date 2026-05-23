@@ -98,6 +98,15 @@ void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws
   source_result.close();
 }
 
+void exercise_geometry_camera(MaplibreNative.MapHandle map, MaplibreNative.MapProjectionHandle projection, MaplibreNative.Geometry geometry) throws GLib.Error {
+  MaplibreNative.CameraFitOptions fit_options = {};
+  fit_options.default();
+  MaplibreNative.CameraOptions camera;
+  map.camera_for_geometry(geometry, fit_options, out camera);
+  MaplibreNative.EdgeInsets padding = { 0.0, 0.0, 0.0, 0.0 };
+  projection.set_visible_geometry(geometry, padding);
+}
+
 void exercise_feature_extensions(MaplibreNative.RenderSessionHandle session, MaplibreNative.Feature feature, MaplibreNative.JsonValue arguments) throws GLib.Error {
   var result = session.query_feature_extensions("fixture-source", feature, "supercluster", "children", arguments);
   MaplibreNative.FeatureExtensionResultInfo info;

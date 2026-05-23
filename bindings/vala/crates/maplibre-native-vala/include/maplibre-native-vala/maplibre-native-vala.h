@@ -1989,6 +1989,23 @@ gboolean mln_vala_map_handle_camera_for_lat_lngs(
 );
 
 /**
+ * mln_vala_map_handle_camera_for_geometry:
+ * @self: a map handle.
+ * @geometry: (not nullable): geometry descriptor.
+ * @fit_options: (not nullable): camera fit options.
+ * @out_camera: (out): return location for computed camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_camera_for_geometry(
+  MlnValaMapHandle* self, const MlnValaGeometry* geometry,
+  const MlnValaCameraFitOptions* fit_options, MlnValaCameraOptions* out_camera,
+  GError** error
+);
+
+/**
  * mln_vala_map_handle_lat_lng_bounds_for_camera:
  * @self: a map handle.
  * @camera: (not nullable): camera options.
@@ -3517,6 +3534,11 @@ gboolean mln_vala_map_projection_handle_set_camera(
 gboolean mln_vala_map_projection_handle_set_visible_coordinates(
   MlnValaMapProjectionHandle* self, const MlnValaLatLng* coordinates,
   size_t coordinate_count, const MlnValaEdgeInsets* padding, GError** error
+);
+
+gboolean mln_vala_map_projection_handle_set_visible_geometry(
+  MlnValaMapProjectionHandle* self, const MlnValaGeometry* geometry,
+  const MlnValaEdgeInsets* padding, GError** error
 );
 
 /**
