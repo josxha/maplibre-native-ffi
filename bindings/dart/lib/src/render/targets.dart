@@ -55,6 +55,44 @@ final class VulkanContextDescriptor {
   final int graphicsQueueFamilyIndex;
 }
 
+/// Metal native surface session attachment options.
+final class MetalSurfaceDescriptor {
+  /// Creates a Metal surface descriptor.
+  const MetalSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    required this.layer,
+  });
+
+  /// Logical surface extent.
+  final RenderTargetExtent extent;
+
+  /// Metal backend context.
+  final MetalContextDescriptor context;
+
+  /// Borrowed `CAMetalLayer*` / `CA::MetalLayer*`.
+  final NativePointer layer;
+}
+
+/// Vulkan native surface session attachment options.
+final class VulkanSurfaceDescriptor {
+  /// Creates a Vulkan surface descriptor.
+  const VulkanSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    required this.surface,
+  });
+
+  /// Logical surface extent.
+  final RenderTargetExtent extent;
+
+  /// Borrowed Vulkan context.
+  final VulkanContextDescriptor context;
+
+  /// Borrowed `VkSurfaceKHR`.
+  final NativePointer surface;
+}
+
 /// Metal texture session attachment options for a session-owned target.
 final class MetalOwnedTextureDescriptor {
   /// Creates a Metal owned-texture descriptor.

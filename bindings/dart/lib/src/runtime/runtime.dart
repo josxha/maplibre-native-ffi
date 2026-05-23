@@ -624,6 +624,30 @@ final class MapHandle {
     _clearCustomGeometryCallbacks();
   }
 
+  /// Attaches a Metal native surface render target.
+  RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
+    return withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_metal_surface_descriptor>();
+      nativeDescriptor.ref = _metalSurfaceDescriptorToNative(descriptor);
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(_c.metalSurfaceAttach(_pointer, nativeDescriptor, outSession));
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
+  /// Attaches a Vulkan native surface render target.
+  RenderSessionHandle attachVulkanSurface(VulkanSurfaceDescriptor descriptor) {
+    return withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_vulkan_surface_descriptor>();
+      nativeDescriptor.ref = _vulkanSurfaceDescriptorToNative(descriptor);
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(_c.vulkanSurfaceAttach(_pointer, nativeDescriptor, outSession));
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
   /// Attaches a Metal texture render target owned by the render session.
   RenderSessionHandle attachMetalOwnedTexture(
     MetalOwnedTextureDescriptor descriptor,
@@ -2209,6 +2233,26 @@ raw.mln_vulkan_context_descriptor _vulkanContextDescriptorToNative(
     value.graphicsQueue.address,
   );
   result.graphics_queue_family_index = value.graphicsQueueFamilyIndex;
+  return result;
+}
+
+raw.mln_metal_surface_descriptor _metalSurfaceDescriptorToNative(
+  MetalSurfaceDescriptor value,
+) {
+  final result = _c.metalSurfaceDescriptorDefault();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _metalContextDescriptorToNative(value.context);
+  result.layer = Pointer<Void>.fromAddress(value.layer.address);
+  return result;
+}
+
+raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
+  VulkanSurfaceDescriptor value,
+) {
+  final result = _c.vulkanSurfaceDescriptorDefault();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _vulkanContextDescriptorToNative(value.context);
+  result.surface = Pointer<Void>.fromAddress(value.surface.address);
   return result;
 }
 

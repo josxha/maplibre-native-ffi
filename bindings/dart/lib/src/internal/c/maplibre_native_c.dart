@@ -239,6 +239,28 @@ final class MaplibreNativeCApi {
   int mapSetStyleJson(Pointer<raw.mln_map> map, Pointer<Char> json) =>
       _raw.mln_map_set_style_json(map, json).value;
 
+  /// Returns native default Metal surface descriptor.
+  raw.mln_metal_surface_descriptor metalSurfaceDescriptorDefault() =>
+      _raw.mln_metal_surface_descriptor_default();
+
+  /// Returns native default Vulkan surface descriptor.
+  raw.mln_vulkan_surface_descriptor vulkanSurfaceDescriptorDefault() =>
+      _raw.mln_vulkan_surface_descriptor_default();
+
+  /// Attaches a Metal native surface render target.
+  int metalSurfaceAttach(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_metal_surface_descriptor> descriptor,
+    Pointer<Pointer<raw.mln_render_session>> outSession,
+  ) => _raw.mln_metal_surface_attach(map, descriptor, outSession).value;
+
+  /// Attaches a Vulkan native surface render target.
+  int vulkanSurfaceAttach(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_vulkan_surface_descriptor> descriptor,
+    Pointer<Pointer<raw.mln_render_session>> outSession,
+  ) => _raw.mln_vulkan_surface_attach(map, descriptor, outSession).value;
+
   /// Attaches a Metal texture render target owned by the session.
   int metalOwnedTextureAttach(
     Pointer<raw.mln_map> map,

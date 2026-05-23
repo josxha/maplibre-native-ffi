@@ -118,6 +118,16 @@ void main() {
       projection.close();
       expect(projection.isClosed, isTrue);
       expect(
+        () => map.attachMetalSurface(
+          const MetalSurfaceDescriptor(
+            extent: RenderTargetExtent(width: 16, height: 16),
+            context: MetalContextDescriptor(device: NativePointer.nullPointer),
+            layer: NativePointer.nullPointer,
+          ),
+        ),
+        throwsA(isA<MaplibreException>()),
+      );
+      expect(
         () => map.attachMetalOwnedTexture(
           const MetalOwnedTextureDescriptor(
             extent: RenderTargetExtent(width: 16, height: 16),
