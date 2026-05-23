@@ -64,7 +64,7 @@ final class RuntimeHandle {
     : _state = NativeHandleState(pointer, 'RuntimeHandle');
 
   final NativeHandleState<raw.mln_runtime> _state;
-  final _maps = <int, MapHandle>{};
+  final _maps = <int, WeakReference<MapHandle>>{};
   _ResourceTransformState? _resourceTransformState;
   _ResourceProviderRulesState? _resourceProviderRulesState;
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
@@ -368,7 +368,7 @@ final class RuntimeHandle {
       MapHandle.create(this, options: options);
 
   void _registerMap(MapHandle map) {
-    _maps[map._pointer.address] = map;
+    _maps[map._pointer.address] = WeakReference(map);
   }
 
   void _unregisterMapAddress(int? address) {
@@ -386,8 +386,13 @@ final class RuntimeHandle {
         raw.mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED.value) {
       return;
     }
-    final map = _maps[event.sourceAddress];
-    map?._clearCustomGeometryCallbacksAfterUrlStyleLoad();
+    final reference = _maps[event.sourceAddress];
+    final map = reference?.target;
+    if (map == null) {
+      _maps.remove(event.sourceAddress);
+      return;
+    }
+    map._clearCustomGeometryCallbacksAfterUrlStyleLoad();
   }
 
   /// Explicitly destroys this runtime.
@@ -3055,6 +3060,7 @@ final class ResourceRequestHandle {
 
   /// Completes this request with [response] and releases it. Completion is one-shot.
   void complete(ResourceResponse response) {
+    _checkResourceResponseNativeStrings(response);
     final pointer = _takePointer();
     try {
       withNativeArena((arena) {

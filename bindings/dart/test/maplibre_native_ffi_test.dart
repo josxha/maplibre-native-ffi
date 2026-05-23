@@ -62,6 +62,16 @@ void main() {
             expect(request.url, styleUrl);
             expect(request.kind, ResourceKind.style);
             expect(handle.cancelled(), isFalse);
+            expect(
+              () => handle.complete(
+                const ResourceResponse(
+                  status: ResourceResponseStatus.error,
+                  errorMessage: 'bad\u0000message',
+                ),
+              ),
+              throwsA(isA<InvalidArgumentException>()),
+            );
+            expect(handle.isReleased, isFalse);
             handle.complete(
               ResourceResponse(
                 status: ResourceResponseStatus.ok,
