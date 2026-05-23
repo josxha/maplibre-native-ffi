@@ -664,6 +664,7 @@ class MapProjectionHandle {
     if (!(map instanceof MapHandle)) {
       throw new InvalidArgumentError(null, "map must be a MapHandle");
     }
+    this.map = map;
     this.native = translateNativeErrors(() =>
       native.createNativeMapProjectionHandle(map.native),
     );
@@ -711,8 +712,9 @@ class MapProjectionHandle {
 }
 
 class RenderSessionHandle {
-  constructor(nativeHandle) {
+  constructor(nativeHandle, map) {
     this.native = nativeHandle;
+    this.map = map;
   }
 
   static attachMetalOwnedTexture(map, descriptor) {
@@ -912,7 +914,7 @@ function attachRenderSession(map, attach) {
   if (!(map instanceof MapHandle)) {
     throw new InvalidArgumentError(null, "map must be a MapHandle");
   }
-  return new RenderSessionHandle(translateNativeErrors(attach));
+  return new RenderSessionHandle(translateNativeErrors(attach), map);
 }
 
 class MapHandle {
