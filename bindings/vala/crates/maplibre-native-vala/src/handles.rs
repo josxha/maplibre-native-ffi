@@ -853,6 +853,70 @@ pub extern "C" fn mln_vala_map_handle_set_style_json(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_geojson_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_geojson_source_url(handle, source_id, url) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_geojson_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_geojson_source_url(handle, source_id, url) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_style_source_exists(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_exists: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match style_source_exists(handle, source_id, out_exists) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_remove_style_source(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_removed: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match remove_style_source(handle, source_id, out_removed) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
 fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_runtime_options_default() };
@@ -1279,6 +1343,72 @@ fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> erro
     // SAFETY: `json` is a caller-provided NUL-terminated string pointer and
     // `map_native` returns a live map pointer. The C API copies the input.
     error::check(unsafe { sys::mln_map_set_style_json(map, json) })
+}
+
+fn add_geojson_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let url = string_view_from_c(url, "GeoJSON source URL")?;
+    // SAFETY: `map` is live and string views borrow NUL-terminated caller
+    // strings for this call. The C API copies accepted strings.
+    error::check(unsafe { sys::mln_map_add_geojson_source_url(map, source_id, url) })
+}
+
+fn set_geojson_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let url = string_view_from_c(url, "GeoJSON source URL")?;
+    // SAFETY: `map` is live and string views borrow NUL-terminated caller
+    // strings for this call. The C API copies accepted strings.
+    error::check(unsafe { sys::mln_map_set_geojson_source_url(map, source_id, url) })
+}
+
+fn style_source_exists(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_exists: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let mut exists = false;
+    // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
+    // and `exists` is valid output storage.
+    error::check(unsafe { sys::mln_map_style_source_exists(map, source_id, &mut exists) })?;
+    glib::clear_optional_out_pointer(out_exists, if exists { GTRUE } else { GFALSE })
+}
+
+fn remove_style_source(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_removed: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let mut removed = false;
+    // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
+    // and `removed` is valid output storage.
+    error::check(unsafe { sys::mln_map_remove_style_source(map, source_id, &mut removed) })?;
+    glib::clear_optional_out_pointer(out_removed, if removed { GTRUE } else { GFALSE })
+}
+
+fn string_view_from_c(value: *const c_char, label: &str) -> error::Result<sys::mln_string_view> {
+    if value.is_null() {
+        return Err(Error::invalid_argument(format!("{label} is null")));
+    }
+    // SAFETY: The caller supplies a NUL-terminated C string pointer.
+    let bytes = unsafe { CStr::from_ptr(value) }.to_bytes();
+    Ok(sys::mln_string_view {
+        data: value,
+        size: bytes.len(),
+    })
 }
 
 fn set_resource_transform(
@@ -1739,6 +1869,72 @@ mod tests {
         assert!(!runtime.is_null());
         let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
         assert!(!map.is_null());
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn geojson_source_url_lifecycle_round_trips_existence() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_add_geojson_source_url(
+                map,
+                c"fixture-source".as_ptr(),
+                c"asset://fixture.geojson".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut exists = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_style_source_exists(
+                map,
+                c"fixture-source".as_ptr(),
+                &mut exists,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(exists, GTRUE);
+        assert_eq!(
+            mln_vala_map_handle_set_geojson_source_url(
+                map,
+                c"fixture-source".as_ptr(),
+                c"asset://fixture-updated.geojson".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut removed = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"fixture-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

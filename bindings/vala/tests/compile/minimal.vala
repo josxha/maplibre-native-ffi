@@ -47,6 +47,12 @@ int main(string[] args) {
     var map = new MaplibreNative.MapHandle.with_options(runtime, map_options);
     map.set_style_url("asset://missing-style.json");
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    map.add_geojson_source_url("fixture-source", "asset://fixture.geojson");
+    bool source_exists = false;
+    map.style_source_exists("fixture-source", out source_exists);
+    map.set_geojson_source_url("fixture-source", "asset://fixture-updated.geojson");
+    bool source_removed = false;
+    map.remove_style_source("fixture-source", out source_removed);
     map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);
     MaplibreNative.MapDebugOptions debug_options;
     map.get_debug_options(out debug_options);

@@ -1305,6 +1305,64 @@ gboolean mln_vala_map_handle_set_style_json(
 );
 
 /**
+ * mln_vala_map_handle_add_geojson_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @url: (not nullable): GeoJSON URL.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_geojson_source_url(
+  MlnValaMapHandle* self, const char* source_id, const char* url, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_geojson_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @url: (not nullable): GeoJSON URL.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_geojson_source_url(
+  MlnValaMapHandle* self, const char* source_id, const char* url, GError** error
+);
+
+/**
+ * mln_vala_map_handle_style_source_exists:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @out_exists: (out): return location for source existence.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_style_source_exists(
+  MlnValaMapHandle* self, const char* source_id, gboolean* out_exists,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_remove_style_source:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @out_removed: (out): return location for removal state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_remove_style_source(
+  MlnValaMapHandle* self, const char* source_id, gboolean* out_removed,
+  GError** error
+);
+
+/**
  * mln_vala_map_projection_handle_new:
  * @map: a map handle.
  * @error: return location for a `GError`, or `NULL`.
