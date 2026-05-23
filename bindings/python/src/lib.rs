@@ -683,6 +683,72 @@ impl MapHandle {
         Ok(loaded)
     }
 
+    fn get_viewport_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut options = unsafe { sys::mln_map_viewport_options_default() };
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_viewport_options(state.as_ptr(), &mut options)
+        })
+        .map_err(map_error)?;
+        viewport_options_to_py(py, &options)
+    }
+
+    fn set_viewport_options(
+        &self,
+        north_orientation: Option<u32>,
+        constrain_mode: Option<u32>,
+        viewport_mode: Option<u32>,
+        frustum_offset: Option<(f64, f64, f64, f64)>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let options = viewport_options_from_parts(
+            north_orientation,
+            constrain_mode,
+            viewport_mode,
+            frustum_offset,
+        );
+        // SAFETY: The C API validates the map pointer and viewport options.
+        maplibre_core::check(unsafe { sys::mln_map_set_viewport_options(state.as_ptr(), &options) })
+            .map_err(map_error)
+    }
+
+    fn get_tile_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut options = unsafe { sys::mln_map_tile_options_default() };
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_tile_options(state.as_ptr(), &mut options)
+        })
+        .map_err(map_error)?;
+        tile_options_to_py(py, &options)
+    }
+
+    fn set_tile_options(
+        &self,
+        prefetch_zoom_delta: Option<u32>,
+        lod_min_radius: Option<f64>,
+        lod_scale: Option<f64>,
+        lod_pitch_threshold: Option<f64>,
+        lod_zoom_shift: Option<f64>,
+        lod_mode: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let options = tile_options_from_parts(
+            prefetch_zoom_delta,
+            lod_min_radius,
+            lod_scale,
+            lod_pitch_threshold,
+            lod_zoom_shift,
+            lod_mode,
+        );
+        // SAFETY: The C API validates the map pointer and tile options.
+        maplibre_core::check(unsafe { sys::mln_map_set_tile_options(state.as_ptr(), &options) })
+            .map_err(map_error)
+    }
+
     fn create_projection(&self) -> PyResult<MapProjectionHandle> {
         let state = self.state();
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map_projection>::new();
@@ -1878,6 +1944,71 @@ fn screen_point_to_py(py: Python<'_>, point: sys::mln_screen_point) -> PyResult<
     Ok(dict.into_any().unbind())
 }
 
+fn viewport_options_from_parts(
+    north_orientation: Option<u32>,
+    constrain_mode: Option<u32>,
+    viewport_mode: Option<u32>,
+    frustum_offset: Option<(f64, f64, f64, f64)>,
+) -> sys::mln_map_viewport_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_map_viewport_options_default() };
+    if let Some(north_orientation) = north_orientation {
+        raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+        raw.north_orientation = north_orientation;
+    }
+    if let Some(constrain_mode) = constrain_mode {
+        raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+        raw.constrain_mode = constrain_mode;
+    }
+    if let Some(viewport_mode) = viewport_mode {
+        raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+        raw.viewport_mode = viewport_mode;
+    }
+    if let Some(frustum_offset) = frustum_offset {
+        raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+        raw.frustum_offset = edge_insets_from_tuple(frustum_offset);
+    }
+    raw
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tile_options_from_parts(
+    prefetch_zoom_delta: Option<u32>,
+    lod_min_radius: Option<f64>,
+    lod_scale: Option<f64>,
+    lod_pitch_threshold: Option<f64>,
+    lod_zoom_shift: Option<f64>,
+    lod_mode: Option<u32>,
+) -> sys::mln_map_tile_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_map_tile_options_default() };
+    if let Some(prefetch_zoom_delta) = prefetch_zoom_delta {
+        raw.fields |= sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+        raw.prefetch_zoom_delta = prefetch_zoom_delta;
+    }
+    if let Some(lod_min_radius) = lod_min_radius {
+        raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+        raw.lod_min_radius = lod_min_radius;
+    }
+    if let Some(lod_scale) = lod_scale {
+        raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_SCALE;
+        raw.lod_scale = lod_scale;
+    }
+    if let Some(lod_pitch_threshold) = lod_pitch_threshold {
+        raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+        raw.lod_pitch_threshold = lod_pitch_threshold;
+    }
+    if let Some(lod_zoom_shift) = lod_zoom_shift {
+        raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+        raw.lod_zoom_shift = lod_zoom_shift;
+    }
+    if let Some(lod_mode) = lod_mode {
+        raw.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MODE;
+        raw.lod_mode = lod_mode;
+    }
+    raw
+}
+
 fn animation_options_from_parts(
     (duration_ms, velocity, min_zoom, easing): (
         Option<f64>,
@@ -1943,6 +2074,72 @@ fn camera_options_from_parts(
         raw.anchor = screen_point_from_tuple(anchor);
     }
     raw
+}
+
+fn viewport_options_to_py(
+    py: Python<'_>,
+    options: &sys::mln_map_viewport_options,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "north_orientation",
+        (options.fields & sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0)
+            .then_some(options.north_orientation),
+    )?;
+    dict.set_item(
+        "constrain_mode",
+        (options.fields & sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0)
+            .then_some(options.constrain_mode),
+    )?;
+    dict.set_item(
+        "viewport_mode",
+        (options.fields & sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0)
+            .then_some(options.viewport_mode),
+    )?;
+    if options.fields & sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0 {
+        let frustum_offset = PyDict::new(py);
+        frustum_offset.set_item("top", options.frustum_offset.top)?;
+        frustum_offset.set_item("left", options.frustum_offset.left)?;
+        frustum_offset.set_item("bottom", options.frustum_offset.bottom)?;
+        frustum_offset.set_item("right", options.frustum_offset.right)?;
+        dict.set_item("frustum_offset", frustum_offset)?;
+    } else {
+        dict.set_item("frustum_offset", py.None())?;
+    }
+    Ok(dict.into_any().unbind())
+}
+
+fn tile_options_to_py(py: Python<'_>, options: &sys::mln_map_tile_options) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "prefetch_zoom_delta",
+        (options.fields & sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0)
+            .then_some(options.prefetch_zoom_delta),
+    )?;
+    dict.set_item(
+        "lod_min_radius",
+        (options.fields & sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0)
+            .then_some(options.lod_min_radius),
+    )?;
+    dict.set_item(
+        "lod_scale",
+        (options.fields & sys::MLN_MAP_TILE_OPTION_LOD_SCALE != 0).then_some(options.lod_scale),
+    )?;
+    dict.set_item(
+        "lod_pitch_threshold",
+        (options.fields & sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0)
+            .then_some(options.lod_pitch_threshold),
+    )?;
+    dict.set_item(
+        "lod_zoom_shift",
+        (options.fields & sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0)
+            .then_some(options.lod_zoom_shift),
+    )?;
+    dict.set_item(
+        "lod_mode",
+        (options.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0).then_some(options.lod_mode),
+    )?;
+    Ok(dict.into_any().unbind())
 }
 
 fn camera_options_to_py(py: Python<'_>, camera: &sys::mln_camera_options) -> PyResult<Py<PyAny>> {

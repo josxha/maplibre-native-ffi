@@ -8,6 +8,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING
 
 from . import _native
+from .camera import EdgeInsets
 from .runtime import RuntimeHandle
 
 if TYPE_CHECKING:
@@ -38,6 +39,38 @@ class MapDebugOptions(IntFlag):
     DEPTH_BUFFER = 1 << 7
 
 
+class NorthOrientation(IntEnum):
+    """Map north orientation values."""
+
+    UP = 0
+    RIGHT = 1
+    DOWN = 2
+    LEFT = 3
+
+
+class ConstrainMode(IntEnum):
+    """Map camera constraint modes."""
+
+    NONE = 0
+    HEIGHT_ONLY = 1
+    WIDTH_AND_HEIGHT = 2
+    SCREEN = 3
+
+
+class ViewportMode(IntEnum):
+    """Viewport orientation modes."""
+
+    DEFAULT = 0
+    FLIPPED_Y = 1
+
+
+class TileLodMode(IntEnum):
+    """Tile LOD algorithm values."""
+
+    DEFAULT = 0
+    DISTANCE = 1
+
+
 class MapMode(IntEnum):
     """Map rendering mode used when creating a map."""
 
@@ -59,6 +92,61 @@ class MapOptions:
     height: int = 64
     scale_factor: float = 1.0
     mode: MapMode = MapMode.CONTINUOUS
+
+
+@dataclass(frozen=True, slots=True)
+class MapViewportOptions:
+    """Live map viewport and render-transform controls."""
+
+    north_orientation: NorthOrientation | None = None
+    constrain_mode: ConstrainMode | None = None
+    viewport_mode: ViewportMode | None = None
+    frustum_offset: EdgeInsets | None = None
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "MapViewportOptions":
+        """Build viewport options from private native bridge values."""
+        frustum_offset = raw["frustum_offset"]
+        return cls(
+            north_orientation=NorthOrientation(raw["north_orientation"])
+            if raw["north_orientation"] is not None
+            else None,
+            constrain_mode=ConstrainMode(raw["constrain_mode"])
+            if raw["constrain_mode"] is not None
+            else None,
+            viewport_mode=ViewportMode(raw["viewport_mode"])
+            if raw["viewport_mode"] is not None
+            else None,
+            frustum_offset=EdgeInsets(**frustum_offset)
+            if isinstance(frustum_offset, dict)
+            else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MapTileOptions:
+    """Tile prefetch and LOD tuning controls."""
+
+    prefetch_zoom_delta: int | None = None
+    lod_min_radius: float | None = None
+    lod_scale: float | None = None
+    lod_pitch_threshold: float | None = None
+    lod_zoom_shift: float | None = None
+    lod_mode: TileLodMode | None = None
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "MapTileOptions":
+        """Build tile options from private native bridge values."""
+        return cls(
+            prefetch_zoom_delta=raw["prefetch_zoom_delta"],
+            lod_min_radius=raw["lod_min_radius"],
+            lod_scale=raw["lod_scale"],
+            lod_pitch_threshold=raw["lod_pitch_threshold"],
+            lod_zoom_shift=raw["lod_zoom_shift"],
+            lod_mode=TileLodMode(raw["lod_mode"])
+            if raw["lod_mode"] is not None
+            else None,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,6 +351,46 @@ class MapHandle:
     def dump_debug_logs(self) -> None:
         """Dump map debug logs through MapLibre Native logging."""
         self._native.dump_debug_logs()
+
+    def get_viewport_options(self) -> MapViewportOptions:
+        """Return live map viewport and render-transform controls."""
+        return MapViewportOptions.from_native(self._native.get_viewport_options())
+
+    def set_viewport_options(self, options: MapViewportOptions) -> None:
+        """Apply selected live map viewport and render-transform controls."""
+        frustum_offset = (
+            (
+                options.frustum_offset.top,
+                options.frustum_offset.left,
+                options.frustum_offset.bottom,
+                options.frustum_offset.right,
+            )
+            if options.frustum_offset is not None
+            else None
+        )
+        self._native.set_viewport_options(
+            int(options.north_orientation)
+            if options.north_orientation is not None
+            else None,
+            int(options.constrain_mode) if options.constrain_mode is not None else None,
+            int(options.viewport_mode) if options.viewport_mode is not None else None,
+            frustum_offset,
+        )
+
+    def get_tile_options(self) -> MapTileOptions:
+        """Return tile prefetch and LOD tuning controls."""
+        return MapTileOptions.from_native(self._native.get_tile_options())
+
+    def set_tile_options(self, options: MapTileOptions) -> None:
+        """Apply selected tile prefetch and LOD tuning controls."""
+        self._native.set_tile_options(
+            options.prefetch_zoom_delta,
+            options.lod_min_radius,
+            options.lod_scale,
+            options.lod_pitch_threshold,
+            options.lod_zoom_shift,
+            int(options.lod_mode) if options.lod_mode is not None else None,
+        )
 
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""

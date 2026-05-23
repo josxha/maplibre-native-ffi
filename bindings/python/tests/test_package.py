@@ -177,6 +177,31 @@ def test_map_debug_and_status_options_round_trip_public_values() -> None:
             assert map_handle.get_rendering_stats_view_enabled() is False
 
 
+def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
+    viewport = map_module.MapViewportOptions(
+        north_orientation=map_module.NorthOrientation.RIGHT,
+        constrain_mode=map_module.ConstrainMode.WIDTH_AND_HEIGHT,
+        viewport_mode=map_module.ViewportMode.DEFAULT,
+        frustum_offset=camera.EdgeInsets(top=1.0, left=2.0, bottom=3.0, right=4.0),
+    )
+    tile = map_module.MapTileOptions(
+        prefetch_zoom_delta=1,
+        lod_min_radius=1.0,
+        lod_scale=1.0,
+        lod_pitch_threshold=30.0,
+        lod_zoom_shift=0.0,
+        lod_mode=map_module.TileLodMode.DEFAULT,
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_viewport_options(viewport)
+            map_handle.set_tile_options(tile)
+
+            assert map_handle.get_viewport_options() == viewport
+            assert map_handle.get_tile_options() == tile
+
+
 def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
