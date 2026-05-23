@@ -1173,6 +1173,41 @@ impl MapHandle {
         .map_err(map_error)
     }
 
+    fn add_geojson_source_data(&self, source_id: String, data: &Bound<'_, PyAny>) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let data = geojson_from_wire(data)?;
+        let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_geojson_source_data(state.as_ptr(), source_id.raw(), data.as_ptr())
+        })
+        .map_err(map_error)
+    }
+
+    fn set_geojson_source_url(&self, source_id: String, url: String) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        // SAFETY: The C API validates the map pointer and borrowed string views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_geojson_source_url(state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(map_error)
+    }
+
+    fn set_geojson_source_data(&self, source_id: String, data: &Bound<'_, PyAny>) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let data = geojson_from_wire(data)?;
+        let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_geojson_source_data(state.as_ptr(), source_id.raw(), data.as_ptr())
+        })
+        .map_err(map_error)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_vector_source_url(
         &self,
@@ -3553,6 +3588,146 @@ fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> Py
     dict.set_item("x", event.tile_id.x)?;
     dict.set_item("y", event.tile_id.y)?;
     Ok(dict.into_any().unbind())
+}
+
+fn geojson_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::GeoJson> {
+    let dict = raw.cast::<PyDict>()?;
+    let kind: String = required_dict_item(dict, "type")?.extract()?;
+    match kind.as_str() {
+        "geometry" => Ok(maplibre_core::GeoJson::Geometry(geometry_from_wire(
+            &required_dict_item(dict, "geometry")?,
+        )?)),
+        "feature" => Ok(maplibre_core::GeoJson::Feature(feature_from_wire(
+            &required_dict_item(dict, "feature")?,
+        )?)),
+        "feature_collection" => {
+            let features = required_dict_item(dict, "features")?;
+            let features = features.cast::<PyList>()?;
+            let mut copied = Vec::with_capacity(features.len());
+            for feature in features.iter() {
+                copied.push(feature_from_wire(&feature)?);
+            }
+            Ok(maplibre_core::GeoJson::FeatureCollection(copied))
+        }
+        _ => Err(invalid_argument_error(format!(
+            "unsupported GeoJSON wire type: {kind}"
+        ))),
+    }
+}
+
+fn feature_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::Feature> {
+    let dict = raw.cast::<PyDict>()?;
+    let geometry = geometry_from_wire(&required_dict_item(dict, "geometry")?)?;
+    let properties = required_dict_item(dict, "properties")?;
+    let properties = properties.cast::<PyList>()?;
+    let mut copied_properties = Vec::with_capacity(properties.len());
+    for member in properties.iter() {
+        let key: String = member.get_item(0)?.extract()?;
+        let value = member.get_item(1)?;
+        copied_properties.push(maplibre_core::JsonMember::new(
+            key,
+            json_value_from_wire(&value)?,
+        ));
+    }
+    let identifier = feature_identifier_from_wire(&required_dict_item(dict, "identifier")?)?;
+    Ok(maplibre_core::Feature::new(geometry, copied_properties).with_identifier(identifier))
+}
+
+fn feature_identifier_from_wire(
+    raw: &Bound<'_, PyAny>,
+) -> PyResult<maplibre_core::FeatureIdentifier> {
+    let dict = raw.cast::<PyDict>()?;
+    let kind: String = required_dict_item(dict, "type")?.extract()?;
+    match kind.as_str() {
+        "null" => Ok(maplibre_core::FeatureIdentifier::Null),
+        "uint" => Ok(maplibre_core::FeatureIdentifier::UInt(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        "int" => Ok(maplibre_core::FeatureIdentifier::Int(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        "double" => Ok(maplibre_core::FeatureIdentifier::Double(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        "string" => Ok(maplibre_core::FeatureIdentifier::String(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        _ => Err(invalid_argument_error(format!(
+            "unsupported feature identifier wire type: {kind}"
+        ))),
+    }
+}
+
+fn geometry_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::Geometry> {
+    let dict = raw.cast::<PyDict>()?;
+    let kind: String = required_dict_item(dict, "type")?.extract()?;
+    match kind.as_str() {
+        "empty" => Ok(maplibre_core::Geometry::Empty),
+        "point" => Ok(maplibre_core::Geometry::Point(lat_lng_from_wire(
+            &required_dict_item(dict, "coordinate")?,
+        )?)),
+        "line_string" => Ok(maplibre_core::Geometry::LineString(lat_lng_list_from_wire(
+            &required_dict_item(dict, "coordinates")?,
+        )?)),
+        "polygon" => Ok(maplibre_core::Geometry::Polygon(lat_lng_rings_from_wire(
+            &required_dict_item(dict, "rings")?,
+        )?)),
+        "multi_point" => Ok(maplibre_core::Geometry::MultiPoint(lat_lng_list_from_wire(
+            &required_dict_item(dict, "coordinates")?,
+        )?)),
+        "multi_line_string" => Ok(maplibre_core::Geometry::MultiLineString(
+            lat_lng_rings_from_wire(&required_dict_item(dict, "lines")?)?,
+        )),
+        "multi_polygon" => Ok(maplibre_core::Geometry::MultiPolygon(
+            lat_lng_polygons_from_wire(&required_dict_item(dict, "polygons")?)?,
+        )),
+        "geometry_collection" => {
+            let geometries = required_dict_item(dict, "geometries")?;
+            let geometries = geometries.cast::<PyList>()?;
+            let mut copied = Vec::with_capacity(geometries.len());
+            for geometry in geometries.iter() {
+                copied.push(geometry_from_wire(&geometry)?);
+            }
+            Ok(maplibre_core::Geometry::GeometryCollection(copied))
+        }
+        _ => Err(invalid_argument_error(format!(
+            "unsupported geometry wire type: {kind}"
+        ))),
+    }
+}
+
+fn lat_lng_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::LatLng> {
+    let (latitude, longitude): (f64, f64) = raw.extract()?;
+    Ok(maplibre_core::LatLng::new(latitude, longitude))
+}
+
+fn lat_lng_list_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<Vec<maplibre_core::LatLng>> {
+    let coordinates = raw.cast::<PyList>()?;
+    let mut copied = Vec::with_capacity(coordinates.len());
+    for coordinate in coordinates.iter() {
+        copied.push(lat_lng_from_wire(&coordinate)?);
+    }
+    Ok(copied)
+}
+
+fn lat_lng_rings_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<maplibre_core::LatLng>>> {
+    let rings = raw.cast::<PyList>()?;
+    let mut copied = Vec::with_capacity(rings.len());
+    for ring in rings.iter() {
+        copied.push(lat_lng_list_from_wire(&ring)?);
+    }
+    Ok(copied)
+}
+
+fn lat_lng_polygons_from_wire(
+    raw: &Bound<'_, PyAny>,
+) -> PyResult<Vec<Vec<Vec<maplibre_core::LatLng>>>> {
+    let polygons = raw.cast::<PyList>()?;
+    let mut copied = Vec::with_capacity(polygons.len());
+    for polygon in polygons.iter() {
+        copied.push(lat_lng_rings_from_wire(&polygon)?);
+    }
+    Ok(copied)
 }
 
 fn json_value_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonValue> {

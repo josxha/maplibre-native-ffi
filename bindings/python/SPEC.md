@@ -115,9 +115,10 @@ The current implementation includes these completed slices:
   options, repaint requests, and still-image requests.
 - `MapHandle` exposes map debug overlay options, rendering-stats view state,
   loaded-state queries, viewport options, and tile options.
-- `MapHandle` exposes GeoJSON source URL insertion plus vector, raster, and
-  raster DEM style source URL/inline-tile insertion, source removal, existence
-  checks, type/info lookup, attribution copying, and source ID listing.
+- `MapHandle` exposes GeoJSON source URL/data insertion and update plus vector,
+  raster, and raster DEM style source URL/inline-tile insertion, source removal,
+  existence checks, type/info lookup, attribution copying, and source ID
+  listing.
 - `MapHandle` exposes built-in hillshade, color-relief, and location-indicator
   layer insertion, JSON style layer insertion/copying, style light JSON/property
   APIs, layer property/filter APIs, location-indicator property setters, style

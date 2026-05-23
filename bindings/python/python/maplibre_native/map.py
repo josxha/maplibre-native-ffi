@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         ProjectionMode,
         ScreenPoint,
     )
-    from .geo import LatLng
+    from .geo import GeoJson, LatLng
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -467,6 +467,22 @@ class MapHandle:
     def add_geojson_source_url(self, source_id: str, url: str) -> None:
         """Add a GeoJSON source that loads data from a URL."""
         self._native.add_geojson_source_url(source_id, url)
+
+    def add_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
+        """Add a GeoJSON source with inline data."""
+        from .geo import _to_native_wire as _geojson_to_native_wire
+
+        self._native.add_geojson_source_data(source_id, _geojson_to_native_wire(data))
+
+    def set_geojson_source_url(self, source_id: str, url: str) -> None:
+        """Update one GeoJSON source to load data from a URL."""
+        self._native.set_geojson_source_url(source_id, url)
+
+    def set_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
+        """Update one GeoJSON source with inline data."""
+        from .geo import _to_native_wire as _geojson_to_native_wire
+
+        self._native.set_geojson_source_data(source_id, _geojson_to_native_wire(data))
 
     def add_vector_source_url(
         self,

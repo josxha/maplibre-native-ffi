@@ -199,6 +199,21 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             map_handle.add_geojson_source_url(
                 "points", "https://example.test/points.geojson"
             )
+            inline_points = geo.FeatureCollection(
+                (
+                    geo.Feature(
+                        geometry=geo.point(1.0, 2.0),
+                        properties=(json.JsonMember("name", "one"),),
+                        identifier=geo.FeatureIdentifierString("point-1"),
+                    ),
+                )
+            )
+            map_handle.add_geojson_source_data("inline-points", inline_points)
+            map_handle.set_geojson_source_url(
+                "inline-points",
+                "https://example.test/inline-points.geojson",
+            )
+            map_handle.set_geojson_source_data("inline-points", inline_points)
             map_handle.add_vector_source_url(
                 "vector-tiles",
                 "https://example.test/vector.json",
@@ -241,6 +256,10 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 == style.StyleSourceType.GEOJSON
             )
             assert (
+                map_handle.get_style_source_type("inline-points")
+                == style.StyleSourceType.GEOJSON
+            )
+            assert (
                 map_handle.get_style_source_type("vector-tiles")
                 == style.StyleSourceType.VECTOR
             )
@@ -267,6 +286,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert map_handle.get_style_source_type("missing") is None
             source_ids = map_handle.list_style_source_ids()
             assert "points" in source_ids
+            assert "inline-points" in source_ids
             assert "vector-tiles" in source_ids
             assert "raster-tiles" in source_ids
             assert "dem-tiles" in source_ids
@@ -282,6 +302,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
 
             assert map_handle.remove_style_source("points") is True
             assert map_handle.remove_style_source("points") is False
+            assert map_handle.remove_style_source("inline-points") is True
             assert map_handle.remove_style_source("vector-tiles") is True
             assert map_handle.remove_style_source("raster-tiles") is True
             assert map_handle.remove_style_source("dem-tiles") is True
@@ -290,6 +311,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert map_handle.remove_style_source("dem-inline") is True
             source_ids = map_handle.list_style_source_ids()
             assert "points" not in source_ids
+            assert "inline-points" not in source_ids
             assert "vector-tiles" not in source_ids
             assert "raster-tiles" not in source_ids
             assert "dem-tiles" not in source_ids

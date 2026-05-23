@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TypeAlias
 
 from .json import JsonMember
+from .json import _to_native_wire as _json_to_native_wire
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +191,109 @@ def geometry_collection(
 ) -> GeometryCollection:
     """Create a geometry collection."""
     return GeometryCollection(tuple(geometries))
+
+
+def _coordinate_to_native_wire(coordinate: LatLng) -> tuple[float, float]:
+    return (coordinate.latitude, coordinate.longitude)
+
+
+def _coordinates_to_native_wire(
+    coordinates: tuple[LatLng, ...],
+) -> list[tuple[float, float]]:
+    return [_coordinate_to_native_wire(coordinate) for coordinate in coordinates]
+
+
+def _geometry_to_native_wire(geometry: Geometry) -> dict[str, object]:
+    if isinstance(geometry, EmptyGeometry):
+        return {"type": "empty"}
+    if isinstance(geometry, Point):
+        return {
+            "type": "point",
+            "coordinate": _coordinate_to_native_wire(geometry.coordinate),
+        }
+    if isinstance(geometry, LineString):
+        return {
+            "type": "line_string",
+            "coordinates": _coordinates_to_native_wire(geometry.coordinates),
+        }
+    if isinstance(geometry, Polygon):
+        return {
+            "type": "polygon",
+            "rings": [_coordinates_to_native_wire(ring) for ring in geometry.rings],
+        }
+    if isinstance(geometry, MultiPoint):
+        return {
+            "type": "multi_point",
+            "coordinates": _coordinates_to_native_wire(geometry.coordinates),
+        }
+    if isinstance(geometry, MultiLineString):
+        return {
+            "type": "multi_line_string",
+            "lines": [_coordinates_to_native_wire(line) for line in geometry.lines],
+        }
+    if isinstance(geometry, MultiPolygon):
+        return {
+            "type": "multi_polygon",
+            "polygons": [
+                [_coordinates_to_native_wire(ring) for ring in polygon]
+                for polygon in geometry.polygons
+            ],
+        }
+    if isinstance(geometry, GeometryCollection):
+        return {
+            "type": "geometry_collection",
+            "geometries": [
+                _geometry_to_native_wire(child) for child in geometry.geometries
+            ],
+        }
+    msg = f"unsupported geometry value: {type(geometry).__name__}"
+    raise TypeError(msg)
+
+
+def _identifier_to_native_wire(identifier: FeatureIdentifier) -> dict[str, object]:
+    if identifier is None:
+        return {"type": "null"}
+    if isinstance(identifier, FeatureIdentifierUInt):
+        return {"type": "uint", "value": identifier.value}
+    if isinstance(identifier, FeatureIdentifierInt):
+        return {"type": "int", "value": identifier.value}
+    if isinstance(identifier, FeatureIdentifierDouble):
+        return {"type": "double", "value": identifier.value}
+    if isinstance(identifier, FeatureIdentifierString):
+        return {"type": "string", "value": identifier.value}
+    msg = f"unsupported feature identifier: {type(identifier).__name__}"
+    raise TypeError(msg)
+
+
+def _feature_to_native_wire(feature: Feature) -> dict[str, object]:
+    return {
+        "geometry": _geometry_to_native_wire(feature.geometry),
+        "properties": [
+            (member.key, _json_to_native_wire(member.value))
+            for member in feature.properties
+        ],
+        "identifier": _identifier_to_native_wire(feature.identifier),
+    }
+
+
+def _to_native_wire(value: GeoJson) -> dict[str, object]:
+    """Convert an explicit GeoJSON tree to private native-bridge wire values."""
+    if isinstance(value, GeometryGeoJson):
+        return {
+            "type": "geometry",
+            "geometry": _geometry_to_native_wire(value.geometry),
+        }
+    if isinstance(value, FeatureGeoJson):
+        return {"type": "feature", "feature": _feature_to_native_wire(value.feature)}
+    if isinstance(value, FeatureCollection):
+        return {
+            "type": "feature_collection",
+            "features": [
+                _feature_to_native_wire(feature) for feature in value.features
+            ],
+        }
+    msg = f"unsupported GeoJSON value: {type(value).__name__}"
+    raise TypeError(msg)
 
 
 __all__ = [
