@@ -265,3 +265,49 @@ type-surface polish after Round 4.
   `uv run ruff format --check bindings/python`,
   `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
   (58 Python tests, wheel build, and metadata/`_native` import check) passed.
+
+## Round 6
+
+Review fanout: final API/type-surface and lifecycle/callback review after Round
+5 typed-surface polish.
+
+### Applied findings
+
+- Avoid holding the runtime handle-state mutex while detached native calls wait
+  for resource-transform callbacks.
+  - Evidence: final lifecycle review found
+    `RuntimeHandle.set_resource_transform()`, `clear_resource_transform()`, and
+    `close()` released the GIL for native calls that can wait for callbacks, but
+    still held the Rust handle-state mutex. A Python callback or another Python
+    thread touching the same runtime could then block on that mutex while
+    holding or needing the GIL.
+  - Resolution: capture the native runtime address, release the handle-state
+    mutex before `py.detach(...)`, and reacquire only for close failure
+    recovery/bookkeeping. Runtime close marks the handle closed before detached
+    destruction and restores the address if native destruction fails so
+    owner-thread retry semantics are preserved.
+
+### Rejected or deferred findings
+
+- Broader public top-level export expansion remains deferred; reviewers found no
+  evidence it is required for this PR.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, and broad enum deduplication.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused resource-transform/runtime regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_resource_transform_registers_and_clears
+  tests/test_package.py::test_runtime_handle_context_manager_closes_once
+  tests/test_package.py::test_duplicate_runtime_reports_invalid_state
+  tests/test_package.py::test_runtime_rejects_close_while_map_is_live`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
+  (58 Python tests, wheel build, and metadata/`_native` import check) passed.

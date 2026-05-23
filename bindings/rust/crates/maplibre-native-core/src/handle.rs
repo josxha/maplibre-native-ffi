@@ -67,6 +67,10 @@ impl<T> NativeHandleState<T> {
         self.address.set(None);
     }
 
+    pub fn restore_address_for_retry(&self, address: usize) {
+        self.address.set(Some(address));
+    }
+
     pub fn as_non_null(&self) -> Option<NonNull<T>> {
         NonNull::new(self.as_ptr())
     }

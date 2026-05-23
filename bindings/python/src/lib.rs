@@ -494,18 +494,25 @@ impl RenderSessionState {
 #[pymethods]
 impl RuntimeHandle {
     fn close(&self, py: Python<'_>) -> PyResult<()> {
-        let state = self.state();
-        let Some(runtime_address) = state.address() else {
-            return Ok(());
+        let runtime_address = {
+            let state = self.state();
+            let Some(runtime_address) = state.address() else {
+                return Ok(());
+            };
+            state.mark_closed();
+            runtime_address
         };
         // SAFETY: state owns an mln_runtime pointer created by mln_runtime_create
         // and pairs it with the matching status-returning destroy function. The
-        // C API can wait for in-flight callbacks, so release the GIL while it runs.
+        // C API can wait for in-flight callbacks, so release the GIL while it runs
+        // without holding the Rust handle-state mutex.
         let status = py.detach(move || unsafe {
             sys::mln_runtime_destroy(runtime_address as *mut sys::mln_runtime)
         });
-        maplibre_core::check(status).map_err(map_error)?;
-        state.mark_closed();
+        if let Err(error) = maplibre_core::check(status) {
+            self.state().restore_address_for_retry(runtime_address);
+            return Err(map_error(error));
+        }
         self.resource_provider
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -836,15 +843,15 @@ impl RuntimeHandle {
             max_pending_callbacks,
         ));
         let descriptor = replacement.descriptor();
-        let state = self.state();
-        let runtime_address = state.as_ptr() as usize;
+        let runtime_address = self.state().as_ptr() as usize;
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
         // SAFETY: state owns or has released the runtime pointer. The C API
         // validates that it is live. descriptor points to replacement state,
         // which is retained after a successful native registration. Replacement
-        // can wait for in-flight callbacks, so release the GIL while it runs.
+        // can wait for in-flight callbacks, so release the GIL while it runs
+        // without holding the Rust handle-state mutex.
         let status = py.detach(move || {
             let descriptor = sys::mln_resource_transform {
                 size,
@@ -867,11 +874,11 @@ impl RuntimeHandle {
     }
 
     fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<()> {
-        let state = self.state();
-        let runtime_address = state.as_ptr() as usize;
+        let runtime_address = self.state().as_ptr() as usize;
         // SAFETY: state owns or has released the runtime pointer. The C API
         // validates that it is live and waits for in-flight callbacks before
-        // returning success, so release the GIL while it runs.
+        // returning success, so release the GIL while it runs without holding
+        // the Rust handle-state mutex.
         let status = py.detach(move || unsafe {
             sys::mln_runtime_clear_resource_transform(runtime_address as *mut sys::mln_runtime)
         });
