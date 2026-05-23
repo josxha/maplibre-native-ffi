@@ -16,6 +16,7 @@ const {
   NativeBuffer,
   NativePointer,
   OfflineOperationHandle,
+  ResourceRequestHandle,
   networkStatus,
   projectedMetersForLatLng,
   restoreDefaultAsyncLogSeverities,
@@ -186,6 +187,25 @@ test("ambient cache operations expose discardable handles", () => {
     operation.close();
     assert.throws(
       () => runtime.runAmbientCacheOperation(/** @type {any} */ ("vacuum")),
+      InvalidArgumentError,
+    );
+  } finally {
+    runtime.close();
+  }
+});
+
+test("resource provider callback registration validates Node handoff shape", () => {
+  const runtime = new RuntimeHandle();
+
+  try {
+    runtime.setResourceProvider((request) => {
+      assert.equal(typeof request.url, "string");
+      assert.equal(typeof request.rawKind, "number");
+      assert.equal(request.handle instanceof ResourceRequestHandle, true);
+      return "passThrough";
+    });
+    assert.throws(
+      () => runtime.setResourceProvider(/** @type {any} */ (null)),
       InvalidArgumentError,
     );
   } finally {

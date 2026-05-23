@@ -220,16 +220,18 @@ export type AmbientCacheOperation =
   | "invalidate"
   | "clear";
 
+export type ResourceKind =
+  | "unknown"
+  | "style"
+  | "source"
+  | "tile"
+  | "glyphs"
+  | "sprite-image"
+  | "sprite-json"
+  | "image";
+
 export interface ResourceTransformRequest {
-  kind:
-    | "unknown"
-    | "style"
-    | "source"
-    | "tile"
-    | "glyphs"
-    | "sprite-image"
-    | "sprite-json"
-    | "image";
+  kind: ResourceKind;
   rawKind: number;
   url: string;
 }
@@ -237,6 +239,65 @@ export interface ResourceTransformRequest {
 export type ResourceTransformCallback = (
   request: ResourceTransformRequest,
 ) => string | null | undefined;
+
+export interface ResourceByteRange {
+  start: string;
+  end: string;
+}
+
+export interface ResourceProviderRequest {
+  url: string;
+  kind: ResourceKind;
+  rawKind: number;
+  loadingMethod: "all" | "cacheOnly" | "networkOnly" | "unknown";
+  rawLoadingMethod: number;
+  priority: "regular" | "low" | "unknown";
+  rawPriority: number;
+  usage: "online" | "offline" | "unknown";
+  rawUsage: number;
+  storagePolicy: "permanent" | "volatile" | "unknown";
+  rawStoragePolicy: number;
+  range?: ResourceByteRange | null;
+  priorModifiedUnixMs?: number | null;
+  priorExpiresUnixMs?: number | null;
+  priorEtag?: string | null;
+  priorData: Uint8Array;
+  handle: ResourceRequestHandle;
+}
+
+export interface ResourceResponseInput {
+  status?: "ok" | "error" | "noContent" | "notModified" | null;
+  errorReason?:
+    | "none"
+    | "notFound"
+    | "server"
+    | "connection"
+    | "rateLimit"
+    | "other"
+    | null;
+  bytes?: Uint8Array | null;
+  errorMessage?: string | null;
+  mustRevalidate?: boolean | null;
+  modifiedUnixMs?: number | null;
+  expiresUnixMs?: number | null;
+  etag?: string | null;
+  retryAfterUnixMs?: number | null;
+}
+
+export type ResourceProviderDecision = "passThrough" | "handle";
+
+export type ResourceProviderCallback = (
+  request: ResourceProviderRequest,
+) => ResourceProviderDecision | null | undefined;
+
+export declare class ResourceRequestHandle {
+  private constructor(nativeHandle: unknown);
+  readonly closed: boolean;
+  complete(response?: ResourceResponseInput): void;
+  cancelled(): boolean;
+  close(): void;
+  [Symbol.dispose](): void;
+}
 
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
@@ -246,6 +307,7 @@ export declare class RuntimeHandle {
   runOnce(): void;
   setResourceTransform(callback: ResourceTransformCallback): void;
   clearResourceTransform(): void;
+  setResourceProvider(callback: ResourceProviderCallback): void;
   runAmbientCacheOperation(
     operation: AmbientCacheOperation,
   ): OfflineOperationHandle;

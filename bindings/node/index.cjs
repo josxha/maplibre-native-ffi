@@ -268,6 +268,43 @@ function validateByteLength(byteLength) {
   return byteLength;
 }
 
+class ResourceRequestHandle {
+  constructor(handleId) {
+    this.handleId = handleId;
+    this.closed = false;
+  }
+
+  complete(response = {}) {
+    if (this.closed) {
+      throw new InvalidStateError(null, "ResourceRequestHandle is closed");
+    }
+    translateNativeErrors(() =>
+      native.nativeResourceRequestComplete(this.handleId, response),
+    );
+    this.closed = true;
+  }
+
+  cancelled() {
+    return translateNativeErrors(() =>
+      native.nativeResourceRequestCancelled(this.handleId),
+    );
+  }
+
+  close() {
+    if (this.closed) {
+      return;
+    }
+    translateNativeErrors(() =>
+      native.nativeResourceRequestClose(this.handleId),
+    );
+    this.closed = true;
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
 class OfflineOperationHandle {
   constructor(runtime, operationId) {
     if (!(runtime instanceof RuntimeHandle)) {
@@ -335,6 +372,25 @@ class RuntimeHandle {
     }
     return translateNativeErrors(() =>
       this.native.setResourceTransform(callback),
+    );
+  }
+
+  setResourceProvider(callback) {
+    if (typeof callback !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "resource provider callback must be a function",
+      );
+    }
+    return translateNativeErrors(() =>
+      this.native.setResourceProvider((request) => {
+        const wrapped = {
+          ...request,
+          handle: new ResourceRequestHandle(request.handleId),
+        };
+        delete wrapped.handleId;
+        return callback(wrapped);
+      }),
     );
   }
 
@@ -1056,6 +1112,7 @@ module.exports = {
   NativeError,
   MaplibreStatus,
   RuntimeHandle,
+  ResourceRequestHandle,
   OfflineOperationHandle,
   MapHandle,
   MapProjectionHandle,

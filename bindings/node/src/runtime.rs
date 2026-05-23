@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, mpsc};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
-use napi::bindgen_prelude::{BigInt, Result};
+use napi::bindgen_prelude::{BigInt, Result, Uint8Array};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -41,15 +43,65 @@ pub struct ResourceTransformRequest {
     pub url: String,
 }
 
+#[napi(object)]
+pub struct ResourceByteRange {
+    pub start: String,
+    pub end: String,
+}
+
+#[napi(object)]
+pub struct ResourceProviderRequest {
+    pub url: String,
+    pub kind: String,
+    pub raw_kind: u32,
+    pub loading_method: String,
+    pub raw_loading_method: u32,
+    pub priority: String,
+    pub raw_priority: u32,
+    pub usage: String,
+    pub raw_usage: u32,
+    pub storage_policy: String,
+    pub raw_storage_policy: u32,
+    pub range: Option<ResourceByteRange>,
+    pub prior_modified_unix_ms: Option<i64>,
+    pub prior_expires_unix_ms: Option<i64>,
+    pub prior_etag: Option<String>,
+    pub prior_data: Uint8Array,
+    pub handle_id: String,
+}
+
+#[napi(object)]
+pub struct ResourceResponseInput {
+    pub status: Option<String>,
+    pub error_reason: Option<String>,
+    pub bytes: Option<Uint8Array>,
+    pub error_message: Option<String>,
+    pub must_revalidate: Option<bool>,
+    pub modified_unix_ms: Option<i64>,
+    pub expires_unix_ms: Option<i64>,
+    pub etag: Option<String>,
+    pub retry_after_unix_ms: Option<i64>,
+}
+
+static RESOURCE_REQUEST_HANDLE_IDS: AtomicU64 = AtomicU64::new(1);
+static RESOURCE_REQUEST_HANDLES: OnceLock<
+    Mutex<HashMap<u64, Arc<core::resource::ResourceRequestHandleState>>>,
+> = OnceLock::new();
+
 struct ResourceTransformState {
     callback: ThreadsafeFunction<ResourceTransformRequest, Option<String>>,
     replacements: Mutex<Vec<CString>>,
+}
+
+struct ResourceProviderState {
+    callback: ThreadsafeFunction<ResourceProviderRequest, Option<String>>,
 }
 
 #[napi(js_name = "NativeRuntimeHandle")]
 pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
+    resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -68,14 +120,63 @@ pub fn create_native_runtime_handle(
     Ok(NativeRuntimeHandle {
         state,
         resource_transform: Mutex::new(None),
+        resource_provider: Mutex::new(None),
     })
+}
+
+#[napi(js_name = "nativeResourceRequestComplete")]
+pub fn native_resource_request_complete(
+    handle_id: String,
+    response: ResourceResponseInput,
+) -> Result<()> {
+    let handle_id = parse_resource_request_handle_id(&handle_id)?;
+    let handle = resource_request_handles()
+        .lock()
+        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
+        .remove(&handle_id)
+        .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
+    handle
+        .complete(&resource_response_from_input(response)?)
+        .map_err(error::from_core)
+}
+
+#[napi(js_name = "nativeResourceRequestCancelled")]
+pub fn native_resource_request_cancelled(handle_id: String) -> Result<bool> {
+    let handle_id = parse_resource_request_handle_id(&handle_id)?;
+    let handle = resource_request_handles()
+        .lock()
+        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
+        .get(&handle_id)
+        .cloned()
+        .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
+    handle.is_cancelled().map_err(error::from_core)
+}
+
+#[napi(js_name = "nativeResourceRequestClose")]
+pub fn native_resource_request_close(handle_id: String) -> Result<()> {
+    let handle_id = parse_resource_request_handle_id(&handle_id)?;
+    if let Some(handle) = resource_request_handles()
+        .lock()
+        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
+        .remove(&handle_id)
+    {
+        handle.close();
+    }
+    Ok(())
 }
 
 #[napi]
 impl NativeRuntimeHandle {
     #[napi]
     pub fn close(&self) -> Result<()> {
-        unsafe { self.state.close_status(sys::mln_runtime_destroy) }.map_err(error::from_core)
+        unsafe { self.state.close_status(sys::mln_runtime_destroy) }.map_err(error::from_core)?;
+        if let Ok(mut transform) = self.resource_transform.lock() {
+            *transform = None;
+        }
+        if let Ok(mut provider) = self.resource_provider.lock() {
+            *provider = None;
+        }
+        Ok(())
     }
 
     #[napi(getter)]
@@ -87,6 +188,28 @@ impl NativeRuntimeHandle {
     pub fn run_once(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_run_once(self.state.as_ptr()) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setResourceProvider")]
+    pub fn set_resource_provider(
+        &self,
+        callback: ThreadsafeFunction<ResourceProviderRequest, Option<String>>,
+    ) -> Result<()> {
+        let provider = Arc::new(ResourceProviderState { callback });
+        let descriptor = core::resource::resource_provider_descriptor(
+            Some(resource_provider_trampoline),
+            Arc::as_ptr(&provider) as *mut c_void,
+        );
+        core::check(unsafe {
+            sys::mln_runtime_set_resource_provider(self.state.as_ptr(), &descriptor)
+        })
+        .map_err(error::from_core)?;
+        *self
+            .resource_provider
+            .lock()
+            .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))? =
+            Some(provider);
+        Ok(())
     }
 
     #[napi(js_name = "setResourceTransform")]
@@ -172,6 +295,58 @@ impl NativeRuntimeHandle {
     }
 }
 
+unsafe extern "C" fn resource_provider_trampoline(
+    user_data: *mut c_void,
+    request: *const sys::mln_resource_request,
+    handle: *mut sys::mln_resource_request_handle,
+) -> u32 {
+    if user_data.is_null() || request.is_null() || handle.is_null() {
+        return core::resource::UNKNOWN_PROVIDER_DECISION;
+    }
+    let provider = unsafe { &*(user_data as *const ResourceProviderState) };
+    let request = match unsafe { core::resource::copy_resource_request(&*request) } {
+        Ok(request) => request,
+        Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
+    };
+    let handle_state = match unsafe {
+        core::resource::ResourceRequestHandleState::new(
+            handle,
+            core::resource::ResourceRequestHandleFns::NATIVE,
+        )
+    } {
+        Ok(handle_state) => handle_state,
+        Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
+    };
+    let handle_id = register_resource_request_handle(handle_state.clone());
+    let provider_request = resource_provider_request_from_core(request, handle_id);
+    let (sender, receiver) = mpsc::sync_channel(1);
+    let decision_state = handle_state.clone();
+    let decision_handle_id = handle_id;
+    let status = provider.callback.call_with_return_value(
+        Ok(provider_request),
+        ThreadsafeFunctionCallMode::Blocking,
+        move |result, _env| {
+            let decision = match result.ok().flatten().as_deref() {
+                Some("handle") => core::resource::ResourceProviderDecision::Handle,
+                _ => core::resource::ResourceProviderDecision::PassThrough,
+            };
+            if !matches!(decision, core::resource::ResourceProviderDecision::Handle) {
+                unregister_resource_request_handle(decision_handle_id);
+            }
+            let _ = sender.send(decision_state.finish_provider_decision(decision));
+            Ok(())
+        },
+    );
+    if !matches!(status, napi::Status::Ok) {
+        unregister_resource_request_handle(handle_id);
+        return handle_state.finish_provider_exception();
+    }
+    receiver.recv().unwrap_or_else(|_| {
+        unregister_resource_request_handle(handle_id);
+        handle_state.finish_provider_exception()
+    })
+}
+
 unsafe extern "C" fn resource_transform_trampoline(
     user_data: *mut c_void,
     kind: u32,
@@ -245,6 +420,104 @@ impl RuntimeEvent {
     }
 }
 
+fn resource_request_handles()
+-> &'static Mutex<HashMap<u64, Arc<core::resource::ResourceRequestHandleState>>> {
+    RESOURCE_REQUEST_HANDLES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn register_resource_request_handle(
+    handle: Arc<core::resource::ResourceRequestHandleState>,
+) -> u64 {
+    let handle_id = RESOURCE_REQUEST_HANDLE_IDS.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut handles) = resource_request_handles().lock() {
+        handles.insert(handle_id, handle);
+    }
+    handle_id
+}
+
+fn unregister_resource_request_handle(handle_id: u64) {
+    if let Ok(mut handles) = resource_request_handles().lock() {
+        handles.remove(&handle_id);
+    }
+}
+
+fn parse_resource_request_handle_id(handle_id: &str) -> Result<u64> {
+    handle_id
+        .parse::<u64>()
+        .map_err(|_| error::invalid_argument("ResourceRequestHandle id is invalid"))
+}
+
+fn resource_provider_request_from_core(
+    request: core::resource::ResourceRequest,
+    handle_id: u64,
+) -> ResourceProviderRequest {
+    ResourceProviderRequest {
+        url: request.url,
+        kind: resource_kind_name(request.kind).to_owned(),
+        raw_kind: request.raw_kind,
+        loading_method: resource_loading_method_name(request.loading_method).to_owned(),
+        raw_loading_method: request.raw_loading_method,
+        priority: resource_priority_name(request.priority).to_owned(),
+        raw_priority: request.raw_priority,
+        usage: resource_usage_name(request.usage).to_owned(),
+        raw_usage: request.raw_usage,
+        storage_policy: resource_storage_policy_name(request.storage_policy).to_owned(),
+        raw_storage_policy: request.raw_storage_policy,
+        range: request.range.map(|range| ResourceByteRange {
+            start: range.start.to_string(),
+            end: range.end.to_string(),
+        }),
+        prior_modified_unix_ms: request.prior_modified_unix_ms,
+        prior_expires_unix_ms: request.prior_expires_unix_ms,
+        prior_etag: request.prior_etag,
+        prior_data: Uint8Array::from(request.prior_data),
+        handle_id: handle_id.to_string(),
+    }
+}
+
+fn resource_response_from_input(input: ResourceResponseInput) -> Result<core::ResourceResponse> {
+    let status = resource_response_status_from_string(input.status.as_deref().unwrap_or("ok"))?;
+    let error_reason =
+        resource_error_reason_from_string(input.error_reason.as_deref().unwrap_or("none"))?;
+    let mut response = core::ResourceResponse::default();
+    response.status = status;
+    response.error_reason = error_reason;
+    response.bytes = input.bytes.map(|bytes| bytes.to_vec()).unwrap_or_default();
+    response.error_message = input.error_message;
+    response.must_revalidate = input.must_revalidate.unwrap_or(false);
+    response.modified_unix_ms = input.modified_unix_ms;
+    response.expires_unix_ms = input.expires_unix_ms;
+    response.etag = input.etag;
+    response.retry_after_unix_ms = input.retry_after_unix_ms;
+    Ok(response)
+}
+
+fn resource_response_status_from_string(value: &str) -> Result<core::ResourceResponseStatus> {
+    match value {
+        "ok" => Ok(core::ResourceResponseStatus::Ok),
+        "error" => Ok(core::ResourceResponseStatus::Error),
+        "noContent" => Ok(core::ResourceResponseStatus::NoContent),
+        "notModified" => Ok(core::ResourceResponseStatus::NotModified),
+        other => Err(error::invalid_argument(format!(
+            "resource response status must be 'ok', 'error', 'noContent', or 'notModified', got '{other}'"
+        ))),
+    }
+}
+
+fn resource_error_reason_from_string(value: &str) -> Result<core::ResourceErrorReason> {
+    match value {
+        "none" => Ok(core::ResourceErrorReason::None),
+        "notFound" => Ok(core::ResourceErrorReason::NotFound),
+        "server" => Ok(core::ResourceErrorReason::Server),
+        "connection" => Ok(core::ResourceErrorReason::Connection),
+        "rateLimit" => Ok(core::ResourceErrorReason::RateLimit),
+        "other" => Ok(core::ResourceErrorReason::Other),
+        other => Err(error::invalid_argument(format!(
+            "resource error reason must be 'none', 'notFound', 'server', 'connection', 'rateLimit', or 'other', got '{other}'"
+        ))),
+    }
+}
+
 fn resource_kind_name(kind: core::ResourceKind) -> &'static str {
     match kind {
         core::ResourceKind::Unknown => "unknown",
@@ -256,6 +529,43 @@ fn resource_kind_name(kind: core::ResourceKind) -> &'static str {
         core::ResourceKind::SpriteJson => "sprite-json",
         core::ResourceKind::Image => "image",
         core::ResourceKind::UnknownRaw(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn resource_loading_method_name(value: core::ResourceLoadingMethod) -> &'static str {
+    match value {
+        core::ResourceLoadingMethod::All => "all",
+        core::ResourceLoadingMethod::CacheOnly => "cacheOnly",
+        core::ResourceLoadingMethod::NetworkOnly => "networkOnly",
+        core::ResourceLoadingMethod::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn resource_priority_name(value: core::ResourcePriority) -> &'static str {
+    match value {
+        core::ResourcePriority::Low => "low",
+        core::ResourcePriority::Regular => "regular",
+        core::ResourcePriority::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn resource_usage_name(value: core::ResourceUsage) -> &'static str {
+    match value {
+        core::ResourceUsage::Online => "online",
+        core::ResourceUsage::Offline => "offline",
+        core::ResourceUsage::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn resource_storage_policy_name(value: core::ResourceStoragePolicy) -> &'static str {
+    match value {
+        core::ResourceStoragePolicy::Permanent => "permanent",
+        core::ResourceStoragePolicy::Volatile => "volatile",
+        core::ResourceStoragePolicy::Unknown(_) => "unknown",
         _ => "unknown",
     }
 }
