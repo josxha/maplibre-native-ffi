@@ -263,7 +263,7 @@ class NativeBuffer {
     if (typeof data === "number") {
       this.buffer = new ArrayBuffer(validateByteLength(data));
     } else if (data instanceof ArrayBuffer) {
-      this.buffer = data;
+      this.buffer = data.slice(0);
     } else if (ArrayBuffer.isView(data)) {
       const copy = new Uint8Array(data.byteLength);
       copy.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));

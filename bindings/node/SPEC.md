@@ -72,6 +72,7 @@ convention-defined behavior.
 bindings/node/
   .gitignore
   SPEC.md
+  REVIEW.md
   Cargo.toml
   build.rs
   mise.toml
@@ -93,6 +94,7 @@ bindings/node/
     values.rs
   test/
     maplibre.test.cjs
+    subpath-types.test.cts
 ```
 
 The package implements the low-level Node binding surface named in this file:

@@ -53,3 +53,30 @@ Recorded limitations / not applied:
   JavaScript handle guards, and `SPEC.md` now records the Node-suite limitation.
 
 Findings requiring user input: none.
+
+## Round 2
+
+Review evidence:
+
+- Ran three independent review agents after the Round 1 fixes:
+  - FFI/lifetime review.
+  - JavaScript/TypeScript API surface review.
+  - SPEC/REVIEW/test adequacy review.
+- The FFI/lifetime reviewer reported no remaining actionable findings.
+
+Applied findings:
+
+1. `NativeBuffer` constructor aliases caller-owned `ArrayBuffer`.
+   - Action: `new NativeBuffer(existingArrayBuffer)` now copies with `slice(0)`,
+     and tests verify source mutation does not affect the `NativeBuffer`.
+2. Subpath export tests did not cover `types` conditions or most curated module
+   shapes.
+   - Action: tests assert representative value exports for each value-bearing
+     subpath, and `test/subpath-types.test.cts` imports every concept subpath
+     through the package export map for type resolution.
+3. `SPEC.md` current-file block omitted the review log.
+   - Action: `SPEC.md` now includes `REVIEW.md` and the subpath type fixture.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.

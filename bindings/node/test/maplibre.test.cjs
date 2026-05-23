@@ -54,12 +54,22 @@ test("concept subpath modules expose curated public API groups", () => {
   const runtimeModule = require("@maplibre/native-ffi-node/runtime");
   const renderModule = require("@maplibre/native-ffi-node/render");
   const errorModule = require("@maplibre/native-ffi-node/error");
+  const geoModule = require("@maplibre/native-ffi-node/geo");
+  const logModule = require("@maplibre/native-ffi-node/log");
+  const mapModule = require("@maplibre/native-ffi-node/map");
+  const offlineModule = require("@maplibre/native-ffi-node/offline");
+  const resourceModule = require("@maplibre/native-ffi-node/resource");
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
   assert.equal(runtimeModule.networkStatus, networkStatus);
   assert.equal(renderModule.RenderSessionHandle, RenderSessionHandle);
   assert.equal(renderModule.NativeBuffer, NativeBuffer);
   assert.equal(errorModule.InvalidArgumentError, InvalidArgumentError);
+  assert.equal(geoModule.projectedMetersForLatLng, projectedMetersForLatLng);
+  assert.equal(logModule.setLogCallback, setLogCallback);
+  assert.equal(mapModule.MapHandle, MapHandle);
+  assert.equal(offlineModule.OfflineOperationHandle, OfflineOperationHandle);
+  assert.equal(resourceModule.ResourceRequestHandle, ResourceRequestHandle);
 });
 
 test("process-global APIs cross the native add-on", () => {
@@ -215,6 +225,11 @@ test("native buffer owns byte storage for render interop", () => {
   const copied = NativeBuffer.from(allocated.asUint8Array());
   allocated.asUint8Array()[0] = 9;
   assert.deepEqual([...copied.asUint8Array()], [1, 2, 3, 4]);
+  const sourceBuffer = new ArrayBuffer(4);
+  new Uint8Array(sourceBuffer).set([5, 6, 7, 8]);
+  const constructorCopied = new NativeBuffer(sourceBuffer);
+  new Uint8Array(sourceBuffer)[0] = 1;
+  assert.deepEqual([...constructorCopied.asUint8Array()], [5, 6, 7, 8]);
   const sharedCopy = NativeBuffer.from(
     new Uint8Array(new SharedArrayBuffer(4)),
   );
