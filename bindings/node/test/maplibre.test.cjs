@@ -3,10 +3,13 @@ const test = require("node:test");
 
 const {
   cVersion,
+  InvalidArgumentError,
+  MaplibreError,
+  MaplibreStatus,
   networkStatus,
   setNetworkStatus,
   supportedRenderBackends,
-} = require("../index.js");
+} = require("..");
 
 test("process-global proof slice crosses the native add-on", () => {
   assert.equal(cVersion(), 0);
@@ -31,5 +34,17 @@ test("process-global proof slice crosses the native add-on", () => {
 });
 
 test("binding-owned validation rejects unknown network status strings", () => {
-  assert.throws(() => setNetworkStatus("airplane"));
+  assert.throws(
+    () => setNetworkStatus(/** @type {any} */ ("airplane")),
+    (error) => {
+      if (!(error instanceof InvalidArgumentError)) {
+        return false;
+      }
+      assert.equal(error instanceof MaplibreError, true);
+      assert.equal(error.status, MaplibreStatus.invalidArgument);
+      assert.equal(error.nativeStatusCode, null);
+      assert.match(error.diagnostic, /network status/);
+      return true;
+    },
+  );
 });

@@ -59,11 +59,10 @@ have not moved into `core` yet.
 Record Node-only differences here. Remove rows as the implementation reaches the
 convention-defined behavior.
 
-| Item               | Difference or omission                                                                                    | Reason                                                                                | User-visible behavior                                                                                                        | Tests/docs impact                                          |
-| ------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Error classes      | The scaffold maps native failures to generic N-API errors instead of final `MaplibreError` subclasses.    | The proof slice verifies native calls before the JavaScript exception taxonomy lands. | Failed proof-slice calls throw `Error`; future calls throw `MaplibreError` subclasses with kind, raw status, and diagnostic. | Add tests when `MaplibreError` lands.                      |
-| Direct `sys` calls | `cVersion`, `supportedRenderBackends`, and network status call `maplibre-native-sys` from the Node crate. | Matching helpers are not yet in `maplibre-native-core`.                               | The public API remains Node-shaped; raw C details stay inside Rust.                                                          | Move repeated sequences into `core` before broad coverage. |
-| TypeScript modules | The scaffold uses generated root exports only.                                                            | `napi-rs` proves the add-on before curated concept modules land.                      | Consumers import the proof-slice functions from the package root.                                                            | Add subpath/module tests when concept modules land.        |
+| Item               | Difference or omission                                                                                    | Reason                                                           | User-visible behavior                                               | Tests/docs impact                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Direct `sys` calls | `cVersion`, `supportedRenderBackends`, and network status call `maplibre-native-sys` from the Node crate. | Matching helpers are not yet in `maplibre-native-core`.          | The public API remains Node-shaped; raw C details stay inside Rust. | Move repeated sequences into `core` before broad coverage. |
+| TypeScript modules | The scaffold uses generated root exports only.                                                            | `napi-rs` proves the add-on before curated concept modules land. | Consumers import the proof-slice functions from the package root.   | Add subpath/module tests when concept modules land.        |
 
 ## Current scaffold
 
@@ -77,6 +76,8 @@ bindings/node/
   package.json
   pnpm-lock.yaml
   tsconfig.json
+  index.cjs
+  index.d.cts
   src/
     lib.rs
     error.rs
@@ -93,18 +94,22 @@ The scaffold implements one proof slice:
   while preserving the raw mask.
 - `networkStatus()` and `setNetworkStatus(status)` cross the real C ABI and use
   Rust status conversion for native failures.
-- The Node test uses the generated `index.js` after `napi build` and verifies
+- `MaplibreError` subclasses expose stable status, raw native status when
+  available, and copied diagnostics through the checked-in JavaScript wrapper.
+- The Node test uses the package root wrapper after `napi build` and verifies
   the process-global proof slice.
 
 ## Build artifacts and tasks
 
-| Artifact               | Path                       | Contents                                                                                      |
-| ---------------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
-| Node package           | `bindings/node`            | Package metadata, generated JavaScript entry point, generated TypeScript declarations, tests. |
-| N-API Rust crate       | `bindings/node`            | Rust add-on crate using `napi-rs`, `maplibre-native-core`, and narrow `sys` access.           |
-| Native add-on binary   | `bindings/node/*.node`     | Platform-specific Node-API shared library generated by `napi build`.                          |
-| Generated declarations | `bindings/node/index.d.ts` | TypeScript declarations generated from `#[napi]` exports.                                     |
-| Generated loader       | `bindings/node/index.js`   | JavaScript loader generated by `napi-rs`.                                                     |
+| Artifact               | Path                        | Contents                                                                                      |
+| ---------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| Node package           | `bindings/node`             | Package metadata, generated JavaScript entry point, generated TypeScript declarations, tests. |
+| N-API Rust crate       | `bindings/node`             | Rust add-on crate using `napi-rs`, `maplibre-native-core`, and narrow `sys` access.           |
+| Native add-on binary   | `bindings/node/*.node`      | Platform-specific Node-API shared library generated by `napi build`.                          |
+| Public wrapper         | `bindings/node/index.cjs`   | Checked-in CommonJS API wrapper with error classes and stable package exports.                |
+| Public declarations    | `bindings/node/index.d.cts` | Checked-in TypeScript declarations for the public wrapper.                                    |
+| Generated declarations | `bindings/node/index.d.ts`  | TypeScript declarations generated from `#[napi]` exports and kept out of git.                 |
+| Generated loader       | `bindings/node/index.js`    | JavaScript native loader generated by `napi-rs` and kept out of git.                          |
 
 Implemented tasks:
 
@@ -121,9 +126,9 @@ The add-on links `maplibre-native-c` through `maplibre-native-sys`, which uses
 
 ## Planned package and module map
 
-The current package root exports the proof-slice process-global functions. As
-coverage grows, the package root will re-export concept modules. Planned public
-TypeScript modules group C API concepts:
+The current package root exports the proof-slice process-global functions and
+error classes. As coverage grows, the package root will re-export concept
+modules. Planned public TypeScript modules group C API concepts:
 
 ```text
 @maplibre/native-ffi-node
@@ -144,7 +149,9 @@ TypeScript modules group C API concepts:
 Current internal Rust modules:
 
 ```text
-src/error.rs       status and diagnostic conversion into Node errors
+index.cjs          public JavaScript wrapper and error classes
+index.d.cts        public TypeScript declarations
+src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice and root exports
 ```
 
@@ -522,7 +529,7 @@ area instead of retesting all native C validation rules.
 1. Keep the proof slice green: `napi-rs` build, ABI version, supported render
    backends, network status, and Node test.
 2. Add `MaplibreError` subclasses, status conversion, raw status, and copied
-   diagnostic properties.
+   diagnostic properties. _(Initial proof-slice wrapper complete.)_
 3. Add environment ownership, cleanup hooks, close-once handle state, leak
    reporting, `close()`, and `Symbol.dispose`.
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
