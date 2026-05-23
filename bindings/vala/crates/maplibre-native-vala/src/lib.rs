@@ -11,6 +11,7 @@ pub mod handles;
 pub mod logging;
 pub mod native_pointer;
 pub mod projection;
+pub mod query;
 pub mod render;
 pub mod resource;
 pub mod status;

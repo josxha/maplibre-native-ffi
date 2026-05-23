@@ -146,6 +146,20 @@ typedef enum {
   MLN_VALA_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2,
 } MlnValaLocationIndicatorImageKind;
 
+typedef enum {
+  MLN_VALA_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1,
+  MLN_VALA_RENDERED_QUERY_GEOMETRY_TYPE_BOX = 2,
+  MLN_VALA_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3,
+} MlnValaRenderedQueryGeometryType;
+
+typedef enum {
+  MLN_VALA_RENDERED_FEATURE_QUERY_OPTION_FIELDS_LAYER_IDS = 1u << 0u,
+} MlnValaRenderedFeatureQueryOptionFields;
+
+typedef enum {
+  MLN_VALA_SOURCE_FEATURE_QUERY_OPTION_FIELDS_SOURCE_LAYER_IDS = 1u << 0u,
+} MlnValaSourceFeatureQueryOptionFields;
+
 /**
  * MlnValaResourceTransformCallback:
  * @kind: resource kind.
@@ -349,6 +363,49 @@ typedef struct {
   double x;
   double y;
 } MlnValaScreenPoint;
+
+typedef struct {
+  MlnValaScreenPoint min;
+  MlnValaScreenPoint max;
+} MlnValaScreenBox;
+
+typedef struct {
+  const MlnValaScreenPoint* points;
+  size_t point_count;
+} MlnValaScreenLineString;
+
+typedef struct {
+  const char* data;
+  size_t size;
+} MlnValaStringView;
+
+typedef struct _MlnValaJsonValue MlnValaJsonValue;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderedQueryGeometryType type;
+  union {
+    MlnValaScreenPoint point;
+    MlnValaScreenBox box;
+    MlnValaScreenLineString line_string;
+  } data;
+} MlnValaRenderedQueryGeometry;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderedFeatureQueryOptionFields fields;
+  const MlnValaStringView* layer_ids;
+  size_t layer_id_count;
+  const MlnValaJsonValue* filter;
+} MlnValaRenderedFeatureQueryOptions;
+
+typedef struct {
+  uint32_t size;
+  MlnValaSourceFeatureQueryOptionFields fields;
+  const MlnValaStringView* source_layer_ids;
+  size_t source_layer_id_count;
+  const MlnValaJsonValue* filter;
+} MlnValaSourceFeatureQueryOptions;
 
 typedef struct {
   uint32_t size;
@@ -698,6 +755,55 @@ gboolean mln_vala_style_image_options_default(
 );
 gboolean mln_vala_style_image_info_default(
   MlnValaStyleImageInfo* out_info, GError** error
+);
+gboolean mln_vala_rendered_feature_query_options_default(
+  MlnValaRenderedFeatureQueryOptions* out_options, GError** error
+);
+gboolean mln_vala_source_feature_query_options_default(
+  MlnValaSourceFeatureQueryOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_rendered_query_geometry_point:
+ * @point: (not nullable): screen point.
+ * @out_geometry: (out): return location for query geometry.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_rendered_query_geometry_point(
+  const MlnValaScreenPoint* point, MlnValaRenderedQueryGeometry* out_geometry,
+  GError** error
+);
+
+/**
+ * mln_vala_rendered_query_geometry_box:
+ * @box: (not nullable): screen box.
+ * @out_geometry: (out): return location for query geometry.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_rendered_query_geometry_box(
+  const MlnValaScreenBox* box, MlnValaRenderedQueryGeometry* out_geometry,
+  GError** error
+);
+
+/**
+ * mln_vala_rendered_query_geometry_line_string:
+ * @points: (array length=point_count): screen line string points.
+ * @point_count: number of points in @points.
+ * @out_geometry: (out): return location for query geometry.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_rendered_query_geometry_line_string(
+  const MlnValaScreenPoint* points, size_t point_count,
+  MlnValaRenderedQueryGeometry* out_geometry, GError** error
 );
 gboolean mln_vala_metal_surface_descriptor_default(
   MlnValaMetalSurfaceDescriptor* out_descriptor, GError** error

@@ -77,8 +77,20 @@ int main(string[] args) {
     size_t pointer_bits = native_pointer.get_bits();
     MaplibreNative.ResourceResponse response = {};
     response.default();
+    MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
+    rendered_query_options.default();
+    MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
+    source_query_options.default();
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
+    MaplibreNative.ScreenPoint query_point = { 0.0, 0.0 };
+    MaplibreNative.RenderedQueryGeometry query_geometry;
+    MaplibreNative.RenderedQueryGeometry.point(query_point, out query_geometry);
+    MaplibreNative.ScreenBox query_box = { { 0.0, 0.0 }, { 1.0, 1.0 } };
+    MaplibreNative.RenderedQueryGeometry.box(query_box, out query_geometry);
+    MaplibreNative.ScreenPoint[] query_points = { { 0.0, 0.0 }, { 1.0, 1.0 } };
+    MaplibreNative.RenderedQueryGeometry.line_string(query_points, out query_geometry);
+
     MaplibreNative.ProjectedMeters meters;
     MaplibreNative.ProjectedMeters.for_lat_lng(coordinate, out meters);
     MaplibreNative.LatLng round_trip;
