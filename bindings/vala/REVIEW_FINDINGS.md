@@ -544,3 +544,4 @@ Review artifacts:
 
 - `mise run fix`
 - `mise run //bindings/vala:ci`
+- `mise run test`
