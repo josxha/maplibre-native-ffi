@@ -33,6 +33,10 @@ requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
 task = "//examples/zig-readback:build"
 requires = { platform = ["windows"], backend = ["vulkan"] }
 
+[bindings.dart]
+task = "//bindings/dart:ci"
+requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
+
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
 requires = { platform = ["linux", "macos"] }

@@ -318,10 +318,10 @@ final class NullFeatureIdentifier extends FeatureIdentifier {
 
 /// Unsigned integer feature identifier.
 final class UIntFeatureIdentifier extends FeatureIdentifier {
-  /// Creates an unsigned integer feature identifier.
+  /// Creates an unsigned integer feature identifier in the supported unsigned 63-bit subset.
   const UIntFeatureIdentifier(this.value);
 
-  /// Identifier value.
+  /// Identifier value in the supported unsigned 63-bit subset.
   final int value;
 }
 

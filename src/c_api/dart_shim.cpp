@@ -1,3 +1,5 @@
+#define MLN_BUILDING_C
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>

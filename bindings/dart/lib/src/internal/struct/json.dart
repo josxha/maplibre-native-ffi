@@ -10,6 +10,8 @@ import '../status/status.dart';
 /// Maximum nested JSON descriptor depth accepted by the binding.
 const int maxJsonDescriptorDepth = 64;
 
+const int _maxUnsignedInt63 = 0x7fffffffffffffff;
+
 /// Call-scoped native JSON descriptor.
 final class NativeJsonValue {
   const NativeJsonValue(this.pointer);
@@ -41,11 +43,7 @@ void _writeJsonValue(
       out.ref.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL.value;
       out.ref.data.bool_value = value;
     case JsonUInt(:final value):
-      if (value < 0) {
-        throwInvalidArgument(
-          'JSON unsigned integer values must be non-negative',
-        );
-      }
+      _checkUnsignedInt63(value, 'JSON unsigned integer values');
       out.ref.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT.value;
       out.ref.data.uint_value = value;
     case JsonInt(:final value):
@@ -103,7 +101,9 @@ JsonValue _jsonValueFromNative(raw.mln_json_value value, int depth) {
     case 1:
       return JsonBool(value.data.bool_value);
     case 2:
-      return JsonUInt(value.data.uint_value);
+      final uintValue = value.data.uint_value;
+      _checkUnsignedInt63(uintValue, 'native JSON unsigned integer values');
+      return JsonUInt(uintValue);
     case 3:
       return JsonInt(value.data.int_value);
     case 4:
@@ -135,6 +135,12 @@ String _copyStringView(raw.mln_string_view view) {
     return '';
   }
   return view.data.cast<Utf8>().toDartString(length: view.size);
+}
+
+void _checkUnsignedInt63(int value, String name) {
+  if (value < 0 || value > _maxUnsignedInt63) {
+    throwInvalidArgument('$name must be between 0 and $_maxUnsignedInt63');
+  }
 }
 
 void _checkJsonDepth(int depth) {

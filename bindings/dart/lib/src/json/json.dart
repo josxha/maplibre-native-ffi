@@ -35,10 +35,10 @@ final class JsonBool extends JsonValue {
 
 /// JSON unsigned integer.
 final class JsonUInt extends JsonValue {
-  /// Creates a JSON unsigned integer.
+  /// Creates a JSON unsigned integer in the supported unsigned 63-bit subset.
   const JsonUInt(this.value);
 
-  /// Integer value.
+  /// Integer value in the supported unsigned 63-bit subset.
   final int value;
 }
 

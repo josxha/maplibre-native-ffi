@@ -13,6 +13,8 @@ import 'struct.dart';
 /// Maximum nested geometry descriptor depth accepted by the binding.
 const int maxGeometryDescriptorDepth = 64;
 
+const int _maxUnsignedInt63 = 0x7fffffffffffffff;
+
 /// Call-scoped native geometry descriptor.
 final class NativeGeometry {
   const NativeGeometry(this.pointer);
@@ -223,11 +225,10 @@ void _writeFeatureIdentifier(
           .MLN_FEATURE_IDENTIFIER_TYPE_NULL
           .value;
     case UIntFeatureIdentifier(:final value):
-      if (value < 0) {
-        throwInvalidArgument(
-          'feature identifiers with unsigned integer values must be non-negative',
-        );
-      }
+      _checkUnsignedInt63(
+        value,
+        'feature identifiers with unsigned integer values',
+      );
       out.identifier_type = raw
           .mln_feature_identifier_type
           .MLN_FEATURE_IDENTIFIER_TYPE_UINT
@@ -354,7 +355,12 @@ FeatureIdentifier _featureIdentifierFromNative(raw.mln_feature value) {
     case 0:
       return const NullFeatureIdentifier();
     case 1:
-      return UIntFeatureIdentifier(value.identifier.uint_value);
+      final uintValue = value.identifier.uint_value;
+      _checkUnsignedInt63(
+        uintValue,
+        'native unsigned integer feature identifiers',
+      );
+      return UIntFeatureIdentifier(uintValue);
     case 2:
       return IntFeatureIdentifier(value.identifier.int_value);
     case 3:
@@ -367,6 +373,12 @@ FeatureIdentifier _featureIdentifierFromNative(raw.mln_feature value) {
       throwInvalidArgument(
         'unknown native feature identifier type: ${value.identifier_type}',
       );
+  }
+}
+
+void _checkUnsignedInt63(int value, String name) {
+  if (value < 0 || value > _maxUnsignedInt63) {
+    throwInvalidArgument('$name must be between 0 and $_maxUnsignedInt63');
   }
 }
 

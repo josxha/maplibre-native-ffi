@@ -171,6 +171,48 @@ void main() {
 
       final runtime = RuntimeHandle.create();
       expect(runtime.isClosed, isFalse);
+      expect(
+        () => runtime.setResourceUrlRewriteRules([
+          const ResourceUrlRewriteRule(
+            url: 'https://example.com/original\u0000truncated',
+            replacementUrl: 'https://example.com/replacement',
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceUrlRewriteRules([
+          const ResourceUrlRewriteRule(
+            url: 'https://example.com/original',
+            replacementUrl: 'https://example.com/replacement\u0000truncated',
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceProviderRules([
+          ResourceProviderRule(
+            url: 'https://example.com/provider\u0000truncated',
+            response: const ResourceResponse(status: ResourceResponseStatus.ok),
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceProvider(
+          ResourceProvider(
+            routes: const [
+              ResourceProviderRoute(url: 'https://example.com/provider\u0000x'),
+            ],
+            callback: (_, _) {},
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.createMap(options: const MapOptions(width: -1)),
+        throwsA(isA<InvalidArgumentException>()),
+      );
       runtime.setResourceUrlRewriteRules([
         const ResourceUrlRewriteRule(
           kind: ResourceKind.style,
@@ -326,6 +368,16 @@ void main() {
       expect(projection.camera().zoom, closeTo(2, 0.0001));
       projection.close();
       expect(projection.isClosed, isTrue);
+      expect(
+        () => map.attachMetalSurface(
+          const MetalSurfaceDescriptor(
+            extent: RenderTargetExtent(width: -1, height: 16),
+            context: MetalContextDescriptor(device: NativePointer.nullPointer),
+            layer: NativePointer.nullPointer,
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
       expect(
         () => map.attachMetalSurface(
           const MetalSurfaceDescriptor(
@@ -498,6 +550,13 @@ void main() {
       map.invalidateCustomGeometrySourceTile(
         'dart-custom-source',
         const CanonicalTileId(z: 0, x: 0, y: 0),
+      );
+      expect(
+        () => map.invalidateCustomGeometrySourceTile(
+          'dart-custom-source',
+          const CanonicalTileId(z: -1, x: 0, y: 0),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
       );
       map.invalidateCustomGeometrySourceRegion(
         'dart-custom-source',

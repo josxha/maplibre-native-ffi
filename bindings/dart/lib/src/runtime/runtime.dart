@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -391,6 +392,10 @@ final class _NativeResourceRewriteRule extends Struct {
 
 final class _ResourceTransformState {
   _ResourceTransformState(List<ResourceUrlRewriteRule> rules) {
+    for (final rule in rules) {
+      _checkNativeCString(rule.url);
+      _checkNativeCString(rule.replacementUrl);
+    }
     pointer = calloc<_NativeResourceRewriteRules>();
     pointer.ref.count = rules.length;
     pointer.ref.rules = rules.isEmpty
@@ -399,10 +404,10 @@ final class _ResourceTransformState {
     for (var index = 0; index < rules.length; index += 1) {
       final rule = rules[index];
       pointer.ref.rules[index].kind = rule.kind?.rawValue ?? 0;
-      pointer.ref.rules[index].url = rule.url.toNativeUtf8().cast<Char>();
-      pointer.ref.rules[index].replacementUrl = rule.replacementUrl
-          .toNativeUtf8()
-          .cast<Char>();
+      pointer.ref.rules[index].url = _nativeOwnedCString(rule.url);
+      pointer.ref.rules[index].replacementUrl = _nativeOwnedCString(
+        rule.replacementUrl,
+      );
     }
   }
 
@@ -509,6 +514,9 @@ final class _NativeQueuedResourceRequest extends Struct {
 
 final class _ResourceProviderRulesState {
   _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
+    for (final rule in rules) {
+      _checkNativeCString(rule.url);
+    }
     pointer = calloc<_NativeResourceProviderRules>();
     pointer.ref.count = rules.length;
     pointer.ref.rules = rules.isEmpty
@@ -517,7 +525,7 @@ final class _ResourceProviderRulesState {
     for (var index = 0; index < rules.length; index += 1) {
       final rule = rules[index];
       pointer.ref.rules[index].kind = rule.kind?.rawValue ?? 0;
-      pointer.ref.rules[index].url = rule.url.toNativeUtf8().cast<Char>();
+      pointer.ref.rules[index].url = _nativeOwnedCString(rule.url);
       pointer.ref.rules[index].response = _resourceResponseToNative(
         rule.response,
         calloc,
@@ -542,6 +550,9 @@ final class _ResourceProviderRulesState {
 
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
   _ResourceProviderCallbackState(ResourceProvider provider) {
+    for (final route in provider.routes) {
+      _checkNativeCString(route.url);
+    }
     callback = NativeCallable<_QueuedResourceRequestListenerFunction>.listener((
       Pointer<Void> request,
     ) {
@@ -557,7 +568,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     for (var index = 0; index < provider.routes.length; index += 1) {
       final route = provider.routes[index];
       pointer.ref.routes[index].kind = route.kind?.rawValue ?? 0;
-      pointer.ref.routes[index].url = route.url.toNativeUtf8().cast<Char>();
+      pointer.ref.routes[index].url = _nativeOwnedCString(route.url);
     }
     pointer.ref.listener = callback.nativeFunction;
   }
@@ -867,6 +878,31 @@ raw.mln_offline_geometry_region_definition _offlineGeometryDefinitionToNative(
   return result;
 }
 
+Pointer<Char> _nativeOwnedCString(String value) =>
+    nativeUtf8CString(value, calloc).pointer.cast<Char>();
+
+void _checkNativeCString(String value) {
+  if (value.contains('\u0000')) {
+    throwInvalidArgument(
+      'null-terminated strings must not contain embedded NUL',
+    );
+  }
+}
+
+int _uint32(int value, String name) {
+  if (value < 0 || value > 0xffffffff) {
+    throwInvalidArgument('$name must fit uint32');
+  }
+  return value;
+}
+
+int _positiveUint32(int value, String name) {
+  if (value <= 0 || value > 0xffffffff) {
+    throwInvalidArgument('$name must be between 1 and 4294967295');
+  }
+  return value;
+}
+
 Pointer<Uint8> _nativeBytes(Uint8List? bytes, Allocator allocator) {
   if (bytes == null || bytes.isEmpty) {
     return nullptr.cast<Uint8>();
@@ -1117,8 +1153,8 @@ final class MapHandle {
     return withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_map_options>();
       nativeOptions.ref = _c.mapOptionsDefault();
-      nativeOptions.ref.width = options.width;
-      nativeOptions.ref.height = options.height;
+      nativeOptions.ref.width = _positiveUint32(options.width, 'map width');
+      nativeOptions.ref.height = _positiveUint32(options.height, 'map height');
       nativeOptions.ref.scale_factor = options.scaleFactor;
       nativeOptions.ref.map_mode = options.mapMode.rawValue;
       final outMap = arena<Pointer<raw.mln_map>>();
@@ -1147,7 +1183,6 @@ final class MapHandle {
       final nativeUrl = nativeUtf8CString(url, arena);
       _check(_c.mapSetStyleUrl(_pointer, nativeUrl.pointer.cast<Char>()));
     });
-    _clearCustomGeometryCallbacks();
   }
 
   /// Loads inline style JSON through MapLibre Native style APIs.
@@ -2894,9 +2929,11 @@ final class RenderSessionHandle {
 
 /// Releasable handle for a resource request owned by a Dart provider.
 final class ResourceRequestHandle {
-  ResourceRequestHandle._(this._pointer);
+  ResourceRequestHandle._(this._pointer)
+    : _ownerIsolateHash = Isolate.current.hashCode;
 
   Pointer<raw.mln_resource_request_handle> _pointer;
+  final int _ownerIsolateHash;
   var _released = false;
 
   /// Whether this provider reference has been released by Dart.
@@ -2930,6 +2967,7 @@ final class ResourceRequestHandle {
 
   /// Releases the provider reference. The handle must not be used afterwards.
   void close() {
+    _checkOwnerIsolate();
     if (_released) {
       return;
     }
@@ -2946,10 +2984,19 @@ final class ResourceRequestHandle {
   }
 
   Pointer<raw.mln_resource_request_handle> get _livePointer {
+    _checkOwnerIsolate();
     if (_released || _pointer == nullptr) {
       throwInvalidArgument('resource request handle has been released');
     }
     return _pointer;
+  }
+
+  void _checkOwnerIsolate() {
+    if (Isolate.current.hashCode != _ownerIsolateHash) {
+      throwWrongThread(
+        'ResourceRequestHandle belongs to a different Dart isolate',
+      );
+    }
   }
 }
 
@@ -3277,9 +3324,9 @@ raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
 
 raw.mln_canonical_tile_id _canonicalTileIdToNative(CanonicalTileId tileId) {
   final result = Struct.create<raw.mln_canonical_tile_id>();
-  result.z = tileId.z;
-  result.x = tileId.x;
-  result.y = tileId.y;
+  result.z = _uint32(tileId.z, 'tile z');
+  result.x = _uint32(tileId.x, 'tile x');
+  result.y = _uint32(tileId.y, 'tile y');
   return result;
 }
 
@@ -3663,8 +3710,8 @@ raw.mln_render_target_extent _renderTargetExtentToNative(
 ) {
   final result = Struct.create<raw.mln_render_target_extent>();
   result.size = sizeOf<raw.mln_render_target_extent>();
-  result.width = value.width;
-  result.height = value.height;
+  result.width = _positiveUint32(value.width, 'render target width');
+  result.height = _positiveUint32(value.height, 'render target height');
   result.scale_factor = value.scaleFactor;
   return result;
 }

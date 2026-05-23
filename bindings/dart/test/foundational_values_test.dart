@@ -138,6 +138,36 @@ void main() {
   );
 
   test(
+    'GeoJSON identifiers reject unsupported unsigned integer values before C calls',
+    () {
+      expect(
+        () => withNativeArena(
+          (arena) => nativeGeoJson(
+            const FeatureGeoJson(
+              geometry: EmptyGeometry(),
+              identifier: UIntFeatureIdentifier(-1),
+            ),
+            arena,
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => withNativeArena(
+          (arena) => nativeGeoJson(
+            const FeatureGeoJson(
+              geometry: EmptyGeometry(),
+              identifier: UIntFeatureIdentifier(0x8000000000000000),
+            ),
+            arena,
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    },
+  );
+
+  test(
     'GeoJSON identifiers reject non-finite double values before C calls',
     () {
       expect(
@@ -181,6 +211,30 @@ void main() {
       expect(copiedObject.members[0].key, 'name');
       expect((copiedObject.members[2].value as JsonArray).values.length, 2);
     });
+  });
+
+  test('JSON unsigned integer descriptors reject unsupported values', () {
+    expect(
+      () => withNativeArena(
+        (arena) => nativeJsonValue(const JsonUInt(-1), arena),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(
+      () => withNativeArena(
+        (arena) => nativeJsonValue(const JsonUInt(0x8000000000000000), arena),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+
+    final nativeHighBit = Struct.create<raw.mln_json_value>();
+    nativeHighBit.size = sizeOf<raw.mln_json_value>();
+    nativeHighBit.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT.value;
+    nativeHighBit.data.uint_value = -1;
+    expect(
+      () => jsonValueFromNative(nativeHighBit),
+      throwsA(isA<InvalidArgumentException>()),
+    );
   });
 
   test('JSON double descriptors reject non-finite values before C calls', () {
