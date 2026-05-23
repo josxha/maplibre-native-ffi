@@ -134,6 +134,11 @@ class OfflineOperationHandle:
         self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
         self._closed = True
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("OfflineOperationHandle", getattr(self, "closed", True))
+
     def take_region(self) -> "OfflineRegionInfo":
         """Take a completed region snapshot result."""
         raw = self._runtime._native.offline_region_create_take_result(

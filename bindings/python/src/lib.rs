@@ -5532,23 +5532,8 @@ impl MetalOwnedTextureFrameHandle {
 
 impl Drop for MetalOwnedTextureFrameHandle {
     fn drop(&mut self) {
-        let Ok(mut closed) = self.closed.lock() else {
-            return;
-        };
-        if *closed {
-            return;
-        }
-        let Ok(mut session) = self.session.lock() else {
-            return;
-        };
-        let raw = self.raw.to_native();
-        // SAFETY: Best-effort release of the active frame. Drop cannot report
-        // errors and never panics.
-        let status = unsafe { sys::mln_metal_owned_texture_release_frame(session.as_ptr(), &raw) };
-        if status == sys::MLN_STATUS_OK {
-            session.frame_acquired = false;
-            *closed = true;
-        }
+        // Python finalization may run off the owner thread, so native frame
+        // release is explicit through close(). The public wrapper reports leaks.
     }
 }
 
@@ -5652,23 +5637,8 @@ impl VulkanOwnedTextureFrameHandle {
 
 impl Drop for VulkanOwnedTextureFrameHandle {
     fn drop(&mut self) {
-        let Ok(mut closed) = self.closed.lock() else {
-            return;
-        };
-        if *closed {
-            return;
-        }
-        let Ok(mut session) = self.session.lock() else {
-            return;
-        };
-        let raw = self.raw.to_native();
-        // SAFETY: Best-effort release of the active frame. Drop cannot report
-        // errors and never panics.
-        let status = unsafe { sys::mln_vulkan_owned_texture_release_frame(session.as_ptr(), &raw) };
-        if status == sys::MLN_STATUS_OK {
-            session.frame_acquired = false;
-            *closed = true;
-        }
+        // Python finalization may run off the owner thread, so native frame
+        // release is explicit through close(). The public wrapper reports leaks.
     }
 }
 

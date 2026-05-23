@@ -1385,6 +1385,12 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     assert second.closed is True
     assert second_native.closed is True
 
+    leaked_native = FakeNativeRequest()
+    leaked = resource.ResourceRequestHandle(leaked_native)
+    with pytest.warns(ResourceWarning, match="ResourceRequestHandle was not closed"):
+        leaked.__del__()
+    assert leaked_native.closed is False
+
 
 def test_resource_transform_registers_and_clears() -> None:
     seen: list[resource.ResourceTransformRequest] = []

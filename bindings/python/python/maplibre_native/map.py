@@ -364,6 +364,11 @@ class MapProjectionHandle:
         """Release this projection helper exactly once."""
         self._native.close()
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("MapProjectionHandle", getattr(self, "closed", True))
+
     def get_camera(self) -> CameraOptions:
         """Return the helper's current camera snapshot."""
         from .camera import CameraOptions
@@ -452,6 +457,11 @@ class MapHandle:
     def close(self) -> None:
         """Release this map handle exactly once."""
         self._native.close()
+
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("MapHandle", getattr(self, "closed", True))
 
     def request_repaint(self) -> None:
         """Request a repaint for a continuous map."""

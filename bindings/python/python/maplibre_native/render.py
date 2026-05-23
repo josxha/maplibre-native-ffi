@@ -231,6 +231,11 @@ class DetachedRenderSessionHandle:
         """Release this detached render session exactly once."""
         self._native.close()
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("DetachedRenderSessionHandle", getattr(self, "closed", True))
+
     def __enter__(self) -> "DetachedRenderSessionHandle":
         return self
 
@@ -263,6 +268,11 @@ class RenderSessionHandle:
     def close(self) -> None:
         """Release this render session exactly once."""
         self._native.close()
+
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("RenderSessionHandle", getattr(self, "closed", True))
 
     def resize(self, width: int, height: int, scale_factor: float) -> None:
         """Resize this attached render session."""
@@ -453,6 +463,11 @@ class MetalOwnedTextureFrameHandle:
         """Release this acquired frame exactly once."""
         self._native.close()
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("MetalOwnedTextureFrameHandle", getattr(self, "closed", True))
+
     def __enter__(self) -> "MetalOwnedTextureFrameHandle":
         return self
 
@@ -499,6 +514,11 @@ class VulkanOwnedTextureFrameHandle:
     def close(self) -> None:
         """Release this acquired frame exactly once."""
         self._native.close()
+
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("VulkanOwnedTextureFrameHandle", getattr(self, "closed", True))
 
     def __enter__(self) -> "VulkanOwnedTextureFrameHandle":
         return self

@@ -319,10 +319,10 @@ Successful `close()` releases the native object exactly once; later closes
 no-op. Failed native destruction leaves the handle live so callers can retry on
 the owner thread.
 
-`__del__`, weakref finalizers, and GC callbacks report leaks. They destroy
-native resources only when the native release function is thread-independent and
-infallible. Thread-affine handles close through explicit user calls on the owner
-thread.
+`__del__`, weakref finalizers, and GC callbacks report leaks with
+`ResourceWarning`. They destroy native resources only when the native release
+function is thread-independent and infallible. Thread-affine handles close
+through explicit user calls on the owner thread.
 
 Child handles keep parent wrappers alive while native validity depends on the
 parent. `MapProjectionHandle` is the shared exception: after creation, it owns a

@@ -230,6 +230,11 @@ class CustomGeometrySourceHandle:
         """Release queued callback state for this source handle."""
         self._native.close()
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("CustomGeometrySourceHandle", getattr(self, "closed", True))
+
     def poll_event(self) -> CustomGeometrySourceEvent | None:
         """Return one queued fetch/cancel event copied into Python values."""
         event = self._native.poll_event()

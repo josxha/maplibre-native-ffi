@@ -161,6 +161,11 @@ class RuntimeHandle:
         """Release this runtime handle exactly once."""
         self._native.close()
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("RuntimeHandle", getattr(self, "closed", True))
+
     def run_once(self) -> None:
         """Run one pending owner-thread task for this runtime."""
         self._native.run_once()

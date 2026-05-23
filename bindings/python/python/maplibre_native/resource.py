@@ -292,6 +292,11 @@ class ResourceRequestHandle:
         self._native.close()
         self._closed = True
 
+    def __del__(self) -> None:
+        from ._lifecycle import warn_unclosed
+
+        warn_unclosed("ResourceRequestHandle", getattr(self, "closed", True))
+
     def __enter__(self) -> "ResourceRequestHandle":
         return self
 
