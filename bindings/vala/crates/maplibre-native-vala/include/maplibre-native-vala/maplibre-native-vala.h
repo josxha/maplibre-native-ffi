@@ -543,6 +543,22 @@ void mln_vala_geo_json_free(MlnValaGeoJson* value);
 MlnValaGeoJson* mln_vala_geo_json_new_geometry(
   const MlnValaGeometry* geometry, GError** error
 );
+MlnValaGeoJson* mln_vala_geo_json_new_feature(
+  const MlnValaGeometry* geometry, GError** error
+);
+/**
+ * mln_vala_geo_json_new_feature_collection:
+ * @geometries: (array length=geometry_count) (nullable): feature geometries.
+ * @geometry_count: number of geometries.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): GeoJSON feature collection.
+ * Throws: MlnValaError
+ */
+MlnValaGeoJson* mln_vala_geo_json_new_feature_collection(
+  const MlnValaGeometry* const* geometries, size_t geometry_count,
+  GError** error
+);
 
 typedef struct {
   MlnValaStringView key;
@@ -771,6 +787,16 @@ typedef struct {
   const uint8_t* metadata;
   size_t metadata_size;
 } MlnValaOfflineRegionInfo;
+
+/**
+ * mln_vala_offline_region_info_dup_metadata:
+ * @info: (not nullable): offline region info copied from a snapshot/list.
+ *
+ * Returns: (transfer full) (nullable): copied metadata bytes owned by caller.
+ */
+GBytes* mln_vala_offline_region_info_dup_metadata(
+  const MlnValaOfflineRegionInfo* info
+);
 
 typedef struct {
   uint32_t size;

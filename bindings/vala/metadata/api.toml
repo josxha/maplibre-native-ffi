@@ -56,6 +56,8 @@ functions = [
   "mln_vala_geo_json_copy",
   "mln_vala_geo_json_free",
   "mln_vala_geo_json_get_type",
+  "mln_vala_geo_json_new_feature",
+  "mln_vala_geo_json_new_feature_collection",
   "mln_vala_geo_json_new_geometry",
   "mln_vala_geometry_copy",
   "mln_vala_geometry_free",
@@ -218,6 +220,7 @@ functions = [
   "mln_vala_native_pointer_new",
   "mln_vala_network_status_get",
   "mln_vala_network_status_set",
+  "mln_vala_offline_region_info_dup_metadata",
   "mln_vala_offline_region_list_handle_close",
   "mln_vala_offline_region_list_handle_count",
   "mln_vala_offline_region_list_handle_get",
@@ -482,6 +485,8 @@ throws = [
   "mln_vala_feature_query_result_handle_count",
   "mln_vala_feature_query_result_handle_get",
   "mln_vala_free_camera_options_default",
+  "mln_vala_geo_json_new_feature",
+  "mln_vala_geo_json_new_feature_collection",
   "mln_vala_geo_json_new_geometry",
   "mln_vala_geometry_new_line_string",
   "mln_vala_geometry_new_point",
@@ -715,6 +720,7 @@ throws = [
 ]
 
 transfer_full_returns = [
+  "mln_vala_geo_json_new_feature_collection",
   "mln_vala_geometry_new_line_string",
   "mln_vala_json_value_new_array",
   "mln_vala_json_value_new_object",
@@ -735,6 +741,7 @@ transfer_full_returns = [
   "mln_vala_map_projection_handle_new",
   "mln_vala_metal_owned_texture_frame_handle_get_device",
   "mln_vala_metal_owned_texture_frame_handle_get_texture",
+  "mln_vala_offline_region_info_dup_metadata",
   "mln_vala_render_session_handle_acquire_metal_owned_texture_frame",
   "mln_vala_render_session_handle_acquire_vulkan_owned_texture_frame",
   "mln_vala_render_session_handle_get_feature_state",
@@ -759,6 +766,7 @@ transfer_full_returns = [
 ]
 
 array_parameters = [
+  "mln_vala_geo_json_new_feature_collection",
   "mln_vala_geometry_new_line_string",
   "mln_vala_json_value_new_array",
   "mln_vala_json_value_new_object",
@@ -784,6 +792,7 @@ array_parameters = [
 ]
 
 nullable_parameters = [
+  "mln_vala_geo_json_new_feature_collection",
   "mln_vala_json_value_new_array",
   "mln_vala_json_value_new_object",
   "mln_vala_lat_lng_for_projected_meters",
@@ -852,6 +861,7 @@ nullable_parameters = [
   "mln_vala_map_projection_handle_pixel_for_lat_lng",
   "mln_vala_map_projection_handle_set_camera",
   "mln_vala_map_projection_handle_set_visible_coordinates",
+  "mln_vala_offline_region_info_dup_metadata",
   "mln_vala_premultiplied_rgba8_image_init",
   "mln_vala_projected_meters_for_lat_lng",
   "mln_vala_render_session_handle_get_feature_state",

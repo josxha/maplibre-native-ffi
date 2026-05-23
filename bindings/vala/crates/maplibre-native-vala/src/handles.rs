@@ -2614,6 +2614,31 @@ pub extern "C" fn mln_vala_offline_region_snapshot_handle_get(
     }
 }
 
+fn offline_region_info_dup_metadata(
+    info: *const sys::mln_offline_region_info,
+) -> *mut glib::GBytes {
+    if info.is_null() {
+        return ptr::null_mut();
+    }
+    // SAFETY: info points to a copied offline-region info struct. Copy the
+    // metadata bytes immediately into a GBytes owned by the caller.
+    let info = unsafe { &*info };
+    if info.metadata.is_null() || info.metadata_size == 0 {
+        return ptr::null_mut();
+    }
+    // SAFETY: metadata is valid for metadata_size bytes while the copied info
+    // remains live; bytes_new copies it.
+    let bytes = unsafe { std::slice::from_raw_parts(info.metadata, info.metadata_size) };
+    glib::bytes_new(bytes)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_dup_metadata(
+    info: *const sys::mln_offline_region_info,
+) -> *mut glib::GBytes {
+    offline_region_info_dup_metadata(info)
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_offline_region_snapshot_handle_close(
     handle: *mut OfflineRegionSnapshotHandle,
@@ -5387,7 +5412,6 @@ mod tests {
     use std::ffi::CStr;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    static TRANSFORM_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
     static PROVIDER_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     unsafe extern "C" fn passthrough_transform(
@@ -5410,8 +5434,11 @@ mod tests {
         .expect("test replacement URL allocation should succeed")
     }
 
-    unsafe extern "C" fn transform_destroy_notify(_user_data: *mut c_void) {
-        TRANSFORM_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
+    unsafe extern "C" fn counted_transform_destroy_notify(user_data: *mut c_void) {
+        assert!(!user_data.is_null());
+        // SAFETY: Tests pass a live `AtomicUsize` pointer as user_data and
+        // trigger destroy-notify before the counter leaves scope.
+        unsafe { &*(user_data as *const AtomicUsize) }.fetch_add(1, Ordering::SeqCst);
     }
 
     unsafe extern "C" fn passthrough_provider(
@@ -5519,20 +5546,20 @@ mod tests {
     fn gobject_finalize_releases_runtime_callback_state() {
         let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
         assert!(!runtime.is_null());
-        TRANSFORM_DESTROY_COUNT.store(0, Ordering::SeqCst);
+        let destroy_count = AtomicUsize::new(0);
 
         assert_eq!(
             mln_vala_runtime_handle_set_resource_transform(
                 runtime,
                 Some(passthrough_transform),
-                ptr::null_mut(),
-                Some(transform_destroy_notify),
+                &destroy_count as *const AtomicUsize as *mut c_void,
+                Some(counted_transform_destroy_notify),
                 ptr::null_mut(),
             ),
             GTRUE
         );
         glib::unref_object(runtime);
-        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
     }
 
     #[test]
@@ -5554,37 +5581,37 @@ mod tests {
     fn resource_transform_replacement_and_clear_run_destroy_notify() {
         let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
         assert!(!runtime.is_null());
-        TRANSFORM_DESTROY_COUNT.store(0, Ordering::SeqCst);
+        let destroy_count = AtomicUsize::new(0);
 
         assert_eq!(
             mln_vala_runtime_handle_set_resource_transform(
                 runtime,
                 Some(passthrough_transform),
-                ptr::null_mut(),
-                Some(transform_destroy_notify),
+                &destroy_count as *const AtomicUsize as *mut c_void,
+                Some(counted_transform_destroy_notify),
                 ptr::null_mut(),
             ),
             GTRUE
         );
-        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 0);
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 0);
 
         assert_eq!(
             mln_vala_runtime_handle_set_resource_transform(
                 runtime,
                 Some(passthrough_transform),
-                ptr::null_mut(),
-                Some(transform_destroy_notify),
+                &destroy_count as *const AtomicUsize as *mut c_void,
+                Some(counted_transform_destroy_notify),
                 ptr::null_mut(),
             ),
             GTRUE
         );
-        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
 
         assert_eq!(
             mln_vala_runtime_handle_clear_resource_transform(runtime, ptr::null_mut()),
             GTRUE
         );
-        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 2);
 
         assert_eq!(
             mln_vala_runtime_handle_close(runtime, ptr::null_mut()),

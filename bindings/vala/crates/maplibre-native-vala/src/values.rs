@@ -315,28 +315,29 @@ pub extern "C" fn mln_vala_geo_json_new_geometry(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_geo_json_new_feature(
-    feature: *const Feature,
+    geometry: *const Geometry,
     error_out: *mut *mut GError,
 ) -> *mut GeoJson {
-    let Some(feature) = feature_ref(feature) else {
+    let Some(geometry) = geometry_ref(geometry) else {
         glib::set_error(
             error_out,
-            Error::invalid_argument("GeoJSON feature is null"),
+            Error::invalid_argument("GeoJSON feature geometry is null"),
         );
         return ptr::null_mut();
     };
+    let feature = core::Feature::new(geometry.value.clone(), Vec::new());
     Box::into_raw(Box::new(GeoJson {
-        value: core::GeoJson::Feature(feature.value.clone()),
+        value: core::GeoJson::Feature(feature),
     }))
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_geo_json_new_feature_collection(
-    features: *const *const Feature,
-    feature_count: usize,
+    geometries: *const *const Geometry,
+    geometry_count: usize,
     error_out: *mut *mut GError,
 ) -> *mut GeoJson {
-    match feature_array(features, feature_count) {
+    match geometry_feature_array(geometries, geometry_count) {
         Ok(features) => Box::into_raw(Box::new(GeoJson {
             value: core::GeoJson::FeatureCollection(features),
         })),
@@ -434,17 +435,17 @@ fn json_object(
     Ok(core::JsonValue::Object(members))
 }
 
-fn feature_array(
-    features: *const *const Feature,
-    feature_count: usize,
+fn geometry_feature_array(
+    geometries: *const *const Geometry,
+    geometry_count: usize,
 ) -> Result<Vec<core::Feature>> {
-    let features = pointer_slice(features, feature_count, "GeoJSON features")?;
-    let mut copied = Vec::with_capacity(features.len());
-    for feature in features {
-        let Some(feature) = feature_ref(*feature) else {
-            return Err(Error::invalid_argument("GeoJSON feature is null"));
+    let geometries = pointer_slice(geometries, geometry_count, "GeoJSON feature geometries")?;
+    let mut copied = Vec::with_capacity(geometries.len());
+    for geometry in geometries {
+        let Some(geometry) = geometry_ref(*geometry) else {
+            return Err(Error::invalid_argument("GeoJSON feature geometry is null"));
         };
-        copied.push(feature.value.clone());
+        copied.push(core::Feature::new(geometry.value.clone(), Vec::new()));
     }
     Ok(copied)
 }
