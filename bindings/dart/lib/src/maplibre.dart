@@ -1,9 +1,8 @@
 import 'dart:ffi';
 
-import 'package:ffi/ffi.dart';
-
-import 'error/maplibre_exception.dart';
 import 'internal/c/maplibre_native_c.dart';
+import 'internal/memory/memory.dart';
+import 'internal/status/status.dart';
 
 /// Process-global entry points for the Dart binding.
 final class Maplibre {
@@ -20,13 +19,11 @@ final class Maplibre {
 
   /// Reads MapLibre Native's process-global network status.
   static NetworkStatus networkStatus() {
-    final outStatus = calloc<Uint32>();
-    try {
+    return withNativeArena((arena) {
+      final outStatus = arena<Uint32>();
       _checkStatus(_c.networkStatusGet(outStatus));
       return NetworkStatus.fromRawValue(outStatus.value);
-    } finally {
-      calloc.free(outStatus);
-    }
+    });
   }
 
   /// Sets MapLibre Native's process-global network status.
@@ -35,13 +32,7 @@ final class Maplibre {
   }
 
   static void _checkStatus(int statusCode) {
-    if (statusCode == MaplibreStatus.ok.nativeStatusCode) {
-      return;
-    }
-    throw MaplibreException.forNativeStatusCode(
-      statusCode,
-      _c.threadLastErrorMessage(),
-    );
+    checkNativeStatus(statusCode, _c.threadLastErrorMessage);
   }
 }
 
@@ -95,9 +86,7 @@ final class NetworkStatus {
   /// Returns the raw value for native setter calls.
   int rawValueForSet() {
     if (!_canSet) {
-      throw MaplibreException.invalidArgument(
-        'unknown network status $rawValue cannot be set',
-      );
+      throwInvalidArgument('unknown network status $rawValue cannot be set');
     }
     return rawValue;
   }
