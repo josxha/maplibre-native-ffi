@@ -876,3 +876,37 @@ Review artifacts:
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`
 - `git diff --check`
+
+## Round 23
+
+Review artifacts:
+
+- `review-loop/round23-api-surface.md`
+- `review-loop/round23-lifecycle.md`
+- `review-loop/round23-validation-docs.md`
+
+### Applied findings
+
+- None. Independent reviewers found no remaining actionable API-surface,
+  ownership/lifetime/error-propagation, generated-surface, validation, test,
+  documentation, branch hygiene, or push-state blockers.
+
+### Rejected or deferred findings
+
+- None.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- Reviewers verified the generated VAPI, sanitized GIR, and typelib-derived GIR
+  expose owned result/list/snapshot and offline-region-definition replacements
+  while hiding raw native handles and borrowed offline geometry records.
+- Reviewers verified Vala compile/runtime fixture coverage and Rust adapter
+  tests cover the owned APIs where practical.
+- Reviewers verified generated-surface checker runs pass for sanitized GIR and
+  typelib-derived GIR.
+- Reviewers verified branch `vala` was clean and pushed at `a2d77a9` with
+  `HEAD...@{upstream}` at `0 0`.
