@@ -64,11 +64,12 @@ leaked thread-affine handles. `MapProjectionHandle` follows the shared
 exception: it owns a standalone projection snapshot and does not retain its
 source `MapHandle` for native validity after creation.
 
-Copied descriptors, events, snapshots, camera values, geometry values, and
-render metadata are GLib-friendly value objects where the current GIR/Vala layer
-can preserve the intended ownership. Public Vala metadata hides ABI `size`
-fields, field masks, and backend pointer fields. Default helpers and setter
-methods initialize those ABI details inside the adapter.
+Copied descriptors, events, snapshots, camera values, geometry values, query
+results, offline region definitions, and render metadata are GLib-friendly value
+objects where the current GIR/Vala layer can preserve the intended ownership.
+Public Vala metadata hides ABI `size` fields, field masks, raw union storage,
+and backend pointer fields. Default helpers, constructors, and setter methods
+initialize those ABI details inside the adapter.
 
 `NativePointer` is a boxed value for borrowed backend-native addresses. It wraps
 a non-null `void*`, grants no memory access, and transfers no ownership. Use it
@@ -152,9 +153,13 @@ updates, resize, detach, and session destruction while a frame is active.
 
 Temporary native storage lives for one adapter call. Native result, snapshot,
 and list handles stay private; internal guards copy data into GLib-owned values
-and release native handles on every exit path. Struct-owned byte buffers use
-Vala arrays or `GLib.Bytes`; large reusable readback storage may use GLib bytes
-or an explicit native buffer type with deterministic release.
+and release native handles on every exit path. Public replacements use boxed
+values such as `StringList`, `Feature`, `OfflineRegionDefinition`,
+`OfflineRegionInfo`, `OfflineRegionInfoList`, `QueriedFeature`,
+`QueriedFeatureList`, and `FeatureExtensionResult`, or copied `JsonValue?`,
+strings, and `GLib.Bytes`. Struct-owned byte buffers use Vala arrays or
+`GLib.Bytes`; large reusable readback storage may use GLib bytes or an explicit
+native buffer type with deterministic release.
 
 ## Testing
 

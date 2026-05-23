@@ -2,12 +2,14 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;
 use std::hash::{Hash, Hasher};
 use std::ptr;
+use std::ptr::NonNull;
 
+use maplibre_native_core as core;
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
-use crate::handles::{self, JsonSnapshotHandle, MapHandle};
+use crate::handles::{self, MapHandle};
 use crate::native_pointer::NativePointer;
 use crate::values::{self, JsonValue};
 
@@ -508,9 +510,11 @@ pub extern "C" fn mln_vala_render_session_handle_get_feature_state(
     handle: *mut RenderSessionHandle,
     selector: *const sys::mln_feature_state_selector,
     error_out: *mut *mut GError,
-) -> *mut JsonSnapshotHandle {
+) -> *mut JsonValue {
     match get_feature_state(handle, selector) {
-        Ok(snapshot) => snapshot,
+        Ok(value) => value.map_or(ptr::null_mut(), |value| {
+            Box::into_raw(Box::new(JsonValue { value }))
+        }),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -1166,7 +1170,7 @@ fn set_feature_state(
 fn get_feature_state(
     handle: *mut RenderSessionHandle,
     selector: *const sys::mln_feature_state_selector,
-) -> error::Result<*mut JsonSnapshotHandle> {
+) -> error::Result<Option<core::JsonValue>> {
     if selector.is_null() {
         return Err(Error::invalid_argument("feature state selector is null"));
     }
@@ -1177,7 +1181,10 @@ fn get_feature_state(
     error::check(unsafe {
         sys::mln_render_session_get_feature_state(session, selector, &mut snapshot)
     })?;
-    handles::wrap_json_snapshot(snapshot)
+    let snapshot = NonNull::new(snapshot);
+    // SAFETY: the C API returned an owned JSON snapshot; the core helper copies
+    // the JSON value and releases the native snapshot on every exit path.
+    unsafe { core::json::copy_json_snapshot(snapshot) }
 }
 
 fn remove_feature_state(

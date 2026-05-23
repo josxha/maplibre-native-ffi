@@ -827,3 +827,52 @@ Review artifacts:
   and in-flight callback teardown.
 - Independent reviewers verified the branch was clean and pushed at `c52c3fa`
   with `HEAD...@{upstream}` at `0 0`.
+
+## Round 22
+
+Review artifacts:
+
+- Synchronous scout/planner/reviewer subagent run for goal `mpiwuf4w-ayx14h`.
+- `review-loop/round22-api-surface.md`
+- `review-loop/round22-lifecycle.md`
+- `review-loop/round22-validation-docs.md`
+
+### Applied findings
+
+- Added owned public Vala/GObject replacements for hidden result/list/snapshot
+  capabilities: `StringList`, copied `JsonValue?` snapshot returns,
+  `OfflineRegionInfo`, `OfflineRegionInfoList`, `QueriedFeature`,
+  `QueriedFeatureList`, and `FeatureExtensionResult`.
+- Added owned `Feature` and opaque `OfflineRegionDefinition` boxed values with
+  tile-pyramid and geometry constructors so public Vala code can create offline
+  geometry region definitions without borrowed geometry fields.
+- Kept native result/list/snapshot handles and raw offline region definition
+  records hidden from generated VAPI, sanitized GIR, and typelib-derived GIR.
+- Updated metadata, scanner annotations, generated-surface checks, Vala compile
+  coverage, Rust adapter tests, API decisions, SPEC, and Vala binding
+  conventions for the owned API policy.
+- Fixed Round 22 validation-review findings by annotating
+  `OfflineRegionInfo.get_definition()` and `QueriedFeature.get_feature()` as
+  transfer-full nullable returns, covering
+  `FeatureExtensionResult.get_feature_collection()` in the Vala fixture, and
+  documenting the new public `Feature` boxed value.
+
+### Rejected or deferred findings
+
+- Non-Vala GI consumer support remains out of scope for this branch; the GIR and
+  typelib shapes are review artifacts that preserve future-compatible ownership
+  and hiding policy.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- `mise run //bindings/vala:generate`
+- `mise run fix`
+- `mise run //bindings/vala:ci`
+- `mise run test`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`
+- `git diff --check`

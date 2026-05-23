@@ -2,8 +2,10 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::hash::{Hash, Hasher};
 use std::ptr;
+use std::ptr::NonNull;
 use std::sync::{Condvar, Mutex};
 
+use maplibre_native_core as core;
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
@@ -19,6 +21,9 @@ use crate::values::{self, GeoJson, Geometry, JsonValue};
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
+const OFFLINE_REGION_DEFINITION_TYPE_NAME: &CStr = c"MlnValaOfflineRegionDefinition";
+const OFFLINE_REGION_INFO_TYPE_NAME: &CStr = c"MlnValaOfflineRegionInfo";
+const OFFLINE_REGION_INFO_LIST_TYPE_NAME: &CStr = c"MlnValaOfflineRegionInfoList";
 const STYLE_ID_LIST_TYPE_NAME: &CStr = c"MlnValaStyleIdListHandle";
 const JSON_SNAPSHOT_TYPE_NAME: &CStr = c"MlnValaJsonSnapshotHandle";
 const OFFLINE_REGION_SNAPSHOT_TYPE_NAME: &CStr = c"MlnValaOfflineRegionSnapshotHandle";
@@ -175,6 +180,24 @@ pub struct MapHandle {
 }
 
 #[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OfflineRegionDefinition {
+    value: core::OfflineRegionDefinition,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OfflineRegionInfo {
+    value: core::OfflineRegionInfo,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OfflineRegionInfoList {
+    regions: Vec<core::OfflineRegionInfo>,
+}
+
+#[repr(C)]
 pub struct StyleIdListHandle {
     parent_instance: GObject,
     native: *mut sys::mln_style_id_list,
@@ -259,6 +282,33 @@ pub extern "C" fn mln_vala_map_handle_get_type() -> GType {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_type() -> GType {
+    glib::register_boxed_type(
+        OFFLINE_REGION_DEFINITION_TYPE_NAME,
+        offline_region_definition_copy_erased,
+        offline_region_definition_free_erased,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_get_type() -> GType {
+    glib::register_boxed_type(
+        OFFLINE_REGION_INFO_TYPE_NAME,
+        offline_region_info_copy_erased,
+        offline_region_info_free_erased,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_list_get_type() -> GType {
+    glib::register_boxed_type(
+        OFFLINE_REGION_INFO_LIST_TYPE_NAME,
+        offline_region_info_list_copy_erased,
+        offline_region_info_list_free_erased,
+    )
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_style_id_list_handle_get_type() -> GType {
     glib::register_object_type::<StyleIdListHandle>(STYLE_ID_LIST_TYPE_NAME)
 }
@@ -276,6 +326,265 @@ pub extern "C" fn mln_vala_offline_region_snapshot_handle_get_type() -> GType {
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_offline_region_list_handle_get_type() -> GType {
     glib::register_object_type::<OfflineRegionListHandle>(OFFLINE_REGION_LIST_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_copy(
+    value: *const OfflineRegionDefinition,
+) -> *mut OfflineRegionDefinition {
+    offline_region_definition_ref(value)
+        .map(|value| Box::into_raw(Box::new(value.clone())))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn mln_vala_offline_region_definition_free(value: *mut OfflineRegionDefinition) {
+    if !value.is_null() {
+        unsafe { drop(Box::from_raw(value)) };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_copy(
+    value: *const OfflineRegionInfo,
+) -> *mut OfflineRegionInfo {
+    offline_region_info_ref(value)
+        .map(|value| Box::into_raw(Box::new(value.clone())))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn mln_vala_offline_region_info_free(value: *mut OfflineRegionInfo) {
+    if !value.is_null() {
+        unsafe { drop(Box::from_raw(value)) };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_list_copy(
+    value: *const OfflineRegionInfoList,
+) -> *mut OfflineRegionInfoList {
+    offline_region_info_list_ref(value)
+        .map(|value| Box::into_raw(Box::new(value.clone())))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn mln_vala_offline_region_info_list_free(value: *mut OfflineRegionInfoList) {
+    if !value.is_null() {
+        unsafe { drop(Box::from_raw(value)) };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_new_tile_pyramid(
+    style_url: *const c_char,
+    bounds: *const sys::mln_lat_lng_bounds,
+    min_zoom: f64,
+    max_zoom: f64,
+    pixel_ratio: f32,
+    include_ideographs: bool,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionDefinition {
+    match offline_region_definition_new_tile_pyramid(
+        style_url,
+        bounds,
+        min_zoom,
+        max_zoom,
+        pixel_ratio,
+        include_ideographs,
+    ) {
+        Ok(value) => Box::into_raw(Box::new(value)),
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_new_geometry(
+    style_url: *const c_char,
+    geometry: *const Geometry,
+    min_zoom: f64,
+    max_zoom: f64,
+    pixel_ratio: f32,
+    include_ideographs: bool,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionDefinition {
+    match offline_region_definition_new_geometry(
+        style_url,
+        geometry,
+        min_zoom,
+        max_zoom,
+        pixel_ratio,
+        include_ideographs,
+    ) {
+        Ok(value) => Box::into_raw(Box::new(value)),
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_definition_type(
+    value: *const OfflineRegionDefinition,
+) -> sys::mln_offline_region_definition_type {
+    match offline_region_definition_ref(value).map(|value| &value.value) {
+        Some(core::OfflineRegionDefinition::TilePyramid { .. }) => {
+            sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+        }
+        Some(core::OfflineRegionDefinition::GeometryRegion { .. }) => {
+            sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+        }
+        _ => 0,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_dup_style_url(
+    value: *const OfflineRegionDefinition,
+) -> *mut c_char {
+    offline_region_definition_ref(value)
+        .and_then(|value| match &value.value {
+            core::OfflineRegionDefinition::TilePyramid { style_url, .. }
+            | core::OfflineRegionDefinition::GeometryRegion { style_url, .. } => {
+                Some(style_url.as_str())
+            }
+            _ => None,
+        })
+        .and_then(copy_string)
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_bounds(
+    value: *const OfflineRegionDefinition,
+    out_bounds: *mut sys::mln_lat_lng_bounds,
+) -> GBoolean {
+    let Some(value) = offline_region_definition_ref(value) else {
+        return GFALSE;
+    };
+    let core::OfflineRegionDefinition::TilePyramid { bounds, .. } = &value.value else {
+        return GFALSE;
+    };
+    glib::clear_optional_out_pointer(out_bounds, core::values::lat_lng_bounds_to_native(*bounds))
+        .map(|()| GTRUE)
+        .unwrap_or(GFALSE)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_geometry(
+    value: *const OfflineRegionDefinition,
+) -> *mut Geometry {
+    match offline_region_definition_ref(value).map(|value| &value.value) {
+        Some(core::OfflineRegionDefinition::GeometryRegion { geometry, .. }) => {
+            Box::into_raw(Box::new(Geometry {
+                value: geometry.clone(),
+            }))
+        }
+        _ => ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_min_zoom(
+    value: *const OfflineRegionDefinition,
+) -> f64 {
+    offline_region_definition_ref(value).map_or(0.0, |value| match &value.value {
+        core::OfflineRegionDefinition::TilePyramid { min_zoom, .. }
+        | core::OfflineRegionDefinition::GeometryRegion { min_zoom, .. } => *min_zoom,
+        _ => 0.0,
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_max_zoom(
+    value: *const OfflineRegionDefinition,
+) -> f64 {
+    offline_region_definition_ref(value).map_or(0.0, |value| match &value.value {
+        core::OfflineRegionDefinition::TilePyramid { max_zoom, .. }
+        | core::OfflineRegionDefinition::GeometryRegion { max_zoom, .. } => *max_zoom,
+        _ => 0.0,
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_pixel_ratio(
+    value: *const OfflineRegionDefinition,
+) -> f32 {
+    offline_region_definition_ref(value).map_or(0.0, |value| match &value.value {
+        core::OfflineRegionDefinition::TilePyramid { pixel_ratio, .. }
+        | core::OfflineRegionDefinition::GeometryRegion { pixel_ratio, .. } => *pixel_ratio,
+        _ => 0.0,
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_definition_get_include_ideographs(
+    value: *const OfflineRegionDefinition,
+) -> bool {
+    offline_region_definition_ref(value).is_some_and(|value| match &value.value {
+        core::OfflineRegionDefinition::TilePyramid {
+            include_ideographs, ..
+        }
+        | core::OfflineRegionDefinition::GeometryRegion {
+            include_ideographs, ..
+        } => *include_ideographs,
+        _ => false,
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_get_id(value: *const OfflineRegionInfo) -> i64 {
+    offline_region_info_ref(value).map_or(0, |value| value.value.id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_get_definition(
+    value: *const OfflineRegionInfo,
+) -> *mut OfflineRegionDefinition {
+    offline_region_info_ref(value).map_or(ptr::null_mut(), |value| {
+        Box::into_raw(Box::new(OfflineRegionDefinition {
+            value: value.value.definition.clone(),
+        }))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_dup_metadata(
+    value: *const OfflineRegionInfo,
+) -> *mut glib::GBytes {
+    offline_region_info_ref(value)
+        .map(|value| glib::bytes_new(&value.value.metadata))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_list_count(
+    value: *const OfflineRegionInfoList,
+) -> usize {
+    offline_region_info_list_ref(value).map_or(0, |value| value.regions.len())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_info_list_get(
+    value: *const OfflineRegionInfoList,
+    index: usize,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionInfo {
+    match offline_region_info_list_get(value, index) {
+        Ok(info) => Box::into_raw(Box::new(info)),
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -444,7 +753,7 @@ pub extern "C" fn mln_vala_runtime_handle_run_ambient_cache_operation_start(
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_offline_region_create_start(
     handle: *mut RuntimeHandle,
-    definition: *const sys::mln_offline_region_definition,
+    definition: *const OfflineRegionDefinition,
     metadata: *const u8,
     metadata_size: usize,
     out_operation_id: *mut u64,
@@ -624,9 +933,9 @@ pub extern "C" fn mln_vala_runtime_handle_offline_region_create_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
     error_out: *mut *mut GError,
-) -> *mut OfflineRegionSnapshotHandle {
+) -> *mut OfflineRegionInfo {
     match offline_region_create_take_result(handle, operation_id) {
-        Ok(snapshot) => snapshot,
+        Ok(info) => Box::into_raw(Box::new(info)),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -640,9 +949,9 @@ pub extern "C" fn mln_vala_runtime_handle_offline_region_get_take_result(
     operation_id: u64,
     out_found: *mut GBoolean,
     error_out: *mut *mut GError,
-) -> *mut OfflineRegionSnapshotHandle {
+) -> *mut OfflineRegionInfo {
     match offline_region_get_take_result(handle, operation_id, out_found) {
-        Ok(snapshot) => snapshot,
+        Ok(info) => info.map_or(ptr::null_mut(), |info| Box::into_raw(Box::new(info))),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -655,9 +964,9 @@ pub extern "C" fn mln_vala_runtime_handle_offline_regions_list_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
     error_out: *mut *mut GError,
-) -> *mut OfflineRegionListHandle {
+) -> *mut OfflineRegionInfoList {
     match offline_regions_list_take_result(handle, operation_id) {
-        Ok(list) => list,
+        Ok(list) => Box::into_raw(Box::new(list)),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -670,9 +979,9 @@ pub extern "C" fn mln_vala_runtime_handle_offline_regions_merge_database_take_re
     handle: *mut RuntimeHandle,
     operation_id: u64,
     error_out: *mut *mut GError,
-) -> *mut OfflineRegionListHandle {
+) -> *mut OfflineRegionInfoList {
     match offline_regions_merge_database_take_result(handle, operation_id) {
-        Ok(list) => list,
+        Ok(list) => Box::into_raw(Box::new(list)),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -685,9 +994,9 @@ pub extern "C" fn mln_vala_runtime_handle_offline_region_update_metadata_take_re
     handle: *mut RuntimeHandle,
     operation_id: u64,
     error_out: *mut *mut GError,
-) -> *mut OfflineRegionSnapshotHandle {
+) -> *mut OfflineRegionInfo {
     match offline_region_update_metadata_take_result(handle, operation_id) {
-        Ok(snapshot) => snapshot,
+        Ok(info) => Box::into_raw(Box::new(info)),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -2841,9 +3150,9 @@ pub extern "C" fn mln_vala_map_handle_get_style_layer_type(
 pub extern "C" fn mln_vala_map_handle_list_style_source_ids(
     handle: *mut MapHandle,
     error_out: *mut *mut GError,
-) -> *mut StyleIdListHandle {
+) -> *mut StringList {
     match list_style_source_ids(handle) {
-        Ok(list) => list,
+        Ok(list) => Box::into_raw(Box::new(list)),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -2857,9 +3166,11 @@ pub extern "C" fn mln_vala_map_handle_get_style_layer_json(
     layer_id: *const c_char,
     out_found: *mut GBoolean,
     error_out: *mut *mut GError,
-) -> *mut JsonSnapshotHandle {
+) -> *mut JsonValue {
     match get_style_layer_json(handle, layer_id, out_found) {
-        Ok(snapshot) => snapshot,
+        Ok(value) => value.map_or(ptr::null_mut(), |value| {
+            Box::into_raw(Box::new(JsonValue { value }))
+        }),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -2903,9 +3214,11 @@ pub extern "C" fn mln_vala_map_handle_get_style_light_property(
     handle: *mut MapHandle,
     property_name: *const c_char,
     error_out: *mut *mut GError,
-) -> *mut JsonSnapshotHandle {
+) -> *mut JsonValue {
     match get_style_light_property(handle, property_name) {
-        Ok(snapshot) => snapshot,
+        Ok(value) => value.map_or(ptr::null_mut(), |value| {
+            Box::into_raw(Box::new(JsonValue { value }))
+        }),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -2936,9 +3249,11 @@ pub extern "C" fn mln_vala_map_handle_get_layer_property(
     layer_id: *const c_char,
     property_name: *const c_char,
     error_out: *mut *mut GError,
-) -> *mut JsonSnapshotHandle {
+) -> *mut JsonValue {
     match get_layer_property(handle, layer_id, property_name) {
-        Ok(snapshot) => snapshot,
+        Ok(value) => value.map_or(ptr::null_mut(), |value| {
+            Box::into_raw(Box::new(JsonValue { value }))
+        }),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -2967,9 +3282,11 @@ pub extern "C" fn mln_vala_map_handle_get_layer_filter(
     handle: *mut MapHandle,
     layer_id: *const c_char,
     error_out: *mut *mut GError,
-) -> *mut JsonSnapshotHandle {
+) -> *mut JsonValue {
     match get_layer_filter(handle, layer_id) {
-        Ok(snapshot) => snapshot,
+        Ok(value) => value.map_or(ptr::null_mut(), |value| {
+            Box::into_raw(Box::new(JsonValue { value }))
+        }),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -2981,9 +3298,9 @@ pub extern "C" fn mln_vala_map_handle_get_layer_filter(
 pub extern "C" fn mln_vala_map_handle_list_style_layer_ids(
     handle: *mut MapHandle,
     error_out: *mut *mut GError,
-) -> *mut StyleIdListHandle {
+) -> *mut StringList {
     match list_style_layer_ids(handle) {
-        Ok(list) => list,
+        Ok(list) => Box::into_raw(Box::new(list)),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -3059,31 +3376,6 @@ pub extern "C" fn mln_vala_offline_region_snapshot_handle_get(
             GFALSE
         }
     }
-}
-
-fn offline_region_info_dup_metadata(
-    info: *const sys::mln_offline_region_info,
-) -> *mut glib::GBytes {
-    if info.is_null() {
-        return ptr::null_mut();
-    }
-    // SAFETY: info points to a copied offline-region info struct. Copy the
-    // metadata bytes immediately into a GBytes owned by the caller.
-    let info = unsafe { &*info };
-    if info.metadata.is_null() || info.metadata_size == 0 {
-        return ptr::null_mut();
-    }
-    // SAFETY: metadata is valid for metadata_size bytes while the copied info
-    // remains live; bytes_new copies it.
-    let bytes = unsafe { std::slice::from_raw_parts(info.metadata, info.metadata_size) };
-    glib::bytes_new(bytes)
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_offline_region_info_dup_metadata(
-    info: *const sys::mln_offline_region_info,
-) -> *mut glib::GBytes {
-    offline_region_info_dup_metadata(info)
 }
 
 #[unsafe(no_mangle)]
@@ -5262,7 +5554,7 @@ fn get_style_layer_json(
     handle: *mut MapHandle,
     layer_id: *const c_char,
     out_found: *mut GBoolean,
-) -> error::Result<*mut JsonSnapshotHandle> {
+) -> error::Result<Option<core::JsonValue>> {
     if out_found.is_null() {
         return Err(Error::invalid_argument(
             "style layer found output pointer is null",
@@ -5278,9 +5570,9 @@ fn get_style_layer_json(
     })?;
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })?;
     if found {
-        wrap_json_snapshot(snapshot)
+        copy_json_snapshot(snapshot)
     } else {
-        Ok(ptr::null_mut())
+        Ok(None)
     }
 }
 
@@ -5308,7 +5600,7 @@ fn set_style_light_property(
 fn get_style_light_property(
     handle: *mut MapHandle,
     property_name: *const c_char,
-) -> error::Result<*mut JsonSnapshotHandle> {
+) -> error::Result<Option<core::JsonValue>> {
     let map = map_native(handle)?;
     let property_name = string_view_from_c(property_name, "style light property name")?;
     let mut snapshot = ptr::null_mut();
@@ -5316,7 +5608,7 @@ fn get_style_light_property(
     error::check(unsafe {
         sys::mln_map_get_style_light_property(map, property_name, &mut snapshot)
     })?;
-    wrap_nullable_json_snapshot(snapshot)
+    copy_nullable_json_snapshot(snapshot)
 }
 
 fn set_layer_property(
@@ -5339,7 +5631,7 @@ fn get_layer_property(
     handle: *mut MapHandle,
     layer_id: *const c_char,
     property_name: *const c_char,
-) -> error::Result<*mut JsonSnapshotHandle> {
+) -> error::Result<Option<core::JsonValue>> {
     let map = map_native(handle)?;
     let layer_id = string_view_from_c(layer_id, "style layer ID")?;
     let property_name = string_view_from_c(property_name, "style layer property name")?;
@@ -5348,7 +5640,7 @@ fn get_layer_property(
     error::check(unsafe {
         sys::mln_map_get_layer_property(map, layer_id, property_name, &mut snapshot)
     })?;
-    wrap_nullable_json_snapshot(snapshot)
+    copy_nullable_json_snapshot(snapshot)
 }
 
 fn set_layer_filter(
@@ -5373,29 +5665,54 @@ fn set_layer_filter(
 fn get_layer_filter(
     handle: *mut MapHandle,
     layer_id: *const c_char,
-) -> error::Result<*mut JsonSnapshotHandle> {
+) -> error::Result<Option<core::JsonValue>> {
     let map = map_native(handle)?;
     let layer_id = string_view_from_c(layer_id, "style layer ID")?;
     let mut snapshot = ptr::null_mut();
     // SAFETY: `map` is live and output storage is valid and null-initialized.
     error::check(unsafe { sys::mln_map_get_layer_filter(map, layer_id, &mut snapshot) })?;
-    wrap_nullable_json_snapshot(snapshot)
+    copy_nullable_json_snapshot(snapshot)
 }
 
-fn list_style_source_ids(handle: *mut MapHandle) -> error::Result<*mut StyleIdListHandle> {
+fn list_style_source_ids(handle: *mut MapHandle) -> error::Result<StringList> {
     let map = map_native(handle)?;
     let mut native = ptr::null_mut();
     // SAFETY: `map` is live and `native` is null before the call as required.
     error::check(unsafe { sys::mln_map_list_style_source_ids(map, &mut native) })?;
-    wrap_style_id_list(native)
+    copy_style_id_list(native)
 }
 
-fn list_style_layer_ids(handle: *mut MapHandle) -> error::Result<*mut StyleIdListHandle> {
+fn list_style_layer_ids(handle: *mut MapHandle) -> error::Result<StringList> {
     let map = map_native(handle)?;
     let mut native = ptr::null_mut();
     // SAFETY: `map` is live and `native` is null before the call as required.
     error::check(unsafe { sys::mln_map_list_style_layer_ids(map, &mut native) })?;
-    wrap_style_id_list(native)
+    copy_style_id_list(native)
+}
+
+fn copy_style_id_list(native: *mut sys::mln_style_id_list) -> error::Result<StringList> {
+    let handle = wrap_style_id_list(native)?;
+    let mut count = 0usize;
+    let copy_result = (|| {
+        style_id_list_count(handle, &mut count)?;
+        let mut strings = Vec::with_capacity(count);
+        for index in 0..count {
+            let id = style_id_list_get(handle, index)?;
+            if id.is_null() {
+                return Err(Error::invalid_argument("style ID copy is null"));
+            }
+            // SAFETY: style_id_list_get returns a GLib-allocated NUL-terminated string.
+            let bytes = unsafe { CStr::from_ptr(id) }.to_bytes();
+            let string = CString::new(bytes)
+                .map_err(|_| Error::invalid_argument("style ID contains embedded NUL"))?;
+            // SAFETY: transfer the temporary GLib string copy back to GLib.
+            unsafe { glib::free(id.cast()) };
+            strings.push(string);
+        }
+        Ok(StringList::from_strings(strings))
+    })();
+    close_style_id_list(handle);
+    copy_result
 }
 
 fn wrap_style_id_list(
@@ -5481,35 +5798,24 @@ fn json_value_native(
         .materialize()
 }
 
-fn wrap_nullable_json_snapshot(
+fn copy_nullable_json_snapshot(
     native: *mut sys::mln_json_snapshot,
-) -> error::Result<*mut JsonSnapshotHandle> {
+) -> error::Result<Option<core::JsonValue>> {
     if native.is_null() {
-        Ok(ptr::null_mut())
+        Ok(None)
     } else {
-        wrap_json_snapshot(native)
+        copy_json_snapshot(native)
     }
 }
 
-pub(crate) fn wrap_json_snapshot(
+fn copy_json_snapshot(
     native: *mut sys::mln_json_snapshot,
-) -> error::Result<*mut JsonSnapshotHandle> {
-    if native.is_null() {
-        return Err(Error::invalid_argument("native JSON snapshot is null"));
-    }
-    let handle = glib::new_object::<JsonSnapshotHandle>(mln_vala_json_snapshot_handle_get_type());
-    if handle.is_null() {
-        // SAFETY: `native` came from a successful snapshot-producing operation.
-        unsafe { sys::mln_json_snapshot_destroy(native) };
-        return Err(Error::invalid_argument(
-            "failed to allocate JsonSnapshotHandle",
-        ));
-    }
-    // SAFETY: `handle` points to a newly allocated snapshot wrapper.
-    unsafe {
-        (*handle).native = native;
-    }
-    Ok(handle)
+) -> error::Result<Option<core::JsonValue>> {
+    let native = NonNull::new(native)
+        .ok_or_else(|| Error::invalid_argument("native JSON snapshot is null"))?;
+    // SAFETY: the C API returned an owned JSON snapshot; the core helper copies
+    // the JSON value and releases the native snapshot on every exit path.
+    unsafe { core::json::copy_json_snapshot(Some(native)) }
 }
 
 fn json_snapshot_native(
@@ -5566,53 +5872,164 @@ fn close_json_snapshot(handle: *mut JsonSnapshotHandle) {
     }
 }
 
-fn wrap_offline_region_snapshot(
-    native: *mut sys::mln_offline_region_snapshot,
-) -> error::Result<*mut OfflineRegionSnapshotHandle> {
-    if native.is_null() {
-        return Err(Error::invalid_argument(
-            "native offline region snapshot is null",
-        ));
+fn offline_region_definition_ref(
+    value: *const OfflineRegionDefinition,
+) -> Option<&'static OfflineRegionDefinition> {
+    if value.is_null() {
+        None
+    } else {
+        Some(unsafe { &*value })
     }
-    let handle = glib::new_object::<OfflineRegionSnapshotHandle>(
-        mln_vala_offline_region_snapshot_handle_get_type(),
-    );
-    if handle.is_null() {
-        // SAFETY: `native` came from a successful take-result operation.
-        unsafe { sys::mln_offline_region_snapshot_destroy(native) };
-        return Err(Error::invalid_argument(
-            "failed to allocate OfflineRegionSnapshotHandle",
-        ));
-    }
-    // SAFETY: `handle` points to a newly allocated snapshot wrapper.
-    unsafe {
-        (*handle).native = native;
-    }
-    Ok(handle)
 }
 
-fn wrap_offline_region_list(
+fn offline_region_info_ref(value: *const OfflineRegionInfo) -> Option<&'static OfflineRegionInfo> {
+    if value.is_null() {
+        None
+    } else {
+        Some(unsafe { &*value })
+    }
+}
+
+fn offline_region_info_list_ref(
+    value: *const OfflineRegionInfoList,
+) -> Option<&'static OfflineRegionInfoList> {
+    if value.is_null() {
+        None
+    } else {
+        Some(unsafe { &*value })
+    }
+}
+
+fn offline_region_info_list_get(
+    value: *const OfflineRegionInfoList,
+    index: usize,
+) -> error::Result<OfflineRegionInfo> {
+    let list = offline_region_info_list_ref(value)
+        .ok_or_else(|| Error::invalid_argument("offline region info list is null"))?;
+    let value = list
+        .regions
+        .get(index)
+        .ok_or_else(|| Error::invalid_argument("offline region info index is out of range"))?
+        .clone();
+    Ok(OfflineRegionInfo { value })
+}
+
+fn offline_region_definition_new_tile_pyramid(
+    style_url: *const c_char,
+    bounds: *const sys::mln_lat_lng_bounds,
+    min_zoom: f64,
+    max_zoom: f64,
+    pixel_ratio: f32,
+    include_ideographs: bool,
+) -> error::Result<OfflineRegionDefinition> {
+    if bounds.is_null() {
+        return Err(Error::invalid_argument(
+            "offline tile-pyramid bounds are null",
+        ));
+    }
+    let style_url = copy_input_c_string(style_url)?;
+    let bounds = core::values::lat_lng_bounds_from_native(unsafe { *bounds });
+    Ok(OfflineRegionDefinition {
+        value: core::OfflineRegionDefinition::TilePyramid {
+            style_url,
+            bounds,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        },
+    })
+}
+
+fn offline_region_definition_new_geometry(
+    style_url: *const c_char,
+    geometry: *const Geometry,
+    min_zoom: f64,
+    max_zoom: f64,
+    pixel_ratio: f32,
+    include_ideographs: bool,
+) -> error::Result<OfflineRegionDefinition> {
+    let style_url = copy_input_c_string(style_url)?;
+    let geometry = values::geometry_ref(geometry)
+        .ok_or_else(|| Error::invalid_argument("offline geometry region geometry is null"))?
+        .value
+        .clone();
+    Ok(OfflineRegionDefinition {
+        value: core::OfflineRegionDefinition::GeometryRegion {
+            style_url,
+            geometry,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        },
+    })
+}
+
+fn copy_input_c_string(value: *const c_char) -> error::Result<String> {
+    if value.is_null() {
+        return Err(Error::invalid_argument("string is null"));
+    }
+    // SAFETY: The caller supplies a NUL-terminated C string pointer.
+    let bytes = unsafe { CStr::from_ptr(value) }.to_bytes();
+    Ok(std::str::from_utf8(bytes)
+        .map_err(|_| Error::invalid_argument("string is not valid UTF-8"))?
+        .to_owned())
+}
+
+fn copy_string(value: &str) -> Option<*mut c_char> {
+    let c_string = CString::new(value).ok()?;
+    glib::copy_string_view(sys::mln_string_view {
+        data: c_string.as_ptr(),
+        size: c_string.as_bytes().len(),
+    })
+    .ok()
+}
+
+unsafe extern "C" fn offline_region_definition_copy_erased(value: *mut c_void) -> *mut c_void {
+    mln_vala_offline_region_definition_copy(value.cast()).cast()
+}
+
+unsafe extern "C" fn offline_region_definition_free_erased(value: *mut c_void) {
+    mln_vala_offline_region_definition_free(value.cast());
+}
+
+unsafe extern "C" fn offline_region_info_copy_erased(value: *mut c_void) -> *mut c_void {
+    mln_vala_offline_region_info_copy(value.cast()).cast()
+}
+
+unsafe extern "C" fn offline_region_info_free_erased(value: *mut c_void) {
+    mln_vala_offline_region_info_free(value.cast());
+}
+
+unsafe extern "C" fn offline_region_info_list_copy_erased(value: *mut c_void) -> *mut c_void {
+    mln_vala_offline_region_info_list_copy(value.cast()).cast()
+}
+
+unsafe extern "C" fn offline_region_info_list_free_erased(value: *mut c_void) {
+    mln_vala_offline_region_info_list_free(value.cast());
+}
+
+fn copy_offline_region_snapshot(
+    native: *mut sys::mln_offline_region_snapshot,
+) -> error::Result<OfflineRegionInfo> {
+    let native = NonNull::new(native)
+        .ok_or_else(|| Error::invalid_argument("native offline region snapshot is null"))?;
+    // SAFETY: the C API returned an owned snapshot; the core helper copies all
+    // region data and releases the native snapshot on every exit path.
+    let value = unsafe { core::runtime::copy_offline_region_snapshot(native) }?;
+    Ok(OfflineRegionInfo { value })
+}
+
+fn copy_offline_region_list(
     native: *mut sys::mln_offline_region_list,
-) -> error::Result<*mut OfflineRegionListHandle> {
-    if native.is_null() {
-        return Err(Error::invalid_argument(
-            "native offline region list is null",
-        ));
-    }
-    let handle =
-        glib::new_object::<OfflineRegionListHandle>(mln_vala_offline_region_list_handle_get_type());
-    if handle.is_null() {
-        // SAFETY: `native` came from a successful take-result operation.
-        unsafe { sys::mln_offline_region_list_destroy(native) };
-        return Err(Error::invalid_argument(
-            "failed to allocate OfflineRegionListHandle",
-        ));
-    }
-    // SAFETY: `handle` points to a newly allocated list wrapper.
-    unsafe {
-        (*handle).native = native;
-    }
-    Ok(handle)
+) -> error::Result<OfflineRegionInfoList> {
+    let native = NonNull::new(native)
+        .ok_or_else(|| Error::invalid_argument("native offline region list is null"))?;
+    // SAFETY: the C API returned an owned list; the core helper copies all
+    // region data and releases the native list on every exit path.
+    let regions = unsafe { core::runtime::copy_offline_region_list(native) }?;
+    Ok(OfflineRegionInfoList { regions })
 }
 
 fn offline_region_snapshot_native(
@@ -5954,15 +6371,14 @@ fn run_ambient_cache_operation_start(
 
 fn offline_region_create_start(
     handle: *mut RuntimeHandle,
-    definition: *const sys::mln_offline_region_definition,
+    definition: *const OfflineRegionDefinition,
     metadata: *const u8,
     metadata_size: usize,
     out_operation_id: *mut u64,
 ) -> error::Result<()> {
     let runtime = runtime_native(handle)?;
-    if definition.is_null() {
-        return Err(Error::invalid_argument("offline region definition is null"));
-    }
+    let definition = offline_region_definition_ref(definition)
+        .ok_or_else(|| Error::invalid_argument("offline region definition is null"))?;
     if metadata.is_null() && metadata_size != 0 {
         return Err(Error::invalid_argument(
             "offline region metadata is null with non-zero size",
@@ -5973,9 +6389,9 @@ fn offline_region_create_start(
             "offline operation ID output pointer is null",
         ));
     }
-    let mut definition = unsafe { *definition };
-    initialize_offline_region_definition(&mut definition);
-    // SAFETY: `runtime` is live, definition and metadata are borrowed for this
+    let definition = core::runtime::offline_region_definition_to_native(&definition.value)?;
+    let definition = definition.to_raw();
+    // SAFETY: `runtime` is live, definition-owned storage is borrowed for this
     // call, and output storage is writable.
     error::check(unsafe {
         sys::mln_runtime_offline_region_create_start(
@@ -5988,6 +6404,7 @@ fn offline_region_create_start(
     })
 }
 
+#[cfg(test)]
 fn initialize_offline_region_definition(definition: &mut sys::mln_offline_region_definition) {
     definition.size = std::mem::size_of::<sys::mln_offline_region_definition>() as u32;
     match definition.type_ {
@@ -6192,7 +6609,7 @@ fn offline_region_delete_start(
 fn offline_region_create_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
-) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+) -> error::Result<OfflineRegionInfo> {
     let runtime = runtime_native(handle)?;
     let mut snapshot = ptr::null_mut();
     // SAFETY: `runtime` is live and output storage is valid. The C API
@@ -6200,14 +6617,14 @@ fn offline_region_create_take_result(
     error::check(unsafe {
         sys::mln_runtime_offline_region_create_take_result(runtime, operation_id, &mut snapshot)
     })?;
-    wrap_offline_region_snapshot(snapshot)
+    copy_offline_region_snapshot(snapshot)
 }
 
 fn offline_region_get_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
     out_found: *mut GBoolean,
-) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+) -> error::Result<Option<OfflineRegionInfo>> {
     if out_found.is_null() {
         return Err(Error::invalid_argument(
             "offline region found output pointer is null",
@@ -6228,16 +6645,16 @@ fn offline_region_get_take_result(
     })?;
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })?;
     if found {
-        wrap_offline_region_snapshot(snapshot)
+        copy_offline_region_snapshot(snapshot).map(Some)
     } else {
-        Ok(ptr::null_mut())
+        Ok(None)
     }
 }
 
 fn offline_regions_list_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
-) -> error::Result<*mut OfflineRegionListHandle> {
+) -> error::Result<OfflineRegionInfoList> {
     let runtime = runtime_native(handle)?;
     let mut list = ptr::null_mut();
     // SAFETY: `runtime` is live and output storage is valid. The C API
@@ -6245,13 +6662,13 @@ fn offline_regions_list_take_result(
     error::check(unsafe {
         sys::mln_runtime_offline_regions_list_take_result(runtime, operation_id, &mut list)
     })?;
-    wrap_offline_region_list(list)
+    copy_offline_region_list(list)
 }
 
 fn offline_regions_merge_database_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
-) -> error::Result<*mut OfflineRegionListHandle> {
+) -> error::Result<OfflineRegionInfoList> {
     let runtime = runtime_native(handle)?;
     let mut list = ptr::null_mut();
     // SAFETY: `runtime` is live and output storage is valid. The C API
@@ -6263,13 +6680,13 @@ fn offline_regions_merge_database_take_result(
             &mut list,
         )
     })?;
-    wrap_offline_region_list(list)
+    copy_offline_region_list(list)
 }
 
 fn offline_region_update_metadata_take_result(
     handle: *mut RuntimeHandle,
     operation_id: u64,
-) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+) -> error::Result<OfflineRegionInfo> {
     let runtime = runtime_native(handle)?;
     let mut snapshot = ptr::null_mut();
     // SAFETY: `runtime` is live and output storage is valid. The C API
@@ -6281,7 +6698,7 @@ fn offline_region_update_metadata_take_result(
             &mut snapshot,
         )
     })?;
-    wrap_offline_region_snapshot(snapshot)
+    copy_offline_region_snapshot(snapshot)
 }
 
 fn offline_region_get_status_take_result(
@@ -6972,6 +7389,89 @@ mod tests {
             unsafe { geometry_definition.data.geometry.size },
             std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32
         );
+    }
+
+    #[test]
+    fn owned_offline_region_definitions_copy_and_expose_safe_accessors() {
+        let point = LatLng {
+            latitude: 1.0,
+            longitude: 2.0,
+        };
+        let geometry = values::mln_vala_geometry_new_point(&point, ptr::null_mut());
+        assert!(!geometry.is_null());
+
+        let definition = mln_vala_offline_region_definition_new_geometry(
+            c"asset://style.json".as_ptr(),
+            geometry,
+            0.0,
+            4.0,
+            1.0,
+            false,
+            ptr::null_mut(),
+        );
+        assert!(!definition.is_null());
+        assert_eq!(
+            mln_vala_offline_region_definition_get_definition_type(definition),
+            sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+        );
+        assert_eq!(
+            mln_vala_offline_region_definition_get_min_zoom(definition),
+            0.0
+        );
+        assert_eq!(
+            mln_vala_offline_region_definition_get_max_zoom(definition),
+            4.0
+        );
+        assert_eq!(
+            mln_vala_offline_region_definition_get_pixel_ratio(definition),
+            1.0
+        );
+        assert!(!mln_vala_offline_region_definition_get_include_ideographs(
+            definition
+        ));
+        let style_url = mln_vala_offline_region_definition_dup_style_url(definition);
+        assert!(!style_url.is_null());
+        // SAFETY: String was allocated with GLib allocation by the wrapper.
+        unsafe { glib::free(style_url.cast::<c_void>()) };
+        let copied_geometry = mln_vala_offline_region_definition_get_geometry(definition);
+        assert!(!copied_geometry.is_null());
+        values::mln_vala_geometry_free(copied_geometry);
+
+        let bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: -1.0,
+                longitude: -2.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 1.0,
+                longitude: 2.0,
+            },
+        };
+        let tile_definition = mln_vala_offline_region_definition_new_tile_pyramid(
+            c"asset://style.json".as_ptr(),
+            &bounds,
+            1.0,
+            8.0,
+            2.0,
+            true,
+            ptr::null_mut(),
+        );
+        assert!(!tile_definition.is_null());
+        assert_eq!(
+            mln_vala_offline_region_definition_get_definition_type(tile_definition),
+            sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+        );
+        let mut copied_bounds: sys::mln_lat_lng_bounds = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_offline_region_definition_get_bounds(tile_definition, &mut copied_bounds),
+            GTRUE
+        );
+        assert_eq!(copied_bounds.southwest.latitude, -1.0);
+        assert!(mln_vala_offline_region_definition_get_geometry(tile_definition).is_null());
+
+        mln_vala_offline_region_definition_free(tile_definition);
+        mln_vala_offline_region_definition_free(definition);
+        values::mln_vala_geometry_free(geometry);
     }
 
     #[test]
@@ -7857,28 +8357,26 @@ mod tests {
 
         let layer_ids = mln_vala_map_handle_list_style_layer_ids(map, ptr::null_mut());
         assert!(!layer_ids.is_null());
-        let mut layer_count = 0;
-        assert_eq!(
-            mln_vala_style_id_list_handle_count(layer_ids, &mut layer_count, ptr::null_mut()),
-            GTRUE
-        );
+        let layer_count = crate::string_list::mln_vala_string_list_count(layer_ids);
         assert_ne!(layer_count, 0);
-        let first_layer_id = mln_vala_style_id_list_handle_get(layer_ids, 0, ptr::null_mut());
+        let first_layer_id =
+            crate::string_list::mln_vala_string_list_get(layer_ids, 0, ptr::null_mut());
         assert!(!first_layer_id.is_null());
         // SAFETY: ID was allocated with GLib allocation by the wrapper.
         unsafe { glib::free(first_layer_id.cast::<c_void>()) };
-        mln_vala_style_id_list_handle_close(layer_ids);
-        glib::unref_object(layer_ids);
+        crate::string_list::mln_vala_string_list_free(layer_ids);
 
         let source_ids = mln_vala_map_handle_list_style_source_ids(map, ptr::null_mut());
         assert!(!source_ids.is_null());
-        let mut source_count = 0;
-        assert_eq!(
-            mln_vala_style_id_list_handle_count(source_ids, &mut source_count, ptr::null_mut()),
-            GTRUE
-        );
-        mln_vala_style_id_list_handle_close(source_ids);
-        glib::unref_object(source_ids);
+        let source_count = crate::string_list::mln_vala_string_list_count(source_ids);
+        if source_count > 0 {
+            let first_source_id =
+                crate::string_list::mln_vala_string_list_get(source_ids, 0, ptr::null_mut());
+            assert!(!first_source_id.is_null());
+            // SAFETY: ID was allocated with GLib allocation by the wrapper.
+            unsafe { glib::free(first_source_id.cast::<c_void>()) };
+        }
+        crate::string_list::mln_vala_string_list_free(source_ids);
 
         assert_eq!(
             mln_vala_map_handle_move_style_layer(

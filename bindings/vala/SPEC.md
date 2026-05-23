@@ -107,20 +107,21 @@ The Rust adapter implements the low-level GLib/GObject surface:
   replacement, and async severity-mask operations are exposed in generated Vala.
 - Resource response descriptors, safe response byte setters, resource request
   prior-data byte accessors, resource transform/provider callbacks, offline
-  operation create/start/status/discard helpers, copied offline status/info
-  values, and `ResourceRequestHandle` one-shot
-  completion/cancellation/release/async-retain methods are visible in generated
-  Vala.
+  operation create/start/status/discard helpers, owned offline region
+  definitions, copied offline status/info/list values, and
+  `ResourceRequestHandle` one-shot completion/cancellation/release/async-retain
+  methods are visible in generated Vala.
 - Basic style-source operations for GeoJSON URL and inline data sources,
   vector/raster/raster DEM tile source URL and inline tile sources, custom
   geometry sources, image sources, source metadata and attribution, source
   lifecycle, runtime style images, DEM helper layers, style
   JSON/property/light/filter operations, basic style-layer lifecycle operations,
   and map coordinate conversion helpers are exposed through `MapHandle`.
-- Geographic value structs, boxed geometry/GeoJSON value builders, boxed JSON
-  value builders, and projected-meter conversion helpers are visible in
-  generated Vala. Borrowed offline geometry-definition fields stay hidden until
-  the binding has an owned constructor/API shape for them.
+- Geographic value structs, boxed geometry/GeoJSON/feature value builders, boxed
+  JSON value builders, owned offline region definition constructors, and
+  projected-meter conversion helpers are visible in generated Vala. Borrowed
+  offline tile-pyramid and geometry definition structs stay hidden from VAPI,
+  GIR, and typelib-derived GIR.
 - `MapProjectionHandle` is registered as a standalone GObject class with
   close-once lifecycle, camera, visible-coordinate/geometry fitting, and
   coordinate conversion methods.
@@ -129,9 +130,11 @@ The Rust adapter implements the low-level GLib/GObject surface:
   attach methods, readback helpers, texture frame handles, and basic session
   lifecycle methods.
 - Rendered/source feature query option descriptors and rendered query geometry
-  constructors are exposed for Vala bindability. Native feature query result and
-  feature extension result handles remain internal until owned result APIs are
-  available.
+  constructors are exposed for Vala bindability. Rendered/source query results,
+  queried features, feature extension results, style ID lists, and JSON
+  snapshots return owned boxed values or copied strings/JSON values. Native
+  feature query result, feature extension result, style ID list, JSON snapshot,
+  and offline snapshot/list handles remain internal.
 - `NativePointer` records borrowed opaque-address value semantics for the public
   boxed type.
 - `metadata/api.toml` is the generator manifest for namespace, error domain,

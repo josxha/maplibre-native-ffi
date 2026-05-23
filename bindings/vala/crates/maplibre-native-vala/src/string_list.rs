@@ -32,7 +32,7 @@ impl Clone for StringList {
 }
 
 impl StringList {
-    fn from_strings(strings: Vec<CString>) -> Self {
+    pub(crate) fn from_strings(strings: Vec<CString>) -> Self {
         let views = strings
             .iter()
             .map(|value| sys::mln_string_view {
@@ -88,6 +88,26 @@ pub extern "C" fn mln_vala_string_list_copy(list: *const StringList) -> *mut Str
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_string_list_count(list: *const StringList) -> usize {
+    string_list_ref(list).map_or(0, StringList::len)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_string_list_get(
+    list: *const StringList,
+    index: usize,
+    error_out: *mut *mut GError,
+) -> *mut c_char {
+    match string_list_get(list, index) {
+        Ok(value) => value,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_string_list_free(list: *mut StringList) {
     if list.is_null() {
         return;
@@ -103,6 +123,17 @@ unsafe extern "C" fn string_list_copy_boxed(list: *mut c_void) -> *mut c_void {
 
 unsafe extern "C" fn string_list_free_boxed(list: *mut c_void) {
     mln_vala_string_list_free(list.cast::<StringList>())
+}
+
+fn string_list_get(list: *const StringList, index: usize) -> Result<*mut c_char, Error> {
+    let list =
+        string_list_ref(list).ok_or_else(|| Error::invalid_argument("string list is null"))?;
+    let view = list
+        .views
+        .get(index)
+        .copied()
+        .ok_or_else(|| Error::invalid_argument("string list index is out of range"))?;
+    glib::copy_string_view(view)
 }
 
 fn new_string_list(values: *const *const c_char, value_count: usize) -> Result<StringList, Error> {

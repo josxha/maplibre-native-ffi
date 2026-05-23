@@ -298,11 +298,26 @@ void exercise_option_setters(MaplibreNative.LatLng coordinate) throws GLib.Error
   image.set_sdf(false);
 }
 
-void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GLib.Error {
+void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime, MaplibreNative.Geometry geometry) throws GLib.Error {
   uint64 operation_id;
-  MaplibreNative.OfflineRegionDefinition definition = {};
+  MaplibreNative.LatLngBounds region_bounds = { { -1.0, -1.0 }, { 1.0, 1.0 } };
+  var tile_definition = new MaplibreNative.OfflineRegionDefinition.tile_pyramid("asset://offline-style.json", region_bounds, 0.0, 4.0, 1.0f, true);
+  var geometry_definition = new MaplibreNative.OfflineRegionDefinition.geometry("asset://offline-style.json", geometry, 0.0, 4.0, 1.0f, false);
+  var definition_copy = geometry_definition.copy();
+  string? style_url = definition_copy.dup_style_url();
+  MaplibreNative.Geometry? copied_geometry = definition_copy.get_geometry();
+  if (tile_definition.get_definition_type() == MaplibreNative.OfflineRegionDefinitionType.TILE_PYRAMID && geometry_definition.get_definition_type() == MaplibreNative.OfflineRegionDefinitionType.GEOMETRY && style_url != null && copied_geometry != null) {
+    GLib.stderr.printf("");
+  }
+  double min_zoom = definition_copy.get_min_zoom();
+  double max_zoom = definition_copy.get_max_zoom();
+  float pixel_ratio = definition_copy.get_pixel_ratio();
+  bool include_ideographs = definition_copy.get_include_ideographs();
+  if (min_zoom <= max_zoom && pixel_ratio > 0.0f && !include_ideographs) {
+    GLib.stderr.printf("");
+  }
   uint8[] metadata = { 1, 2, 3 };
-  runtime.offline_region_create_start(definition, metadata, out operation_id);
+  runtime.offline_region_create_start(geometry_definition, metadata, out operation_id);
   runtime.offline_region_get_start(1, out operation_id);
   runtime.offline_regions_list_start(out operation_id);
   runtime.offline_regions_merge_database_start("offline.db", out operation_id);
@@ -312,6 +327,24 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   runtime.offline_region_set_download_state_start(1, MaplibreNative.OfflineRegionDownloadState.INACTIVE, out operation_id);
   MaplibreNative.OfflineRegionStatus status;
   runtime.offline_region_get_status_take_result(operation_id, out status);
+  MaplibreNative.OfflineRegionInfo? maybe_region = runtime.offline_region_get_take_result(operation_id, out include_ideographs);
+  if (maybe_region != null) {
+    var region_definition = maybe_region.get_definition();
+    GLib.Bytes region_metadata = maybe_region.dup_metadata();
+    if (region_definition.get_definition_type() != 0 && region_metadata.get_size() >= 0) {
+      GLib.stderr.printf("");
+    }
+  }
+  MaplibreNative.OfflineRegionInfo created_region = runtime.offline_region_create_take_result(operation_id);
+  MaplibreNative.OfflineRegionInfo updated_region = runtime.offline_region_update_metadata_take_result(operation_id);
+  if (created_region.get_id() == updated_region.get_id()) {
+    GLib.stderr.printf("");
+  }
+  MaplibreNative.OfflineRegionInfoList regions = runtime.offline_regions_list_take_result(operation_id);
+  if (regions.count() > 0) {
+    var first_region = regions.get(0);
+    first_region.dup_metadata();
+  }
   runtime.offline_region_invalidate_start(1, out operation_id);
   runtime.offline_region_delete_start(1, out operation_id);
   runtime.offline_operation_discard(operation_id);
@@ -349,7 +382,7 @@ void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Ge
   map.invalidate_custom_geometry_source_region("custom-geometry-source", bounds);
 }
 
-void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws GLib.Error {
+void exercise_feature_queries(MaplibreNative.RenderSessionHandle session, MaplibreNative.Geometry feature_geometry, MaplibreNative.JsonValue json) throws GLib.Error {
   MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
   rendered_options.default();
   MaplibreNative.SourceFeatureQueryOptions source_options = {};
@@ -357,7 +390,36 @@ void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws
   MaplibreNative.ScreenPoint point = { 0.0, 0.0 };
   MaplibreNative.RenderedQueryGeometry geometry;
   MaplibreNative.RenderedQueryGeometry.point(point, out geometry);
-  if (geometry.type == MaplibreNative.RenderedQueryGeometryType.POINT) {
+  var rendered_features = session.query_rendered_features(geometry, rendered_options);
+  var source_features = session.query_source_features("fixture-source", source_options);
+  if (rendered_features.count() > 0) {
+    var rendered_feature = rendered_features.get(0);
+    MaplibreNative.Feature? copied_feature = rendered_feature.get_feature();
+    MaplibreNative.JsonValue? state = rendered_feature.get_state();
+    string? source_id = rendered_feature.dup_source_id();
+    string? source_layer_id = rendered_feature.dup_source_layer_id();
+    if ((copied_feature != null && copied_feature.to_geo_json() != null) || state != null || source_id != null || source_layer_id != null) {
+      GLib.stderr.printf("");
+    }
+  }
+  if (source_features.count() > 0) {
+    source_features.get(0).get_feature();
+  }
+  var feature = new MaplibreNative.Feature(feature_geometry);
+  var extension_result = session.query_feature_extension("fixture-source", feature, "supercluster", "children", json);
+  if (extension_result.get_result_type() == MaplibreNative.FeatureExtensionResultType.VALUE) {
+    MaplibreNative.JsonValue? value = extension_result.get_value();
+    if (value != null) {
+      GLib.stderr.printf("");
+    }
+  }
+  MaplibreNative.GeoJson? extension_collection = extension_result.get_feature_collection();
+  if (extension_collection != null) {
+    GLib.stderr.printf("");
+  }
+  MaplibreNative.FeatureStateSelector selector = {};
+  MaplibreNative.JsonValue? feature_state = session.get_feature_state(selector);
+  if (feature_state != null || geometry.type == MaplibreNative.RenderedQueryGeometryType.POINT) {
     GLib.stderr.printf("");
   }
 }
@@ -565,6 +627,17 @@ int main(string[] args) {
     map.set_location_indicator_image_name("location-layer", MaplibreNative.LocationIndicatorImageKind.TOP, "fixture-image");
     bool layer_exists = false;
     map.style_layer_exists("location-layer", out layer_exists);
+    var layer_ids = map.list_style_layer_ids();
+    size_t layer_id_count = layer_ids.count();
+    string? first_layer_id = layer_id_count > 0 ? layer_ids.get(0) : null;
+    var copied_layer_ids = layer_ids.copy();
+    var source_ids = map.list_style_source_ids();
+    size_t source_id_count = source_ids.count();
+    bool layer_json_found = false;
+    MaplibreNative.JsonValue? layer_json = map.get_style_layer_json("location-layer", out layer_json_found);
+    if (first_layer_id != null && copied_layer_ids != null && source_id_count >= 0 && layer_json != null && layer_json_found) {
+      GLib.stderr.printf("");
+    }
     string? layer_type;
     bool layer_found = false;
     map.get_style_layer_type("location-layer", out layer_type, out layer_found);
@@ -690,10 +763,10 @@ int main(string[] args) {
     MaplibreNative.MetalOwnedTextureFrameHandle? bindability_metal_frame = null;
     MaplibreNative.VulkanOwnedTextureFrameHandle? bindability_vulkan_frame = null;
     if (args.length < 0 && bindability_geometry != null && bindability_json != null && bindability_session != null) {
-      exercise_offline_operations(runtime);
+      exercise_offline_operations(runtime, bindability_geometry);
       exercise_json_style(map, bindability_json);
       exercise_inline_source_data(map, bindability_geometry);
-      exercise_feature_queries(bindability_session);
+      exercise_feature_queries(bindability_session, bindability_geometry, bindability_json);
       exercise_geometry_camera(map, projection, bindability_geometry);
       if (bindability_metal_frame != null) {
         inspect_metal_owned_texture_frame(bindability_metal_frame);

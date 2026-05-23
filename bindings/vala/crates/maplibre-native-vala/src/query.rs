@@ -1,15 +1,38 @@
-use std::ffi::{CStr, c_char};
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::ptr;
+use std::ptr::NonNull;
 
+use maplibre_native_core as core;
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::render::{self, RenderSessionHandle};
-use crate::values::{self, JsonValue};
+use crate::values::{self, Feature, GeoJson, JsonValue};
 
+const QUERIED_FEATURE_TYPE_NAME: &CStr = c"MlnValaQueriedFeature";
+const QUERIED_FEATURE_LIST_TYPE_NAME: &CStr = c"MlnValaQueriedFeatureList";
+const FEATURE_EXTENSION_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureExtensionResult";
 const FEATURE_QUERY_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureQueryResultHandle";
-const FEATURE_EXTENSION_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureExtensionResultHandle";
+const FEATURE_EXTENSION_RESULT_HANDLE_TYPE_NAME: &CStr = c"MlnValaFeatureExtensionResultHandle";
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct QueriedFeature {
+    value: core::query::QueriedFeature,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct QueriedFeatureList {
+    features: Vec<core::query::QueriedFeature>,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct FeatureExtensionResult {
+    value: core::query::FeatureExtensionResult,
+}
 
 #[repr(C)]
 pub struct FeatureQueryResultHandle {
@@ -42,7 +65,87 @@ pub extern "C" fn mln_vala_feature_query_result_handle_get_type() -> GType {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_feature_extension_result_handle_get_type() -> GType {
-    glib::register_object_type::<FeatureExtensionResultHandle>(FEATURE_EXTENSION_RESULT_TYPE_NAME)
+    glib::register_object_type::<FeatureExtensionResultHandle>(
+        FEATURE_EXTENSION_RESULT_HANDLE_TYPE_NAME,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_get_type() -> GType {
+    glib::register_boxed_type(
+        QUERIED_FEATURE_TYPE_NAME,
+        queried_feature_copy_erased,
+        queried_feature_free_erased,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_list_get_type() -> GType {
+    glib::register_boxed_type(
+        QUERIED_FEATURE_LIST_TYPE_NAME,
+        queried_feature_list_copy_erased,
+        queried_feature_list_free_erased,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_get_type() -> GType {
+    glib::register_boxed_type(
+        FEATURE_EXTENSION_RESULT_TYPE_NAME,
+        feature_extension_result_copy_erased,
+        feature_extension_result_free_erased,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_copy(
+    value: *const QueriedFeature,
+) -> *mut QueriedFeature {
+    queried_feature_ref(value)
+        .map(|value| Box::into_raw(Box::new(value.clone())))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn mln_vala_queried_feature_free(value: *mut QueriedFeature) {
+    if !value.is_null() {
+        unsafe { drop(Box::from_raw(value)) };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_list_copy(
+    value: *const QueriedFeatureList,
+) -> *mut QueriedFeatureList {
+    queried_feature_list_ref(value)
+        .map(|value| Box::into_raw(Box::new(value.clone())))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn mln_vala_queried_feature_list_free(value: *mut QueriedFeatureList) {
+    if !value.is_null() {
+        unsafe { drop(Box::from_raw(value)) };
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_copy(
+    value: *const FeatureExtensionResult,
+) -> *mut FeatureExtensionResult {
+    feature_extension_result_ref(value)
+        .map(|value| Box::into_raw(Box::new(value.clone())))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
+pub extern "C" fn mln_vala_feature_extension_result_free(value: *mut FeatureExtensionResult) {
+    if !value.is_null() {
+        unsafe { drop(Box::from_raw(value)) };
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -125,9 +228,9 @@ pub extern "C" fn mln_vala_render_session_handle_query_rendered_features(
     geometry: *const sys::mln_rendered_query_geometry,
     options: *const sys::mln_rendered_feature_query_options,
     error_out: *mut *mut GError,
-) -> *mut FeatureQueryResultHandle {
+) -> *mut QueriedFeatureList {
     match query_rendered_features(session, geometry, options) {
-        Ok(handle) => handle,
+        Ok(features) => Box::into_raw(Box::new(QueriedFeatureList { features })),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -141,9 +244,9 @@ pub extern "C" fn mln_vala_render_session_handle_query_source_features(
     source_id: *const c_char,
     options: *const sys::mln_source_feature_query_options,
     error_out: *mut *mut GError,
-) -> *mut FeatureQueryResultHandle {
+) -> *mut QueriedFeatureList {
     match query_source_features(session, source_id, options) {
-        Ok(handle) => handle,
+        Ok(features) => Box::into_raw(Box::new(QueriedFeatureList { features })),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
@@ -152,16 +255,16 @@ pub extern "C" fn mln_vala_render_session_handle_query_source_features(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_render_session_handle_query_feature_extensions(
+pub extern "C" fn mln_vala_render_session_handle_query_feature_extension(
     session: *mut RenderSessionHandle,
     source_id: *const c_char,
-    feature: *const sys::mln_feature,
+    feature: *const Feature,
     extension: *const c_char,
     extension_field: *const c_char,
     arguments: *const JsonValue,
     error_out: *mut *mut GError,
-) -> *mut FeatureExtensionResultHandle {
-    match query_feature_extensions(
+) -> *mut FeatureExtensionResult {
+    match query_feature_extension(
         session,
         source_id,
         feature,
@@ -169,11 +272,115 @@ pub extern "C" fn mln_vala_render_session_handle_query_feature_extensions(
         extension_field,
         arguments,
     ) {
-        Ok(handle) => handle,
+        Ok(value) => Box::into_raw(Box::new(FeatureExtensionResult { value })),
         Err(error) => {
             glib::set_error(error_out, error);
             ptr::null_mut()
         }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_list_count(value: *const QueriedFeatureList) -> usize {
+    queried_feature_list_ref(value).map_or(0, |value| value.features.len())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_list_get(
+    value: *const QueriedFeatureList,
+    index: usize,
+    error_out: *mut *mut GError,
+) -> *mut QueriedFeature {
+    match queried_feature_list_get(value, index) {
+        Ok(feature) => Box::into_raw(Box::new(feature)),
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_get_feature(
+    value: *const QueriedFeature,
+) -> *mut Feature {
+    queried_feature_ref(value).map_or(ptr::null_mut(), |value| {
+        Box::into_raw(Box::new(Feature {
+            value: value.value.feature.clone(),
+        }))
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_dup_source_id(
+    value: *const QueriedFeature,
+) -> *mut c_char {
+    queried_feature_ref(value)
+        .and_then(|value| value.value.source_id.as_deref())
+        .and_then(copy_string)
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_dup_source_layer_id(
+    value: *const QueriedFeature,
+) -> *mut c_char {
+    queried_feature_ref(value)
+        .and_then(|value| value.value.source_layer_id.as_deref())
+        .and_then(copy_string)
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_queried_feature_get_state(
+    value: *const QueriedFeature,
+) -> *mut JsonValue {
+    queried_feature_ref(value)
+        .and_then(|value| value.value.state.clone())
+        .map(|value| Box::into_raw(Box::new(JsonValue { value })))
+        .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_get_result_type(
+    value: *const FeatureExtensionResult,
+) -> sys::mln_feature_extension_result_type {
+    match feature_extension_result_ref(value).map(|value| &value.value) {
+        Some(core::query::FeatureExtensionResult::Value(_)) => {
+            sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
+        }
+        Some(core::query::FeatureExtensionResult::FeatureCollection(_)) => {
+            sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION
+        }
+        _ => 0,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_get_value(
+    value: *const FeatureExtensionResult,
+) -> *mut JsonValue {
+    match feature_extension_result_ref(value).map(|value| &value.value) {
+        Some(core::query::FeatureExtensionResult::Value(value)) => {
+            Box::into_raw(Box::new(JsonValue {
+                value: value.clone(),
+            }))
+        }
+        _ => ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_get_feature_collection(
+    value: *const FeatureExtensionResult,
+) -> *mut GeoJson {
+    match feature_extension_result_ref(value).map(|value| &value.value) {
+        Some(core::query::FeatureExtensionResult::FeatureCollection(features)) => {
+            Box::into_raw(Box::new(GeoJson {
+                value: core::GeoJson::FeatureCollection(features.clone()),
+            }))
+        }
+        _ => ptr::null_mut(),
     }
 }
 
@@ -297,7 +504,7 @@ fn query_rendered_features(
     session: *mut RenderSessionHandle,
     geometry: *const sys::mln_rendered_query_geometry,
     options: *const sys::mln_rendered_feature_query_options,
-) -> error::Result<*mut FeatureQueryResultHandle> {
+) -> error::Result<Vec<core::query::QueriedFeature>> {
     if geometry.is_null() {
         return Err(Error::invalid_argument("rendered query geometry is null"));
     }
@@ -313,14 +520,14 @@ fn query_rendered_features(
     error::check(unsafe {
         sys::mln_render_session_query_rendered_features(session, geometry, options, &mut result)
     })?;
-    wrap_feature_query_result(result)
+    copy_feature_query_result(result)
 }
 
 fn query_source_features(
     session: *mut RenderSessionHandle,
     source_id: *const c_char,
     options: *const sys::mln_source_feature_query_options,
-) -> error::Result<*mut FeatureQueryResultHandle> {
+) -> error::Result<Vec<core::query::QueriedFeature>> {
     if options.is_null() {
         return Err(Error::invalid_argument(
             "source feature query options are null",
@@ -334,23 +541,29 @@ fn query_source_features(
     error::check(unsafe {
         sys::mln_render_session_query_source_features(session, source_id, options, &mut result)
     })?;
-    wrap_feature_query_result(result)
+    copy_feature_query_result(result)
 }
 
-fn query_feature_extensions(
+fn query_feature_extension(
     session: *mut RenderSessionHandle,
     source_id: *const c_char,
-    feature: *const sys::mln_feature,
+    feature: *const Feature,
     extension: *const c_char,
     extension_field: *const c_char,
     arguments: *const JsonValue,
-) -> error::Result<*mut FeatureExtensionResultHandle> {
-    if feature.is_null() {
-        return Err(Error::invalid_argument("feature descriptor is null"));
-    }
-    let arguments = values::json_ref(arguments)
-        .ok_or_else(|| Error::invalid_argument("feature extension arguments are null"))?
-        .materialize()?;
+) -> error::Result<core::query::FeatureExtensionResult> {
+    let feature = values::feature_ref(feature)
+        .ok_or_else(|| Error::invalid_argument("feature descriptor is null"))?;
+    let feature = core::geojson::feature_try_to_native(&feature.value, 0)?;
+    let arguments = if arguments.is_null() {
+        None
+    } else {
+        Some(
+            values::json_ref(arguments)
+                .ok_or_else(|| Error::invalid_argument("feature extension arguments are null"))?
+                .materialize()?,
+        )
+    };
     let session = render::session_native(session)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
     let extension = string_view_from_c(extension, "feature extension name")?;
@@ -362,39 +575,111 @@ fn query_feature_extensions(
         sys::mln_render_session_query_feature_extensions(
             session,
             source_id,
-            feature,
+            feature.as_ref(),
             extension,
             extension_field,
-            arguments.as_ptr(),
+            arguments
+                .as_ref()
+                .map_or(ptr::null(), |arguments| arguments.as_ptr()),
             &mut result,
         )
     })?;
-    wrap_feature_extension_result(result)
+    copy_feature_extension_result(result)
 }
 
-fn wrap_feature_query_result(
+fn queried_feature_ref(value: *const QueriedFeature) -> Option<&'static QueriedFeature> {
+    if value.is_null() {
+        None
+    } else {
+        Some(unsafe { &*value })
+    }
+}
+
+fn queried_feature_list_ref(
+    value: *const QueriedFeatureList,
+) -> Option<&'static QueriedFeatureList> {
+    if value.is_null() {
+        None
+    } else {
+        Some(unsafe { &*value })
+    }
+}
+
+fn feature_extension_result_ref(
+    value: *const FeatureExtensionResult,
+) -> Option<&'static FeatureExtensionResult> {
+    if value.is_null() {
+        None
+    } else {
+        Some(unsafe { &*value })
+    }
+}
+
+fn queried_feature_list_get(
+    value: *const QueriedFeatureList,
+    index: usize,
+) -> error::Result<QueriedFeature> {
+    let list = queried_feature_list_ref(value)
+        .ok_or_else(|| Error::invalid_argument("queried feature list is null"))?;
+    let value = list
+        .features
+        .get(index)
+        .ok_or_else(|| Error::invalid_argument("queried feature index is out of range"))?
+        .clone();
+    Ok(QueriedFeature { value })
+}
+
+fn copy_string(value: &str) -> Option<*mut c_char> {
+    let c_string = CString::new(value).ok()?;
+    glib::copy_string_view(sys::mln_string_view {
+        data: c_string.as_ptr(),
+        size: c_string.as_bytes().len(),
+    })
+    .ok()
+}
+
+unsafe extern "C" fn queried_feature_copy_erased(value: *mut c_void) -> *mut c_void {
+    mln_vala_queried_feature_copy(value.cast()).cast()
+}
+
+unsafe extern "C" fn queried_feature_free_erased(value: *mut c_void) {
+    mln_vala_queried_feature_free(value.cast());
+}
+
+unsafe extern "C" fn queried_feature_list_copy_erased(value: *mut c_void) -> *mut c_void {
+    mln_vala_queried_feature_list_copy(value.cast()).cast()
+}
+
+unsafe extern "C" fn queried_feature_list_free_erased(value: *mut c_void) {
+    mln_vala_queried_feature_list_free(value.cast());
+}
+
+unsafe extern "C" fn feature_extension_result_copy_erased(value: *mut c_void) -> *mut c_void {
+    mln_vala_feature_extension_result_copy(value.cast()).cast()
+}
+
+unsafe extern "C" fn feature_extension_result_free_erased(value: *mut c_void) {
+    mln_vala_feature_extension_result_free(value.cast());
+}
+
+fn copy_feature_query_result(
     native: *mut sys::mln_feature_query_result,
-) -> error::Result<*mut FeatureQueryResultHandle> {
-    if native.is_null() {
-        return Err(Error::invalid_argument(
-            "native feature query result is null",
-        ));
-    }
-    let handle = glib::new_object::<FeatureQueryResultHandle>(
-        mln_vala_feature_query_result_handle_get_type(),
-    );
-    if handle.is_null() {
-        // SAFETY: `native` came from a successful query operation.
-        unsafe { sys::mln_feature_query_result_destroy(native) };
-        return Err(Error::invalid_argument(
-            "failed to allocate FeatureQueryResultHandle",
-        ));
-    }
-    // SAFETY: `handle` points to a newly allocated query result wrapper.
-    unsafe {
-        (*handle).native = native;
-    }
-    Ok(handle)
+) -> error::Result<Vec<core::query::QueriedFeature>> {
+    let native = NonNull::new(native)
+        .ok_or_else(|| Error::invalid_argument("native feature query result is null"))?;
+    // SAFETY: the C API returned an owned query result handle; the core helper
+    // copies all result data and releases the native handle on every exit path.
+    unsafe { core::query::copy_feature_query_result(native) }
+}
+
+fn copy_feature_extension_result(
+    native: *mut sys::mln_feature_extension_result,
+) -> error::Result<core::query::FeatureExtensionResult> {
+    let native = NonNull::new(native)
+        .ok_or_else(|| Error::invalid_argument("native feature extension result is null"))?;
+    // SAFETY: the C API returned an owned extension result handle; the core
+    // helper copies all result data and releases the native handle on every exit path.
+    unsafe { core::query::copy_feature_extension_result(native) }
 }
 
 fn feature_query_result_native(
@@ -459,31 +744,6 @@ fn close_feature_query_result(handle: *mut FeatureQueryResultHandle) {
         // SAFETY: This wrapper owns the native query result and closes it exactly once.
         unsafe { sys::mln_feature_query_result_destroy(native) };
     }
-}
-
-fn wrap_feature_extension_result(
-    native: *mut sys::mln_feature_extension_result,
-) -> error::Result<*mut FeatureExtensionResultHandle> {
-    if native.is_null() {
-        return Err(Error::invalid_argument(
-            "native feature extension result is null",
-        ));
-    }
-    let handle = glib::new_object::<FeatureExtensionResultHandle>(
-        mln_vala_feature_extension_result_handle_get_type(),
-    );
-    if handle.is_null() {
-        // SAFETY: `native` came from a successful query operation.
-        unsafe { sys::mln_feature_extension_result_destroy(native) };
-        return Err(Error::invalid_argument(
-            "failed to allocate FeatureExtensionResultHandle",
-        ));
-    }
-    // SAFETY: `handle` points to a newly allocated query result wrapper.
-    unsafe {
-        (*handle).native = native;
-    }
-    Ok(handle)
 }
 
 fn feature_extension_result_native(
@@ -598,6 +858,21 @@ mod tests {
             .is_null()
         );
         assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(mln_vala_queried_feature_list_count(ptr::null()), 0);
+        assert!(mln_vala_queried_feature_list_get(ptr::null(), 0, &mut error).is_null());
+        assert!(!error.is_null());
+        assert!(mln_vala_queried_feature_get_feature(ptr::null()).is_null());
+        assert!(mln_vala_queried_feature_dup_source_id(ptr::null()).is_null());
+        assert!(mln_vala_queried_feature_dup_source_layer_id(ptr::null()).is_null());
+        assert!(mln_vala_queried_feature_get_state(ptr::null()).is_null());
+        assert_eq!(
+            mln_vala_feature_extension_result_get_result_type(ptr::null()),
+            0
+        );
+        assert!(mln_vala_feature_extension_result_get_value(ptr::null()).is_null());
+        assert!(mln_vala_feature_extension_result_get_feature_collection(ptr::null()).is_null());
 
         error = ptr::null_mut();
         assert_eq!(

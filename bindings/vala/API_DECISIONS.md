@@ -41,6 +41,13 @@ Pre-merge consequence: public APIs should not expose handles such as
 `FeatureQueryResultHandle`, `JsonSnapshotHandle`, `OfflineRegionListHandle`, or
 `StyleIdListHandle` as ordinary result/list/snapshot data surfaces.
 
+Implemented policy: style ID lists use boxed `StringList`; JSON snapshots return
+copied `JsonValue?`; offline region snapshots/lists use boxed
+`OfflineRegionInfo` and `OfflineRegionInfoList`; feature query results use boxed
+`QueriedFeatureList`/`QueriedFeature`; feature extension results use boxed
+`FeatureExtensionResult`. Native handles for those concepts stay internal and
+hidden from generated VAPI, sanitized GIR, and typelib-derived GIR.
+
 ## String ownership policy
 
 Public Vala APIs should expose normal owned UTF-8 strings, properties, setters,
@@ -108,6 +115,11 @@ Pre-merge consequence: even if PyGObject, GJS, lgi, and similar consumers remain
 unsupported for now, the Vala adapter should not ship a public GIR/typelib shape
 that exposes raw unions or other convention-breaking ABI details when the Vala
 API can hide them behind GLib-friendly constructors and accessors.
+
+Implemented policy: `OfflineRegionDefinition` is an opaque boxed value with
+`tile_pyramid` and `geometry` constructors plus owned accessors. Raw
+`OfflineTilePyramidRegionDefinition` and `OfflineGeometryRegionDefinition`
+records stay hidden from VAPI, sanitized GIR, and typelib-derived GIR.
 
 ## Documentation promise
 

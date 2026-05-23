@@ -255,6 +255,12 @@ typedef struct {
 typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
 typedef struct _MlnValaNativePointer MlnValaNativePointer;
 typedef struct _MlnValaRenderSessionHandle MlnValaRenderSessionHandle;
+typedef struct _MlnValaOfflineRegionDefinition MlnValaOfflineRegionDefinition;
+typedef struct _MlnValaOfflineRegionInfo MlnValaOfflineRegionInfo;
+typedef struct _MlnValaOfflineRegionInfoList MlnValaOfflineRegionInfoList;
+typedef struct _MlnValaQueriedFeature MlnValaQueriedFeature;
+typedef struct _MlnValaQueriedFeatureList MlnValaQueriedFeatureList;
+typedef struct _MlnValaFeatureExtensionResult MlnValaFeatureExtensionResult;
 typedef struct _MlnValaFeatureQueryResultHandle MlnValaFeatureQueryResultHandle;
 typedef struct _MlnValaFeatureExtensionResultHandle
   MlnValaFeatureExtensionResultHandle;
@@ -485,6 +491,10 @@ GType mln_vala_string_list_get_type(void);
  *   @list is `NULL`.
  */
 MlnValaStringList* mln_vala_string_list_copy(const MlnValaStringList* list);
+size_t mln_vala_string_list_count(const MlnValaStringList* list);
+char* mln_vala_string_list_get(
+  const MlnValaStringList* list, size_t index, GError** error
+);
 void mln_vala_string_list_free(MlnValaStringList* list);
 /**
  * mln_vala_string_list_new:
@@ -503,6 +513,8 @@ MlnValaStringList* mln_vala_string_list_new(
 typedef struct _MlnValaJsonValue MlnValaJsonValue;
 #define MLN_VALA_TYPE_GEOMETRY (mln_vala_geometry_get_type())
 typedef struct _MlnValaGeometry MlnValaGeometry;
+#define MLN_VALA_TYPE_FEATURE (mln_vala_feature_get_type())
+typedef struct _MlnValaFeature MlnValaFeature;
 #define MLN_VALA_TYPE_GEO_JSON (mln_vala_geo_json_get_type())
 typedef struct _MlnValaGeoJson MlnValaGeoJson;
 typedef struct _MlnValaJsonSnapshotHandle MlnValaJsonSnapshotHandle;
@@ -629,6 +641,27 @@ MlnValaGeometry* mln_vala_geometry_new_point(
 MlnValaGeometry* mln_vala_geometry_new_line_string(
   const MlnValaLatLng* coordinates, size_t coordinate_count, GError** error
 );
+GType mln_vala_feature_get_type(void);
+MlnValaFeature* mln_vala_feature_copy(const MlnValaFeature* value);
+void mln_vala_feature_free(MlnValaFeature* value);
+/**
+ * mln_vala_feature_new:
+ * @geometry: (not nullable): feature geometry value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): feature value, or `NULL` on error.
+ * Throws: MlnValaError
+ */
+MlnValaFeature* mln_vala_feature_new(
+  const MlnValaGeometry* geometry, GError** error
+);
+/**
+ * mln_vala_feature_to_geo_json:
+ * @feature: (nullable): feature value.
+ *
+ * Returns: (transfer full) (nullable): feature encoded as GeoJSON, or `NULL`.
+ */
+MlnValaGeoJson* mln_vala_feature_to_geo_json(const MlnValaFeature* feature);
 GType mln_vala_geo_json_get_type(void);
 /**
  * mln_vala_geo_json_copy:
@@ -690,29 +723,6 @@ typedef struct {
   MlnValaStringView feature_id;
   MlnValaStringView state_key;
 } MlnValaFeatureStateSelector;
-
-typedef struct {
-  uint32_t size;
-  const MlnValaGeometry* geometry;
-  const MlnValaJsonMember* properties;
-  size_t property_count;
-  MlnValaFeatureIdentifierType identifier_type;
-  union {
-    uint64_t uint_value;
-    int64_t int_value;
-    double double_value;
-    MlnValaStringView string_value;
-  } identifier;
-} MlnValaFeature;
-
-typedef struct {
-  uint32_t size;
-  MlnValaQueriedFeatureFields fields;
-  MlnValaFeature feature;
-  MlnValaStringView source_id;
-  MlnValaStringView source_layer_id;
-  const MlnValaJsonValue* state;
-} MlnValaQueriedFeature;
 
 typedef struct {
   const MlnValaFeature* features;
@@ -888,31 +898,96 @@ typedef struct {
   bool include_ideographs;
 } MlnValaOfflineGeometryRegionDefinition;
 
-typedef struct {
-  uint32_t size;
-  MlnValaOfflineRegionDefinitionType type;
-  union {
-    MlnValaOfflineTilePyramidRegionDefinition tile_pyramid;
-    MlnValaOfflineGeometryRegionDefinition geometry;
-  } data;
-} MlnValaOfflineRegionDefinition;
+#define MLN_VALA_TYPE_OFFLINE_REGION_DEFINITION \
+  (mln_vala_offline_region_definition_get_type())
+#define MLN_VALA_TYPE_OFFLINE_REGION_INFO \
+  (mln_vala_offline_region_info_get_type())
+#define MLN_VALA_TYPE_OFFLINE_REGION_INFO_LIST \
+  (mln_vala_offline_region_info_list_get_type())
 
-typedef struct {
-  uint32_t size;
-  int64_t id;
-  MlnValaOfflineRegionDefinition definition;
-  const uint8_t* metadata;
-  size_t metadata_size;
-} MlnValaOfflineRegionInfo;
-
+GType mln_vala_offline_region_definition_get_type(void);
+MlnValaOfflineRegionDefinition* mln_vala_offline_region_definition_copy(
+  const MlnValaOfflineRegionDefinition* value
+);
+void mln_vala_offline_region_definition_free(
+  MlnValaOfflineRegionDefinition* value
+);
+MlnValaOfflineRegionDefinition*
+mln_vala_offline_region_definition_new_tile_pyramid(
+  const char* style_url, const MlnValaLatLngBounds* bounds, double min_zoom,
+  double max_zoom, float pixel_ratio, bool include_ideographs, GError** error
+);
+MlnValaOfflineRegionDefinition* mln_vala_offline_region_definition_new_geometry(
+  const char* style_url, const MlnValaGeometry* geometry, double min_zoom,
+  double max_zoom, float pixel_ratio, bool include_ideographs, GError** error
+);
+MlnValaOfflineRegionDefinitionType
+mln_vala_offline_region_definition_get_definition_type(
+  const MlnValaOfflineRegionDefinition* value
+);
+char* mln_vala_offline_region_definition_dup_style_url(
+  const MlnValaOfflineRegionDefinition* value
+);
+gboolean mln_vala_offline_region_definition_get_bounds(
+  const MlnValaOfflineRegionDefinition* value, MlnValaLatLngBounds* out_bounds
+);
 /**
- * mln_vala_offline_region_info_dup_metadata:
- * @info: (not nullable): offline region info copied from a snapshot/list.
+ * mln_vala_offline_region_definition_get_geometry:
+ * @value: (nullable): offline region definition.
  *
- * Returns: (transfer full) (nullable): copied metadata bytes owned by caller.
+ * Returns: (transfer full) (nullable): copied geometry for geometry regions, or
+ * `NULL`.
  */
+MlnValaGeometry* mln_vala_offline_region_definition_get_geometry(
+  const MlnValaOfflineRegionDefinition* value
+);
+double mln_vala_offline_region_definition_get_min_zoom(
+  const MlnValaOfflineRegionDefinition* value
+);
+double mln_vala_offline_region_definition_get_max_zoom(
+  const MlnValaOfflineRegionDefinition* value
+);
+float mln_vala_offline_region_definition_get_pixel_ratio(
+  const MlnValaOfflineRegionDefinition* value
+);
+bool mln_vala_offline_region_definition_get_include_ideographs(
+  const MlnValaOfflineRegionDefinition* value
+);
+
+GType mln_vala_offline_region_info_get_type(void);
+MlnValaOfflineRegionInfo* mln_vala_offline_region_info_copy(
+  const MlnValaOfflineRegionInfo* value
+);
+void mln_vala_offline_region_info_free(MlnValaOfflineRegionInfo* value);
+int64_t mln_vala_offline_region_info_get_id(
+  const MlnValaOfflineRegionInfo* value
+);
+/**
+ * mln_vala_offline_region_info_get_definition:
+ * @value: (nullable): offline region info.
+ *
+ * Returns: (transfer full) (nullable): copied offline region definition, or
+ * `NULL`.
+ */
+MlnValaOfflineRegionDefinition* mln_vala_offline_region_info_get_definition(
+  const MlnValaOfflineRegionInfo* value
+);
 GBytes* mln_vala_offline_region_info_dup_metadata(
-  const MlnValaOfflineRegionInfo* info
+  const MlnValaOfflineRegionInfo* value
+);
+
+GType mln_vala_offline_region_info_list_get_type(void);
+MlnValaOfflineRegionInfoList* mln_vala_offline_region_info_list_copy(
+  const MlnValaOfflineRegionInfoList* value
+);
+void mln_vala_offline_region_info_list_free(
+  MlnValaOfflineRegionInfoList* value
+);
+size_t mln_vala_offline_region_info_list_count(
+  const MlnValaOfflineRegionInfoList* value
+);
+MlnValaOfflineRegionInfo* mln_vala_offline_region_info_list_get(
+  const MlnValaOfflineRegionInfoList* value, size_t index, GError** error
 );
 
 typedef struct {
@@ -1447,10 +1522,10 @@ gboolean mln_vala_rendered_query_geometry_line_string(
  * @options: (not nullable): rendered feature query options.
  * @error: return location for a `GError`, or `NULL`.
  *
- * Returns: (transfer full): owned feature query result handle.
+ * Returns: (transfer full): owned queried feature list.
  * Throws: MlnValaError
  */
-MlnValaFeatureQueryResultHandle*
+MlnValaQueriedFeatureList*
 mln_vala_render_session_handle_query_rendered_features(
   MlnValaRenderSessionHandle* self,
   const MlnValaRenderedQueryGeometry* geometry,
@@ -1464,33 +1539,117 @@ mln_vala_render_session_handle_query_rendered_features(
  * @options: (not nullable): source feature query options.
  * @error: return location for a `GError`, or `NULL`.
  *
- * Returns: (transfer full): owned feature query result handle.
+ * Returns: (transfer full): owned queried feature list.
  * Throws: MlnValaError
  */
-MlnValaFeatureQueryResultHandle*
-mln_vala_render_session_handle_query_source_features(
+MlnValaQueriedFeatureList* mln_vala_render_session_handle_query_source_features(
   MlnValaRenderSessionHandle* self, const char* source_id,
   const MlnValaSourceFeatureQueryOptions* options, GError** error
 );
 
 /**
- * mln_vala_render_session_handle_query_feature_extensions:
+ * mln_vala_render_session_handle_query_feature_extension:
  * @self: a render session handle.
  * @source_id: (not nullable): source identifier.
  * @feature: (not nullable): feature descriptor.
  * @extension: (not nullable): extension name.
  * @extension_field: (not nullable): extension field.
- * @arguments: (not nullable): extension arguments JSON value.
+ * @arguments: (nullable): extension arguments JSON value.
  * @error: return location for a `GError`, or `NULL`.
  *
- * Returns: (transfer full): owned feature extension result handle.
+ * Returns: (transfer full): owned feature extension result.
  * Throws: MlnValaError
  */
-MlnValaFeatureExtensionResultHandle*
-mln_vala_render_session_handle_query_feature_extensions(
+MlnValaFeatureExtensionResult*
+mln_vala_render_session_handle_query_feature_extension(
   MlnValaRenderSessionHandle* self, const char* source_id,
   const MlnValaFeature* feature, const char* extension,
   const char* extension_field, const MlnValaJsonValue* arguments, GError** error
+);
+
+GType mln_vala_queried_feature_get_type(void);
+MlnValaQueriedFeature* mln_vala_queried_feature_copy(
+  const MlnValaQueriedFeature* value
+);
+void mln_vala_queried_feature_free(MlnValaQueriedFeature* value);
+/**
+ * mln_vala_queried_feature_get_feature:
+ * @value: (nullable): queried feature.
+ *
+ * Returns: (transfer full) (nullable): copied feature, or `NULL`.
+ */
+MlnValaFeature* mln_vala_queried_feature_get_feature(
+  const MlnValaQueriedFeature* value
+);
+/**
+ * mln_vala_queried_feature_dup_source_id:
+ * @value: (nullable): queried feature.
+ *
+ * Returns: (transfer full) (nullable): copied source ID, or `NULL`.
+ */
+char* mln_vala_queried_feature_dup_source_id(
+  const MlnValaQueriedFeature* value
+);
+/**
+ * mln_vala_queried_feature_dup_source_layer_id:
+ * @value: (nullable): queried feature.
+ *
+ * Returns: (transfer full) (nullable): copied source-layer ID, or `NULL`.
+ */
+char* mln_vala_queried_feature_dup_source_layer_id(
+  const MlnValaQueriedFeature* value
+);
+/**
+ * mln_vala_queried_feature_get_state:
+ * @value: (nullable): queried feature.
+ *
+ * Returns: (transfer full) (nullable): copied feature state, or `NULL`.
+ */
+MlnValaJsonValue* mln_vala_queried_feature_get_state(
+  const MlnValaQueriedFeature* value
+);
+
+GType mln_vala_queried_feature_list_get_type(void);
+MlnValaQueriedFeatureList* mln_vala_queried_feature_list_copy(
+  const MlnValaQueriedFeatureList* value
+);
+void mln_vala_queried_feature_list_free(MlnValaQueriedFeatureList* value);
+size_t mln_vala_queried_feature_list_count(
+  const MlnValaQueriedFeatureList* value
+);
+MlnValaQueriedFeature* mln_vala_queried_feature_list_get(
+  const MlnValaQueriedFeatureList* value, size_t index, GError** error
+);
+
+GType mln_vala_feature_extension_result_get_type(void);
+MlnValaFeatureExtensionResult* mln_vala_feature_extension_result_copy(
+  const MlnValaFeatureExtensionResult* value
+);
+void mln_vala_feature_extension_result_free(
+  MlnValaFeatureExtensionResult* value
+);
+MlnValaFeatureExtensionResultType
+mln_vala_feature_extension_result_get_result_type(
+  const MlnValaFeatureExtensionResult* value
+);
+/**
+ * mln_vala_feature_extension_result_get_value:
+ * @value: (nullable): feature extension result.
+ *
+ * Returns: (transfer full) (nullable): copied JSON result value, or `NULL`.
+ */
+MlnValaJsonValue* mln_vala_feature_extension_result_get_value(
+  const MlnValaFeatureExtensionResult* value
+);
+/**
+ * mln_vala_feature_extension_result_get_feature_collection:
+ * @value: (nullable): feature extension result.
+ *
+ * Returns: (transfer full) (nullable): copied feature collection as GeoJSON, or
+ * `NULL`.
+ */
+MlnValaGeoJson* mln_vala_feature_extension_result_get_feature_collection(
+  const MlnValaFeatureExtensionResult* value
 );
 
 /**
@@ -2395,7 +2554,7 @@ gboolean mln_vala_runtime_handle_offline_region_delete_start(
  * Returns: (transfer full): owned offline region snapshot handle.
  * Throws: MlnValaError
  */
-MlnValaOfflineRegionSnapshotHandle*
+MlnValaOfflineRegionInfo*
 mln_vala_runtime_handle_offline_region_create_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
 );
@@ -2411,7 +2570,7 @@ mln_vala_runtime_handle_offline_region_create_take_result(
  * `NULL` when no region was found.
  * Throws: MlnValaError
  */
-MlnValaOfflineRegionSnapshotHandle*
+MlnValaOfflineRegionInfo*
 mln_vala_runtime_handle_offline_region_get_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id, gboolean* out_found,
   GError** error
@@ -2426,7 +2585,7 @@ mln_vala_runtime_handle_offline_region_get_take_result(
  * Returns: (transfer full): owned offline region list handle.
  * Throws: MlnValaError
  */
-MlnValaOfflineRegionListHandle*
+MlnValaOfflineRegionInfoList*
 mln_vala_runtime_handle_offline_regions_list_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
 );
@@ -2440,7 +2599,7 @@ mln_vala_runtime_handle_offline_regions_list_take_result(
  * Returns: (transfer full): owned offline region list handle.
  * Throws: MlnValaError
  */
-MlnValaOfflineRegionListHandle*
+MlnValaOfflineRegionInfoList*
 mln_vala_runtime_handle_offline_regions_merge_database_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
 );
@@ -2454,7 +2613,7 @@ mln_vala_runtime_handle_offline_regions_merge_database_take_result(
  * Returns: (transfer full): owned offline region snapshot handle.
  * Throws: MlnValaError
  */
-MlnValaOfflineRegionSnapshotHandle*
+MlnValaOfflineRegionInfo*
 mln_vala_runtime_handle_offline_region_update_metadata_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
 );
@@ -3796,7 +3955,7 @@ gboolean mln_vala_map_handle_add_style_layer_json(
  * Returns: (transfer full) (nullable): owned JSON snapshot handle.
  * Throws: MlnValaError
  */
-MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_style_layer_json(
+MlnValaJsonValue* mln_vala_map_handle_get_style_layer_json(
   MlnValaMapHandle* self, const char* layer_id, gboolean* out_found,
   GError** error
 );
@@ -3816,7 +3975,7 @@ gboolean mln_vala_map_handle_set_style_light_property(
  * Returns: (transfer full) (nullable): owned JSON snapshot handle.
  * Throws: MlnValaError
  */
-MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_style_light_property(
+MlnValaJsonValue* mln_vala_map_handle_get_style_light_property(
   MlnValaMapHandle* self, const char* property_name, GError** error
 );
 gboolean mln_vala_map_handle_set_layer_property(
@@ -3833,7 +3992,7 @@ gboolean mln_vala_map_handle_set_layer_property(
  * Returns: (transfer full) (nullable): owned JSON snapshot handle.
  * Throws: MlnValaError
  */
-MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_layer_property(
+MlnValaJsonValue* mln_vala_map_handle_get_layer_property(
   MlnValaMapHandle* self, const char* layer_id, const char* property_name,
   GError** error
 );
@@ -3850,7 +4009,7 @@ gboolean mln_vala_map_handle_set_layer_filter(
  * Returns: (transfer full) (nullable): owned JSON snapshot handle.
  * Throws: MlnValaError
  */
-MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_layer_filter(
+MlnValaJsonValue* mln_vala_map_handle_get_layer_filter(
   MlnValaMapHandle* self, const char* layer_id, GError** error
 );
 /**
@@ -3876,7 +4035,7 @@ void mln_vala_json_snapshot_handle_close(MlnValaJsonSnapshotHandle* self);
  * Returns: (transfer full): style source ID list handle, or `NULL` on failure.
  * Throws: MlnValaError
  */
-MlnValaStyleIdListHandle* mln_vala_map_handle_list_style_source_ids(
+MlnValaStringList* mln_vala_map_handle_list_style_source_ids(
   MlnValaMapHandle* self, GError** error
 );
 
@@ -3888,7 +4047,7 @@ MlnValaStyleIdListHandle* mln_vala_map_handle_list_style_source_ids(
  * Returns: (transfer full): style layer ID list handle, or `NULL` on failure.
  * Throws: MlnValaError
  */
-MlnValaStyleIdListHandle* mln_vala_map_handle_list_style_layer_ids(
+MlnValaStringList* mln_vala_map_handle_list_style_layer_ids(
   MlnValaMapHandle* self, GError** error
 );
 
@@ -4021,10 +4180,10 @@ gboolean mln_vala_render_session_handle_set_feature_state(
  * @selector: (not nullable): feature state selector.
  * @error: return location for a `GError`, or `NULL`.
  *
- * Returns: (transfer full): owned JSON snapshot handle.
+ * Returns: (transfer full) (nullable): copied feature-state JSON value.
  * Throws: MlnValaError
  */
-MlnValaJsonSnapshotHandle* mln_vala_render_session_handle_get_feature_state(
+MlnValaJsonValue* mln_vala_render_session_handle_get_feature_state(
   MlnValaRenderSessionHandle* self, const MlnValaFeatureStateSelector* selector,
   GError** error
 );
