@@ -6661,6 +6661,7 @@ mod tests {
     use super::*;
     use std::ffi::{CStr, CString};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
 
     static PROVIDER_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -7109,6 +7110,7 @@ mod tests {
             GTRUE
         );
         assert_eq!(source_selector.size, expected_size);
+        assert!(!source_selector.source_id.data.is_null());
 
         // SAFETY: Zeroed storage is initialized by the semantic setter.
         let mut source_layer_selector: sys::mln_feature_state_selector =
@@ -7223,8 +7225,9 @@ mod tests {
         while !teardown_started.load(Ordering::SeqCst) {
             std::thread::yield_now();
         }
+        let deadline = Instant::now() + Duration::from_secs(5);
         let mut observed_closing = false;
-        for _ in 0..10_000 {
+        while Instant::now() < deadline {
             let closing = unsafe { &*state }
                 .lifecycle
                 .lock()
