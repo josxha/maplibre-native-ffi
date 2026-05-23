@@ -6,7 +6,6 @@ build-backend = "maturin"
 name = "maplibre-native"
 version = "0.0.0"
 description = "Low-level Python bindings for MapLibre Native FFI"
-readme = "SPEC.md"
 requires-python = ">=3.14"
 license = "BSD-2-Clause"
 classifiers = [
