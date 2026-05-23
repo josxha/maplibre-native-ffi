@@ -1,8 +1,12 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use maplibre_native_core::{self as maplibre_core, Error, ErrorKind, NetworkStatus};
+use maplibre_native_core::{
+    self as maplibre_core, Error, ErrorKind, NetworkStatus, RenderMode, RuntimeEventPayload,
+    RuntimeEventType, TileOperation,
+};
 use maplibre_native_sys as sys;
 use pyo3::prelude::*;
+use pyo3::types::{PyBytes, PyDict};
 use std::sync::{Mutex, MutexGuard};
 
 mod py_errors {
@@ -57,6 +61,29 @@ impl RuntimeHandle {
             .map_err(map_error)
     }
 
+    fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let mut event = maplibre_core::events::empty_runtime_event();
+        let mut has_event = false;
+        // SAFETY: The C API validates that the pointer is a live runtime handle.
+        // event has the correct size field and has_event points to writable
+        // storage for one bool.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_poll_event(state.as_ptr(), &mut event, &mut has_event)
+        })
+        .map_err(map_error)?;
+        if !has_event {
+            return Ok(None);
+        }
+
+        // SAFETY: event and its payload/text pointers remain valid until the
+        // next poll for this runtime. This call copies before another poll can
+        // occur because the runtime state mutex is still held.
+        let copied = unsafe { maplibre_core::events::runtime_event_from_native(&event) }
+            .map_err(map_error)?;
+        event_to_py(py, copied).map(Some)
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
@@ -80,9 +107,154 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn set_style_json(&self, json: String) -> PyResult<()> {
+        let state = self.state();
+        let json = maplibre_core::string::c_string(&json).map_err(map_error)?;
+        // SAFETY: The C API validates that the pointer is a live map handle.
+        // json is a null-terminated C string whose storage lives for this call.
+        maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.as_ptr(), json.as_ptr()) })
+            .map_err(map_error)
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
+    }
+}
+
+fn event_to_py(py: Python<'_>, event: maplibre_core::CopiedRuntimeEvent) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("event_type", event_type_raw(event.event_type))?;
+    dict.set_item("source_type", event.source.source_type)?;
+    dict.set_item("source_address", event.source.source_address)?;
+    dict.set_item("code", event.code)?;
+    dict.set_item("message", event.message)?;
+    dict.set_item("payload", payload_to_py(py, event.payload)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    match payload {
+        RuntimeEventPayload::None => {
+            dict.set_item("kind", "none")?;
+        }
+        RuntimeEventPayload::RenderFrame(payload) => {
+            dict.set_item("kind", "render_frame")?;
+            dict.set_item("mode", render_mode_raw(payload.mode))?;
+            dict.set_item("needs_repaint", payload.needs_repaint)?;
+            dict.set_item("placement_changed", payload.placement_changed)?;
+        }
+        RuntimeEventPayload::RenderMap(payload) => {
+            dict.set_item("kind", "render_map")?;
+            dict.set_item("mode", render_mode_raw(payload.mode))?;
+        }
+        RuntimeEventPayload::StyleImageMissing(payload) => {
+            dict.set_item("kind", "style_image_missing")?;
+            dict.set_item("image_id", payload.image_id)?;
+        }
+        RuntimeEventPayload::TileAction(payload) => {
+            dict.set_item("kind", "tile_action")?;
+            dict.set_item("operation", tile_operation_raw(payload.operation))?;
+            dict.set_item("source_id", payload.source_id)?;
+        }
+        RuntimeEventPayload::OfflineRegionStatus(payload) => {
+            dict.set_item("kind", "offline_region_status")?;
+            dict.set_item("region_id", payload.region_id)?;
+        }
+        RuntimeEventPayload::OfflineRegionResponseError(payload) => {
+            dict.set_item("kind", "offline_region_response_error")?;
+            dict.set_item("region_id", payload.region_id)?;
+            dict.set_item("reason", payload.reason.raw_value())?;
+        }
+        RuntimeEventPayload::OfflineRegionTileCountLimit(payload) => {
+            dict.set_item("kind", "offline_region_tile_count_limit")?;
+            dict.set_item("region_id", payload.region_id)?;
+            dict.set_item("limit", payload.limit)?;
+        }
+        RuntimeEventPayload::OfflineOperationCompleted(payload) => {
+            dict.set_item("kind", "offline_operation_completed")?;
+            dict.set_item("operation_id", payload.operation_id)?;
+            dict.set_item("operation_kind", payload.raw_operation_kind)?;
+            dict.set_item("result_kind", payload.raw_result_kind)?;
+            dict.set_item("result_status", payload.result_status)?;
+            dict.set_item("found", payload.found)?;
+        }
+        RuntimeEventPayload::Unknown(payload) => {
+            dict.set_item("kind", "unknown")?;
+            dict.set_item("raw_type", payload.raw_type)?;
+            dict.set_item("bytes", PyBytes::new(py, &payload.bytes))?;
+        }
+        _ => {
+            dict.set_item("kind", "unknown")?;
+        }
+    }
+    Ok(dict.into_any().unbind())
+}
+
+fn render_mode_raw(mode: RenderMode) -> u32 {
+    match mode {
+        RenderMode::Partial => sys::MLN_RENDER_MODE_PARTIAL,
+        RenderMode::Full => sys::MLN_RENDER_MODE_FULL,
+        RenderMode::Unknown(raw) => raw,
+        _ => 0,
+    }
+}
+
+fn tile_operation_raw(operation: TileOperation) -> u32 {
+    match operation {
+        TileOperation::RequestedFromCache => sys::MLN_TILE_OPERATION_REQUESTED_FROM_CACHE,
+        TileOperation::RequestedFromNetwork => sys::MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK,
+        TileOperation::LoadFromNetwork => sys::MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
+        TileOperation::LoadFromCache => sys::MLN_TILE_OPERATION_LOAD_FROM_CACHE,
+        TileOperation::StartParse => sys::MLN_TILE_OPERATION_START_PARSE,
+        TileOperation::EndParse => sys::MLN_TILE_OPERATION_END_PARSE,
+        TileOperation::Error => sys::MLN_TILE_OPERATION_ERROR,
+        TileOperation::Cancelled => sys::MLN_TILE_OPERATION_CANCELLED,
+        TileOperation::Null => sys::MLN_TILE_OPERATION_NULL,
+        TileOperation::Unknown(raw) => raw,
+        _ => 0,
+    }
+}
+
+fn event_type_raw(event_type: RuntimeEventType) -> u32 {
+    match event_type {
+        RuntimeEventType::MapCameraWillChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
+        RuntimeEventType::MapCameraIsChanging => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING,
+        RuntimeEventType::MapCameraDidChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
+        RuntimeEventType::MapStyleLoaded => sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED,
+        RuntimeEventType::MapLoadingStarted => sys::MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
+        RuntimeEventType::MapLoadingFinished => sys::MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
+        RuntimeEventType::MapLoadingFailed => sys::MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
+        RuntimeEventType::MapIdle => sys::MLN_RUNTIME_EVENT_MAP_IDLE,
+        RuntimeEventType::MapRenderUpdateAvailable => {
+            sys::MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+        }
+        RuntimeEventType::MapRenderError => sys::MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
+        RuntimeEventType::MapStillImageFinished => sys::MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED,
+        RuntimeEventType::MapStillImageFailed => sys::MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
+        RuntimeEventType::MapRenderFrameStarted => sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED,
+        RuntimeEventType::MapRenderFrameFinished => {
+            sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED
+        }
+        RuntimeEventType::MapRenderMapStarted => sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED,
+        RuntimeEventType::MapRenderMapFinished => sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
+        RuntimeEventType::MapStyleImageMissing => sys::MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
+        RuntimeEventType::MapTileAction => sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
+        RuntimeEventType::OfflineRegionStatusChanged => {
+            sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED
+        }
+        RuntimeEventType::OfflineRegionResponseError => {
+            sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR
+        }
+        RuntimeEventType::OfflineRegionTileCountLimitExceeded => {
+            sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+        }
+        RuntimeEventType::OfflineOperationCompleted => {
+            sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED
+        }
+        RuntimeEventType::Unknown(raw) => raw,
+        _ => 0,
     }
 }
 

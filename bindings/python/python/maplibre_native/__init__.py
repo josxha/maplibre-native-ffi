@@ -19,7 +19,15 @@ from .errors import (
 )
 from .map import MapHandle, MapMode, MapOptions
 from .render import NativePointer, RenderBackend
-from .runtime import NetworkStatus, RuntimeHandle, RuntimeOptions
+from .runtime import (
+    NetworkStatus,
+    RuntimeEvent,
+    RuntimeEventSource,
+    RuntimeEventSourceType,
+    RuntimeEventType,
+    RuntimeHandle,
+    RuntimeOptions,
+)
 
 __all__ = [
     "EXPECTED_C_ABI_VERSION",
@@ -34,6 +42,10 @@ __all__ = [
     "NativePointer",
     "NetworkStatus",
     "RenderBackend",
+    "RuntimeEvent",
+    "RuntimeEventSource",
+    "RuntimeEventSourceType",
+    "RuntimeEventType",
     "RuntimeHandle",
     "RuntimeOptions",
     "UnknownStatusError",

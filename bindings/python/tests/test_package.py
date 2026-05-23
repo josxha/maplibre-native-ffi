@@ -141,3 +141,33 @@ def test_map_create_from_closed_runtime_reports_invalid_argument() -> None:
 
     with pytest.raises(mln.InvalidArgumentError):
         runtime.create_map()
+
+
+def test_poll_event_returns_none_when_queue_is_empty() -> None:
+    with mln.RuntimeHandle() as runtime:
+        assert runtime.poll_event() is None
+
+
+def test_poll_event_returns_copied_map_event() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
+                map_handle.set_style_json("{")
+
+            loading_failed = None
+            for _ in range(8):
+                event = runtime.poll_event()
+                if event is None:
+                    break
+                if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
+                    loading_failed = event
+                    break
+
+            assert loading_failed is not None
+            copied_message = loading_failed.message
+            runtime.poll_event()
+
+            assert loading_failed.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
+            assert loading_failed.source.source_type == mln.RuntimeEventSourceType.MAP
+            assert copied_message == loading_failed.message
+            assert loading_failed.message
