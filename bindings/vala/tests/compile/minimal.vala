@@ -451,6 +451,21 @@ int main(string[] args) {
     MaplibreNative.ScreenPoint point;
     projection.pixel_for_lat_lng(coordinate, out point);
     projection.lat_lng_for_pixel(point, out round_trip);
+
+    unowned MaplibreNative.Geometry? bindability_geometry = null;
+    unowned MaplibreNative.JsonValue? bindability_json = null;
+    MaplibreNative.RenderSessionHandle? bindability_session = null;
+    if (args.length < 0 && bindability_geometry != null && bindability_json != null && bindability_session != null) {
+      exercise_offline_operations(runtime);
+      exercise_json_style(map, bindability_json);
+      exercise_inline_source_data(map, bindability_geometry);
+      exercise_feature_state(bindability_session, bindability_json);
+      exercise_feature_queries(bindability_session);
+      exercise_geometry_camera(map, projection, bindability_geometry);
+      MaplibreNative.Feature bindability_feature = {};
+      exercise_feature_extensions(bindability_session, bindability_feature, bindability_json);
+    }
+
     projection.close();
 
     map.close();
