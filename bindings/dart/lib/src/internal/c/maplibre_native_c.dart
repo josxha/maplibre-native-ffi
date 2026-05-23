@@ -591,6 +591,29 @@ final class MaplibreNativeCApi {
   int renderSessionDumpDebugLogs(Pointer<raw.mln_render_session> session) =>
       _raw.mln_render_session_dump_debug_logs(session).value;
 
+  /// Sets per-feature state.
+  int renderSessionSetFeatureState(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_feature_state_selector> selector,
+    Pointer<raw.mln_json_value> state,
+  ) =>
+      _raw.mln_render_session_set_feature_state(session, selector, state).value;
+
+  /// Copies per-feature state.
+  int renderSessionGetFeatureState(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_feature_state_selector> selector,
+    Pointer<Pointer<raw.mln_json_snapshot>> outState,
+  ) => _raw
+      .mln_render_session_get_feature_state(session, selector, outState)
+      .value;
+
+  /// Removes per-feature state.
+  int renderSessionRemoveFeatureState(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_feature_state_selector> selector,
+  ) => _raw.mln_render_session_remove_feature_state(session, selector).value;
+
   /// Queries rendered features from the latest render session state.
   int renderSessionQueryRenderedFeatures(
     Pointer<raw.mln_render_session> session,

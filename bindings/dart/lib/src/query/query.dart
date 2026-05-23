@@ -4,6 +4,29 @@ library;
 import '../geo/geo.dart';
 import '../json/json.dart';
 
+/// Feature-state source, feature, and key selector.
+final class FeatureStateSelector {
+  /// Creates a feature-state selector.
+  const FeatureStateSelector({
+    required this.sourceId,
+    this.sourceLayerId,
+    this.featureId,
+    this.stateKey,
+  });
+
+  /// Source ID.
+  final String sourceId;
+
+  /// Optional source layer ID for vector-source disambiguation.
+  final String? sourceLayerId;
+
+  /// Optional feature ID.
+  final String? featureId;
+
+  /// Optional state key.
+  final String? stateKey;
+}
+
 /// Rendered feature query geometry.
 sealed class RenderedQueryGeometry {
   const RenderedQueryGeometry();

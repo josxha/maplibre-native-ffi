@@ -2257,6 +2257,42 @@ final class RenderSessionHandle {
     _check(_c.renderSessionDumpDebugLogs(_pointer));
   }
 
+  /// Sets per-feature state on a render source.
+  void setFeatureState(FeatureStateSelector selector, JsonObject state) {
+    withNativeArena((arena) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      final nativeState = native_json.nativeJsonValue(state, arena);
+      _check(
+        _c.renderSessionSetFeatureState(
+          _pointer,
+          nativeSelector,
+          nativeState.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Copies per-feature state from a render source.
+  JsonValue? getFeatureState(FeatureStateSelector selector) {
+    return withNativeArena((arena) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      final outState = arena<Pointer<raw.mln_json_snapshot>>();
+      outState.value = nullptr;
+      _check(
+        _c.renderSessionGetFeatureState(_pointer, nativeSelector, outState),
+      );
+      return _copyJsonSnapshot(outState.value);
+    });
+  }
+
+  /// Removes per-feature state from a render source.
+  void removeFeatureState(FeatureStateSelector selector) {
+    withNativeArena((arena) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      _check(_c.renderSessionRemoveFeatureState(_pointer, nativeSelector));
+    });
+  }
+
   /// Queries rendered features from the latest render session state.
   List<QueriedFeature> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
@@ -2871,6 +2907,49 @@ raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(
       }
       return _c.renderedQueryGeometryLineString(nativePoints, points.length);
   }
+}
+
+Pointer<raw.mln_feature_state_selector> _featureStateSelectorToNative(
+  FeatureStateSelector selector,
+  Allocator allocator,
+) {
+  final nativeSelector = allocator<raw.mln_feature_state_selector>();
+  nativeSelector.ref.size = sizeOf<raw.mln_feature_state_selector>();
+  nativeSelector.ref.source_id = nativeStringView(
+    selector.sourceId,
+    allocator,
+  ).value;
+  final sourceLayerId = selector.sourceLayerId;
+  if (sourceLayerId != null) {
+    nativeSelector.ref.fields |= raw
+        .mln_feature_state_selector_field
+        .MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+        .value;
+    nativeSelector.ref.source_layer_id = nativeStringView(
+      sourceLayerId,
+      allocator,
+    ).value;
+  }
+  final featureId = selector.featureId;
+  if (featureId != null) {
+    nativeSelector.ref.fields |= raw
+        .mln_feature_state_selector_field
+        .MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+        .value;
+    nativeSelector.ref.feature_id = nativeStringView(
+      featureId,
+      allocator,
+    ).value;
+  }
+  final stateKey = selector.stateKey;
+  if (stateKey != null) {
+    nativeSelector.ref.fields |= raw
+        .mln_feature_state_selector_field
+        .MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+        .value;
+    nativeSelector.ref.state_key = nativeStringView(stateKey, allocator).value;
+  }
+  return nativeSelector;
 }
 
 Pointer<raw.mln_rendered_feature_query_options>
