@@ -283,6 +283,60 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert "dem-inline" not in source_ids
 
 
+def test_image_source_url_image_and_coordinates_public_api() -> None:
+    coordinates = (
+        geo.LatLng(1.0, 2.0),
+        geo.LatLng(1.0, 3.0),
+        geo.LatLng(0.0, 3.0),
+        geo.LatLng(0.0, 2.0),
+    )
+    updated_coordinates = (
+        geo.LatLng(2.0, 2.0),
+        geo.LatLng(2.0, 3.0),
+        geo.LatLng(1.0, 3.0),
+        geo.LatLng(1.0, 2.0),
+    )
+    image = render.PremultipliedRgba8Image(
+        info=render.TextureImageInfo(width=1, height=1, stride=4, byte_length=4),
+        data=bytes([0, 255, 0, 255]),
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            map_handle.add_image_source_url(
+                "overlay-url",
+                coordinates,
+                "https://example.test/overlay.png",
+            )
+            map_handle.add_image_source_image("overlay-inline", coordinates, image)
+
+            assert (
+                map_handle.get_style_source_type("overlay-url")
+                == style.StyleSourceType.IMAGE
+            )
+            assert (
+                map_handle.get_style_source_type("overlay-inline")
+                == style.StyleSourceType.IMAGE
+            )
+            assert map_handle.get_image_source_coordinates("overlay-url") == coordinates
+            assert map_handle.get_image_source_coordinates("missing") is None
+
+            map_handle.set_image_source_url(
+                "overlay-url",
+                "https://example.test/overlay-2.png",
+            )
+            map_handle.set_image_source_image("overlay-url", image)
+            map_handle.set_image_source_coordinates("overlay-url", updated_coordinates)
+            assert (
+                map_handle.get_image_source_coordinates("overlay-url")
+                == updated_coordinates
+            )
+
+            assert map_handle.remove_style_source("overlay-url") is True
+            assert map_handle.remove_style_source("overlay-inline") is True
+
+
 def test_style_image_metadata_copy_and_removal_public_api() -> None:
     image = render.PremultipliedRgba8Image(
         info=render.TextureImageInfo(width=1, height=1, stride=4, byte_length=4),

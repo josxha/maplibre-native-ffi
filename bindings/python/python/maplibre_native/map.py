@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
         MetalSurfaceDescriptor,
+        PremultipliedRgba8Image,
         RenderSessionHandle,
         VulkanBorrowedTextureDescriptor,
         VulkanOwnedTextureDescriptor,
@@ -219,6 +220,16 @@ def _animation_parts(
         else None
     )
     return animation.duration_ms, animation.velocity, animation.min_zoom, easing
+
+
+def _coordinate_parts(
+    coordinates: list[LatLng] | tuple[LatLng, ...],
+) -> list[tuple[float, float]]:
+    return [(coordinate.latitude, coordinate.longitude) for coordinate in coordinates]
+
+
+def _image_parts(image: PremultipliedRgba8Image) -> tuple[int, int, int, bytes]:
+    return image.info.width, image.info.height, image.info.stride, image.data
 
 
 def _tile_source_parts(
@@ -608,6 +619,61 @@ class MapHandle:
 
         raw = self._native.copy_style_image_premultiplied_rgba8(image_id)
         return StyleImage.from_native(raw) if raw is not None else None
+
+    def add_image_source_url(
+        self,
+        source_id: str,
+        coordinates: list[LatLng] | tuple[LatLng, ...],
+        url: str,
+    ) -> None:
+        """Add an image source that loads its image from a URL."""
+        self._native.add_image_source_url(
+            source_id, _coordinate_parts(coordinates), url
+        )
+
+    def add_image_source_image(
+        self,
+        source_id: str,
+        coordinates: list[LatLng] | tuple[LatLng, ...],
+        image: PremultipliedRgba8Image,
+    ) -> None:
+        """Add an image source with inline image pixels."""
+        self._native.add_image_source_image(
+            source_id,
+            _coordinate_parts(coordinates),
+            *_image_parts(image),
+        )
+
+    def set_image_source_url(self, source_id: str, url: str) -> None:
+        """Update an image source to load its image from a URL."""
+        self._native.set_image_source_url(source_id, url)
+
+    def set_image_source_image(
+        self,
+        source_id: str,
+        image: PremultipliedRgba8Image,
+    ) -> None:
+        """Update an image source with inline image pixels."""
+        self._native.set_image_source_image(source_id, *_image_parts(image))
+
+    def set_image_source_coordinates(
+        self,
+        source_id: str,
+        coordinates: list[LatLng] | tuple[LatLng, ...],
+    ) -> None:
+        """Update image source coordinates."""
+        self._native.set_image_source_coordinates(
+            source_id, _coordinate_parts(coordinates)
+        )
+
+    def get_image_source_coordinates(self, source_id: str) -> tuple[LatLng, ...] | None:
+        """Return copied image source coordinates, or None when missing."""
+        from .geo import LatLng
+
+        raw = self._native.get_image_source_coordinates(source_id)
+        if raw is None:
+            return None
+        return tuple(LatLng(**coordinate) for coordinate in raw)
 
     def create_projection(self) -> MapProjectionHandle:
         """Create a standalone projection helper from the current map transform."""

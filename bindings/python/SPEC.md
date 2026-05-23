@@ -122,6 +122,8 @@ The current implementation includes these completed slices:
   listing, and layer reordering.
 - `MapHandle` exposes runtime style image set, removal, existence checks,
   metadata lookup, and premultiplied RGBA8 copying.
+- `MapHandle` exposes image source URL/inline-image insertion, URL/image
+  updates, coordinate updates, and coordinate copying.
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
 - `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes

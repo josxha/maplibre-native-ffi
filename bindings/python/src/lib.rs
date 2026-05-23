@@ -8,7 +8,7 @@ use maplibre_native_core::{
 use maplibre_native_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyDict};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{CString, c_char, c_void};
 use std::ptr;
@@ -1570,6 +1570,142 @@ impl MapHandle {
         style_image_to_py(py, &info, &pixels).map(Some)
     }
 
+    fn add_image_source_url(
+        &self,
+        source_id: String,
+        coordinates: Vec<(f64, f64)>,
+        url: String,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        let coordinates = lat_lngs_from_tuples(coordinates);
+        // SAFETY: The C API validates the map pointer, source ID, coordinate slice, and URL.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_image_source_url(
+                state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                url.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn add_image_source_image(
+        &self,
+        source_id: String,
+        coordinates: Vec<(f64, f64)>,
+        width: u32,
+        height: u32,
+        stride: u32,
+        pixels: Vec<u8>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let coordinates = lat_lngs_from_tuples(coordinates);
+        let image = premultiplied_rgba8_image_from_parts(width, height, stride, &pixels);
+        // SAFETY: The C API validates the map pointer, source ID, coordinates,
+        // image descriptor, and pixel storage. pixels is retained for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_image_source_image(
+                state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                &image,
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn set_image_source_url(&self, source_id: String, url: String) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        // SAFETY: The C API validates the map pointer and borrowed string views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_image_source_url(state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(map_error)
+    }
+
+    fn set_image_source_image(
+        &self,
+        source_id: String,
+        width: u32,
+        height: u32,
+        stride: u32,
+        pixels: Vec<u8>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let image = premultiplied_rgba8_image_from_parts(width, height, stride, &pixels);
+        // SAFETY: The C API validates the map pointer, source ID, image descriptor,
+        // and pixel storage. pixels is retained for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_image_source_image(state.as_ptr(), source_id.raw(), &image)
+        })
+        .map_err(map_error)
+    }
+
+    fn set_image_source_coordinates(
+        &self,
+        source_id: String,
+        coordinates: Vec<(f64, f64)>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let coordinates = lat_lngs_from_tuples(coordinates);
+        // SAFETY: The C API validates the map pointer, source ID, and coordinate slice.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_image_source_coordinates(
+                state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn get_image_source_coordinates(
+        &self,
+        py: Python<'_>,
+        source_id: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let mut coordinates = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0
+            };
+            4
+        ];
+        let mut coordinate_count = 0;
+        let mut found = false;
+        // SAFETY: coordinates is writable for four entries. The C API validates
+        // all pointers and returns a copied coordinate count.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_image_source_coordinates(
+                state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_mut_ptr(),
+                coordinates.len(),
+                &mut coordinate_count,
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+        coordinates.truncate(coordinate_count);
+        lat_lng_list_to_py(py, &coordinates).map(Some)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_custom_geometry_source(
         &self,
@@ -2483,11 +2619,29 @@ fn edge_insets_from_tuple(
     }
 }
 
+fn lat_lngs_from_tuples(coordinates: Vec<(f64, f64)>) -> Vec<sys::mln_lat_lng> {
+    coordinates
+        .into_iter()
+        .map(|(latitude, longitude)| sys::mln_lat_lng {
+            latitude,
+            longitude,
+        })
+        .collect()
+}
+
 fn lat_lng_to_py(py: Python<'_>, coordinate: sys::mln_lat_lng) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("latitude", coordinate.latitude)?;
     dict.set_item("longitude", coordinate.longitude)?;
     Ok(dict.into_any().unbind())
+}
+
+fn lat_lng_list_to_py(py: Python<'_>, coordinates: &[sys::mln_lat_lng]) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for coordinate in coordinates {
+        list.append(lat_lng_to_py(py, *coordinate)?)?;
+    }
+    Ok(list.into_any().unbind())
 }
 
 fn screen_point_to_py(py: Python<'_>, point: sys::mln_screen_point) -> PyResult<Py<PyAny>> {
@@ -2825,6 +2979,22 @@ fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResul
     dict.set_item("is_volatile", info.is_volatile)?;
     dict.set_item("attribution", info.attribution)?;
     Ok(dict.into_any().unbind())
+}
+
+fn premultiplied_rgba8_image_from_parts(
+    width: u32,
+    height: u32,
+    stride: u32,
+    pixels: &[u8],
+) -> sys::mln_premultiplied_rgba8_image {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut image = unsafe { sys::mln_premultiplied_rgba8_image_default() };
+    image.width = width;
+    image.height = height;
+    image.stride = stride;
+    image.pixels = pixels.as_ptr();
+    image.byte_length = pixels.len();
+    image
 }
 
 fn style_image_options_from_parts(
