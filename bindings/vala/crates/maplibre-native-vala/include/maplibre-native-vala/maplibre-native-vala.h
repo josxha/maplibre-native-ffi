@@ -253,6 +253,7 @@ typedef struct {
 } MlnValaOfflineRegionStatus;
 
 typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
+typedef struct _MlnValaNativePointer MlnValaNativePointer;
 typedef struct _MlnValaRenderSessionHandle MlnValaRenderSessionHandle;
 typedef struct _MlnValaFeatureQueryResultHandle MlnValaFeatureQueryResultHandle;
 typedef struct _MlnValaFeatureExtensionResultHandle
@@ -472,9 +473,76 @@ typedef struct {
   size_t size;
 } MlnValaStringView;
 
+#define MLN_VALA_TYPE_JSON_VALUE (mln_vala_json_value_get_type())
 typedef struct _MlnValaJsonValue MlnValaJsonValue;
-typedef struct _MlnValaJsonSnapshotHandle MlnValaJsonSnapshotHandle;
+#define MLN_VALA_TYPE_GEOMETRY (mln_vala_geometry_get_type())
 typedef struct _MlnValaGeometry MlnValaGeometry;
+#define MLN_VALA_TYPE_GEO_JSON (mln_vala_geo_json_get_type())
+typedef struct _MlnValaGeoJson MlnValaGeoJson;
+typedef struct _MlnValaJsonSnapshotHandle MlnValaJsonSnapshotHandle;
+
+GType mln_vala_json_value_get_type(void);
+MlnValaJsonValue* mln_vala_json_value_copy(const MlnValaJsonValue* value);
+void mln_vala_json_value_free(MlnValaJsonValue* value);
+MlnValaJsonValue* mln_vala_json_value_new_null(void);
+MlnValaJsonValue* mln_vala_json_value_new_bool(bool value);
+MlnValaJsonValue* mln_vala_json_value_new_uint(uint64_t value);
+MlnValaJsonValue* mln_vala_json_value_new_int(int64_t value);
+MlnValaJsonValue* mln_vala_json_value_new_double(double value, GError** error);
+MlnValaJsonValue* mln_vala_json_value_new_string(
+  const char* value, GError** error
+);
+/**
+ * mln_vala_json_value_new_array:
+ * @values: (array length=value_count) (nullable): JSON values.
+ * @value_count: number of values.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): JSON array value.
+ * Throws: MlnValaError
+ */
+MlnValaJsonValue* mln_vala_json_value_new_array(
+  const MlnValaJsonValue* const* values, size_t value_count, GError** error
+);
+/**
+ * mln_vala_json_value_new_object:
+ * @keys: (array length=member_count) (nullable): member keys.
+ * @values: (array length=member_count) (nullable): member values.
+ * @member_count: number of members.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): JSON object value.
+ * Throws: MlnValaError
+ */
+MlnValaJsonValue* mln_vala_json_value_new_object(
+  const char* const* keys, const MlnValaJsonValue* const* values,
+  size_t member_count, GError** error
+);
+GType mln_vala_geometry_get_type(void);
+MlnValaGeometry* mln_vala_geometry_copy(const MlnValaGeometry* value);
+void mln_vala_geometry_free(MlnValaGeometry* value);
+MlnValaGeometry* mln_vala_geometry_new_empty(void);
+MlnValaGeometry* mln_vala_geometry_new_point(
+  const MlnValaLatLng* point, GError** error
+);
+/**
+ * mln_vala_geometry_new_line_string:
+ * @coordinates: (array length=coordinate_count): coordinates.
+ * @coordinate_count: number of coordinates.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): line-string geometry.
+ * Throws: MlnValaError
+ */
+MlnValaGeometry* mln_vala_geometry_new_line_string(
+  const MlnValaLatLng* coordinates, size_t coordinate_count, GError** error
+);
+GType mln_vala_geo_json_get_type(void);
+MlnValaGeoJson* mln_vala_geo_json_copy(const MlnValaGeoJson* value);
+void mln_vala_geo_json_free(MlnValaGeoJson* value);
+MlnValaGeoJson* mln_vala_geo_json_new_geometry(
+  const MlnValaGeometry* geometry, GError** error
+);
 
 typedef struct {
   MlnValaStringView key;
@@ -523,16 +591,6 @@ typedef enum {
   MLN_VALA_GEOJSON_TYPE_FEATURE = 2,
   MLN_VALA_GEOJSON_TYPE_FEATURE_COLLECTION = 3,
 } MlnValaGeoJsonType;
-
-typedef struct {
-  uint32_t size;
-  MlnValaGeoJsonType type;
-  union {
-    const MlnValaGeometry* geometry;
-    const MlnValaFeature* feature;
-    MlnValaFeatureCollection feature_collection;
-  } data;
-} MlnValaGeoJson;
 
 typedef struct {
   uint32_t size;
@@ -803,6 +861,14 @@ typedef struct {
 
 typedef void (*MlnValaCustomGeometrySourceTileCallback)(
   void* callback_data, MlnValaCanonicalTileId tile_id
+);
+
+/**
+ * MlnValaCustomGeometrySourceTileDelegate:
+ * @tile_id: canonical tile identifier.
+ */
+typedef void (*MlnValaCustomGeometrySourceTileDelegate)(
+  MlnValaCanonicalTileId tile_id, gpointer user_data
 );
 
 typedef struct {
@@ -1168,7 +1234,6 @@ gboolean mln_vala_texture_image_info_default(
 );
 
 #define MLN_VALA_TYPE_NATIVE_POINTER (mln_vala_native_pointer_get_type())
-typedef struct _MlnValaNativePointer MlnValaNativePointer;
 
 GType mln_vala_native_pointer_get_type(void);
 
@@ -1199,23 +1264,309 @@ MlnValaNativePointer* mln_vala_native_pointer_copy(
 );
 void mln_vala_native_pointer_free(MlnValaNativePointer* pointer);
 
+gboolean mln_vala_render_target_extent_set(
+  MlnValaRenderTargetExtent* out_extent, uint32_t width, uint32_t height,
+  double scale_factor, GError** error
+);
+gboolean mln_vala_metal_context_descriptor_set_device(
+  MlnValaMetalContextDescriptor* descriptor, const MlnValaNativePointer* device,
+  GError** error
+);
+gboolean mln_vala_metal_surface_descriptor_set_layer(
+  MlnValaMetalSurfaceDescriptor* descriptor, const MlnValaNativePointer* layer,
+  GError** error
+);
+gboolean mln_vala_metal_borrowed_texture_descriptor_set_texture(
+  MlnValaMetalBorrowedTextureDescriptor* descriptor,
+  const MlnValaNativePointer* texture, GError** error
+);
+gboolean mln_vala_vulkan_context_descriptor_set_handles(
+  MlnValaVulkanContextDescriptor* descriptor,
+  const MlnValaNativePointer* instance,
+  const MlnValaNativePointer* physical_device,
+  const MlnValaNativePointer* device,
+  const MlnValaNativePointer* graphics_queue,
+  uint32_t graphics_queue_family_index, GError** error
+);
+gboolean mln_vala_vulkan_surface_descriptor_set_surface(
+  MlnValaVulkanSurfaceDescriptor* descriptor,
+  const MlnValaNativePointer* surface, GError** error
+);
+gboolean mln_vala_vulkan_borrowed_texture_descriptor_set_image_handles(
+  MlnValaVulkanBorrowedTextureDescriptor* descriptor,
+  const MlnValaNativePointer* image, const MlnValaNativePointer* image_view,
+  GError** error
+);
+
+typedef enum {
+  MLN_VALA_RUNTIME_EVENT_TYPE_UNKNOWN = 0,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_CAMERA_WILL_CHANGE = 1,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_CAMERA_IS_CHANGING = 2,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_CAMERA_DID_CHANGE = 3,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_STYLE_LOADED = 4,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_LOADING_STARTED = 5,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_LOADING_FINISHED = 6,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_LOADING_FAILED = 7,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_IDLE = 8,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_RENDER_UPDATE_AVAILABLE = 9,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_RENDER_ERROR = 10,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_STILL_IMAGE_FINISHED = 11,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_STILL_IMAGE_FAILED = 12,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_RENDER_FRAME_STARTED = 13,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_RENDER_FRAME_FINISHED = 14,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_RENDER_MAP_STARTED = 15,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_RENDER_MAP_FINISHED = 16,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_STYLE_IMAGE_MISSING = 17,
+  MLN_VALA_RUNTIME_EVENT_TYPE_MAP_TILE_ACTION = 18,
+  MLN_VALA_RUNTIME_EVENT_TYPE_OFFLINE_REGION_STATUS_CHANGED = 19,
+  MLN_VALA_RUNTIME_EVENT_TYPE_OFFLINE_REGION_RESPONSE_ERROR = 20,
+  MLN_VALA_RUNTIME_EVENT_TYPE_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
+  MLN_VALA_RUNTIME_EVENT_TYPE_OFFLINE_OPERATION_COMPLETED = 22,
+} MlnValaRuntimeEventType;
+
+typedef enum {
+  MLN_VALA_RUNTIME_EVENT_SOURCE_TYPE_RUNTIME = 0,
+  MLN_VALA_RUNTIME_EVENT_SOURCE_TYPE_MAP = 1,
+  MLN_VALA_RUNTIME_EVENT_SOURCE_TYPE_UNKNOWN = 2,
+} MlnValaRuntimeEventSourceType;
+
+typedef enum {
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_NONE = 0,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_RENDER_FRAME = 1,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_RENDER_MAP = 2,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_STYLE_IMAGE_MISSING = 3,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_TILE_ACTION = 4,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_OFFLINE_REGION_STATUS = 5,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_OFFLINE_REGION_RESPONSE_ERROR = 6,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_OFFLINE_OPERATION_COMPLETED = 8,
+  MLN_VALA_RUNTIME_EVENT_PAYLOAD_TYPE_UNKNOWN = 0xffffffffu,
+} MlnValaRuntimeEventPayloadType;
+
+typedef enum {
+  MLN_VALA_RENDER_MODE_PARTIAL = 0,
+  MLN_VALA_RENDER_MODE_FULL = 1,
+  MLN_VALA_RENDER_MODE_UNKNOWN = 0xffffffffu,
+} MlnValaRenderMode;
+
+typedef enum {
+  MLN_VALA_TILE_OPERATION_REQUESTED_FROM_CACHE = 0,
+  MLN_VALA_TILE_OPERATION_REQUESTED_FROM_NETWORK = 1,
+  MLN_VALA_TILE_OPERATION_LOAD_FROM_NETWORK = 2,
+  MLN_VALA_TILE_OPERATION_LOAD_FROM_CACHE = 3,
+  MLN_VALA_TILE_OPERATION_START_PARSE = 4,
+  MLN_VALA_TILE_OPERATION_END_PARSE = 5,
+  MLN_VALA_TILE_OPERATION_ERROR = 6,
+  MLN_VALA_TILE_OPERATION_CANCELLED = 7,
+  MLN_VALA_TILE_OPERATION_NULL = 8,
+  MLN_VALA_TILE_OPERATION_UNKNOWN = 0xffffffffu,
+} MlnValaTileOperation;
+
 #define MLN_VALA_TYPE_RUNTIME_EVENT (mln_vala_runtime_event_get_type())
 typedef struct _MlnValaRuntimeEvent MlnValaRuntimeEvent;
 
-struct _MlnValaRuntimeEvent {
-  uint32_t type;
-  uint32_t source_type;
-  int32_t code;
-  uint32_t payload_type;
-  char* message;
-  size_t message_size;
-};
+typedef struct {
+  double encoding_time;
+  double rendering_time;
+  int64_t frame_count;
+  int64_t draw_call_count;
+  int64_t total_draw_call_count;
+} MlnValaRenderingStats;
+
+typedef struct {
+  MlnValaRenderMode mode;
+  uint32_t raw_mode;
+  bool needs_repaint;
+  bool placement_changed;
+  MlnValaRenderingStats stats;
+} MlnValaRuntimeEventRenderFrame;
+
+typedef struct {
+  MlnValaRenderMode mode;
+  uint32_t raw_mode;
+} MlnValaRuntimeEventRenderMap;
+
+typedef struct {
+  uint32_t overscaled_z;
+  int32_t wrap;
+  uint32_t canonical_z;
+  uint32_t canonical_x;
+  uint32_t canonical_y;
+} MlnValaTileId;
+
+typedef struct {
+  MlnValaTileOperation operation;
+  uint32_t raw_operation;
+  MlnValaTileId tile_id;
+} MlnValaRuntimeEventTileAction;
+
+typedef struct {
+  int64_t region_id;
+  MlnValaOfflineRegionStatus status;
+} MlnValaRuntimeEventOfflineRegionStatus;
+
+typedef struct {
+  int64_t region_id;
+  MlnValaResourceErrorReason reason;
+  uint32_t raw_reason;
+} MlnValaRuntimeEventOfflineRegionResponseError;
+
+typedef struct {
+  int64_t region_id;
+  uint64_t limit;
+} MlnValaRuntimeEventOfflineRegionTileCountLimit;
+
+typedef struct {
+  uint64_t operation_id;
+  MlnValaOfflineOperationKind operation_kind;
+  uint32_t raw_operation_kind;
+  MlnValaOfflineOperationResultKind result_kind;
+  uint32_t raw_result_kind;
+  int32_t result_status;
+  bool found;
+} MlnValaRuntimeEventOfflineOperationCompleted;
 
 GType mln_vala_runtime_event_get_type(void);
 MlnValaRuntimeEvent* mln_vala_runtime_event_copy(
   const MlnValaRuntimeEvent* event
 );
 void mln_vala_runtime_event_free(MlnValaRuntimeEvent* event);
+MlnValaRuntimeEventType mln_vala_runtime_event_get_event_type(
+  const MlnValaRuntimeEvent* event
+);
+uint32_t mln_vala_runtime_event_get_raw_type(const MlnValaRuntimeEvent* event);
+MlnValaRuntimeEventSourceType mln_vala_runtime_event_get_source_type(
+  const MlnValaRuntimeEvent* event
+);
+uint32_t mln_vala_runtime_event_get_raw_source_type(
+  const MlnValaRuntimeEvent* event
+);
+/**
+ * mln_vala_runtime_event_get_source_pointer:
+ * @event: (not nullable): copied runtime event.
+ *
+ * Returns: (transfer full) (nullable): opaque native source pointer.
+ */
+MlnValaNativePointer* mln_vala_runtime_event_get_source_pointer(
+  const MlnValaRuntimeEvent* event
+);
+int32_t mln_vala_runtime_event_get_code(const MlnValaRuntimeEvent* event);
+MlnValaRuntimeEventPayloadType mln_vala_runtime_event_get_payload_type(
+  const MlnValaRuntimeEvent* event
+);
+uint32_t mln_vala_runtime_event_get_raw_payload_type(
+  const MlnValaRuntimeEvent* event
+);
+/**
+ * mln_vala_runtime_event_get_message:
+ * @event: (not nullable): copied runtime event.
+ *
+ * Returns: (transfer none) (nullable): message owned by @event.
+ */
+const char* mln_vala_runtime_event_get_message(
+  const MlnValaRuntimeEvent* event
+);
+/**
+ * mln_vala_runtime_event_get_render_frame:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): render-frame payload output.
+ *
+ * Returns: whether @event carries a render-frame payload.
+ */
+gboolean mln_vala_runtime_event_get_render_frame(
+  const MlnValaRuntimeEvent* event, MlnValaRuntimeEventRenderFrame* out_payload
+);
+/**
+ * mln_vala_runtime_event_get_render_map:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): render-map payload output.
+ *
+ * Returns: whether @event carries a render-map payload.
+ */
+gboolean mln_vala_runtime_event_get_render_map(
+  const MlnValaRuntimeEvent* event, MlnValaRuntimeEventRenderMap* out_payload
+);
+/**
+ * mln_vala_runtime_event_get_style_image_missing_image_id:
+ * @event: (not nullable): copied runtime event.
+ *
+ * Returns: (transfer none) (nullable): image ID owned by @event.
+ */
+const char* mln_vala_runtime_event_get_style_image_missing_image_id(
+  const MlnValaRuntimeEvent* event
+);
+/**
+ * mln_vala_runtime_event_get_tile_action:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): tile-action payload output.
+ *
+ * Returns: whether @event carries a tile-action payload.
+ */
+gboolean mln_vala_runtime_event_get_tile_action(
+  const MlnValaRuntimeEvent* event, MlnValaRuntimeEventTileAction* out_payload
+);
+/**
+ * mln_vala_runtime_event_get_tile_action_source_id:
+ * @event: (not nullable): copied runtime event.
+ *
+ * Returns: (transfer none) (nullable): source ID owned by @event.
+ */
+const char* mln_vala_runtime_event_get_tile_action_source_id(
+  const MlnValaRuntimeEvent* event
+);
+/**
+ * mln_vala_runtime_event_dup_unknown_payload:
+ * @event: (not nullable): copied runtime event.
+ *
+ * Returns: (transfer full) (nullable): unknown payload bytes owned by caller.
+ */
+GBytes* mln_vala_runtime_event_dup_unknown_payload(
+  const MlnValaRuntimeEvent* event
+);
+/**
+ * mln_vala_runtime_event_get_offline_region_status:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): offline-region-status payload output.
+ *
+ * Returns: whether @event carries an offline-region-status payload.
+ */
+gboolean mln_vala_runtime_event_get_offline_region_status(
+  const MlnValaRuntimeEvent* event,
+  MlnValaRuntimeEventOfflineRegionStatus* out_payload
+);
+/**
+ * mln_vala_runtime_event_get_offline_region_response_error:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): offline-region-response-error payload output.
+ *
+ * Returns: whether @event carries an offline-region-response-error payload.
+ */
+gboolean mln_vala_runtime_event_get_offline_region_response_error(
+  const MlnValaRuntimeEvent* event,
+  MlnValaRuntimeEventOfflineRegionResponseError* out_payload
+);
+/**
+ * mln_vala_runtime_event_get_offline_region_tile_count_limit:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): offline-region-tile-count-limit payload output.
+ *
+ * Returns: whether @event carries an offline-region-tile-count-limit payload.
+ */
+gboolean mln_vala_runtime_event_get_offline_region_tile_count_limit(
+  const MlnValaRuntimeEvent* event,
+  MlnValaRuntimeEventOfflineRegionTileCountLimit* out_payload
+);
+/**
+ * mln_vala_runtime_event_get_offline_operation_completed:
+ * @event: (not nullable): copied runtime event.
+ * @out_payload: (out): offline-operation-completed payload output.
+ *
+ * Returns: whether @event carries an offline-operation-completed payload.
+ */
+gboolean mln_vala_runtime_event_get_offline_operation_completed(
+  const MlnValaRuntimeEvent* event,
+  MlnValaRuntimeEventOfflineOperationCompleted* out_payload
+);
 
 #define MLN_VALA_TYPE_RUNTIME_HANDLE (mln_vala_runtime_handle_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -1858,6 +2209,53 @@ gboolean mln_vala_runtime_handle_offline_operation_discard(
  */
 gboolean mln_vala_resource_request_handle_complete(
   MlnValaResourceRequestHandle* self, const MlnValaResourceResponse* response,
+  GError** error
+);
+
+/**
+ * mln_vala_resource_request_handle_retain_for_async:
+ * @self: a resource request handle received by a provider callback.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a retained handle that may complete later, or NULL.
+ * Throws: MlnValaError
+ */
+MlnValaResourceRequestHandle* mln_vala_resource_request_handle_retain_for_async(
+  MlnValaResourceRequestHandle* self, GError** error
+);
+
+/**
+ * mln_vala_resource_request_get_url:
+ * @request: (not nullable): callback-duration borrowed request.
+ *
+ * Returns: (transfer none) (nullable): URL borrowed from @request.
+ */
+const char* mln_vala_resource_request_get_url(
+  const MlnValaResourceRequest* request
+);
+
+/**
+ * mln_vala_resource_request_dup_prior_data:
+ * @request: (not nullable): callback-duration borrowed request.
+ *
+ * Returns: (transfer full) (nullable): copied prior data bytes.
+ */
+GBytes* mln_vala_resource_request_dup_prior_data(
+  const MlnValaResourceRequest* request
+);
+
+/**
+ * mln_vala_resource_response_set_bytes:
+ * @response: (not nullable): response descriptor.
+ * @bytes: (array length=byte_count) (nullable): response bytes.
+ * @byte_count: byte count.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_resource_response_set_bytes(
+  MlnValaResourceResponse* response, const uint8_t* bytes, size_t byte_count,
   GError** error
 );
 
@@ -2671,6 +3069,27 @@ gboolean mln_vala_map_handle_add_custom_geometry_source(
   MlnValaMapHandle* self, const char* source_id,
   const MlnValaCustomGeometrySourceOptions* options, GError** error
 );
+/**
+ * mln_vala_map_handle_add_custom_geometry_source_with_callbacks:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @fetch_tile: (scope async) (closure fetch_user_data): fetch delegate.
+ * @cancel_tile: (scope async) (closure cancel_user_data) (nullable): cancel
+ * delegate.
+ * @options: (nullable): semantic source options, or `NULL` for defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_custom_geometry_source_with_callbacks(
+  MlnValaMapHandle* self, const char* source_id,
+  MlnValaCustomGeometrySourceTileDelegate fetch_tile, gpointer fetch_user_data,
+  GDestroyNotify fetch_destroy_notify,
+  MlnValaCustomGeometrySourceTileDelegate cancel_tile,
+  gpointer cancel_user_data, GDestroyNotify cancel_destroy_notify,
+  const MlnValaCustomGeometrySourceOptions* options, GError** error
+);
 gboolean mln_vala_map_handle_set_custom_geometry_source_tile_data(
   MlnValaMapHandle* self, const char* source_id,
   const MlnValaCanonicalTileId* tile_id, const MlnValaGeoJson* data,
@@ -3106,15 +3525,15 @@ MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_layer_filter(
 /**
  * mln_vala_json_snapshot_handle_get:
  * @self: a JSON snapshot handle.
- * @out_value: (out) (transfer none): return location for root JSON value.
+ * @out_value: (out) (transfer full): return location for copied root JSON
+ * value.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
  * Throws: MlnValaError
  */
 gboolean mln_vala_json_snapshot_handle_get(
-  MlnValaJsonSnapshotHandle* self, const MlnValaJsonValue** out_value,
-  GError** error
+  MlnValaJsonSnapshotHandle* self, MlnValaJsonValue** out_value, GError** error
 );
 void mln_vala_json_snapshot_handle_close(MlnValaJsonSnapshotHandle* self);
 

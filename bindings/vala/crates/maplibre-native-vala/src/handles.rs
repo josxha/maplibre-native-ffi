@@ -11,8 +11,10 @@ use crate::events::RuntimeEvent;
 use crate::geo::{LatLng, ScreenPoint};
 use crate::glib::{self, GBoolean, GDestroyNotify, GError, GFALSE, GObject, GTRUE, GType};
 use crate::resource::{
-    ResourceRequestHandle, resource_request_handle_disarm, resource_request_handle_from_native,
+    ResourceRequestHandle, resource_request_handle_finish_provider_decision,
+    resource_request_handle_from_native,
 };
+use crate::values::{self, GeoJson, Geometry, JsonValue};
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
@@ -38,6 +40,46 @@ pub type ResourceProviderCallback = unsafe extern "C" fn(
     handle: *mut ResourceRequestHandle,
     user_data: *mut c_void,
 ) -> u32;
+
+pub type CustomGeometrySourceTileDelegate =
+    unsafe extern "C" fn(tile_id: sys::mln_canonical_tile_id, user_data: *mut c_void);
+
+struct CustomGeometrySourceCallbackState {
+    fetch_tile: CustomGeometrySourceTileDelegate,
+    fetch_user_data: *mut c_void,
+    fetch_destroy_notify: GDestroyNotify,
+    cancel_tile: Option<CustomGeometrySourceTileDelegate>,
+    cancel_user_data: *mut c_void,
+    cancel_destroy_notify: GDestroyNotify,
+}
+
+unsafe extern "C" fn custom_geometry_fetch_trampoline(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    let state = user_data.cast::<CustomGeometrySourceCallbackState>();
+    if state.is_null() {
+        return;
+    }
+    // SAFETY: state is retained by the owning MapHandle while native can invoke
+    // the source callback, and the stored delegate owns its Vala closure.
+    unsafe { ((*state).fetch_tile)(tile_id, (*state).fetch_user_data) };
+}
+
+unsafe extern "C" fn custom_geometry_cancel_trampoline(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    let state = user_data.cast::<CustomGeometrySourceCallbackState>();
+    if state.is_null() {
+        return;
+    }
+    // SAFETY: state is retained by the owning MapHandle while native can invoke
+    // the source callback, and the stored delegate owns its Vala closure.
+    if let Some(cancel_tile) = unsafe { (*state).cancel_tile } {
+        unsafe { cancel_tile(tile_id, (*state).cancel_user_data) };
+    }
+}
 
 struct ResourceTransformState {
     callback: ResourceTransformCallback,
@@ -80,6 +122,7 @@ pub struct MapHandle {
     native: *mut sys::mln_map,
     runtime: *mut RuntimeHandle,
     owner_thread: u64,
+    custom_geometry_callbacks: *mut Vec<*mut CustomGeometrySourceCallbackState>,
 }
 
 #[repr(C)]
@@ -1207,7 +1250,7 @@ pub extern "C" fn mln_vala_map_handle_camera_for_lat_lngs(
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_camera_for_geometry(
     handle: *mut MapHandle,
-    geometry: *const sys::mln_geometry,
+    geometry: *const Geometry,
     fit_options: *const sys::mln_camera_fit_options,
     out_camera: *mut sys::mln_camera_options,
     error_out: *mut *mut GError,
@@ -1560,7 +1603,7 @@ pub extern "C" fn mln_vala_map_handle_add_geojson_source_url(
 pub extern "C" fn mln_vala_map_handle_add_geojson_source_data(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    data: *const sys::mln_geojson,
+    data: *const GeoJson,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match add_geojson_source_data(handle, source_id, data) {
@@ -1592,7 +1635,7 @@ pub extern "C" fn mln_vala_map_handle_set_geojson_source_url(
 pub extern "C" fn mln_vala_map_handle_set_geojson_source_data(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    data: *const sys::mln_geojson,
+    data: *const GeoJson,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_geojson_source_data(handle, source_id, data) {
@@ -1747,11 +1790,43 @@ pub extern "C" fn mln_vala_map_handle_add_custom_geometry_source(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_custom_geometry_source_with_callbacks(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    fetch_tile: Option<CustomGeometrySourceTileDelegate>,
+    fetch_user_data: *mut c_void,
+    fetch_destroy_notify: GDestroyNotify,
+    cancel_tile: Option<CustomGeometrySourceTileDelegate>,
+    cancel_user_data: *mut c_void,
+    cancel_destroy_notify: GDestroyNotify,
+    options: *const sys::mln_custom_geometry_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_custom_geometry_source_with_callbacks(
+        handle,
+        source_id,
+        fetch_tile,
+        fetch_user_data,
+        fetch_destroy_notify,
+        cancel_tile,
+        cancel_user_data,
+        cancel_destroy_notify,
+        options,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_set_custom_geometry_source_tile_data(
     handle: *mut MapHandle,
     source_id: *const c_char,
     tile_id: *const sys::mln_canonical_tile_id,
-    data: *const sys::mln_geojson,
+    data: *const GeoJson,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_custom_geometry_source_tile_data(handle, source_id, tile_id, data) {
@@ -2222,7 +2297,7 @@ pub extern "C" fn mln_vala_map_handle_set_location_indicator_image_name(
 pub extern "C" fn mln_vala_map_handle_add_style_source_json(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    source_json: *const sys::mln_json_value,
+    source_json: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match add_style_source_json(handle, source_id, source_json) {
@@ -2237,7 +2312,7 @@ pub extern "C" fn mln_vala_map_handle_add_style_source_json(
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_add_style_layer_json(
     handle: *mut MapHandle,
-    layer_json: *const sys::mln_json_value,
+    layer_json: *const JsonValue,
     before_layer_id: *const c_char,
     error_out: *mut *mut GError,
 ) -> GBoolean {
@@ -2348,7 +2423,7 @@ pub extern "C" fn mln_vala_map_handle_get_style_layer_json(
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_set_style_light_json(
     handle: *mut MapHandle,
-    light_json: *const sys::mln_json_value,
+    light_json: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_style_light_json(handle, light_json) {
@@ -2364,7 +2439,7 @@ pub extern "C" fn mln_vala_map_handle_set_style_light_json(
 pub extern "C" fn mln_vala_map_handle_set_style_light_property(
     handle: *mut MapHandle,
     property_name: *const c_char,
-    value: *const sys::mln_json_value,
+    value: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_style_light_property(handle, property_name, value) {
@@ -2396,7 +2471,7 @@ pub extern "C" fn mln_vala_map_handle_set_layer_property(
     handle: *mut MapHandle,
     layer_id: *const c_char,
     property_name: *const c_char,
-    value: *const sys::mln_json_value,
+    value: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_layer_property(handle, layer_id, property_name, value) {
@@ -2428,7 +2503,7 @@ pub extern "C" fn mln_vala_map_handle_get_layer_property(
 pub extern "C" fn mln_vala_map_handle_set_layer_filter(
     handle: *mut MapHandle,
     layer_id: *const c_char,
-    filter: *const sys::mln_json_value,
+    filter: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_layer_filter(handle, layer_id, filter) {
@@ -2507,7 +2582,7 @@ pub extern "C" fn mln_vala_style_id_list_handle_close(handle: *mut StyleIdListHa
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_json_snapshot_handle_get(
     handle: *mut JsonSnapshotHandle,
-    out_value: *mut *const sys::mln_json_value,
+    out_value: *mut *mut JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match json_snapshot_get(handle, out_value) {
@@ -2973,23 +3048,23 @@ fn camera_for_lat_lngs(
 
 fn camera_for_geometry(
     handle: *mut MapHandle,
-    geometry: *const sys::mln_geometry,
+    geometry: *const Geometry,
     fit_options: *const sys::mln_camera_fit_options,
     out_camera: *mut sys::mln_camera_options,
 ) -> error::Result<()> {
-    if geometry.is_null() {
-        return Err(Error::invalid_argument("geometry is null"));
-    }
+    let geometry = values::geometry_ref(geometry)
+        .ok_or_else(|| Error::invalid_argument("geometry is null"))?;
     if out_camera.is_null() {
         return Err(Error::invalid_argument("camera output pointer is null"));
     }
     let map = map_native(handle)?;
+    let geometry = geometry.materialize()?;
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let mut camera = unsafe { sys::mln_camera_options_default() };
-    // SAFETY: `map` is live, geometry and fit options are borrowed for this
+    // SAFETY: `map` is live, geometry materializer owns native storage for this
     // call, and local output storage has the required size.
     error::check(unsafe {
-        sys::mln_map_camera_for_geometry(map, geometry, fit_options, &mut camera)
+        sys::mln_map_camera_for_geometry(map, geometry.as_ptr(), fit_options, &mut camera)
     })?;
     glib::clear_optional_out_pointer(out_camera, camera)
 }
@@ -3292,16 +3367,16 @@ fn add_geojson_source_url(
 fn add_geojson_source_data(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    data: *const sys::mln_geojson,
+    data: *const GeoJson,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
-    if data.is_null() {
-        return Err(Error::invalid_argument("GeoJSON data is null"));
-    }
+    let data = values::geojson_ref(data)
+        .ok_or_else(|| Error::invalid_argument("GeoJSON data is null"))?
+        .materialize()?;
     // SAFETY: `map` is live, source ID borrows a caller string for this call,
-    // and data is borrowed for this call. The C API copies accepted data.
-    error::check(unsafe { sys::mln_map_add_geojson_source_data(map, source_id, data) })
+    // and data materializer owns native storage for this call.
+    error::check(unsafe { sys::mln_map_add_geojson_source_data(map, source_id, data.as_ptr()) })
 }
 
 fn set_geojson_source_url(
@@ -3320,16 +3395,16 @@ fn set_geojson_source_url(
 fn set_geojson_source_data(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    data: *const sys::mln_geojson,
+    data: *const GeoJson,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
-    if data.is_null() {
-        return Err(Error::invalid_argument("GeoJSON data is null"));
-    }
+    let data = values::geojson_ref(data)
+        .ok_or_else(|| Error::invalid_argument("GeoJSON data is null"))?
+        .materialize()?;
     // SAFETY: `map` is live, source ID borrows a caller string for this call,
-    // and data is borrowed for this call. The C API copies accepted data.
-    error::check(unsafe { sys::mln_map_set_geojson_source_data(map, source_id, data) })
+    // and data materializer owns native storage for this call.
+    error::check(unsafe { sys::mln_map_set_geojson_source_data(map, source_id, data.as_ptr()) })
 }
 
 fn add_tile_source_url(
@@ -3419,26 +3494,103 @@ fn add_custom_geometry_source(
     error::check(unsafe { sys::mln_map_add_custom_geometry_source(map, source_id, options) })
 }
 
+#[allow(clippy::too_many_arguments)]
+fn add_custom_geometry_source_with_callbacks(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    fetch_tile: Option<CustomGeometrySourceTileDelegate>,
+    fetch_user_data: *mut c_void,
+    fetch_destroy_notify: GDestroyNotify,
+    cancel_tile: Option<CustomGeometrySourceTileDelegate>,
+    cancel_user_data: *mut c_void,
+    cancel_destroy_notify: GDestroyNotify,
+    options: *const sys::mln_custom_geometry_source_options,
+) -> error::Result<()> {
+    let Some(fetch_tile) = fetch_tile else {
+        return Err(Error::invalid_argument(
+            "custom geometry fetch delegate is null",
+        ));
+    };
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let mut native_options = if options.is_null() {
+        unsafe { sys::mln_custom_geometry_source_options_default() }
+    } else {
+        unsafe { *options }
+    };
+    let state = Box::into_raw(Box::new(CustomGeometrySourceCallbackState {
+        fetch_tile,
+        fetch_user_data,
+        fetch_destroy_notify,
+        cancel_tile,
+        cancel_user_data,
+        cancel_destroy_notify,
+    }));
+    native_options.fetch_tile = Some(custom_geometry_fetch_trampoline);
+    native_options.cancel_tile =
+        cancel_tile.map(|_| custom_geometry_cancel_trampoline as unsafe extern "C" fn(_, _));
+    native_options.user_data = state.cast::<c_void>();
+    let status =
+        unsafe { sys::mln_map_add_custom_geometry_source(map, source_id, &native_options) };
+    if let Err(error) = error::check(status) {
+        destroy_custom_geometry_state(state);
+        return Err(error);
+    }
+    unsafe {
+        let callbacks = (*handle).custom_geometry_callbacks;
+        if callbacks.is_null() {
+            destroy_custom_geometry_state(state);
+            return Err(Error::new(
+                maplibre_native_core::error::ErrorKind::InvalidState,
+                None,
+                "custom geometry callback list is not initialized",
+            ));
+        }
+        (*callbacks).push(state);
+    }
+    Ok(())
+}
+
+fn destroy_custom_geometry_state(state: *mut CustomGeometrySourceCallbackState) {
+    if state.is_null() {
+        return;
+    }
+    let state = unsafe { Box::from_raw(state) };
+    if let Some(destroy) = state.fetch_destroy_notify {
+        unsafe { destroy(state.fetch_user_data) };
+    }
+    if let Some(destroy) = state.cancel_destroy_notify {
+        unsafe { destroy(state.cancel_user_data) };
+    }
+}
+
+fn destroy_custom_geometry_callbacks(callbacks: *mut Vec<*mut CustomGeometrySourceCallbackState>) {
+    if callbacks.is_null() {
+        return;
+    }
+    let callbacks = unsafe { Box::from_raw(callbacks) };
+    for state in callbacks.into_iter() {
+        destroy_custom_geometry_state(state);
+    }
+}
+
 fn set_custom_geometry_source_tile_data(
     handle: *mut MapHandle,
     source_id: *const c_char,
     tile_id: *const sys::mln_canonical_tile_id,
-    data: *const sys::mln_geojson,
+    data: *const GeoJson,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
     if tile_id.is_null() {
         return Err(Error::invalid_argument("tile ID is null"));
     }
-    if data.is_null() {
-        return Err(Error::invalid_argument("GeoJSON data is null"));
-    }
-    // SAFETY: `map` is live, source ID borrows a caller string for this call,
-    // tile_id points to a caller-owned descriptor copied by value, and data is
-    // borrowed for this call.
+    let data = values::geojson_ref(data)
+        .ok_or_else(|| Error::invalid_argument("GeoJSON data is null"))?
+        .materialize()?;
     let tile_id = unsafe { *tile_id };
     error::check(unsafe {
-        sys::mln_map_set_custom_geometry_source_tile_data(map, source_id, tile_id, data)
+        sys::mln_map_set_custom_geometry_source_tile_data(map, source_id, tile_id, data.as_ptr())
     })
 }
 
@@ -3976,25 +4128,29 @@ fn get_style_layer_type(
 fn add_style_source_json(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    source_json: *const sys::mln_json_value,
+    source_json: *const JsonValue,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
     let source_json = json_value_native(source_json, "source JSON")?;
     // SAFETY: `map` is live and descriptors are borrowed for this call.
-    error::check(unsafe { sys::mln_map_add_style_source_json(map, source_id, source_json) })
+    error::check(unsafe {
+        sys::mln_map_add_style_source_json(map, source_id, source_json.as_ptr())
+    })
 }
 
 fn add_style_layer_json(
     handle: *mut MapHandle,
-    layer_json: *const sys::mln_json_value,
+    layer_json: *const JsonValue,
     before_layer_id: *const c_char,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let layer_json = json_value_native(layer_json, "layer JSON")?;
     let before_layer_id = string_view_from_c(before_layer_id, "before layer ID")?;
     // SAFETY: `map` is live and descriptors are borrowed for this call.
-    error::check(unsafe { sys::mln_map_add_style_layer_json(map, layer_json, before_layer_id) })
+    error::check(unsafe {
+        sys::mln_map_add_style_layer_json(map, layer_json.as_ptr(), before_layer_id)
+    })
 }
 
 fn get_style_layer_json(
@@ -4023,26 +4179,25 @@ fn get_style_layer_json(
     }
 }
 
-fn set_style_light_json(
-    handle: *mut MapHandle,
-    light_json: *const sys::mln_json_value,
-) -> error::Result<()> {
+fn set_style_light_json(handle: *mut MapHandle, light_json: *const JsonValue) -> error::Result<()> {
     let map = map_native(handle)?;
     let light_json = json_value_native(light_json, "style light JSON")?;
     // SAFETY: `map` is live and JSON is borrowed for this call.
-    error::check(unsafe { sys::mln_map_set_style_light_json(map, light_json) })
+    error::check(unsafe { sys::mln_map_set_style_light_json(map, light_json.as_ptr()) })
 }
 
 fn set_style_light_property(
     handle: *mut MapHandle,
     property_name: *const c_char,
-    value: *const sys::mln_json_value,
+    value: *const JsonValue,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let property_name = string_view_from_c(property_name, "style light property name")?;
     let value = json_value_native(value, "style light property value")?;
     // SAFETY: `map` is live and descriptors are borrowed for this call.
-    error::check(unsafe { sys::mln_map_set_style_light_property(map, property_name, value) })
+    error::check(unsafe {
+        sys::mln_map_set_style_light_property(map, property_name, value.as_ptr())
+    })
 }
 
 fn get_style_light_property(
@@ -4063,14 +4218,16 @@ fn set_layer_property(
     handle: *mut MapHandle,
     layer_id: *const c_char,
     property_name: *const c_char,
-    value: *const sys::mln_json_value,
+    value: *const JsonValue,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let layer_id = string_view_from_c(layer_id, "style layer ID")?;
     let property_name = string_view_from_c(property_name, "style layer property name")?;
     let value = json_value_native(value, "style layer property value")?;
     // SAFETY: `map` is live and descriptors are borrowed for this call.
-    error::check(unsafe { sys::mln_map_set_layer_property(map, layer_id, property_name, value) })
+    error::check(unsafe {
+        sys::mln_map_set_layer_property(map, layer_id, property_name, value.as_ptr())
+    })
 }
 
 fn get_layer_property(
@@ -4092,12 +4249,20 @@ fn get_layer_property(
 fn set_layer_filter(
     handle: *mut MapHandle,
     layer_id: *const c_char,
-    filter: *const sys::mln_json_value,
+    filter: *const JsonValue,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let filter = if filter.is_null() {
+        None
+    } else {
+        Some(json_value_native(filter, "style layer filter")?)
+    };
+    let filter_ptr = filter
+        .as_ref()
+        .map_or(ptr::null(), |filter| filter.as_ptr());
     // SAFETY: `map` is live and filter is nullable by contract.
-    error::check(unsafe { sys::mln_map_set_layer_filter(map, layer_id, filter) })
+    error::check(unsafe { sys::mln_map_set_layer_filter(map, layer_id, filter_ptr) })
 }
 
 fn get_layer_filter(
@@ -4203,13 +4368,12 @@ fn close_style_id_list(handle: *mut StyleIdListHandle) {
 }
 
 fn json_value_native(
-    value: *const sys::mln_json_value,
+    value: *const JsonValue,
     label: &str,
-) -> error::Result<*const sys::mln_json_value> {
-    if value.is_null() {
-        return Err(Error::invalid_argument(format!("{label} is null")));
-    }
-    Ok(value)
+) -> error::Result<maplibre_native_core::json::NativeJsonValue> {
+    values::json_ref(value)
+        .ok_or_else(|| Error::invalid_argument(format!("{label} is null")))?
+        .materialize()
 }
 
 fn wrap_nullable_json_snapshot(
@@ -4263,14 +4427,22 @@ fn json_snapshot_native(
 
 fn json_snapshot_get(
     handle: *mut JsonSnapshotHandle,
-    out_value: *mut *const sys::mln_json_value,
+    out_value: *mut *mut JsonValue,
 ) -> error::Result<()> {
     let native = json_snapshot_native(handle)?;
     if out_value.is_null() {
         return Err(Error::invalid_argument("JSON value output pointer is null"));
     }
+    let mut borrowed = ptr::null();
     // SAFETY: `native` is live and output storage is valid.
-    error::check(unsafe { sys::mln_json_snapshot_get(native, out_value) })
+    error::check(unsafe { sys::mln_json_snapshot_get(native, &mut borrowed) })?;
+    if borrowed.is_null() {
+        return glib::clear_optional_out_pointer(out_value, ptr::null_mut());
+    }
+    // SAFETY: borrowed JSON storage is valid while snapshot is live. Copy it
+    // into an owned boxed JsonValue before returning to Vala.
+    let value = unsafe { maplibre_native_core::json::json_value_from_native(&*borrowed) }?;
+    glib::clear_optional_out_pointer(out_value, Box::into_raw(Box::new(JsonValue { value })))
 }
 
 fn close_json_snapshot(handle: *mut JsonSnapshotHandle) {
@@ -4636,14 +4808,10 @@ unsafe extern "C" fn resource_provider_trampoline(
     // SAFETY: `state` is the installed provider state and remains valid for the
     // runtime lifetime. The callback must obey provider threading rules.
     let decision = unsafe { ((*state).callback)(request, handle, (*state).user_data) };
-    if decision != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
-        // SAFETY: Pass-through/invalid decisions leave request ownership with
-        // the C API. Disarm the temporary wrapper without releasing.
-        unsafe { resource_request_handle_disarm(handle) };
-    }
-    // The callback parameter is callback-duration borrowed in the Vala API. If
-    // the provider handled the request, finalizing the wrapper releases any
-    // native request still held after synchronous completion.
+    // SAFETY: Finalize provider ownership after the callback returns. Inline
+    // completion forces HANDLE even if the callback accidentally returns
+    // PASS_THROUGH, matching Rust/Java one-shot provider semantics.
+    let decision = unsafe { resource_request_handle_finish_provider_decision(handle, decision) };
     glib::unref_object(handle);
     decision
 }
@@ -5037,12 +5205,15 @@ fn poll_runtime_event(
     error::check(unsafe { sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event) })?;
 
     // SAFETY: `out_event` was null-checked above.
+    let copied_event = if has_event {
+        Some(RuntimeEvent::from_native(&event)?)
+    } else {
+        None
+    };
+
+    // SAFETY: `out_event` was null-checked above.
     unsafe {
-        *out_event = if has_event {
-            Box::into_raw(Box::new(RuntimeEvent::from_native(&event)))
-        } else {
-            ptr::null_mut()
-        };
+        *out_event = copied_event.map_or(ptr::null_mut(), |event| Box::into_raw(Box::new(event)));
     }
     Ok(())
 }
@@ -5166,6 +5337,7 @@ fn create_map_handle_with_options(
         (*handle).native = native;
         (*handle).runtime = glib::ref_object(runtime);
         (*handle).owner_thread = current_thread_token();
+        (*handle).custom_geometry_callbacks = Box::into_raw(Box::new(Vec::new()));
     }
     Ok(handle)
 }
@@ -5184,6 +5356,8 @@ fn close_map_handle(handle: *mut MapHandle) -> error::Result<()> {
     // SAFETY: `handle` was checked above.
     unsafe {
         (*handle).native = ptr::null_mut();
+        destroy_custom_geometry_callbacks((*handle).custom_geometry_callbacks);
+        (*handle).custom_geometry_callbacks = ptr::null_mut();
         glib::unref_object((*handle).runtime);
         (*handle).runtime = ptr::null_mut();
     }
@@ -5256,19 +5430,6 @@ mod tests {
         _user_data: *mut c_void,
         _tile_id: sys::mln_canonical_tile_id,
     ) {
-    }
-
-    fn point_geometry_fixture() -> sys::mln_geometry {
-        sys::mln_geometry {
-            size: std::mem::size_of::<sys::mln_geometry>() as u32,
-            type_: sys::MLN_GEOMETRY_TYPE_POINT,
-            data: sys::mln_geometry__bindgen_ty_1 {
-                point: sys::mln_lat_lng {
-                    latitude: 0.0,
-                    longitude: 0.0,
-                },
-            },
-        }
     }
 
     #[test]
@@ -5733,13 +5894,10 @@ mod tests {
         );
         assert_eq!(removed, GTRUE);
 
-        let geometry = point_geometry_fixture();
-        let geojson = sys::mln_geojson {
-            size: std::mem::size_of::<sys::mln_geojson>() as u32,
-            type_: sys::MLN_GEOJSON_TYPE_GEOMETRY,
-            data: sys::mln_geojson__bindgen_ty_1 {
-                geometry: &geometry,
-            },
+        let geojson = GeoJson {
+            value: maplibre_native_core::GeoJson::Geometry(maplibre_native_core::Geometry::Point(
+                maplibre_native_core::LatLng::new(0.0, 0.0),
+            )),
         };
         assert_eq!(
             mln_vala_map_handle_add_geojson_source_data(

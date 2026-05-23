@@ -1,8 +1,6 @@
 [CCode (has_target = false)]
 delegate void* MetalCreateSystemDefaultDeviceFunc();
 
-const uint32 RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
-
 GLib.Mutex log_lock;
 int log_first_count = 0;
 int log_second_count = 0;
@@ -106,12 +104,14 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
     response.status = MaplibreNative.ResourceResponseStatus.ERROR;
     response.error_reason = MaplibreNative.ResourceErrorReason.OTHER;
     response.error_message = "vala provider handled request";
-    handle.complete(response);
+    var retained = handle.retain_for_async();
+    retained.complete(response);
     try {
-      handle.complete(response);
+      retained.complete(response);
     } catch (GLib.Error second_error) {
       note_provider_second_complete_failed();
     }
+    retained.release();
     handle.release();
     handle.release();
     return MaplibreNative.ResourceProviderDecision.HANDLE;
@@ -120,12 +120,12 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
   }
 }
 
-bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, uint32 event_type, uint attempts) throws GLib.Error {
+bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, MaplibreNative.RuntimeEventType event_type, uint attempts) throws GLib.Error {
   for (uint attempt = 0; attempt < attempts; attempt++) {
     runtime.run_once();
     MaplibreNative.RuntimeEvent? event = null;
     runtime.poll_event(out event);
-    if (event != null && event.type == event_type) {
+    if (event != null && event.get_event_type() == event_type) {
       return true;
     }
   }
@@ -141,17 +141,17 @@ bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, 
     return true;
   }
 
+  MaplibreNative.NativePointer device_pointer;
+  MaplibreNative.NativePointer.@new((size_t) device, out device_pointer);
+
   MaplibreNative.MetalOwnedTextureDescriptor descriptor = {};
   descriptor.default();
-  descriptor.extent.width = 32;
-  descriptor.extent.height = 16;
-  descriptor.extent.scale_factor = 1.0;
-  descriptor.context.size = (uint32) sizeof(MaplibreNative.MetalContextDescriptor);
-  descriptor.context.device = device;
+  descriptor.extent.@set(32, 16, 1.0);
+  descriptor.context.set_device(device_pointer);
 
   var session = map.attach_metal_owned_texture(descriptor);
   map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":\"background\",\"paint\":{\"background-color\":\"#d8f1ff\"}}]}");
-  if (!wait_for_runtime_event(runtime, RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE, 64)) {
+  if (!wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE, 64)) {
     session.close();
     return false;
   }
@@ -244,8 +244,9 @@ void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue 
   bool found = false;
   var layer_json = map.get_style_layer_json("json-layer", out found);
   if (layer_json != null) {
-    unowned MaplibreNative.JsonValue root;
+    MaplibreNative.JsonValue root;
     layer_json.get(out root);
+    root.free();
     layer_json.close();
   }
   map.set_style_light_json(json);
@@ -266,23 +267,18 @@ void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue 
   }
 }
 
-void custom_geometry_tile_callback(void* callback_data, MaplibreNative.CanonicalTileId tile_id) {
-}
-
 void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Geometry geometry) throws GLib.Error {
   string source_id = "fixture-source";
-  MaplibreNative.GeoJson data = {};
-  data.size = (uint32) sizeof(MaplibreNative.GeoJson);
-  data.type = MaplibreNative.GeoJsonType.GEOMETRY;
-  data.data_geometry = geometry;
+  var data = new MaplibreNative.GeoJson.geometry(geometry);
   map.add_geojson_source_data(source_id, data);
   map.set_geojson_source_data(source_id, data);
 
   MaplibreNative.CustomGeometrySourceOptions options = {};
   options.default();
-  options.fetch_tile = custom_geometry_tile_callback;
-  options.cancel_tile = custom_geometry_tile_callback;
-  map.add_custom_geometry_source("custom-geometry-source", options);
+  int captured_fetch_count = 0;
+  map.add_custom_geometry_source_with_callbacks("custom-geometry-source", (tile_id) => {
+    captured_fetch_count++;
+  }, null, options);
   MaplibreNative.CanonicalTileId tile_id = { 0, 0, 0 };
   map.set_custom_geometry_source_tile_data("custom-geometry-source", tile_id, data);
   map.invalidate_custom_geometry_source_tile("custom-geometry-source", tile_id);
@@ -294,8 +290,6 @@ void exercise_feature_state(MaplibreNative.RenderSessionHandle session, Maplibre
   string source_id = "fixture-source";
   string feature_id = "feature-1";
   MaplibreNative.FeatureStateSelector selector = {};
-  selector.size = (uint32) sizeof(MaplibreNative.FeatureStateSelector);
-  selector.fields = MaplibreNative.FeatureStateSelectorFields.FEATURE_ID;
   selector.source_id = { source_id, source_id.length };
   selector.feature_id = { feature_id, feature_id.length };
   session.set_feature_state(selector, state);
@@ -406,10 +400,8 @@ int main(string[] args) {
     response.default();
     MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
     rendered_query_options.default();
-    rendered_query_options.fields = MaplibreNative.RenderedFeatureQueryOptionFields.LAYER_IDS;
     MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
     source_query_options.default();
-    source_query_options.fields = MaplibreNative.SourceFeatureQueryOptionFields.SOURCE_LAYER_IDS;
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ScreenPoint query_point = { 0.0, 0.0 };
@@ -427,7 +419,6 @@ int main(string[] args) {
 
     MaplibreNative.RuntimeOptions runtime_options = {};
     runtime_options.default();
-    runtime_options.flags = MaplibreNative.RuntimeOptionFlags.MAXIMUM_CACHE_SIZE;
     runtime_options.maximum_cache_size = 1024 * 1024;
     var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
     runtime.set_resource_provider(provide_resource);
@@ -439,7 +430,7 @@ int main(string[] args) {
     bool event_copy_matches = true;
     if (event != null) {
       var event_copy = event.copy();
-      event_copy_matches = event_copy.type == event.type && event_copy.source_type == event.source_type && event_copy.payload_type == event.payload_type && event_copy.code == event.code;
+      event_copy_matches = event_copy.get_event_type() == event.get_event_type() && event_copy.get_source_type() == event.get_source_type() && event_copy.get_payload_type() == event.get_payload_type() && event_copy.get_code() == event.get_code();
     }
 
     MaplibreNative.MapOptions map_options = {};

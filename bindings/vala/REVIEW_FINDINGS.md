@@ -213,3 +213,79 @@ Review artifacts:
 ### User-input-needed findings
 
 - None.
+
+## Round 6
+
+### Applied findings
+
+- Added boxed JSON, geometry, and GeoJSON value wrappers with Vala-visible
+  constructors, native materialization at call boundaries, and copied JSON
+  snapshot returns.
+- Hid public Vala descriptor `size` fields, field masks, backend raw pointer
+  fields, and struct byte-buffer pointer fields through vapigen metadata; added
+  semantic setters where needed for render descriptors, resource responses, and
+  copied resource request bytes.
+- Added `NativePointer` setter APIs for Metal and Vulkan render descriptor
+  backend handles while keeping raw `void*` out of generated VAPI descriptor
+  construction.
+- Reworked runtime events as opaque copied boxed values with typed
+  event/source/payload enums, raw diagnostic getters, copied message storage,
+  payload accessors, source `NativePointer`, and copied unknown payload bytes.
+- Strengthened resource-provider request handling with an explicit
+  `retain_for_async()` API and a decision-finalization state machine so inline
+  completion forces `HANDLE`, pass-through disarms the temporary wrapper, and
+  retained handles complete/release exactly once.
+- Added a captured-delegate custom geometry source registration API that stores
+  delegate closures in the owning map wrapper and releases destroy-notify state
+  on map close.
+- Updated the Vala compile fixture to construct JSON/geometry/GeoJSON through
+  wrappers, use typed runtime event accessors, exercise copied JSON snapshot
+  ownership, use `ResourceRequestHandle.retain_for_async()`, and keep render
+  descriptor backend handles behind `NativePointer` setters.
+- Regenerated GIR/VAPI from the scanner header and metadata.
+  `mise run //bindings/vala:ci` passes locally on macOS arm64 Metal.
+
+### Remaining validation notes
+
+- Local validation covered the macOS arm64 Metal profile. Linux x64/aarch64 Vala
+  CI is configured through `.github/config/variants.toml` for
+  `//bindings/vala:ci`; final Linux proof still depends on running the
+  configured GitHub Actions or a Linux host.
+
+## Round 6
+
+Review artifacts:
+
+- Active-session parity implementation notes for value/buffer and event/callback
+  clusters.
+
+### Applied findings
+
+- Added Vala-visible JSON, geometry, and GeoJSON boxed constructors that
+  materialize native value trees at the call boundary.
+- Hid descriptor `size` fields, field masks, and backend raw pointer fields from
+  generated VAPI; render descriptor setup now uses semantic defaults plus
+  `NativePointer` setters.
+- Replaced raw runtime-event fields with typed event/source/payload enums, raw
+  diagnostic getters, copied message access, and typed payload accessors.
+- Added `GLib.Bytes` access for resource request prior data, resource response
+  byte setters, async request-handle retention, and one-shot provider decision
+  finalization.
+- Added captured custom-geometry source delegate registration with
+  closure/destroy-notify metadata and map-scoped callback state retention.
+- Updated the Vala compile fixture to use typed event getters, boxed GeoJSON
+  construction, custom-geometry captured delegates, and `NativePointer` render
+  descriptor setters.
+- Confirmed local `mise run //bindings/vala:ci` passes on macOS arm64 Metal
+  after regeneration, Vala compile/runtime fixture execution, Rust tests, and
+  clippy.
+
+### Rejected or deferred findings
+
+- Linux validation still requires Linux runners or CI artifacts; this workspace
+  only confirms macOS arm64 Metal. Matrix evidence continues to show Vala
+  scheduled for Linux variants.
+
+### User-input-needed findings
+
+- None.

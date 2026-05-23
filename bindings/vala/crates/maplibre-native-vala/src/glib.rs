@@ -47,6 +47,11 @@ pub struct GError {
 }
 
 #[repr(C)]
+pub struct GBytes {
+    _private: [u8; 0],
+}
+
+#[repr(C)]
 struct GObjectClassPrefix {
     g_type: GType,
     construct_properties: *mut c_void,
@@ -72,6 +77,10 @@ unsafe extern "C" {
     fn g_error_new_literal(domain: GQuark, code: c_int, message: *const c_char) -> *mut GError;
     fn g_free(mem: *mut c_void);
     fn g_strndup(string: *const c_char, n: usize) -> *mut c_char;
+    fn g_bytes_new(data: *const c_void, size: usize) -> *mut GBytes;
+    fn g_bytes_get_data(bytes: *mut GBytes, size: *mut usize) -> *const c_void;
+    fn g_bytes_ref(bytes: *mut GBytes) -> *mut GBytes;
+    fn g_bytes_unref(bytes: *mut GBytes);
     fn g_boxed_type_register_static(
         name: *const c_char,
         boxed_copy: Option<unsafe extern "C" fn(*mut c_void) -> *mut c_void>,
@@ -289,6 +298,66 @@ pub unsafe fn free(mem: *mut c_void) {
     // SAFETY: The caller supplied memory allocated by GLib-compatible
     // allocation APIs and transfers it for release.
     unsafe { g_free(mem) }
+}
+
+pub fn bytes_new(bytes: &[u8]) -> *mut GBytes {
+    let data = if bytes.is_empty() {
+        ptr::null()
+    } else {
+        bytes.as_ptr().cast::<c_void>()
+    };
+    // SAFETY: GLib copies `size` bytes from `data` before returning. Null data
+    // is valid with zero size.
+    unsafe { g_bytes_new(data, bytes.len()) }
+}
+
+/// Adds one reference to a `GBytes` value.
+///
+/// # Safety
+///
+/// `bytes` must be null or a live `GBytes*` owned by GLib.
+pub unsafe fn bytes_ref(bytes: *mut GBytes) -> *mut GBytes {
+    if bytes.is_null() {
+        return ptr::null_mut();
+    }
+    // SAFETY: The caller supplied a live GBytes pointer.
+    unsafe { g_bytes_ref(bytes) }
+}
+
+/// Releases one reference from a `GBytes` value.
+///
+/// # Safety
+///
+/// `bytes` must be null or a live `GBytes*` owned by GLib.
+pub unsafe fn bytes_unref(bytes: *mut GBytes) {
+    if bytes.is_null() {
+        return;
+    }
+    // SAFETY: The caller transfers or releases one GBytes reference.
+    unsafe { g_bytes_unref(bytes) }
+}
+
+/// Copies a `GBytes` payload into a Rust vector.
+///
+/// # Safety
+///
+/// `bytes` must be null or a live `GBytes*` owned by GLib.
+pub unsafe fn bytes_to_vec(bytes: *mut GBytes) -> Result<Vec<u8>, Error> {
+    if bytes.is_null() {
+        return Ok(Vec::new());
+    }
+    let mut size = 0usize;
+    // SAFETY: The caller supplied a live GBytes pointer and size out storage.
+    let data = unsafe { g_bytes_get_data(bytes, &mut size) };
+    if size == 0 {
+        return Ok(Vec::new());
+    }
+    if data.is_null() {
+        return Err(Error::invalid_argument("GBytes data is null"));
+    }
+    // SAFETY: GBytes returns immutable data valid for `size` bytes while the
+    // GBytes remains live. Copy immediately.
+    Ok(unsafe { std::slice::from_raw_parts(data.cast::<u8>(), size) }.to_vec())
 }
 
 pub(crate) fn clear_optional_out_pointer<T>(out: *mut T, value: T) -> Result<(), Error> {

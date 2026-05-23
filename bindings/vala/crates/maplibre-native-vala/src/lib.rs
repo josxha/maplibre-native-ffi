@@ -15,6 +15,7 @@ pub mod query;
 pub mod render;
 pub mod resource;
 pub mod status;
+pub mod values;
 
 use glib::{GBoolean, GError, GFALSE, GTRUE};
 use maplibre_native_sys as sys;

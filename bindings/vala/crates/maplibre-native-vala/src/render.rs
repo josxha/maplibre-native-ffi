@@ -9,6 +9,7 @@ use maplibre_native_sys as sys;
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::handles::{self, JsonSnapshotHandle, MapHandle};
 use crate::native_pointer::NativePointer;
+use crate::values::{self, JsonValue};
 
 const RENDER_SESSION_TYPE_NAME: &CStr = c"MlnValaRenderSessionHandle";
 const METAL_FRAME_TYPE_NAME: &CStr = c"MlnValaMetalOwnedTextureFrameHandle";
@@ -209,6 +210,147 @@ pub extern "C" fn mln_vala_vulkan_borrowed_texture_descriptor_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_target_extent_set(
+    out_extent: *mut sys::mln_render_target_extent,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match glib::clear_optional_out_pointer(
+        out_extent,
+        sys::mln_render_target_extent {
+            size: std::mem::size_of::<sys::mln_render_target_extent>() as u32,
+            width,
+            height,
+            scale_factor,
+        },
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_context_descriptor_set_device(
+    descriptor: *mut sys::mln_metal_context_descriptor,
+    device: *const NativePointer,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_metal_context_device(descriptor, device) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_surface_descriptor_set_layer(
+    descriptor: *mut sys::mln_metal_surface_descriptor,
+    layer: *const NativePointer,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_native_pointer_field(
+        descriptor.cast(),
+        layer,
+        |descriptor: &mut sys::mln_metal_surface_descriptor, pointer| descriptor.layer = pointer,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_borrowed_texture_descriptor_set_texture(
+    descriptor: *mut sys::mln_metal_borrowed_texture_descriptor,
+    texture: *const NativePointer,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_native_pointer_field(
+        descriptor.cast(),
+        texture,
+        |descriptor: &mut sys::mln_metal_borrowed_texture_descriptor, pointer| {
+            descriptor.texture = pointer
+        },
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_context_descriptor_set_handles(
+    descriptor: *mut sys::mln_vulkan_context_descriptor,
+    instance: *const NativePointer,
+    physical_device: *const NativePointer,
+    device: *const NativePointer,
+    graphics_queue: *const NativePointer,
+    graphics_queue_family_index: u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_vulkan_context_handles(
+        descriptor,
+        instance,
+        physical_device,
+        device,
+        graphics_queue,
+        graphics_queue_family_index,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_surface_descriptor_set_surface(
+    descriptor: *mut sys::mln_vulkan_surface_descriptor,
+    surface: *const NativePointer,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_native_pointer_field(
+        descriptor.cast(),
+        surface,
+        |descriptor: &mut sys::mln_vulkan_surface_descriptor, pointer| descriptor.surface = pointer,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_borrowed_texture_descriptor_set_image_handles(
+    descriptor: *mut sys::mln_vulkan_borrowed_texture_descriptor,
+    image: *const NativePointer,
+    image_view: *const NativePointer,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_vulkan_borrowed_image_handles(descriptor, image, image_view) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_texture_image_info_default(
     out_info: *mut sys::mln_texture_image_info,
     error_out: *mut *mut GError,
@@ -349,7 +491,7 @@ pub extern "C" fn mln_vala_render_session_handle_render_update(
 pub extern "C" fn mln_vala_render_session_handle_set_feature_state(
     handle: *mut RenderSessionHandle,
     selector: *const sys::mln_feature_state_selector,
-    state: *const sys::mln_json_value,
+    state: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_feature_state(handle, selector, state) {
@@ -911,6 +1053,86 @@ fn session_call(
     error::check(call(session))
 }
 
+fn native_pointer_arg(
+    pointer: *const NativePointer,
+    name: &'static str,
+) -> error::Result<*mut std::ffi::c_void> {
+    if pointer.is_null() {
+        return Err(Error::invalid_argument(format!(
+            "{name} NativePointer is null"
+        )));
+    }
+    // SAFETY: pointer is non-null and points to a live boxed NativePointer.
+    Ok(unsafe { (*pointer).as_ptr() })
+}
+
+fn set_metal_context_device(
+    descriptor: *mut sys::mln_metal_context_descriptor,
+    device: *const NativePointer,
+) -> error::Result<()> {
+    if descriptor.is_null() {
+        return Err(Error::invalid_argument("MetalContextDescriptor is null"));
+    }
+    let device = native_pointer_arg(device, "device")?;
+    unsafe {
+        (*descriptor).device = device;
+    }
+    Ok(())
+}
+
+fn set_vulkan_context_handles(
+    descriptor: *mut sys::mln_vulkan_context_descriptor,
+    instance: *const NativePointer,
+    physical_device: *const NativePointer,
+    device: *const NativePointer,
+    graphics_queue: *const NativePointer,
+    graphics_queue_family_index: u32,
+) -> error::Result<()> {
+    if descriptor.is_null() {
+        return Err(Error::invalid_argument("VulkanContextDescriptor is null"));
+    }
+    unsafe {
+        (*descriptor).instance = native_pointer_arg(instance, "instance")?;
+        (*descriptor).physical_device = native_pointer_arg(physical_device, "physical device")?;
+        (*descriptor).device = native_pointer_arg(device, "device")?;
+        (*descriptor).graphics_queue = native_pointer_arg(graphics_queue, "graphics queue")?;
+        (*descriptor).graphics_queue_family_index = graphics_queue_family_index;
+    }
+    Ok(())
+}
+
+fn set_native_pointer_field<T>(
+    descriptor: *mut T,
+    pointer: *const NativePointer,
+    setter: impl FnOnce(&mut T, *mut std::ffi::c_void),
+) -> error::Result<()> {
+    if descriptor.is_null() {
+        return Err(Error::invalid_argument("render descriptor is null"));
+    }
+    let pointer = native_pointer_arg(pointer, "descriptor field")?;
+    unsafe {
+        setter(&mut *descriptor, pointer);
+    }
+    Ok(())
+}
+
+fn set_vulkan_borrowed_image_handles(
+    descriptor: *mut sys::mln_vulkan_borrowed_texture_descriptor,
+    image: *const NativePointer,
+    image_view: *const NativePointer,
+) -> error::Result<()> {
+    if descriptor.is_null() {
+        return Err(Error::invalid_argument(
+            "VulkanBorrowedTextureDescriptor is null",
+        ));
+    }
+    unsafe {
+        (*descriptor).image = native_pointer_arg(image, "image")?;
+        (*descriptor).image_view = native_pointer_arg(image_view, "image view")?;
+    }
+    Ok(())
+}
+
 fn resize(
     handle: *mut RenderSessionHandle,
     width: u32,
@@ -925,17 +1147,20 @@ fn resize(
 fn set_feature_state(
     handle: *mut RenderSessionHandle,
     selector: *const sys::mln_feature_state_selector,
-    state: *const sys::mln_json_value,
+    state: *const JsonValue,
 ) -> error::Result<()> {
     if selector.is_null() {
         return Err(Error::invalid_argument("feature state selector is null"));
     }
-    if state.is_null() {
-        return Err(Error::invalid_argument("feature state JSON is null"));
-    }
+    let state = values::json_ref(state)
+        .ok_or_else(|| Error::invalid_argument("feature state JSON is null"))?
+        .materialize()?;
     let session = session_native(handle)?;
-    // SAFETY: `session` is live; selector and state are borrowed for this call.
-    error::check(unsafe { sys::mln_render_session_set_feature_state(session, selector, state) })
+    // SAFETY: `session` is live; selector is borrowed and state materializer
+    // owns native JSON storage for this call.
+    error::check(unsafe {
+        sys::mln_render_session_set_feature_state(session, selector, state.as_ptr())
+    })
 }
 
 fn get_feature_state(

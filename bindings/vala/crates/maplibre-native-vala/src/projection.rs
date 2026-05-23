@@ -9,6 +9,7 @@ use maplibre_native_sys as sys;
 use crate::geo::{LatLng, ScreenPoint};
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::handles::{self, MapHandle};
+use crate::values::{self, Geometry};
 
 const PROJECTION_TYPE_NAME: &CStr = c"MlnValaMapProjectionHandle";
 
@@ -129,7 +130,7 @@ pub extern "C" fn mln_vala_map_projection_handle_set_visible_coordinates(
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_projection_handle_set_visible_geometry(
     handle: *mut MapProjectionHandle,
-    geometry: *const sys::mln_geometry,
+    geometry: *const Geometry,
     padding: *const sys::mln_edge_insets,
     error_out: *mut *mut GError,
 ) -> GBoolean {
@@ -293,20 +294,19 @@ fn set_visible_coordinates(
 
 fn set_visible_geometry(
     handle: *mut MapProjectionHandle,
-    geometry: *const sys::mln_geometry,
+    geometry: *const Geometry,
     padding: *const sys::mln_edge_insets,
 ) -> error::Result<()> {
-    if geometry.is_null() {
-        return Err(Error::invalid_argument("geometry is null"));
-    }
+    let geometry = values::geometry_ref(geometry)
+        .ok_or_else(|| Error::invalid_argument("geometry is null"))?
+        .materialize()?;
     if padding.is_null() {
         return Err(Error::invalid_argument("padding is null"));
     }
     let projection = projection_native(handle)?;
-    // SAFETY: `projection` is live, geometry and padding are borrowed for this call.
     let padding = unsafe { *padding };
     error::check(unsafe {
-        sys::mln_map_projection_set_visible_geometry(projection, geometry, padding)
+        sys::mln_map_projection_set_visible_geometry(projection, geometry.as_ptr(), padding)
     })
 }
 

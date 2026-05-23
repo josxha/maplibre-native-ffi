@@ -92,18 +92,20 @@ The Rust adapter implements the low-level GLib/GObject surface:
   operation controls, map lifecycle/style methods, debug option flags,
   rendering-stats controls, camera fit helpers including geometry fitting,
   camera commands, and map state option descriptors.
-- Runtime event polling copies event metadata and message bytes into a boxed
-  `RuntimeEvent` value.
+- Runtime event polling copies event metadata, message bytes, source pointer
+  bits, unknown payload bytes, and typed payload structs into a boxed
+  `RuntimeEvent` value with typed Vala accessors.
 - `RenderBackendFlags` and `NetworkStatus` expose typed Vala enum surfaces
   instead of raw integer masks/statuses.
 - `NativePointer` is a public boxed value that rejects null addresses and
   exposes only opaque address bits.
 - Logging severity/event enums, callback registration with destroy-notify
   replacement, and async severity-mask operations are exposed in generated Vala.
-- Resource response descriptors, resource transform/provider callbacks, offline
+- Resource response descriptors, safe response byte setters, resource request
+  prior-data byte accessors, resource transform/provider callbacks, offline
   operation create/start/status-result/snapshot/list info/discard helpers, and
-  `ResourceRequestHandle` one-shot completion/cancellation/release methods are
-  visible in generated Vala.
+  `ResourceRequestHandle` one-shot completion/cancellation/release/async-retain
+  methods are visible in generated Vala.
 - Basic style-source operations for GeoJSON URL and inline data sources,
   vector/raster/raster DEM tile source URL and inline tile sources, custom
   geometry sources, image sources, source metadata and attribution, source
@@ -111,14 +113,16 @@ The Rust adapter implements the low-level GLib/GObject surface:
   helper layers, style JSON/property/light/filter operations, basic style-layer
   lifecycle operations, and map coordinate conversion helpers are exposed
   through `MapHandle`.
-- Geographic value structs and projected-meter conversion helpers are visible in
+- Geographic value structs, boxed geometry/GeoJSON value builders, boxed JSON
+  value builders, and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with
   close-once lifecycle, camera, visible-coordinate/geometry fitting, and
   coordinate conversion methods.
 - `RenderSessionHandle` is registered as a GObject class with descriptor
-  defaults, render-target attach methods, feature-state JSON snapshot helpers,
-  readback helpers, texture frame handles, and basic session lifecycle methods.
+  defaults, `NativePointer` render-target descriptor setters, render-target
+  attach methods, feature-state JSON snapshot helpers, readback helpers, texture
+  frame handles, and basic session lifecycle methods.
 - Rendered/source feature query option descriptors, rendered query geometry
   constructors, queried feature views, feature query result handles, and feature
   extension result handles are exposed for Vala bindability.
@@ -283,16 +287,16 @@ completion.
 
 ### Boxed values and descriptors
 
-| Shared concept                      | GLib/Vala shape                                                                                                                                                   |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C option structs                    | Current low-level Vala structs mirror C fields and use default helpers; a future ergonomic wrapper pass may add mutable descriptor objects with explicit setters. |
-| C field masks                       | Current low-level Vala structs expose mask fields; future wrappers should keep presence state internal.                                                           |
-| copied coordinates and geometry     | Boxed values or compact structs where GIR/Vala preserves copying and ownership.                                                                                   |
-| JSON and GeoJSON                    | Current low-level Vala APIs accept C-shaped values; full GLib-friendly value-tree builders are deferred.                                                          |
-| runtime events                      | Copied event boxed values independent of the next native poll.                                                                                                    |
-| native result/list/snapshot handles | Internal guards copied into GLib-owned values before release.                                                                                                     |
-| backend `void*` handles             | `NativePointer` boxed values for frame accessors; current descriptor structs expose raw backend handles until a wrapper/setter pass.                              |
-| CPU images and bytes                | Caller-allocated buffer parameters expose Vala arrays; transparent C struct fields may still expose low-level pointer/length pairs until a wrapper pass.          |
+| Shared concept                      | GLib/Vala shape                                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| C option structs                    | Vala metadata hides ABI `size` fields and field masks; default helpers and setters initialize bookkeeping internally.                  |
+| C field masks                       | Vala callers use semantic defaults and setters; generated VAPI does not expose mask fields.                                            |
+| copied coordinates and geometry     | Boxed geometry values and compact coordinate structs preserve copying and ownership.                                                   |
+| JSON and GeoJSON                    | Boxed JSON, geometry, and GeoJSON constructors materialize native descriptor trees at the call boundary.                               |
+| runtime events                      | Copied event boxed values expose typed enums, raw diagnostic getters, and payload accessors independent of the next native poll.       |
+| native result/list/snapshot handles | Internal guards copied into GLib-owned values before release.                                                                          |
+| backend `void*` handles             | `NativePointer` boxed values are used for frame accessors and render descriptor setters.                                               |
+| CPU images and bytes                | Caller-allocated buffer parameters expose Vala arrays; resource request prior data and unknown event payloads use copied `GLib.Bytes`. |
 
 ### Concept groups
 
@@ -381,7 +385,7 @@ field-mask detail.
 | C bit masks and flags               | Vala `[Flags]` enums or typed flag wrappers; raw masks stay internal.                                  |
 | opaque long-lived native handles    | GObject `*Handle` classes with the shared lifetime rules.                                              |
 | opaque result/list/snapshot handles | Internal guards that copy to GLib-owned values before release.                                         |
-| option and descriptor structs       | Current low-level Vala structs plus default helpers; future wrappers may hide size and field masks.    |
+| option and descriptor structs       | Vala-visible defaults and setters hide size fields and field masks from generated VAPI callers.        |
 | copied value structs                | Boxed values, compact value types, arrays, or GLib containers according to GIR/Vala ownership support. |
 | callbacks                           | Vala delegates with closure and destroy-notify metadata.                                               |
 

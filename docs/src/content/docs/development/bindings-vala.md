@@ -66,14 +66,13 @@ source `MapHandle` for native validity after creation.
 
 Copied descriptors, events, snapshots, camera values, geometry values, and
 render metadata are GLib-friendly value objects where the current GIR/Vala layer
-can preserve the intended ownership. The first low-level surface may expose C
-option and descriptor structs directly with default helpers, including `size`,
-field masks, and backend handle fields. Higher-level descriptor wrappers may add
-explicit setters and hide ABI bookkeeping in a later pass.
+can preserve the intended ownership. Public Vala metadata hides ABI `size`
+fields, field masks, and backend pointer fields. Default helpers and setter
+methods initialize those ABI details inside the adapter.
 
 `NativePointer` is a boxed value for borrowed backend-native addresses. It wraps
 a non-null `void*`, grants no memory access, and transfers no ownership. Use it
-for frame accessors and future descriptor wrappers where the C API already
+for frame accessors and render descriptor setters where the C API already
 accepts or returns opaque backend handles.
 
 ## Errors, Metadata, and Ownership
@@ -114,10 +113,12 @@ dispatch internally. Native `MLN_STATUS_WRONG_THREAD` becomes
 GLib adapters may add `GMainContext` dispatch or async APIs; this layer keeps
 native thread identity visible.
 
-Runtime event polling returns copied GLib/Vala values. Signals may mirror events
-as a convenience only while the owner thread explicitly drains the runtime event
-queue. A signal must not imply background pumping, main-loop ownership, or UI
-thread handoff.
+Runtime event polling returns copied GLib/Vala values. Event objects expose
+typed event, source, payload, render-mode, and tile-operation enums plus payload
+accessors. Raw getters preserve forward-compatible native values for
+diagnostics. Signals may mirror events as a convenience only while the owner
+thread explicitly drains the runtime event queue. A signal must not imply
+background pumping, main-loop ownership, or UI thread handoff.
 
 Callback adapters keep closures, destroy notifies, and user data alive for the
 native owner scope. Native upcalls may arrive on worker, network, logging, or
@@ -128,20 +129,19 @@ and must not cross native frames.
 
 Resource-provider callbacks receive request fields and request handles for the
 callback duration. Matching requests complete or release the C request handle
-exactly once at that boundary. Pass-through requests return immediately and do
-not retain the native handle. Higher-level adapters may add asynchronous
-retention when the C API allows it. Custom geometry callbacks stay map/style
-scoped, track active upcalls, and hand work to the map owner thread before
-calling thread-affine map APIs.
+exactly once. `ResourceRequestHandle.retain_for_async()` makes later completion
+explicit when the C API allows it; retained handles still enforce one-shot
+completion and exactly-once release. Pass-through requests return immediately
+and do not retain the native handle. Custom geometry callbacks use captured Vala
+delegates retained by the map/source scope and hand work to the map owner thread
+before calling thread-affine map APIs.
 
 ## Rendering and Memory
 
 `RenderSessionHandle` represents one attached render target for one map and
-keeps the map wrapper alive. Current low-level surface and borrowed-texture
-descriptors may mirror the C ABI with raw backend handle fields; callers keep
-those backend objects valid and synchronized for the C API's documented
-lifetime. Future descriptor wrappers should use `NativePointer` for those
-fields.
+keeps the map wrapper alive. Render-target and borrowed-texture descriptors use
+`NativePointer` setters for backend-native handles; callers keep those backend
+objects valid and synchronized for the C API's documented lifetime.
 
 Session-owned texture targets expose explicit frame handles. A frame handle
 keeps the native frame acquired, exposes copied metadata and scoped
@@ -151,8 +151,9 @@ updates, resize, detach, and session destruction while a frame is active.
 
 Temporary native storage lives for one adapter call. Native result, snapshot,
 and list handles stay private; internal guards copy data into GLib-owned values
-and release native handles on every exit path. Large reusable readback storage
-may use GLib bytes or an explicit native buffer type with deterministic release.
+and release native handles on every exit path. Struct-owned byte buffers use
+Vala arrays or `GLib.Bytes`; large reusable readback storage may use GLib bytes
+or an explicit native buffer type with deterministic release.
 
 ## Testing
 

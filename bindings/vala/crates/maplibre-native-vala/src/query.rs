@@ -6,6 +6,7 @@ use maplibre_native_sys as sys;
 
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::render::{self, RenderSessionHandle};
+use crate::values::{self, JsonValue};
 
 const FEATURE_QUERY_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureQueryResultHandle";
 const FEATURE_EXTENSION_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureExtensionResultHandle";
@@ -157,7 +158,7 @@ pub extern "C" fn mln_vala_render_session_handle_query_feature_extensions(
     feature: *const sys::mln_feature,
     extension: *const c_char,
     extension_field: *const c_char,
-    arguments: *const sys::mln_json_value,
+    arguments: *const JsonValue,
     error_out: *mut *mut GError,
 ) -> *mut FeatureExtensionResultHandle {
     match query_feature_extensions(
@@ -342,23 +343,21 @@ fn query_feature_extensions(
     feature: *const sys::mln_feature,
     extension: *const c_char,
     extension_field: *const c_char,
-    arguments: *const sys::mln_json_value,
+    arguments: *const JsonValue,
 ) -> error::Result<*mut FeatureExtensionResultHandle> {
     if feature.is_null() {
         return Err(Error::invalid_argument("feature descriptor is null"));
     }
-    if arguments.is_null() {
-        return Err(Error::invalid_argument(
-            "feature extension arguments are null",
-        ));
-    }
+    let arguments = values::json_ref(arguments)
+        .ok_or_else(|| Error::invalid_argument("feature extension arguments are null"))?
+        .materialize()?;
     let session = render::session_native(session)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
     let extension = string_view_from_c(extension, "feature extension name")?;
     let extension_field = string_view_from_c(extension_field, "feature extension field")?;
     let mut result = ptr::null_mut();
-    // SAFETY: `session` is live, descriptors and string views are borrowed for
-    // this call, and result output storage is valid.
+    // SAFETY: `session` is live, materializers own descriptor storage for this
+    // call, and result output storage is valid.
     error::check(unsafe {
         sys::mln_render_session_query_feature_extensions(
             session,
@@ -366,7 +365,7 @@ fn query_feature_extensions(
             feature,
             extension,
             extension_field,
-            arguments,
+            arguments.as_ptr(),
             &mut result,
         )
     })?;
