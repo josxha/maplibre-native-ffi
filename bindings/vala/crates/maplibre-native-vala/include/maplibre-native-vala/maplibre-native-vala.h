@@ -1937,6 +1937,60 @@ gboolean mln_vala_map_handle_add_raster_dem_source_url(
 );
 
 /**
+ * mln_vala_map_handle_add_vector_source_tiles:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @tiles: (array length=tile_count): tile URL views.
+ * @tile_count: number of tile URL views.
+ * @options: (not nullable): tile source options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_vector_source_tiles(
+  MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
+  size_t tile_count, const MlnValaStyleTileSourceOptions* options,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_add_raster_source_tiles:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @tiles: (array length=tile_count): tile URL views.
+ * @tile_count: number of tile URL views.
+ * @options: (not nullable): tile source options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_raster_source_tiles(
+  MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
+  size_t tile_count, const MlnValaStyleTileSourceOptions* options,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_add_raster_dem_source_tiles:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @tiles: (array length=tile_count): tile URL views.
+ * @tile_count: number of tile URL views.
+ * @options: (not nullable): tile source options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_raster_dem_source_tiles(
+  MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
+  size_t tile_count, const MlnValaStyleTileSourceOptions* options,
+  GError** error
+);
+
+/**
  * mln_vala_map_handle_style_source_exists:
  * @self: a map handle.
  * @source_id: (not nullable): source identifier.

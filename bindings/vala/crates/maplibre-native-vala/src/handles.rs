@@ -1211,6 +1211,81 @@ pub extern "C" fn mln_vala_map_handle_add_raster_dem_source_url(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_vector_source_tiles(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tiles: *const sys::mln_string_view,
+    tile_count: usize,
+    options: *const sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_tile_source_tiles(
+        handle,
+        source_id,
+        tiles,
+        tile_count,
+        options,
+        TileSourceKind::Vector,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_raster_source_tiles(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tiles: *const sys::mln_string_view,
+    tile_count: usize,
+    options: *const sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_tile_source_tiles(
+        handle,
+        source_id,
+        tiles,
+        tile_count,
+        options,
+        TileSourceKind::Raster,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_raster_dem_source_tiles(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tiles: *const sys::mln_string_view,
+    tile_count: usize,
+    options: *const sys::mln_style_tile_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_tile_source_tiles(
+        handle,
+        source_id,
+        tiles,
+        tile_count,
+        options,
+        TileSourceKind::RasterDem,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_style_source_exists(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -2477,6 +2552,43 @@ fn add_tile_source_url(
             }
             TileSourceKind::RasterDem => {
                 sys::mln_map_add_raster_dem_source_url(map, source_id, url, options)
+            }
+        }
+    };
+    error::check(status)
+}
+
+fn add_tile_source_tiles(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tiles: *const sys::mln_string_view,
+    tile_count: usize,
+    options: *const sys::mln_style_tile_source_options,
+    kind: TileSourceKind,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if tiles.is_null() {
+        return Err(Error::invalid_argument("tile URLs are null"));
+    }
+    if options.is_null() {
+        return Err(Error::invalid_argument(
+            "style tile source options are null",
+        ));
+    }
+    // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
+    // tiles points to caller-owned string views borrowed for this call, and
+    // options points to caller-owned options borrowed for this call.
+    let status = unsafe {
+        match kind {
+            TileSourceKind::Vector => {
+                sys::mln_map_add_vector_source_tiles(map, source_id, tiles, tile_count, options)
+            }
+            TileSourceKind::Raster => {
+                sys::mln_map_add_raster_source_tiles(map, source_id, tiles, tile_count, options)
+            }
+            TileSourceKind::RasterDem => {
+                sys::mln_map_add_raster_dem_source_tiles(map, source_id, tiles, tile_count, options)
             }
         }
     };
@@ -3779,6 +3891,81 @@ mod tests {
             mln_vala_map_handle_remove_style_source(
                 map,
                 c"vector-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let vector_tile_url = c"asset://vector/{z}/{x}/{y}.pbf";
+        let vector_tiles = [sys::mln_string_view {
+            data: vector_tile_url.as_ptr(),
+            size: vector_tile_url.to_bytes().len(),
+        }];
+        assert_eq!(
+            mln_vala_map_handle_add_vector_source_tiles(
+                map,
+                c"vector-tiles-source".as_ptr(),
+                vector_tiles.as_ptr(),
+                vector_tiles.len(),
+                &tile_options,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"vector-tiles-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let raster_tile_url = c"asset://raster/{z}/{x}/{y}.png";
+        let raster_tiles = [sys::mln_string_view {
+            data: raster_tile_url.as_ptr(),
+            size: raster_tile_url.to_bytes().len(),
+        }];
+        assert_eq!(
+            mln_vala_map_handle_add_raster_source_tiles(
+                map,
+                c"raster-tiles-source".as_ptr(),
+                raster_tiles.as_ptr(),
+                raster_tiles.len(),
+                &tile_options,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"raster-tiles-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let dem_tile_url = c"asset://dem/{z}/{x}/{y}.png";
+        let dem_tiles = [sys::mln_string_view {
+            data: dem_tile_url.as_ptr(),
+            size: dem_tile_url.to_bytes().len(),
+        }];
+        assert_eq!(
+            mln_vala_map_handle_add_raster_dem_source_tiles(
+                map,
+                c"dem-tiles-source".as_ptr(),
+                dem_tiles.as_ptr(),
+                dem_tiles.len(),
+                &tile_options,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"dem-tiles-source".as_ptr(),
                 &mut removed,
                 ptr::null_mut(),
             ),
