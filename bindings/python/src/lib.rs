@@ -1381,6 +1381,145 @@ impl MapHandle {
         unsafe { maplibre_core::style::copy_style_id_list(ptr) }.map_err(map_error)
     }
 
+    fn add_hillshade_layer(
+        &self,
+        layer_id: String,
+        source_id: String,
+        before_layer_id: Option<String>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
+        // SAFETY: The C API validates the map pointer and borrowed layer/source ID views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_hillshade_layer(
+                state.as_ptr(),
+                layer_id.raw(),
+                source_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn add_color_relief_layer(
+        &self,
+        layer_id: String,
+        source_id: String,
+        before_layer_id: Option<String>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
+        // SAFETY: The C API validates the map pointer and borrowed layer/source ID views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_color_relief_layer(
+                state.as_ptr(),
+                layer_id.raw(),
+                source_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn add_location_indicator_layer(
+        &self,
+        layer_id: String,
+        before_layer_id: Option<String>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
+        // SAFETY: The C API validates the map pointer and borrowed layer ID views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_location_indicator_layer(
+                state.as_ptr(),
+                layer_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn set_location_indicator_location(
+        &self,
+        layer_id: String,
+        latitude: f64,
+        longitude: f64,
+        altitude: f64,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer, layer ID, coordinate, and altitude.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_location_indicator_location(
+                state.as_ptr(),
+                layer_id.raw(),
+                sys::mln_lat_lng {
+                    latitude,
+                    longitude,
+                },
+                altitude,
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn set_location_indicator_bearing(&self, layer_id: String, bearing: f64) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer, layer ID, and bearing.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_location_indicator_bearing(state.as_ptr(), layer_id.raw(), bearing)
+        })
+        .map_err(map_error)
+    }
+
+    fn set_location_indicator_accuracy_radius(
+        &self,
+        layer_id: String,
+        radius: f64,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer, layer ID, and radius.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_location_indicator_accuracy_radius(
+                state.as_ptr(),
+                layer_id.raw(),
+                radius,
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn set_location_indicator_image_name(
+        &self,
+        layer_id: String,
+        image_kind: u32,
+        image_id: String,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let image_id = maplibre_core::string::string_view(&image_id);
+        // SAFETY: The C API validates the map pointer, layer ID, image kind, and image ID.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_location_indicator_image_name(
+                state.as_ptr(),
+                layer_id.raw(),
+                image_kind,
+                image_id.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
     fn remove_style_layer(&self, layer_id: String) -> PyResult<bool> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);

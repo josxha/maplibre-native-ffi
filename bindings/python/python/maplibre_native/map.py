@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         CustomGeometrySourceOptions,
         StyleImage,
         StyleImageInfo,
+        LocationIndicatorImageKind,
         StyleImageOptions,
         StyleSourceInfo,
         StyleSourceType,
@@ -549,6 +550,71 @@ class MapHandle:
     def list_style_source_ids(self) -> tuple[str, ...]:
         """Return style source IDs in style order."""
         return tuple(self._native.list_style_source_ids())
+
+    def add_hillshade_layer(
+        self,
+        layer_id: str,
+        source_id: str,
+        before_layer_id: str | None = None,
+    ) -> None:
+        """Add a hillshade layer for a raster DEM source."""
+        self._native.add_hillshade_layer(layer_id, source_id, before_layer_id)
+
+    def add_color_relief_layer(
+        self,
+        layer_id: str,
+        source_id: str,
+        before_layer_id: str | None = None,
+    ) -> None:
+        """Add a color-relief layer for a raster DEM source."""
+        self._native.add_color_relief_layer(layer_id, source_id, before_layer_id)
+
+    def add_location_indicator_layer(
+        self,
+        layer_id: str,
+        before_layer_id: str | None = None,
+    ) -> None:
+        """Add a source-free location indicator layer."""
+        self._native.add_location_indicator_layer(layer_id, before_layer_id)
+
+    def set_location_indicator_location(
+        self,
+        layer_id: str,
+        coordinate: LatLng,
+        altitude: float,
+    ) -> None:
+        """Set a location indicator layer location."""
+        self._native.set_location_indicator_location(
+            layer_id,
+            coordinate.latitude,
+            coordinate.longitude,
+            altitude,
+        )
+
+    def set_location_indicator_bearing(self, layer_id: str, bearing: float) -> None:
+        """Set a location indicator layer bearing in degrees."""
+        self._native.set_location_indicator_bearing(layer_id, bearing)
+
+    def set_location_indicator_accuracy_radius(
+        self,
+        layer_id: str,
+        radius: float,
+    ) -> None:
+        """Set a location indicator layer accuracy radius in logical pixels."""
+        self._native.set_location_indicator_accuracy_radius(layer_id, radius)
+
+    def set_location_indicator_image_name(
+        self,
+        layer_id: str,
+        image_kind: LocationIndicatorImageKind,
+        image_id: str,
+    ) -> None:
+        """Set one location indicator image-name property."""
+        self._native.set_location_indicator_image_name(
+            layer_id,
+            image_kind.native_code,
+            image_id,
+        )
 
     def remove_style_layer(self, layer_id: str) -> bool:
         """Remove a style layer by ID and report whether it existed."""

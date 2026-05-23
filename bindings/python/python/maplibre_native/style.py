@@ -150,6 +150,19 @@ class StyleImage:
         )
 
 
+class LocationIndicatorImageKind(IntEnum):
+    """Location indicator image-name properties."""
+
+    TOP = 0
+    BEARING = 1
+    SHADOW = 2
+
+    @property
+    def native_code(self) -> int:
+        """Return the C enum value for this image property slot."""
+        return int(self)
+
+
 class CustomGeometrySourceEventType(IntEnum):
     """Custom geometry source callback event kind."""
 
@@ -227,6 +240,7 @@ __all__ = [
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "LocationIndicatorImageKind",
     "RasterDemEncoding",
     "StyleImage",
     "StyleImageInfo",

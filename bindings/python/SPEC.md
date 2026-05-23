@@ -118,8 +118,9 @@ The current implementation includes these completed slices:
 - `MapHandle` exposes GeoJSON source URL insertion plus vector, raster, and
   raster DEM style source URL/inline-tile insertion, source removal, existence
   checks, type/info lookup, attribution copying, and source ID listing.
-- `MapHandle` exposes style layer removal, existence checks, type lookup, ID
-  listing, and layer reordering.
+- `MapHandle` exposes built-in hillshade, color-relief, and location-indicator
+  layer insertion, location-indicator property setters, style layer removal,
+  existence checks, type lookup, ID listing, and layer reordering.
 - `MapHandle` exposes runtime style image set, removal, existence checks,
   metadata lookup, and premultiplied RGBA8 copying.
 - `MapHandle` exposes image source URL/inline-image insertion, URL/image

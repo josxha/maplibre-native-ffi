@@ -374,6 +374,42 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
             assert map_handle.remove_style_image("marker") is False
 
 
+def test_builtin_style_layers_and_location_indicator_public_api() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            map_handle.add_raster_dem_source_url(
+                "dem",
+                "https://example.test/dem.json",
+                style.TileSourceOptions(
+                    tile_size=512,
+                    raster_dem_encoding=style.RasterDemEncoding.MAPBOX,
+                ),
+            )
+            map_handle.add_hillshade_layer("hillshade", "dem")
+            map_handle.add_color_relief_layer("relief", "dem")
+            map_handle.add_location_indicator_layer("location")
+            map_handle.set_location_indicator_location(
+                "location",
+                geo.LatLng(1.0, 2.0),
+                3.0,
+            )
+            map_handle.set_location_indicator_bearing("location", 45.0)
+            map_handle.set_location_indicator_accuracy_radius("location", 5.0)
+            map_handle.set_location_indicator_image_name(
+                "location",
+                style.LocationIndicatorImageKind.TOP,
+                "marker",
+            )
+
+            assert map_handle.get_style_layer_type("hillshade") == "hillshade"
+            assert map_handle.get_style_layer_type("relief") == "color-relief"
+            assert map_handle.get_style_layer_type("location") == "location-indicator"
+            assert map_handle.remove_style_layer("hillshade") is True
+            assert map_handle.remove_style_layer("relief") is True
+            assert map_handle.remove_style_layer("location") is True
+
+
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
     style_json = """
     {
