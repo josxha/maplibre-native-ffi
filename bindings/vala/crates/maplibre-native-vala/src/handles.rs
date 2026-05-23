@@ -4510,6 +4510,13 @@ fn set_style_url(handle: *mut MapHandle, url: *const std::ffi::c_char) -> error:
     if url.is_null() {
         return Err(Error::invalid_argument("style URL is null"));
     }
+    if unsafe { has_custom_geometry_callbacks(handle) } {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "set_style_url is unavailable while custom geometry callbacks are registered; remove the source, replace with inline style JSON, or close the map first",
+        ));
+    }
     // SAFETY: `url` is a caller-provided NUL-terminated string pointer and
     // `map_native` returns a live map pointer. The C API copies the input.
     error::check(unsafe { sys::mln_map_set_style_url(map, url) })
@@ -4787,6 +4794,17 @@ fn destroy_custom_geometry_callbacks(callbacks: *mut Vec<*mut CustomGeometrySour
     for state in callbacks.into_iter() {
         destroy_custom_geometry_state(state);
     }
+}
+
+unsafe fn has_custom_geometry_callbacks(handle: *mut MapHandle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    let callbacks = unsafe { (*handle).custom_geometry_callbacks };
+    if callbacks.is_null() {
+        return false;
+    }
+    !unsafe { &*callbacks }.is_empty()
 }
 
 unsafe fn destroy_all_custom_geometry_callbacks(handle: *mut MapHandle) {
@@ -7293,6 +7311,54 @@ mod tests {
         assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn custom_geometry_callbacks_block_url_style_replacement() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let destroy_count = AtomicUsize::new(0);
+        assert_eq!(
+            mln_vala_map_handle_add_custom_geometry_source_with_callbacks(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                Some(counted_custom_geometry_tile_delegate),
+                &destroy_count as *const AtomicUsize as *mut c_void,
+                Some(counted_custom_geometry_destroy_notify),
+                None,
+                ptr::null_mut(),
+                None,
+                ptr::null(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_map_handle_set_style_url(map, c"asset://style.json".as_ptr(), &mut error),
+            GFALSE
+        );
+        assert!(!error.is_null());
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 0);
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
         assert_eq!(
             mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
             GTRUE

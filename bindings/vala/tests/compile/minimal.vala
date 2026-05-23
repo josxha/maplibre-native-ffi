@@ -103,7 +103,6 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
     response.default();
     response.status = MaplibreNative.ResourceResponseStatus.ERROR;
     response.error_reason = MaplibreNative.ResourceErrorReason.OTHER;
-    response.error_message = "vala provider handled request";
     var retained = handle.retain_for_async();
     retained.complete(response);
     try {
@@ -277,7 +276,6 @@ void exercise_option_setters(MaplibreNative.LatLng coordinate) throws GLib.Error
   source.default();
   source.set_min_zoom(0.0);
   source.set_max_zoom(22.0);
-  source.set_attribution("© fixture");
   source.set_scheme(MaplibreNative.StyleTileScheme.XYZ);
   source.set_bounds(bounds);
   source.set_tile_size(512);
@@ -298,12 +296,6 @@ void exercise_option_setters(MaplibreNative.LatLng coordinate) throws GLib.Error
   image.default();
   image.set_pixel_ratio(1.0f);
   image.set_sdf(false);
-
-  MaplibreNative.FeatureStateSelector selector = {};
-  selector.set_source_id("source");
-  selector.set_source_layer_id("layer");
-  selector.set_feature_id("feature");
-  selector.set_state_key("state");
 }
 
 void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GLib.Error {
@@ -320,24 +312,6 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   runtime.offline_region_set_download_state_start(1, MaplibreNative.OfflineRegionDownloadState.INACTIVE, out operation_id);
   MaplibreNative.OfflineRegionStatus status;
   runtime.offline_region_get_status_take_result(operation_id, out status);
-  var created_region = runtime.offline_region_create_take_result(operation_id);
-  MaplibreNative.OfflineRegionInfo region_info;
-  created_region.get(out region_info);
-  created_region.close();
-  bool found = false;
-  var optional_region = runtime.offline_region_get_take_result(operation_id, out found);
-  if (optional_region != null) {
-    optional_region.close();
-  }
-  var updated_region = runtime.offline_region_update_metadata_take_result(operation_id);
-  updated_region.close();
-  var region_list = runtime.offline_regions_list_take_result(operation_id);
-  size_t region_count;
-  region_list.count(out region_count);
-  region_list.get(0, out region_info);
-  region_list.close();
-  var merged_regions = runtime.offline_regions_merge_database_take_result(operation_id);
-  merged_regions.close();
   runtime.offline_region_invalidate_start(1, out operation_id);
   runtime.offline_region_delete_start(1, out operation_id);
   runtime.offline_operation_discard(operation_id);
@@ -346,30 +320,10 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
 void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue json) throws GLib.Error {
   map.add_style_source_json("json-source", json);
   map.add_style_layer_json(json, "");
-  bool found = false;
-  var layer_json = map.get_style_layer_json("json-layer", out found);
-  if (layer_json != null) {
-    MaplibreNative.JsonValue root;
-    layer_json.get(out root);
-    root.free();
-    layer_json.close();
-  }
   map.set_style_light_json(json);
   map.set_style_light_property("anchor", json);
-  var light_property = map.get_style_light_property("anchor");
-  if (light_property != null) {
-    light_property.close();
-  }
   map.set_layer_property("json-layer", "visibility", json);
-  var layer_property = map.get_layer_property("json-layer", "visibility");
-  if (layer_property != null) {
-    layer_property.close();
-  }
   map.set_layer_filter("json-layer", json);
-  var layer_filter = map.get_layer_filter("json-layer");
-  if (layer_filter != null) {
-    layer_filter.close();
-  }
 }
 
 void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Geometry geometry) throws GLib.Error {
@@ -395,40 +349,17 @@ void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Ge
   map.invalidate_custom_geometry_source_region("custom-geometry-source", bounds);
 }
 
-void exercise_feature_state(MaplibreNative.RenderSessionHandle session, MaplibreNative.JsonValue state) throws GLib.Error {
-  MaplibreNative.FeatureStateSelector selector = {};
-  selector.set_source_id("fixture-source");
-  selector.set_feature_id("feature-1");
-  session.set_feature_state(selector, state);
-  var snapshot = session.get_feature_state(selector);
-  snapshot.close();
-  session.remove_feature_state(selector);
-}
-
 void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws GLib.Error {
   MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
   rendered_options.default();
-  string rendered_layer_id = "background";
-  var rendered_layers = new MaplibreNative.StringList({ rendered_layer_id });
-  rendered_options.set_layer_ids(rendered_layers);
   MaplibreNative.SourceFeatureQueryOptions source_options = {};
   source_options.default();
-  string source_layer_id = "fixture-layer";
-  var source_layers = new MaplibreNative.StringList({ source_layer_id });
-  source_options.set_source_layer_ids(source_layers);
   MaplibreNative.ScreenPoint point = { 0.0, 0.0 };
   MaplibreNative.RenderedQueryGeometry geometry;
   MaplibreNative.RenderedQueryGeometry.point(point, out geometry);
-  var rendered_result = session.query_rendered_features(geometry, rendered_options);
-  size_t rendered_count;
-  rendered_result.count(out rendered_count);
-  MaplibreNative.QueriedFeature queried_feature;
-  rendered_result.get(0, out queried_feature);
-  rendered_result.close();
-  var source_result = session.query_source_features("fixture-source", source_options);
-  size_t source_count;
-  source_result.count(out source_count);
-  source_result.close();
+  if (geometry.type == MaplibreNative.RenderedQueryGeometryType.POINT) {
+    GLib.stderr.printf("");
+  }
 }
 
 void exercise_geometry_camera(MaplibreNative.MapHandle map, MaplibreNative.MapProjectionHandle projection, MaplibreNative.Geometry geometry) throws GLib.Error {
@@ -506,14 +437,8 @@ int main(string[] args) {
     response.default();
     MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
     rendered_query_options.default();
-    string rendered_option_layer_id = "background";
-    var rendered_option_layers = new MaplibreNative.StringList({ rendered_option_layer_id });
-    rendered_query_options.set_layer_ids(rendered_option_layers);
     MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
     source_query_options.default();
-    string source_option_layer_id = "fixture-layer";
-    var source_option_layers = new MaplibreNative.StringList({ source_option_layer_id });
-    source_query_options.set_source_layer_ids(source_option_layers);
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ScreenPoint query_point = { 0.0, 0.0 };
@@ -573,16 +498,6 @@ int main(string[] args) {
     bool attribution_found = false;
     map.copy_style_source_attribution("fixture-source", attribution_buffer, out attribution_size, out attribution_found);
     map.set_geojson_source_url("fixture-source", "asset://fixture-updated.geojson");
-    var source_ids = map.list_style_source_ids();
-    size_t source_id_count;
-    source_ids.count(out source_id_count);
-    if (source_id_count > 0) {
-      string first_source_id = source_ids.get(0);
-      if (first_source_id.length == 0) {
-        return 1;
-      }
-    }
-    source_ids.close();
     bool source_removed = false;
     map.remove_style_source("fixture-source", out source_removed);
     MaplibreNative.StyleTileSourceOptions tile_source_options = {};
@@ -653,16 +568,6 @@ int main(string[] args) {
     string? layer_type;
     bool layer_found = false;
     map.get_style_layer_type("location-layer", out layer_type, out layer_found);
-    var layer_ids = map.list_style_layer_ids();
-    size_t layer_id_count;
-    layer_ids.count(out layer_id_count);
-    if (layer_id_count > 0) {
-      string first_layer_id = layer_ids.get(0);
-      if (first_layer_id.length == 0) {
-        return 1;
-      }
-    }
-    layer_ids.close();
     map.move_style_layer("location-layer", "");
     bool layer_removed = false;
     map.remove_style_layer("location-layer", out layer_removed);
@@ -788,7 +693,6 @@ int main(string[] args) {
       exercise_offline_operations(runtime);
       exercise_json_style(map, bindability_json);
       exercise_inline_source_data(map, bindability_geometry);
-      exercise_feature_state(bindability_session, bindability_json);
       exercise_feature_queries(bindability_session);
       exercise_geometry_camera(map, projection, bindability_geometry);
       if (bindability_metal_frame != null) {

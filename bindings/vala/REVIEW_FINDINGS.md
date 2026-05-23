@@ -601,3 +601,55 @@ Review artifacts:
 - `mise run //bindings/vala:test -- feature_state_selector_setters_initialize_hidden_size`
 - `mise run //bindings/vala:test -- custom_geometry_destroy_waits_for_in_flight_callback`
 - `git diff --check 6bb8bd6..HEAD`
+
+## Round 16
+
+Review artifacts:
+
+- `review-loop/api-decisions-initial-audit.md`
+- `handoff/vala-api-decisions-context.md`
+
+### Applied findings
+
+- Hid native result/list/snapshot handle classes and methods from the generated
+  Vala, sanitized GIR, and typelib-derived GIR surfaces, including feature query
+  results, feature extension results, JSON snapshots, offline region snapshots
+  and lists, and style ID lists.
+- Hid public weak string fields from generated surfaces, including resource
+  request/response string fields, runtime option paths, and offline definition
+  style URLs.
+- Hid the raw `OfflineRegionDefinition.data` union from generated GIR and VAPI
+  review artifacts so future GI-facing surfaces do not expose the anonymous C
+  union shape.
+- Extended `check_generated_surfaces.py` to fail on public weak strings,
+  result/list/snapshot handles, raw offline definition union data, and the newly
+  hidden string fields.
+- Changed `set_style_url()` to reject URL style replacement while custom
+  geometry callbacks are registered, preventing an async URL-style replacement
+  path from violating callback lifetime policy until a fuller load-state
+  coordination API exists.
+- Hid public setter methods that depended on global sidecar descriptor string
+  storage for feature-state selectors, query option string lists, and style tile
+  source attribution.
+- Updated the Vala compile fixture to exercise only the currently public
+  convention-compliant surfaces.
+
+### Rejected or deferred findings
+
+- Full owned replacement APIs for the hidden result/list/snapshot and descriptor
+  surfaces remain future implementation work; the pre-merge public surface no
+  longer exposes the convention-breaking handles or lifetime hazards.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- `mise run //bindings/vala:generate`
+- `mise run //bindings/vala:compile-tests`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`
+- `mise run //bindings/vala:ci`
+- `mise run fix`
+- `mise run test`

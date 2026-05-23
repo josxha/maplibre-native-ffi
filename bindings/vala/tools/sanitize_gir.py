@@ -63,7 +63,10 @@ def sanitize_child(
     for child in list(parent):
         child_tag = local_name(child)
         child_name = child.attrib.get("name")
-        if child_tag in {"field", "union"} and child_name in owner_fields:
+        if (
+            child_tag in {"field", "union", "method", "function"}
+            and child_name in owner_fields
+        ):
             parent.remove(child)
             continue
         if child_tag in {"method", "function"} and child_name in METHOD_SKIP.get(
