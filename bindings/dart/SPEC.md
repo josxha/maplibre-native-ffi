@@ -399,8 +399,34 @@ behavior.
    binding conventions before implementing arbitrary-thread callback APIs.
 7. Implement resource transforms/providers, custom geometry callbacks, and
    offline operation handles through the native-shim owner-isolate handoff plan.
-8. Add examples and generated API reference integration after package artifact
-   policy is chosen.
+8. Deferred until package artifact policy is chosen: example applications,
+   generated API reference integration, package publication metadata, Flutter
+   integration, and platform UI adapters. These items sit above the core Dart
+   binding layer covered by this spec.
+
+## Final in-scope status
+
+The Dart binding covers the in-scope C ABI areas listed in the coverage map:
+process globals, logging, runtime/resources, offline operations, map lifecycle,
+style loading, camera/map options, projection, query, render sessions, surface
+and texture targets, style sources/layers/images/properties, resource providers,
+and custom geometry callbacks. Public APIs expose Dart handles, descriptors,
+value objects, copied results, typed-data payloads, and explicit close paths;
+generated declarations, raw C structs, `size` fields, and native callback
+trampolines remain internal.
+
+The callback handoff strategy is implemented for landed arbitrary-thread slices:
+native shim entry points copy log and resource request payloads, route work to
+`NativeCallable.listener` owner-isolate listeners, contain exceptions, and
+return immediate C decisions. Resource URL transforms use native-owned
+synchronous rewrite rules. Resource providers use copied request records and
+one-shot request handles. Custom geometry fetch and cancel notifications are
+retained for the source lifetime and later tile-data submission uses
+owner-thread map APIs.
+
+Deferred items are out of scope for this package layer: package distribution
+policy, generated API reference publishing, standalone examples, Flutter
+integration, platform UI work, and adapters above the low-level Dart binding.
 
 ## Completion checklist
 
