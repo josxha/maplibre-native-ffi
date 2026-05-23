@@ -431,6 +431,30 @@ class MapHandle:
         """Return style source IDs in style order."""
         return tuple(self._native.list_style_source_ids())
 
+    def remove_style_layer(self, layer_id: str) -> bool:
+        """Remove a style layer by ID and report whether it existed."""
+        return self._native.remove_style_layer(layer_id)
+
+    def style_layer_exists(self, layer_id: str) -> bool:
+        """Return whether a style layer ID exists."""
+        return self._native.style_layer_exists(layer_id)
+
+    def get_style_layer_type(self, layer_id: str) -> str | None:
+        """Return a style layer type string, or None when the layer is missing."""
+        return self._native.get_style_layer_type(layer_id)
+
+    def list_style_layer_ids(self) -> tuple[str, ...]:
+        """Return style layer IDs in style order."""
+        return tuple(self._native.list_style_layer_ids())
+
+    def move_style_layer(
+        self,
+        layer_id: str,
+        before_layer_id: str | None = None,
+    ) -> None:
+        """Move one style layer before another layer or to the top."""
+        self._native.move_style_layer(layer_id, before_layer_id)
+
     def create_projection(self) -> MapProjectionHandle:
         """Create a standalone projection helper from the current map transform."""
         return MapProjectionHandle(self._native.create_projection())

@@ -206,6 +206,39 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert "points" not in map_handle.list_style_source_ids()
 
 
+def test_style_layer_metadata_move_and_removal_public_api() -> None:
+    style_json = """
+    {
+      "version": 8,
+      "sources": {},
+      "layers": [
+        {"id": "background-a", "type": "background"},
+        {"id": "background-b", "type": "background"}
+      ]
+    }
+    """
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json(style_json)
+
+            layer_ids = map_handle.list_style_layer_ids()
+            assert "background-a" in layer_ids
+            assert "background-b" in layer_ids
+            assert layer_ids.index("background-a") < layer_ids.index("background-b")
+            assert map_handle.style_layer_exists("background-a") is True
+            assert map_handle.style_layer_exists("missing") is False
+            assert map_handle.get_style_layer_type("background-a") == "background"
+            assert map_handle.get_style_layer_type("missing") is None
+
+            map_handle.move_style_layer("background-b", "background-a")
+            layer_ids = map_handle.list_style_layer_ids()
+            assert layer_ids.index("background-b") < layer_ids.index("background-a")
+
+            assert map_handle.remove_style_layer("background-b") is True
+            assert map_handle.remove_style_layer("background-b") is False
+            assert "background-b" not in map_handle.list_style_layer_ids()
+
+
 def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
     viewport = map_module.MapViewportOptions(
         north_orientation=map_module.NorthOrientation.RIGHT,

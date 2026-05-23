@@ -117,6 +117,8 @@ The current implementation includes these completed slices:
   loaded-state queries, viewport options, and tile options.
 - `MapHandle` exposes style source URL insertion, removal, existence checks,
   type/info lookup, attribution copying, and source ID listing.
+- `MapHandle` exposes style layer removal, existence checks, type lookup, ID
+  listing, and layer reordering.
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
 - `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes

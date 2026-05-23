@@ -1138,6 +1138,82 @@ impl MapHandle {
         unsafe { maplibre_core::style::copy_style_id_list(ptr) }.map_err(map_error)
     }
 
+    fn remove_style_layer(&self, layer_id: String) -> PyResult<bool> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut removed = false;
+        // SAFETY: The C API validates the map pointer, layer ID view, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_remove_style_layer(state.as_ptr(), layer_id.raw(), &mut removed)
+        })
+        .map_err(map_error)?;
+        Ok(removed)
+    }
+
+    fn style_layer_exists(&self, layer_id: String) -> PyResult<bool> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut exists = false;
+        // SAFETY: The C API validates the map pointer, layer ID view, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_style_layer_exists(state.as_ptr(), layer_id.raw(), &mut exists)
+        })
+        .map_err(map_error)?;
+        Ok(exists)
+    }
+
+    fn get_style_layer_type(&self, layer_id: String) -> PyResult<Option<String>> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut layer_type = sys::mln_string_view {
+            data: ptr::null(),
+            size: 0,
+        };
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer, layer ID view, and out pointers.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_layer_type(
+                state.as_ptr(),
+                layer_id.raw(),
+                &mut layer_type,
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+        // SAFETY: The returned layer type view is static/live for this call and copied immediately.
+        unsafe { maplibre_core::string::copy_string_view(layer_type) }
+            .map(Some)
+            .map_err(map_error)
+    }
+
+    fn list_style_layer_ids(&self) -> PyResult<Vec<String>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_list_style_layer_ids(state.as_ptr(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let ptr = out.into_non_null("mln_style_id_list").map_err(map_error)?;
+        // SAFETY: ptr is an owned style ID list returned by native.
+        unsafe { maplibre_core::style::copy_style_id_list(ptr) }.map_err(map_error)
+    }
+
+    fn move_style_layer(&self, layer_id: String, before_layer_id: Option<String>) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
+        // SAFETY: The C API validates the map pointer and borrowed layer ID views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_move_style_layer(state.as_ptr(), layer_id.raw(), before_layer_id.raw())
+        })
+        .map_err(map_error)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_custom_geometry_source(
         &self,
