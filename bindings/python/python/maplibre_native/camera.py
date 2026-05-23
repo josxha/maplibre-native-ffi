@@ -118,6 +118,18 @@ class FreeCameraOptions:
     position: Vec3 | None = None
     orientation: Quaternion | None = None
 
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "FreeCameraOptions":
+        """Build free camera options from private native bridge values."""
+        position = raw["position"]
+        orientation = raw["orientation"]
+        return cls(
+            position=Vec3(**position) if isinstance(position, dict) else None,
+            orientation=Quaternion(**orientation)
+            if isinstance(orientation, dict)
+            else None,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ProjectionMode:
@@ -126,6 +138,15 @@ class ProjectionMode:
     axonometric: bool | None = None
     x_skew: float | None = None
     y_skew: float | None = None
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "ProjectionMode":
+        """Build projection mode options from private native bridge values."""
+        return cls(
+            axonometric=raw["axonometric"],
+            x_skew=raw["x_skew"],
+            y_skew=raw["y_skew"],
+        )
 
 
 __all__ = [

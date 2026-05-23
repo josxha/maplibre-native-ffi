@@ -12,7 +12,14 @@ from .camera import EdgeInsets
 from .runtime import RuntimeHandle
 
 if TYPE_CHECKING:
-    from .camera import AnimationOptions, CameraOptions, EdgeInsets, ScreenPoint
+    from .camera import (
+        AnimationOptions,
+        CameraOptions,
+        EdgeInsets,
+        FreeCameraOptions,
+        ProjectionMode,
+        ScreenPoint,
+    )
     from .geo import LatLng
     from .render import (
         MetalBorrowedTextureDescriptor,
@@ -905,6 +912,41 @@ class MapHandle:
     def cancel_transitions(self) -> None:
         """Cancel active camera transitions."""
         self._native.cancel_transitions()
+
+    def get_free_camera_options(self) -> FreeCameraOptions:
+        """Return the current free camera position and orientation."""
+        from .camera import FreeCameraOptions
+
+        return FreeCameraOptions.from_native(self._native.get_free_camera_options())
+
+    def set_free_camera_options(self, options: FreeCameraOptions) -> None:
+        """Apply selected free camera position and orientation fields."""
+        position = (
+            (options.position.x, options.position.y, options.position.z)
+            if options.position is not None
+            else None
+        )
+        orientation = (
+            (
+                options.orientation.x,
+                options.orientation.y,
+                options.orientation.z,
+                options.orientation.w,
+            )
+            if options.orientation is not None
+            else None
+        )
+        self._native.set_free_camera_options(position, orientation)
+
+    def get_projection_mode(self) -> ProjectionMode:
+        """Return the current axonometric rendering options."""
+        from .camera import ProjectionMode
+
+        return ProjectionMode.from_native(self._native.get_projection_mode())
+
+    def set_projection_mode(self, mode: ProjectionMode) -> None:
+        """Apply axonometric rendering option fields to the map."""
+        self._native.set_projection_mode(mode.axonometric, mode.x_skew, mode.y_skew)
 
     def add_custom_geometry_source(
         self,

@@ -1025,6 +1025,57 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn get_free_camera_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut options = unsafe { sys::mln_free_camera_options_default() };
+        // SAFETY: The C API validates the map pointer and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_free_camera_options(state.as_ptr(), &mut options)
+        })
+        .map_err(map_error)?;
+        free_camera_options_to_py(py, &options)
+    }
+
+    fn set_free_camera_options(
+        &self,
+        position: Option<(f64, f64, f64)>,
+        orientation: Option<(f64, f64, f64, f64)>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let options = free_camera_options_from_parts(position, orientation);
+        // SAFETY: The C API validates the map pointer and free camera fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_free_camera_options(state.as_ptr(), &options)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_projection_mode(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut mode = unsafe { sys::mln_projection_mode_default() };
+        // SAFETY: The C API validates the map pointer and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_projection_mode(state.as_ptr(), &mut mode)
+        })
+        .map_err(map_error)?;
+        projection_mode_to_py(py, &mode)
+    }
+
+    fn set_projection_mode(
+        &self,
+        axonometric: Option<bool>,
+        x_skew: Option<f64>,
+        y_skew: Option<f64>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let mode = projection_mode_from_parts(axonometric, x_skew, y_skew);
+        // SAFETY: The C API validates the map pointer and projection mode fields.
+        maplibre_core::check(unsafe { sys::mln_map_set_projection_mode(state.as_ptr(), &mode) })
+            .map_err(map_error)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_geojson_source_url(&self, source_id: String, url: String) -> PyResult<()> {
         let state = self.state();
@@ -3140,6 +3191,45 @@ fn tile_options_from_parts(
     raw
 }
 
+fn free_camera_options_from_parts(
+    position: Option<(f64, f64, f64)>,
+    orientation: Option<(f64, f64, f64, f64)>,
+) -> sys::mln_free_camera_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_free_camera_options_default() };
+    if let Some((x, y, z)) = position {
+        raw.fields |= sys::MLN_FREE_CAMERA_OPTION_POSITION;
+        raw.position = sys::mln_vec3 { x, y, z };
+    }
+    if let Some((x, y, z, w)) = orientation {
+        raw.fields |= sys::MLN_FREE_CAMERA_OPTION_ORIENTATION;
+        raw.orientation = sys::mln_quaternion { x, y, z, w };
+    }
+    raw
+}
+
+fn projection_mode_from_parts(
+    axonometric: Option<bool>,
+    x_skew: Option<f64>,
+    y_skew: Option<f64>,
+) -> sys::mln_projection_mode {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_projection_mode_default() };
+    if let Some(axonometric) = axonometric {
+        raw.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
+        raw.axonometric = axonometric;
+    }
+    if let Some(x_skew) = x_skew {
+        raw.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
+        raw.x_skew = x_skew;
+    }
+    if let Some(y_skew) = y_skew {
+        raw.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
+        raw.y_skew = y_skew;
+    }
+    raw
+}
+
 fn animation_options_from_parts(
     (duration_ms, velocity, min_zoom, easing): (
         Option<f64>,
@@ -3269,6 +3359,50 @@ fn tile_options_to_py(py: Python<'_>, options: &sys::mln_map_tile_options) -> Py
     dict.set_item(
         "lod_mode",
         (options.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0).then_some(options.lod_mode),
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn free_camera_options_to_py(
+    py: Python<'_>,
+    options: &sys::mln_free_camera_options,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    if options.fields & sys::MLN_FREE_CAMERA_OPTION_POSITION != 0 {
+        let position = PyDict::new(py);
+        position.set_item("x", options.position.x)?;
+        position.set_item("y", options.position.y)?;
+        position.set_item("z", options.position.z)?;
+        dict.set_item("position", position)?;
+    } else {
+        dict.set_item("position", py.None())?;
+    }
+    if options.fields & sys::MLN_FREE_CAMERA_OPTION_ORIENTATION != 0 {
+        let orientation = PyDict::new(py);
+        orientation.set_item("x", options.orientation.x)?;
+        orientation.set_item("y", options.orientation.y)?;
+        orientation.set_item("z", options.orientation.z)?;
+        orientation.set_item("w", options.orientation.w)?;
+        dict.set_item("orientation", orientation)?;
+    } else {
+        dict.set_item("orientation", py.None())?;
+    }
+    Ok(dict.into_any().unbind())
+}
+
+fn projection_mode_to_py(py: Python<'_>, mode: &sys::mln_projection_mode) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "axonometric",
+        (mode.fields & sys::MLN_PROJECTION_MODE_AXONOMETRIC != 0).then_some(mode.axonometric),
+    )?;
+    dict.set_item(
+        "x_skew",
+        (mode.fields & sys::MLN_PROJECTION_MODE_X_SKEW != 0).then_some(mode.x_skew),
+    )?;
+    dict.set_item(
+        "y_skew",
+        (mode.fields & sys::MLN_PROJECTION_MODE_Y_SKEW != 0).then_some(mode.y_skew),
     )?;
     Ok(dict.into_any().unbind())
 }

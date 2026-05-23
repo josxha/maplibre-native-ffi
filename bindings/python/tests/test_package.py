@@ -558,6 +558,25 @@ def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
             assert snapshot.padding == target.padding
 
 
+def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            free_camera = map_handle.get_free_camera_options()
+            assert isinstance(free_camera, camera.FreeCameraOptions)
+
+            projection = camera.ProjectionMode(
+                axonometric=True,
+                x_skew=0.1,
+                y_skew=0.2,
+            )
+            map_handle.set_projection_mode(projection)
+            snapshot = map_handle.get_projection_mode()
+
+            assert snapshot.axonometric is True
+            assert snapshot.x_skew == pytest.approx(0.1)
+            assert snapshot.y_skew == pytest.approx(0.2)
+
+
 def test_camera_transition_commands_accept_public_values() -> None:
     animation = camera.AnimationOptions(
         duration_ms=0.0,
