@@ -219,12 +219,7 @@ impl NativeMapHandle {
     #[napi]
     pub fn close(&self) -> Result<()> {
         unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)?;
-        if let Ok(mut sources) = self.custom_geometry_sources.lock() {
-            sources.clear();
-        }
-        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
-            retired_sources.clear();
-        }
+        self.clear_all_custom_geometry_source_state();
         Ok(())
     }
 
@@ -1670,14 +1665,18 @@ impl NativeMapHandle {
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;
         core::check(unsafe { sys::mln_map_set_style_json(self.state.as_ptr(), json.as_ptr()) })
-            .map_err(error::from_core)
+            .map_err(error::from_core)?;
+        self.clear_all_custom_geometry_source_state();
+        Ok(())
     }
 
     #[napi(js_name = "setStyleUrl")]
     pub fn set_style_url(&self, url: String) -> Result<()> {
         let url = c_string(url, "style URL")?;
         core::check(unsafe { sys::mln_map_set_style_url(self.state.as_ptr(), url.as_ptr()) })
-            .map_err(error::from_core)
+            .map_err(error::from_core)?;
+        self.retire_all_custom_geometry_sources();
+        Ok(())
     }
 }
 
@@ -2178,6 +2177,37 @@ impl NativeMapHandle {
             retired_sources.push(source);
         } else {
             Box::leak(source);
+        }
+    }
+
+    fn retire_all_custom_geometry_sources(&self) {
+        let sources = self.custom_geometry_sources.lock().map(|mut sources| {
+            sources
+                .drain()
+                .map(|(_, source)| source)
+                .collect::<Vec<_>>()
+        });
+        match sources {
+            Ok(sources) => {
+                for source in sources {
+                    self.retire_custom_geometry_source(source);
+                }
+            }
+            Err(_) => {
+                // If the active-source registry is poisoned, keep the map live
+                // and let Drop leak the native handle rather than free callback
+                // state whose native reachability is no longer knowable.
+                let _ = self.state.leak_for_report();
+            }
+        }
+    }
+
+    fn clear_all_custom_geometry_source_state(&self) {
+        if let Ok(mut sources) = self.custom_geometry_sources.lock() {
+            sources.clear();
+        }
+        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
+            retired_sources.clear();
         }
     }
 }

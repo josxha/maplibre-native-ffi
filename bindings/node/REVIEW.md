@@ -91,6 +91,8 @@ Review evidence:
   - FFI/lifetime review.
   - JavaScript/TypeScript API surface review.
   - SPEC/REVIEW/test adequacy review.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `mise run fix`, and `mise run //bindings/node:ci`.
 
 Applied findings:
 
@@ -123,3 +125,48 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Round 4
+
+Review evidence:
+
+- Ran three independent review agents after the Round 3 fixes:
+  - FFI/lifetime/render/resource safety review.
+  - JavaScript/TypeScript API, ESM/CJS, declaration, and test review.
+  - SPEC/REVIEW record-conformance review.
+- The JavaScript/TypeScript reviewer reported no remaining actionable findings.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `mise run fix`, and `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. Resource request completion removed the handle from the native registry
+   before response validation and native completion succeeded.
+   - Action: completion now validates the response and performs native
+     completion before removing the request handle from the registry, so
+     binding-owned validation errors leave the request retryable/closable.
+2. Resource-transform replacement URL storage grew without bound.
+   - Action: replacement URLs are now stored per callback thread and overwritten
+     on that thread's next transform result, preserving pointer validity for the
+     current C callback without retaining every past URL.
+3. Custom-geometry callback state was retained after style replacement removed
+   the native source.
+   - Action: successful inline `setStyleJson` clears custom-geometry callback
+     state because replacement has completed before return; successful
+     `setStyleUrl` retires active state conservatively until map close because
+     style loading is asynchronous.
+4. Round 3 validation evidence was missing from the review log.
+   - Action: Round 3 now records the formatter/fix/CI validation commands.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input:
+
+- A reviewer found that resource transform/provider callbacks currently block
+  native worker/network threads while waiting for JavaScript return values. The
+  repository's Node-binding design notes prefer native-owned routing/rewrite
+  rules and asynchronous JavaScript handoff instead. Changing this now would
+  alter the public callback API in `bindings/node/SPEC.md` and the implemented
+  low-level Node surface, so it needs an explicit scope/API decision before this
+  review loop can either redesign the callbacks or record the synchronous
+  callback API as an accepted limitation.

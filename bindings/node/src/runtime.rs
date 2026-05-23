@@ -4,6 +4,7 @@ use std::os::raw::c_char;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
+use std::thread::{self, ThreadId};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
@@ -134,7 +135,7 @@ static RESOURCE_REQUEST_HANDLES: OnceLock<
 
 struct ResourceTransformState {
     callback: ThreadsafeFunction<ResourceTransformRequest, Option<String>>,
-    replacements: Mutex<Vec<CString>>,
+    replacements: Mutex<HashMap<ThreadId, CString>>,
 }
 
 struct ResourceProviderState {
@@ -174,14 +175,19 @@ pub fn native_resource_request_complete(
     response: ResourceResponseInput,
 ) -> Result<()> {
     let handle_id = parse_resource_request_handle_id(&handle_id)?;
+    let response = resource_response_from_input(response)?;
     let handle = resource_request_handles()
         .lock()
         .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
-        .remove(&handle_id)
+        .get(&handle_id)
+        .cloned()
         .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
-    handle
-        .complete(&resource_response_from_input(response)?)
-        .map_err(error::from_core)
+    handle.complete(&response).map_err(error::from_core)?;
+    resource_request_handles()
+        .lock()
+        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
+        .remove(&handle_id);
+    Ok(())
 }
 
 #[napi(js_name = "nativeResourceRequestCancelled")]
@@ -263,7 +269,7 @@ impl NativeRuntimeHandle {
     ) -> Result<()> {
         let transform = Arc::new(ResourceTransformState {
             callback,
-            replacements: Mutex::new(Vec::new()),
+            replacements: Mutex::new(HashMap::new()),
         });
         let descriptor = core::resource::resource_transform_descriptor(
             Some(resource_transform_trampoline),
@@ -714,8 +720,9 @@ unsafe extern "C" fn resource_transform_trampoline(
     let Ok(mut replacements) = transform.replacements.lock() else {
         return sys::MLN_STATUS_OK;
     };
-    replacements.push(replacement);
-    if let Some(replacement) = replacements.last() {
+    let thread_id = thread::current().id();
+    replacements.insert(thread_id, replacement);
+    if let Some(replacement) = replacements.get(&thread_id) {
         unsafe {
             (*out_response).url = replacement.as_ptr();
         }
