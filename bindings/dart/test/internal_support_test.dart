@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
 import 'package:maplibre_native_ffi/src/internal/callback/callback_state.dart';
@@ -125,6 +126,21 @@ void main() {
 
       expect(closes, 1);
       expect(state.isClosed, isTrue);
+    });
+
+    test('owner isolate mismatch rejects use before native calls', () {
+      final state = NativeHandleState<_FakeNativeHandle>(
+        Pointer.fromAddress(0x1234),
+        'fake_handle',
+        ownerIsolateHash: Isolate.current.hashCode + 1,
+        leakReporting: false,
+      );
+
+      expect(() => state.pointer, throwsA(isA<WrongThreadException>()));
+      expect(
+        () => state.close((_) => nativeStatusOk, () => 'unused'),
+        throwsA(isA<WrongThreadException>()),
+      );
     });
 
     test('failed close leaves handle live for retry', () {

@@ -411,9 +411,12 @@ process globals, logging, runtime/resources, offline operations, map lifecycle,
 style loading, camera/map options, projection, query, render sessions, surface
 and texture targets, style sources/layers/images/properties, resource providers,
 and custom geometry callbacks. Public APIs expose Dart handles, descriptors,
-value objects, copied results, typed-data payloads, and explicit close paths;
-generated declarations, raw C structs, `size` fields, and native callback
-trampolines remain internal.
+value objects, copied results, typed-data payloads, and explicit close paths.
+Native handle state records owner-isolate identity, rejects detectable
+owner-isolate misuse before native calls, and attaches `NativeFinalizer` leak
+reporting tokens that report unclosed handles without running thread-affine
+cleanup from finalizers. Generated declarations, raw C structs, `size` fields,
+and native callback trampolines remain internal.
 
 The callback handoff strategy is implemented for landed arbitrary-thread slices:
 native shim entry points copy log and resource request payloads, route work to
@@ -428,10 +431,11 @@ submission uses owner-thread map APIs.
 
 Focused Dart tests cover actual queued resource provider invocation through the
 C ABI, one-shot request completion and post-release errors, provider exception
-containment, custom-geometry tile callback delivery through the native shim, and
-retained callback state release after queued/active upcalls drain. Native C and
-Zig tests continue to cover lower-level C ABI validation, including raw callback
-descriptor shapes and native-side failure paths.
+containment, custom-geometry tile callback delivery through the native shim,
+retained callback state release after queued/active upcalls drain, owner-isolate
+mismatch rejection, and close-once leak-finalizer detachment behavior. Native C
+and Zig tests continue to cover lower-level C ABI validation, including raw
+callback descriptor shapes and native-side failure paths.
 
 Deferred items are out of scope for this package layer: package distribution
 policy, generated API reference publishing, standalone examples, Flutter

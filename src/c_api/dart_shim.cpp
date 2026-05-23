@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <span>
@@ -92,6 +93,10 @@ struct DartLogRecordView {
 struct DartLogRecord {
   DartLogRecordView view{};
   std::string message;
+};
+
+struct DartHandleLeakToken {
+  std::string type_name;
 };
 
 auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
@@ -192,7 +197,44 @@ void destroy_log_record(DartLogRecordView* record) noexcept {
   static_cast<void>(std::unique_ptr<DartLogRecord>{owner});
 }
 
+void destroy_handle_leak_token(void* token) noexcept {
+  static_cast<void>(std::unique_ptr<DartHandleLeakToken>{
+    static_cast<DartHandleLeakToken*>(token),
+  });
+}
+
 }  // namespace
+
+extern "C" MLN_API auto mln_dart_handle_leak_token_create(
+  const char* type_name, void* handle
+) noexcept -> void* {
+  try {
+    auto token = std::make_unique<DartHandleLeakToken>();
+    static_cast<void>(handle);
+    token->type_name = type_name == nullptr ? std::string{} : type_name;
+    return token.release();
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+extern "C" MLN_API void mln_dart_handle_leak_token_destroy(
+  void* token
+) noexcept {
+  destroy_handle_leak_token(token);
+}
+
+extern "C" MLN_API void mln_dart_handle_leak_report(void* token) noexcept {
+  auto* leak = static_cast<DartHandleLeakToken*>(token);
+  if (leak != nullptr) {
+    const auto message = std::string{"maplibre_native_ffi: leaked "} +
+                         leak->type_name +
+                         " native handle; call close() on the owner isolate "
+                         "before releasing the Dart object\n";
+    static_cast<void>(std::fputs(message.c_str(), stderr));
+  }
+  destroy_handle_leak_token(token);
+}
 
 extern "C" MLN_API auto mln_dart_log_callback(
   void* user_data, std::uint32_t severity, std::uint32_t event,

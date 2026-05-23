@@ -60,7 +60,9 @@ and does not retain its source `MapHandle` for native validity.
 Use `NativeFinalizer` for leak reporting. Use a finalizer for cleanup only when
 the release function is documented as thread-independent, infallible, and safe
 after related objects finalize in any order. Thread-affine MapLibre handles flow
-through `close()` on their owner thread. Finalizer tokens never expose the raw
+through `close()` on their owner thread. The core handle state attaches a native
+leak-reporting token, detaches it after successful `close()`, and leaves native
+cleanup to explicit owner-thread calls. Finalizer tokens never expose the raw
 MapLibre handle directly to Dart code; store only the minimal native token or
 adapter state needed for leak reporting or a proven safe cleanup path.
 
@@ -86,11 +88,11 @@ wrong-thread exception carrying the copied diagnostic.
 
 Dart isolates are not OS threads and do not prove native owner-thread identity.
 Thread-affine handles are isolate-local binding objects: they are not serialized
-through ports, and internal adapter state rejects use from an isolate or owner
-scope that did not create the handle where Dart can detect it. Native
-wrong-thread validation remains the authoritative backstop. Higher-level
-adapters own request queues, owner-thread executors, isolate coordination, and
-Flutter scheduling.
+through ports, and internal adapter state stores the creating isolate identity
+and rejects use from an isolate or owner scope that did not create the handle
+where Dart can detect it. Native wrong-thread validation remains the
+authoritative backstop. Higher-level adapters own request queues, owner-thread
+executors, isolate coordination, and Flutter scheduling.
 
 Status-returning C calls either complete normally or throw a stable
 `MaplibreException` subclass. Errors store the mapped status category, raw
@@ -164,5 +166,5 @@ Test the Dart adaptation layer against real C calls when practical. Cover handle
 close semantics, parent retention, native diagnostic mapping, wrong-thread
 status propagation, string and typed-data copying, scoped frame invalidation,
 callback queue handoff, retained callback replacement, callback exception
-conversion, custom-geometry notification delivery, and one-shot resource request
-completion.
+conversion, custom-geometry notification delivery, owner-isolate misuse
+rejection, leak-finalizer detachment, and one-shot resource request completion.

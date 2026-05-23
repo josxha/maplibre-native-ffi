@@ -30,3 +30,11 @@ void checkNativeStatus(int statusCode, String Function() diagnostic) {
 Never throwInvalidArgument(String diagnostic) {
   throw MaplibreException.invalidArgument(diagnostic);
 }
+
+/// Reports Dart-side owner-isolate misuse before calling native code.
+Never throwWrongThread(String diagnostic) {
+  throw MaplibreException.forNativeStatusCode(
+    nativeStatusWrongThread,
+    diagnostic,
+  );
+}
