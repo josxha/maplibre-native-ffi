@@ -55,6 +55,17 @@ class OfflineRegionDownloadState(IntEnum):
         """Return the C enum value for this download state."""
         return int(self)
 
+    def native_code_for_set(self) -> int:
+        """Return the C enum value for setter calls, rejecting unknown values."""
+        if self.name.startswith("UNKNOWN_"):
+            from .errors import InvalidArgumentError
+
+            raise InvalidArgumentError(
+                None,
+                f"unknown offline region download state cannot be set: {int(self)}",
+            )
+        return int(self)
+
 
 class OfflineOperationKind(IntEnum):
     """Offline database operation kinds reported by completion events."""

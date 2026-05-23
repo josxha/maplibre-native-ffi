@@ -135,8 +135,12 @@ def to_python(value: JsonValue) -> Any:
     return value
 
 
-def _to_native_wire(value: JsonValue) -> Any:
-    """Convert an explicit JSON tree to private native-bridge wire values."""
+def _to_native_wire(value: Any) -> Any:
+    """Convert public JSON-like values to private native-bridge wire values.
+
+    Explicit Json* wrappers preserve duplicate keys and numeric shape. Ordinary
+    Python containers are accepted for public convenience APIs.
+    """
     if value is None or isinstance(value, bool | str):
         return value
     if isinstance(value, JsonUInt):
@@ -145,16 +149,32 @@ def _to_native_wire(value: JsonValue) -> Any:
         return {"type": "int", "value": value.value}
     if isinstance(value, JsonDouble):
         return {"type": "double", "value": value.value}
+    if isinstance(value, int):
+        return {"type": "int", "value": value}
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            msg = "JSON float values must be finite"
+            raise ValueError(msg)
+        return {"type": "double", "value": value}
     if isinstance(value, JsonArray):
         return {
             "type": "array",
             "values": [_to_native_wire(item) for item in value.values],
         }
+    if isinstance(value, list | tuple):
+        return {"type": "array", "values": [_to_native_wire(item) for item in value]}
     if isinstance(value, JsonObject):
         return {
             "type": "object",
             "members": [
                 (member.key, _to_native_wire(member.value)) for member in value.members
+            ],
+        }
+    if isinstance(value, dict):
+        return {
+            "type": "object",
+            "members": [
+                (str(key), _to_native_wire(item)) for key, item in value.items()
             ],
         }
     msg = f"unsupported JSON value: {type(value).__name__}"

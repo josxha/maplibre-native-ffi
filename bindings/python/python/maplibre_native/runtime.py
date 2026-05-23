@@ -415,7 +415,7 @@ class RuntimeHandle:
             self,
             self._native.offline_region_set_download_state_start(
                 region_id,
-                OfflineRegionDownloadState(state).native_code,
+                OfflineRegionDownloadState(state).native_code_for_set(),
             ),
         )
 

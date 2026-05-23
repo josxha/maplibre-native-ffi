@@ -402,17 +402,9 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
 
 
 def test_style_json_light_layer_property_and_filter_public_api() -> None:
-    background = json.from_python({"id": "json-background", "type": "background"})
-    circle = json.from_python(
-        {"id": "json-circle", "type": "circle", "source": "points"}
-    )
-    filter_value = json.json_array(
-        (
-            "==",
-            json.json_array(("get", "kind")),
-            "park",
-        )
-    )
+    background = {"id": "json-background", "type": "background"}
+    circle = {"id": "json-circle", "type": "circle", "source": "points"}
+    filter_value = ["==", ["get", "kind"], "park"]
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
@@ -428,8 +420,8 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
                 "#ff0000",
             )
             map_handle.set_layer_filter("json-circle", filter_value)
-            map_handle.set_style_light_json(json.from_python({"anchor": "viewport"}))
-            map_handle.set_style_light_property("intensity", json.json_double(0.5))
+            map_handle.set_style_light_json({"anchor": "viewport"})
+            map_handle.set_style_light_property("intensity", 0.5)
 
             layer_json = map_handle.get_style_layer_json("json-background")
             assert layer_json is not None
@@ -441,11 +433,17 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
             )
             assert isinstance(background_color, json.JsonArray)
             assert background_color.values[0] == "rgba"
-            assert map_handle.get_layer_filter("json-circle") == filter_value
+            assert (
+                json.to_python(map_handle.get_layer_filter("json-circle"))
+                == filter_value
+            )
             assert map_handle.get_style_light_property("anchor") == "viewport"
             assert map_handle.get_style_light_property("intensity") == json.json_double(
                 0.5
             )
+
+            with pytest.raises(ValueError, match="finite"):
+                map_handle.set_style_light_property("intensity", math.inf)
 
             map_handle.set_layer_filter("json-circle", None)
             assert map_handle.get_layer_filter("json-circle") is None
@@ -1255,6 +1253,10 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
     assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
     assert completed.operation_kind == offline.OfflineOperationKind.REGION_CREATE
     assert completed.result_kind == offline.OfflineOperationResultKind.REGION
+    unknown_state = offline.OfflineRegionDownloadState(999_001)
+    assert unknown_state.native_code == 999_001
+    with pytest.raises(mln.InvalidArgumentError, match="cannot be set"):
+        unknown_state.native_code_for_set()
     assert response_error.region_id == 8
     assert response_error.reason == resource.ResourceErrorReason.NOT_FOUND
     assert tile_limit.region_id == 9
@@ -1301,6 +1303,13 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
     assert selector.state_key == "hover"
     assert queried.source_id == "source"
     assert extension.feature_collection == (feature,)
+
+
+def test_feature_extension_result_preserves_unknown_native_type() -> None:
+    extension = query.FeatureExtensionResult.from_native({"type": 999_001})
+
+    assert extension.type is query.FeatureExtensionResultType.UNKNOWN
+    assert extension.raw_type == 999_001
 
 
 def test_query_selector_rejects_state_key_without_feature_id() -> None:
@@ -1462,19 +1471,42 @@ def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> Non
     assert not captured
 
 
+def test_offline_download_state_setter_rejects_unknown_before_native_call() -> None:
+    class FakeRuntimeNative:
+        def offline_region_set_download_state_start(
+            self,
+            region_id: int,
+            state: int,
+        ) -> int:
+            raise AssertionError((region_id, state))
+
+    runtime = mln.RuntimeHandle.__new__(mln.RuntimeHandle)
+    runtime._native = FakeRuntimeNative()
+
+    with pytest.raises(mln.InvalidArgumentError, match="cannot be set"):
+        runtime.set_offline_region_download_state(
+            1,
+            offline.OfflineRegionDownloadState(999_001),
+        )
+
+
 def test_resource_request_handle_close_context_and_completion_state() -> None:
     class FakeNativeRequest:
         def __init__(self) -> None:
             self.completed = None
+            self.complete_count = 0
             self.closed = False
+            self.close_count = 0
 
         def complete(self, response: dict[str, object]) -> None:
+            self.complete_count += 1
             self.completed = response
 
         def is_cancelled(self) -> bool:
             return False
 
         def close(self) -> None:
+            self.close_count += 1
             self.closed = True
 
     native = FakeNativeRequest()
@@ -1485,6 +1517,18 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     handle.complete(resource.ResourceResponse.no_content())
     assert handle.closed is True
     assert native.completed["status"] == resource.ResourceResponseStatus.NO_CONTENT
+    assert native.complete_count == 1
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        handle.complete(resource.ResourceResponse.no_content())
+    assert native.complete_count == 1
+
+    closed_native = FakeNativeRequest()
+    closed = resource.ResourceRequestHandle(closed_native)
+    closed.close()
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        closed.complete(resource.ResourceResponse.no_content())
+    assert closed_native.complete_count == 0
+    assert closed_native.close_count == 1
 
     second_native = FakeNativeRequest()
     with resource.ResourceRequestHandle(second_native) as second:
@@ -1568,6 +1612,25 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
 
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
             assert source.closed
+
+
+def test_custom_geometry_source_survives_accepted_style_url_load() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            source = map_handle.add_custom_geometry_source(
+                "custom",
+                style.CustomGeometrySourceOptions(max_queued_events=1),
+            )
+
+            map_handle.set_style_url("https://example.test/style.json")
+
+            assert not source.closed
+            source._native.push_fetch_for_test(1, 2, 3)
+            assert source.poll_event() == style.CustomGeometrySourceEvent(
+                style.CustomGeometrySourceEventType.FETCH_TILE,
+                style.CanonicalTileId(1, 2, 3),
+            )
 
 
 def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:

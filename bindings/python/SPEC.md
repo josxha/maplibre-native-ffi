@@ -81,6 +81,7 @@ bindings/python/
   python/maplibre_native/
     __init__.py
     _global.py
+    _lifecycle.py
     camera.py
     errors.py
     geo.py
@@ -224,14 +225,22 @@ NativeError
 NativePointer
 NetworkStatus
 RenderBackend
-UnknownStatusError
-UnsupportedFeatureError
+RenderFramePayload
+RenderMapPayload
+RenderMode
+RenderingStats
 RuntimeEvent
 RuntimeEventSource
 RuntimeEventSourceType
 RuntimeEventType
 RuntimeHandle
 RuntimeOptions
+StyleImageMissingPayload
+TileActionPayload
+TileId
+TileOperation
+UnknownStatusError
+UnsupportedFeatureError
 WrongThreadError
 ```
 

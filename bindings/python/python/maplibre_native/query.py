@@ -174,17 +174,17 @@ class FeatureExtensionResult:
         """Build a feature-extension result from private native values."""
         from .geo import _feature_from_native_wire
 
-        result_type = FeatureExtensionResultType(raw["type"])
-        if result_type is FeatureExtensionResultType.VALUE:
+        raw_type = int(raw["type"])
+        if raw_type == FeatureExtensionResultType.VALUE:
             return cls.value_result(_json_from_native_wire(raw["value"]))
-        if result_type is FeatureExtensionResultType.FEATURE_COLLECTION:
+        if raw_type == FeatureExtensionResultType.FEATURE_COLLECTION:
             return cls.feature_collection_result(
                 tuple(
                     _feature_from_native_wire(feature)
                     for feature in raw["feature_collection"]
                 )
             )
-        return cls.unknown_result(raw["type"])
+        return cls.unknown_result(raw_type)
 
 
 def _point_to_native_wire(point: ScreenPoint) -> tuple[float, float]:

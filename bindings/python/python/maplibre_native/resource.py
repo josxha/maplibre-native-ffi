@@ -278,7 +278,18 @@ class ResourceRequestHandle:
 
     def complete(self, response: ResourceResponse) -> None:
         """Complete this request with a copied response."""
-        self._native.complete(response.to_native())
+        if self._closed:
+            from .errors import InvalidStateError
+
+            raise InvalidStateError(
+                None,
+                "resource request handle is already closed",
+            )
+        try:
+            self._native.complete(response.to_native())
+        except BaseException:
+            self.close()
+            raise
         self._closed = True
 
     def is_cancelled(self) -> bool:

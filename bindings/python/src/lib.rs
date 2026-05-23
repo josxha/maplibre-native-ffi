@@ -11,6 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{CString, c_char, c_void};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -402,32 +403,36 @@ unsafe extern "C" fn custom_geometry_fetch_tile_trampoline(
     user_data: *mut c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
-        return;
-    };
-    // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
-    // map until source/style/map teardown waits for in-flight callbacks.
-    let state = unsafe { state.as_ref() };
-    let Some(_guard) = state.shared.enter_callback() else {
-        return;
-    };
-    state.shared.enqueue(0, tile_id);
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
+            return;
+        };
+        // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
+        // map until source/style/map teardown waits for in-flight callbacks.
+        let state = unsafe { state.as_ref() };
+        let Some(_guard) = state.shared.enter_callback() else {
+            return;
+        };
+        state.shared.enqueue(0, tile_id);
+    }));
 }
 
 unsafe extern "C" fn custom_geometry_cancel_tile_trampoline(
     user_data: *mut c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
-        return;
-    };
-    // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
-    // map until source/style/map teardown waits for in-flight callbacks.
-    let state = unsafe { state.as_ref() };
-    let Some(_guard) = state.shared.enter_callback() else {
-        return;
-    };
-    state.shared.enqueue(1, tile_id);
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
+            return;
+        };
+        // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
+        // map until source/style/map teardown waits for in-flight callbacks.
+        let state = unsafe { state.as_ref() };
+        let Some(_guard) = state.shared.enter_callback() else {
+            return;
+        };
+        state.shared.enqueue(1, tile_id);
+    }));
 }
 
 impl RenderSessionState {
@@ -465,11 +470,19 @@ impl RenderSessionState {
 
 #[pymethods]
 impl RuntimeHandle {
-    fn close(&self) -> PyResult<()> {
+    fn close(&self, py: Python<'_>) -> PyResult<()> {
         let state = self.state();
+        let Some(runtime_address) = state.address() else {
+            return Ok(());
+        };
         // SAFETY: state owns an mln_runtime pointer created by mln_runtime_create
-        // and pairs it with the matching status-returning destroy function.
-        unsafe { state.close_status(sys::mln_runtime_destroy) }.map_err(map_error)?;
+        // and pairs it with the matching status-returning destroy function. The
+        // C API can wait for in-flight callbacks, so release the GIL while it runs.
+        let status = py.detach(move || unsafe {
+            sys::mln_runtime_destroy(runtime_address as *mut sys::mln_runtime)
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        state.mark_closed();
         self.resource_provider
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -786,6 +799,7 @@ impl RuntimeHandle {
 
     fn set_resource_transform(
         &self,
+        py: Python<'_>,
         callback: Py<PyAny>,
         max_pending_callbacks: usize,
     ) -> PyResult<()> {
@@ -800,13 +814,28 @@ impl RuntimeHandle {
         ));
         let descriptor = replacement.descriptor();
         let state = self.state();
+        let runtime_address = state.as_ptr() as usize;
+        let callback = descriptor.callback;
+        let user_data_address = descriptor.user_data as usize;
+        let size = descriptor.size;
         // SAFETY: state owns or has released the runtime pointer. The C API
         // validates that it is live. descriptor points to replacement state,
-        // which is retained after a successful native registration.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_transform(state.as_ptr(), &descriptor)
-        })
-        .map_err(map_error)?;
+        // which is retained after a successful native registration. Replacement
+        // can wait for in-flight callbacks, so release the GIL while it runs.
+        let status = py.detach(move || {
+            let descriptor = sys::mln_resource_transform {
+                size,
+                callback,
+                user_data: user_data_address as *mut c_void,
+            };
+            unsafe {
+                sys::mln_runtime_set_resource_transform(
+                    runtime_address as *mut sys::mln_runtime,
+                    &descriptor,
+                )
+            }
+        });
+        maplibre_core::check(status).map_err(map_error)?;
         self.resource_transform
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -814,13 +843,16 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    fn clear_resource_transform(&self) -> PyResult<()> {
+    fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<()> {
         let state = self.state();
+        let runtime_address = state.as_ptr() as usize;
         // SAFETY: state owns or has released the runtime pointer. The C API
         // validates that it is live and waits for in-flight callbacks before
-        // returning success.
-        maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_transform(state.as_ptr()) })
-            .map_err(map_error)?;
+        // returning success, so release the GIL while it runs.
+        let status = py.detach(move || unsafe {
+            sys::mln_runtime_clear_resource_transform(runtime_address as *mut sys::mln_runtime)
+        });
+        maplibre_core::check(status).map_err(map_error)?;
         self.resource_transform
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -1033,7 +1065,9 @@ impl MapHandle {
         // url is a null-terminated C string whose storage lives for this call.
         maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.as_ptr(), url.as_ptr()) })
             .map_err(map_error)?;
-        self.clear_custom_geometry_sources();
+        // URL style replacement completes asynchronously when the new style loads.
+        // Keep custom geometry callback state alive until a synchronous teardown path
+        // can prove native no longer retains its user_data pointer.
         Ok(())
     }
 
@@ -1915,6 +1949,7 @@ impl MapHandle {
 
     fn remove_style_source(&self, source_id: String) -> PyResult<bool> {
         let state = self.state();
+        let source_key = source_id.clone();
         let source_id = maplibre_core::string::string_view(&source_id);
         let mut removed = false;
         // SAFETY: The C API validates the map pointer, source ID view, and out pointer.
@@ -1922,6 +1957,12 @@ impl MapHandle {
             sys::mln_map_remove_style_source(state.as_ptr(), source_id.raw(), &mut removed)
         })
         .map_err(map_error)?;
+        if removed {
+            self.custom_geometry_sources
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .remove(&source_key);
+        }
         Ok(removed)
     }
 
@@ -3609,12 +3650,15 @@ unsafe extern "C" fn resource_provider_trampoline(
     request: *const sys::mln_resource_request,
     handle: *mut sys::mln_resource_request_handle,
 ) -> u32 {
-    let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceProviderState>()) else {
-        return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
-    };
-    // SAFETY: user_data points to PyResourceProviderState retained by RuntimeHandle
-    // until replacement or runtime teardown; native waits for in-flight callbacks.
-    unsafe { state.as_ref() }.invoke(request, handle)
+    catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceProviderState>()) else {
+            return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
+        };
+        // SAFETY: user_data points to PyResourceProviderState retained by RuntimeHandle
+        // until replacement or runtime teardown; native waits for in-flight callbacks.
+        unsafe { state.as_ref() }.invoke(request, handle)
+    }))
+    .unwrap_or(maplibre_core::resource::UNKNOWN_PROVIDER_DECISION)
 }
 
 impl PyResourceTransformState {
@@ -3697,12 +3741,15 @@ unsafe extern "C" fn resource_transform_trampoline(
     url: *const c_char,
     out_response: *mut sys::mln_resource_transform_response,
 ) -> sys::mln_status {
-    let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceTransformState>()) else {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
-    };
-    // SAFETY: user_data points to PyResourceTransformState retained by RuntimeHandle
-    // until replacement, clear, or runtime teardown; native waits for in-flight callbacks.
-    unsafe { state.as_ref() }.invoke(kind, url, out_response)
+    catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceTransformState>()) else {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        };
+        // SAFETY: user_data points to PyResourceTransformState retained by RuntimeHandle
+        // until replacement, clear, or runtime teardown; native waits for in-flight callbacks.
+        unsafe { state.as_ref() }.invoke(kind, url, out_response)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 fn event_to_py(py: Python<'_>, event: maplibre_core::CopiedRuntimeEvent) -> PyResult<Py<PyAny>> {
@@ -5808,24 +5855,27 @@ unsafe extern "C" fn log_callback_trampoline(
     code: i64,
     message: *const c_char,
 ) -> u32 {
-    let Some(state) = ptr::NonNull::new(user_data.cast::<PyLogCallbackState>()) else {
-        return 0;
-    };
-    // SAFETY: user_data points to PyLogCallbackState retained after successful
-    // callback installation.
-    let state = unsafe { state.as_ref() };
-    // SAFETY: message follows the C logging callback contract.
-    let Ok(record) =
-        (unsafe { maplibre_core::logging::copy_log_record(severity, event, code, message) })
-    else {
-        return 0;
-    };
-    state.push(CopiedLogRecordRaw {
-        severity: log_severity_raw(record.severity),
-        event: log_event_raw(record.event),
-        code: record.code,
-        message: record.message,
-    })
+    catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyLogCallbackState>()) else {
+            return 0;
+        };
+        // SAFETY: user_data points to PyLogCallbackState retained after successful
+        // callback installation.
+        let state = unsafe { state.as_ref() };
+        // SAFETY: message follows the C logging callback contract.
+        let Ok(record) =
+            (unsafe { maplibre_core::logging::copy_log_record(severity, event, code, message) })
+        else {
+            return 0;
+        };
+        state.push(CopiedLogRecordRaw {
+            severity: log_severity_raw(record.severity),
+            event: log_event_raw(record.event),
+            code: record.code,
+            message: record.message,
+        })
+    }))
+    .unwrap_or(0)
 }
 
 #[pyfunction]
