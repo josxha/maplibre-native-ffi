@@ -360,3 +360,29 @@ Review artifacts:
 ### User-input-needed findings
 
 - None.
+
+## Round 9
+
+### Applied findings
+
+- Extended GIR sanitization to remove nested raw custom-geometry callback fields
+  (`fetch_tile`, `cancel_tile`, `user_data`) from `CustomGeometrySourceOptions`
+  and to remove the raw `ScreenLineString` point/count record from generated
+  review GIR.
+- Hid `ScreenLineString` and `RenderedQueryGeometry.data` from VAPI metadata so
+  rendered query geometry uses the Vala-visible constructors rather than
+  exposing raw point/count storage.
+- Confirmed risky-surface scans over generated VAPI and GIR now report no raw
+  custom-geometry option callback fields, no `void*` field type, no
+  `ScreenLineString.point_count`, no descriptor size/field-mask fields, no raw
+  feature records, and no raw ABI count fields.
+
+### Validation
+
+- `mise run fix`
+- `mise run //bindings/vala:ci`
+- `mise run test`
+
+### User-input-needed findings
+
+- None.

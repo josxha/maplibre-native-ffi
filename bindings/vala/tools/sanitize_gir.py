@@ -35,6 +35,7 @@ TOP_LEVEL_SKIP = {
     "QueriedFeatureFields",
     "RenderedFeatureQueryOptionFields",
     "RuntimeOptionFlags",
+    "ScreenLineString",
     "SourceFeatureQueryOptionFields",
     "StyleImageOptionFields",
     "StyleTileSourceOptionFields",
@@ -45,10 +46,12 @@ FIELD_SKIP = {
     "byte_count",
     "byte_length",
     "bytes",
+    "cancel_tile",
     "data",
     "feature",
     "feature_count",
     "fields",
+    "fetch_tile",
     "filter",
     "id_size",
     "layer_id_count",
@@ -56,6 +59,7 @@ FIELD_SKIP = {
     "metadata",
     "metadata_size",
     "pixels",
+    "point_count",
     "prior_data",
     "prior_data_size",
     "property_count",
@@ -63,6 +67,7 @@ FIELD_SKIP = {
     "source_layer_id_count",
     "source_layer_ids",
     "state",
+    "user_data",
 }
 
 METHOD_SKIP = {
@@ -78,6 +83,25 @@ def local_name(element: ET.Element) -> str:
     return element.tag.rsplit("}", 1)[-1]
 
 
+def sanitize_child(parent: ET.Element, owner_name: str | None) -> None:
+    for child in list(parent):
+        child_tag = local_name(child)
+        child_name = child.attrib.get("name")
+        if child_tag == "field" and child_name in FIELD_SKIP:
+            parent.remove(child)
+            continue
+        if child_tag == "union" and child_name in FIELD_SKIP:
+            parent.remove(child)
+            continue
+        if child_tag in {"method", "function"} and child_name in METHOD_SKIP.get(
+            owner_name,
+            set(),
+        ):
+            parent.remove(child)
+            continue
+        sanitize_child(child, owner_name)
+
+
 def sanitize(path: Path) -> None:
     tree = ET.parse(path)
     root = tree.getroot()
@@ -86,20 +110,11 @@ def sanitize(path: Path) -> None:
         raise SystemExit(f"{path}: missing GIR namespace")
 
     for child in list(namespace):
-        if child.attrib.get("name") in TOP_LEVEL_SKIP:
+        child_name = child.attrib.get("name")
+        if child_name in TOP_LEVEL_SKIP:
             namespace.remove(child)
             continue
-        child_name = child.attrib.get("name")
-        for nested in list(child):
-            nested_tag = local_name(nested)
-            nested_name = nested.attrib.get("name")
-            if nested_tag == "field" and nested_name in FIELD_SKIP:
-                child.remove(nested)
-            elif nested_tag in {
-                "method",
-                "function",
-            } and nested_name in METHOD_SKIP.get(child_name, set()):
-                child.remove(nested)
+        sanitize_child(child, child_name)
 
     tree.write(path, encoding="utf-8", xml_declaration=True)
 

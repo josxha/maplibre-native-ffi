@@ -175,3 +175,5 @@ RuntimeOptionFlags skip
 SourceFeatureQueryOptionFields skip
 StyleImageOptionFields skip
 StyleTileSourceOptionFields skip
+RenderedQueryGeometry.data skip
+ScreenLineString skip
