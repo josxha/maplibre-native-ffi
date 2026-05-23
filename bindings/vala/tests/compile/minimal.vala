@@ -66,6 +66,14 @@ int main(string[] args) {
     map.remove_style_source("raster-source", out source_removed);
     map.add_raster_dem_source_url("dem-source", "asset://dem-source.json", tile_source_options);
     map.remove_style_source("dem-source", out source_removed);
+    MaplibreNative.MetalSurfaceDescriptor metal_surface = {};
+    metal_surface.default();
+    MaplibreNative.VulkanSurfaceDescriptor vulkan_surface = {};
+    vulkan_surface.default();
+    MaplibreNative.MetalOwnedTextureDescriptor metal_owned_texture = {};
+    metal_owned_texture.default();
+    MaplibreNative.TextureImageInfo texture_info = {};
+    texture_info.default();
     map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);
     MaplibreNative.MapDebugOptions debug_options;
     map.get_debug_options(out debug_options);

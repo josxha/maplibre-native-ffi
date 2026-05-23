@@ -485,6 +485,78 @@ typedef struct {
   MlnValaStyleRasterDemEncoding raster_encoding;
 } MlnValaStyleTileSourceOptions;
 
+typedef struct {
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  double scale_factor;
+} MlnValaRenderTargetExtent;
+
+typedef struct {
+  uint32_t size;
+  gpointer device;
+} MlnValaMetalContextDescriptor;
+
+typedef struct {
+  uint32_t size;
+  gpointer instance;
+  gpointer physical_device;
+  gpointer device;
+  gpointer graphics_queue;
+  uint32_t graphics_queue_family_index;
+} MlnValaVulkanContextDescriptor;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderTargetExtent extent;
+  MlnValaMetalContextDescriptor context;
+  gpointer layer;
+} MlnValaMetalSurfaceDescriptor;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderTargetExtent extent;
+  MlnValaVulkanContextDescriptor context;
+  gpointer surface;
+} MlnValaVulkanSurfaceDescriptor;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderTargetExtent extent;
+  MlnValaMetalContextDescriptor context;
+} MlnValaMetalOwnedTextureDescriptor;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderTargetExtent extent;
+  gpointer texture;
+} MlnValaMetalBorrowedTextureDescriptor;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderTargetExtent extent;
+  MlnValaVulkanContextDescriptor context;
+} MlnValaVulkanOwnedTextureDescriptor;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRenderTargetExtent extent;
+  MlnValaVulkanContextDescriptor context;
+  gpointer image;
+  gpointer image_view;
+  uint32_t format;
+  uint32_t initial_layout;
+  uint32_t final_layout;
+} MlnValaVulkanBorrowedTextureDescriptor;
+
+typedef struct {
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  uint32_t stride;
+  size_t byte_length;
+} MlnValaTextureImageInfo;
+
 /**
  * mln_vala_camera_options_default:
  * @out_options: (out): return location for initialized camera options.
@@ -526,6 +598,27 @@ gboolean mln_vala_map_tile_options_default(
 );
 gboolean mln_vala_style_tile_source_options_default(
   MlnValaStyleTileSourceOptions* out_options, GError** error
+);
+gboolean mln_vala_metal_surface_descriptor_default(
+  MlnValaMetalSurfaceDescriptor* out_descriptor, GError** error
+);
+gboolean mln_vala_vulkan_surface_descriptor_default(
+  MlnValaVulkanSurfaceDescriptor* out_descriptor, GError** error
+);
+gboolean mln_vala_metal_owned_texture_descriptor_default(
+  MlnValaMetalOwnedTextureDescriptor* out_descriptor, GError** error
+);
+gboolean mln_vala_metal_borrowed_texture_descriptor_default(
+  MlnValaMetalBorrowedTextureDescriptor* out_descriptor, GError** error
+);
+gboolean mln_vala_vulkan_owned_texture_descriptor_default(
+  MlnValaVulkanOwnedTextureDescriptor* out_descriptor, GError** error
+);
+gboolean mln_vala_vulkan_borrowed_texture_descriptor_default(
+  MlnValaVulkanBorrowedTextureDescriptor* out_descriptor, GError** error
+);
+gboolean mln_vala_texture_image_info_default(
+  MlnValaTextureImageInfo* out_info, GError** error
 );
 
 #define MLN_VALA_TYPE_NATIVE_POINTER (mln_vala_native_pointer_get_type())
@@ -594,6 +687,13 @@ G_DECLARE_FINAL_TYPE(
 G_DECLARE_FINAL_TYPE(
   MlnValaMapProjectionHandle, mln_vala_map_projection_handle, MLN_VALA,
   MAP_PROJECTION_HANDLE, GObject
+)
+
+#define MLN_VALA_TYPE_RENDER_SESSION_HANDLE \
+  (mln_vala_render_session_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaRenderSessionHandle, mln_vala_render_session_handle, MLN_VALA,
+  RENDER_SESSION_HANDLE, GObject
 )
 
 #define MLN_VALA_TYPE_RESOURCE_REQUEST_HANDLE \
@@ -1504,6 +1604,113 @@ gboolean mln_vala_map_handle_get_style_source_info(
 gboolean mln_vala_map_handle_remove_style_source(
   MlnValaMapHandle* self, const char* source_id, gboolean* out_removed,
   GError** error
+);
+
+/**
+ * mln_vala_map_handle_attach_metal_surface:
+ * @self: a map handle.
+ * @descriptor: (not nullable): Metal surface descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a render session handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRenderSessionHandle* mln_vala_map_handle_attach_metal_surface(
+  MlnValaMapHandle* self, const MlnValaMetalSurfaceDescriptor* descriptor,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_attach_vulkan_surface:
+ * @self: a map handle.
+ * @descriptor: (not nullable): Vulkan surface descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a render session handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRenderSessionHandle* mln_vala_map_handle_attach_vulkan_surface(
+  MlnValaMapHandle* self, const MlnValaVulkanSurfaceDescriptor* descriptor,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_attach_metal_owned_texture:
+ * @self: a map handle.
+ * @descriptor: (not nullable): Metal owned-texture descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a render session handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRenderSessionHandle* mln_vala_map_handle_attach_metal_owned_texture(
+  MlnValaMapHandle* self, const MlnValaMetalOwnedTextureDescriptor* descriptor,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_attach_metal_borrowed_texture:
+ * @self: a map handle.
+ * @descriptor: (not nullable): Metal borrowed-texture descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a render session handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRenderSessionHandle* mln_vala_map_handle_attach_metal_borrowed_texture(
+  MlnValaMapHandle* self,
+  const MlnValaMetalBorrowedTextureDescriptor* descriptor, GError** error
+);
+
+/**
+ * mln_vala_map_handle_attach_vulkan_owned_texture:
+ * @self: a map handle.
+ * @descriptor: (not nullable): Vulkan owned-texture descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a render session handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRenderSessionHandle* mln_vala_map_handle_attach_vulkan_owned_texture(
+  MlnValaMapHandle* self, const MlnValaVulkanOwnedTextureDescriptor* descriptor,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_attach_vulkan_borrowed_texture:
+ * @self: a map handle.
+ * @descriptor: (not nullable): Vulkan borrowed-texture descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a render session handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRenderSessionHandle* mln_vala_map_handle_attach_vulkan_borrowed_texture(
+  MlnValaMapHandle* self,
+  const MlnValaVulkanBorrowedTextureDescriptor* descriptor, GError** error
+);
+
+gboolean mln_vala_render_session_handle_resize(
+  MlnValaRenderSessionHandle* self, uint32_t width, uint32_t height,
+  double scale_factor, GError** error
+);
+gboolean mln_vala_render_session_handle_render_update(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_render_session_handle_detach(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_render_session_handle_close(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_render_session_handle_reduce_memory_use(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_render_session_handle_clear_data(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_render_session_handle_dump_debug_logs(
+  MlnValaRenderSessionHandle* self, GError** error
 );
 
 /**
