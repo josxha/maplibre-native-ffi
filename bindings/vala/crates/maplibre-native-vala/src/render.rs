@@ -1266,6 +1266,40 @@ mod tests {
             GFALSE
         );
         assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_render_session_handle_set_feature_state(
+                ptr::null_mut(),
+                ptr::null(),
+                ptr::null(),
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert!(
+            mln_vala_render_session_handle_get_feature_state(
+                ptr::null_mut(),
+                ptr::null(),
+                &mut error,
+            )
+            .is_null()
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_render_session_handle_remove_feature_state(
+                ptr::null_mut(),
+                ptr::null(),
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
     }
 
     #[test]
