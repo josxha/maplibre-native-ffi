@@ -295,6 +295,34 @@ test("map viewport and tile options map descriptor fields", () => {
   }
 });
 
+test("map bounds options copy constraints", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    const bounds = {
+      southwest: { latitude: -10, longitude: -20 },
+      northeast: { latitude: 10, longitude: 20 },
+    };
+    map.setBounds({
+      bounds,
+      minZoom: 1,
+      maxZoom: 10,
+      minPitch: 0,
+      maxPitch: 45,
+    });
+    const copied = map.getBounds();
+    assert.deepEqual(copied.bounds, bounds);
+    assert.equal(copied.minZoom, 1);
+    assert.equal(copied.maxZoom, 10);
+    assert.equal(copied.minPitch, 0);
+    assert.equal(copied.maxPitch, 45);
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map projection mode maps optional descriptor fields", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });

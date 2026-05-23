@@ -8,7 +8,7 @@ use napi_derive::napi;
 use crate::{
     error,
     runtime::NativeRuntimeHandle,
-    values::{LatLng, ScreenPoint},
+    values::{LatLng, LatLngBounds, ScreenPoint},
 };
 
 #[napi(object)]
@@ -51,6 +51,15 @@ pub struct MapTileOptions {
     pub lod_pitch_threshold: Option<f64>,
     pub lod_zoom_shift: Option<f64>,
     pub lod_mode: Option<String>,
+}
+
+#[napi(object)]
+pub struct BoundOptions {
+    pub bounds: Option<LatLngBounds>,
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub min_pitch: Option<f64>,
+    pub max_pitch: Option<f64>,
 }
 
 #[napi(object)]
@@ -223,6 +232,23 @@ impl NativeMapHandle {
     pub fn set_tile_options(&self, options: MapTileOptions) -> Result<()> {
         let options = core::options::map_tile_options_to_native(&options.into_core()?);
         core::check(unsafe { sys::mln_map_set_tile_options(self.state.as_ptr(), &options) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getBounds")]
+    pub fn get_bounds(&self) -> Result<BoundOptions> {
+        let mut raw = unsafe { sys::mln_bound_options_default() };
+        core::check(unsafe { sys::mln_map_get_bounds(self.state.as_ptr(), &mut raw) })
+            .map_err(error::from_core)?;
+        Ok(BoundOptions::from_core(
+            core::camera::bound_options_from_native(raw),
+        ))
+    }
+
+    #[napi(js_name = "setBounds")]
+    pub fn set_bounds(&self, options: BoundOptions) -> Result<()> {
+        let options = core::camera::bound_options_to_native(&options.into_core());
+        core::check(unsafe { sys::mln_map_set_bounds(self.state.as_ptr(), &options) })
             .map_err(error::from_core)
     }
 
@@ -941,6 +967,38 @@ impl MapTileOptions {
             lod_pitch_threshold: options.lod_pitch_threshold,
             lod_zoom_shift: options.lod_zoom_shift,
             lod_mode: options.lod_mode.map(tile_lod_mode_name),
+        }
+    }
+}
+
+impl BoundOptions {
+    fn into_core(self) -> core::BoundOptions {
+        let mut options = core::BoundOptions::new();
+        if let Some(value) = self.bounds {
+            options = options.with_bounds(value.into_core());
+        }
+        if let Some(value) = self.min_zoom {
+            options = options.with_min_zoom(value);
+        }
+        if let Some(value) = self.max_zoom {
+            options = options.with_max_zoom(value);
+        }
+        if let Some(value) = self.min_pitch {
+            options = options.with_min_pitch(value);
+        }
+        if let Some(value) = self.max_pitch {
+            options = options.with_max_pitch(value);
+        }
+        options
+    }
+
+    fn from_core(options: core::BoundOptions) -> Self {
+        Self {
+            bounds: options.bounds.map(LatLngBounds::from_core),
+            min_zoom: options.min_zoom,
+            max_zoom: options.max_zoom,
+            min_pitch: options.min_pitch,
+            max_pitch: options.max_pitch,
         }
     }
 }

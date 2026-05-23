@@ -12,6 +12,12 @@ pub struct LatLng {
 }
 
 #[napi(object)]
+pub struct LatLngBounds {
+    pub southwest: LatLng,
+    pub northeast: LatLng,
+}
+
+#[napi(object)]
 pub struct ScreenPoint {
     pub x: f64,
     pub y: f64,
@@ -67,6 +73,19 @@ impl LatLng {
 
     pub(crate) fn from_native(raw: sys::mln_lat_lng) -> Self {
         Self::from_core(core::values::lat_lng_from_native(raw))
+    }
+}
+
+impl LatLngBounds {
+    pub(crate) fn into_core(self) -> core::LatLngBounds {
+        core::LatLngBounds::new(self.southwest.into_core(), self.northeast.into_core())
+    }
+
+    pub(crate) fn from_core(value: core::LatLngBounds) -> Self {
+        Self {
+            southwest: LatLng::from_core(value.southwest),
+            northeast: LatLng::from_core(value.northeast),
+        }
     }
 }
 

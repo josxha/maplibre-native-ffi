@@ -467,6 +467,14 @@ class MapHandle {
     return translateNativeErrors(() => this.native.setTileOptions(options));
   }
 
+  getBounds() {
+    return translateNativeErrors(() => this.native.getBounds());
+  }
+
+  setBounds(options) {
+    return translateNativeErrors(() => this.native.setBounds(options));
+  }
+
   getProjectionMode() {
     return translateNativeErrors(() => this.native.getProjectionMode());
   }

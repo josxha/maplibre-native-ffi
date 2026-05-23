@@ -136,6 +136,14 @@ export interface MapTileOptions {
   lodMode?: "default" | "distance" | "unknown" | null;
 }
 
+export interface BoundOptions {
+  bounds?: LatLngBounds | null;
+  minZoom?: number | null;
+  maxZoom?: number | null;
+  minPitch?: number | null;
+  maxPitch?: number | null;
+}
+
 export interface ProjectionMode {
   axonometric?: boolean | null;
   xSkew?: number | null;
@@ -223,6 +231,8 @@ export declare class MapHandle {
   setViewportOptions(options: MapViewportOptions): void;
   getTileOptions(): MapTileOptions;
   setTileOptions(options: MapTileOptions): void;
+  getBounds(): BoundOptions;
+  setBounds(options: BoundOptions): void;
   getProjectionMode(): ProjectionMode;
   setProjectionMode(mode: ProjectionMode): void;
   moveBy(deltaX: number, deltaY: number): void;
@@ -277,6 +287,11 @@ export declare class MapHandle {
 export interface LatLng {
   latitude: number;
   longitude: number;
+}
+
+export interface LatLngBounds {
+  southwest: LatLng;
+  northeast: LatLng;
 }
 
 export interface ProjectedMeters {
