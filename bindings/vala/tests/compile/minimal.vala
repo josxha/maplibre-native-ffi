@@ -25,6 +25,21 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   runtime.offline_region_set_download_state_start(1, MaplibreNative.OfflineRegionDownloadState.INACTIVE, out operation_id);
   MaplibreNative.OfflineRegionStatus status;
   runtime.offline_region_get_status_take_result(operation_id, out status);
+  var created_region = runtime.offline_region_create_take_result(operation_id);
+  created_region.close();
+  bool found = false;
+  var optional_region = runtime.offline_region_get_take_result(operation_id, out found);
+  if (optional_region != null) {
+    optional_region.close();
+  }
+  var updated_region = runtime.offline_region_update_metadata_take_result(operation_id);
+  updated_region.close();
+  var region_list = runtime.offline_regions_list_take_result(operation_id);
+  size_t region_count;
+  region_list.count(out region_count);
+  region_list.close();
+  var merged_regions = runtime.offline_regions_merge_database_take_result(operation_id);
+  merged_regions.close();
   runtime.offline_region_invalidate_start(1, out operation_id);
   runtime.offline_region_delete_start(1, out operation_id);
   runtime.offline_operation_discard(operation_id);

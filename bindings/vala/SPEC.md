@@ -95,9 +95,9 @@ The scaffold implements one proof slice in Rust:
 - Logging severity/event enums, callback registration with destroy-notify
   replacement, and async severity-mask operations are exposed in generated Vala.
 - Resource response descriptors, resource transform/provider callbacks, offline
-  operation start/status-result/discard helpers, and `ResourceRequestHandle`
-  one-shot completion/cancellation/release methods are visible in generated
-  Vala.
+  operation start/status-result/snapshot/list/discard helpers, and
+  `ResourceRequestHandle` one-shot completion/cancellation/release methods are
+  visible in generated Vala.
 - Basic style-source operations for GeoJSON URL sources, vector/raster/raster
   DEM tile source URL and inline tile sources, image sources, source metadata
   and attribution, source lifecycle, runtime style images, style ID list

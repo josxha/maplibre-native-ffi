@@ -213,6 +213,9 @@ typedef struct {
 } MlnValaOfflineRegionStatus;
 
 typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
+typedef struct _MlnValaOfflineRegionSnapshotHandle
+  MlnValaOfflineRegionSnapshotHandle;
+typedef struct _MlnValaOfflineRegionListHandle MlnValaOfflineRegionListHandle;
 
 typedef struct {
   uint32_t size;
@@ -952,6 +955,20 @@ G_DECLARE_FINAL_TYPE(
   STYLE_ID_LIST_HANDLE, GObject
 )
 
+#define MLN_VALA_TYPE_OFFLINE_REGION_SNAPSHOT_HANDLE \
+  (mln_vala_offline_region_snapshot_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaOfflineRegionSnapshotHandle, mln_vala_offline_region_snapshot_handle,
+  MLN_VALA, OFFLINE_REGION_SNAPSHOT_HANDLE, GObject
+)
+
+#define MLN_VALA_TYPE_OFFLINE_REGION_LIST_HANDLE \
+  (mln_vala_offline_region_list_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaOfflineRegionListHandle, mln_vala_offline_region_list_handle, MLN_VALA,
+  OFFLINE_REGION_LIST_HANDLE, GObject
+)
+
 #define MLN_VALA_TYPE_MAP_PROJECTION_HANDLE \
   (mln_vala_map_projection_handle_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -1372,9 +1389,102 @@ gboolean mln_vala_runtime_handle_offline_region_delete_start(
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
  * Throws: MlnValaError
  */
+/**
+ * mln_vala_runtime_handle_offline_region_create_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed create operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned offline region snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaOfflineRegionSnapshotHandle*
+mln_vala_runtime_handle_offline_region_create_take_result(
+  MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_get_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed get operation ID.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): owned offline region snapshot handle, or
+ * `NULL` when no region was found.
+ * Throws: MlnValaError
+ */
+MlnValaOfflineRegionSnapshotHandle*
+mln_vala_runtime_handle_offline_region_get_take_result(
+  MlnValaRuntimeHandle* self, uint64_t operation_id, gboolean* out_found,
+  GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_regions_list_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed list operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned offline region list handle.
+ * Throws: MlnValaError
+ */
+MlnValaOfflineRegionListHandle*
+mln_vala_runtime_handle_offline_regions_list_take_result(
+  MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_regions_merge_database_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed merge operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned offline region list handle.
+ * Throws: MlnValaError
+ */
+MlnValaOfflineRegionListHandle*
+mln_vala_runtime_handle_offline_regions_merge_database_take_result(
+  MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_update_metadata_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed update-metadata operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned offline region snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaOfflineRegionSnapshotHandle*
+mln_vala_runtime_handle_offline_region_update_metadata_take_result(
+  MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
+);
+
 gboolean mln_vala_runtime_handle_offline_region_get_status_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id,
   MlnValaOfflineRegionStatus* out_status, GError** error
+);
+
+void mln_vala_offline_region_snapshot_handle_close(
+  MlnValaOfflineRegionSnapshotHandle* self
+);
+
+/**
+ * mln_vala_offline_region_list_handle_count:
+ * @self: an offline region list handle.
+ * @out_count: (out): return location for the region count.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_offline_region_list_handle_count(
+  MlnValaOfflineRegionListHandle* self, size_t* out_count, GError** error
+);
+void mln_vala_offline_region_list_handle_close(
+  MlnValaOfflineRegionListHandle* self
 );
 
 /**

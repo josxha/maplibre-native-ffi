@@ -15,6 +15,8 @@ use crate::resource::{
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
 const STYLE_ID_LIST_TYPE_NAME: &CStr = c"MlnValaStyleIdListHandle";
+const OFFLINE_REGION_SNAPSHOT_TYPE_NAME: &CStr = c"MlnValaOfflineRegionSnapshotHandle";
+const OFFLINE_REGION_LIST_TYPE_NAME: &CStr = c"MlnValaOfflineRegionListHandle";
 
 #[repr(C)]
 pub struct RuntimeHandle {
@@ -59,6 +61,18 @@ pub struct StyleIdListHandle {
     native: *mut sys::mln_style_id_list,
 }
 
+#[repr(C)]
+pub struct OfflineRegionSnapshotHandle {
+    parent_instance: GObject,
+    native: *mut sys::mln_offline_region_snapshot,
+}
+
+#[repr(C)]
+pub struct OfflineRegionListHandle {
+    parent_instance: GObject,
+    native: *mut sys::mln_offline_region_list,
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_get_type() -> GType {
     glib::register_object_type::<RuntimeHandle>(RUNTIME_TYPE_NAME)
@@ -72,6 +86,16 @@ pub extern "C" fn mln_vala_map_handle_get_type() -> GType {
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_style_id_list_handle_get_type() -> GType {
     glib::register_object_type::<StyleIdListHandle>(STYLE_ID_LIST_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_snapshot_handle_get_type() -> GType {
+    glib::register_object_type::<OfflineRegionSnapshotHandle>(OFFLINE_REGION_SNAPSHOT_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_list_handle_get_type() -> GType {
+    glib::register_object_type::<OfflineRegionListHandle>(OFFLINE_REGION_LIST_TYPE_NAME)
 }
 
 #[unsafe(no_mangle)]
@@ -387,6 +411,82 @@ pub extern "C" fn mln_vala_runtime_handle_offline_region_delete_start(
         Err(error) => {
             glib::set_error(error_out, error);
             GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_create_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionSnapshotHandle {
+    match offline_region_create_take_result(handle, operation_id) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_get_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionSnapshotHandle {
+    match offline_region_get_take_result(handle, operation_id, out_found) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_regions_list_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionListHandle {
+    match offline_regions_list_take_result(handle, operation_id) {
+        Ok(list) => list,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_regions_merge_database_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionListHandle {
+    match offline_regions_merge_database_take_result(handle, operation_id) {
+        Ok(list) => list,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_update_metadata_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    error_out: *mut *mut GError,
+) -> *mut OfflineRegionSnapshotHandle {
+    match offline_region_update_metadata_take_result(handle, operation_id) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
         }
     }
 }
@@ -2006,6 +2106,33 @@ pub extern "C" fn mln_vala_style_id_list_handle_close(handle: *mut StyleIdListHa
     close_style_id_list(handle);
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_snapshot_handle_close(
+    handle: *mut OfflineRegionSnapshotHandle,
+) {
+    close_offline_region_snapshot(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_list_handle_count(
+    handle: *mut OfflineRegionListHandle,
+    out_count: *mut usize,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_list_count(handle, out_count) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_list_handle_close(handle: *mut OfflineRegionListHandle) {
+    close_offline_region_list(handle);
+}
+
 fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_runtime_options_default() };
@@ -3350,6 +3477,116 @@ fn close_style_id_list(handle: *mut StyleIdListHandle) {
     }
 }
 
+fn wrap_offline_region_snapshot(
+    native: *mut sys::mln_offline_region_snapshot,
+) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+    if native.is_null() {
+        return Err(Error::invalid_argument(
+            "native offline region snapshot is null",
+        ));
+    }
+    let handle = glib::new_object::<OfflineRegionSnapshotHandle>(
+        mln_vala_offline_region_snapshot_handle_get_type(),
+    );
+    if handle.is_null() {
+        // SAFETY: `native` came from a successful take-result operation.
+        unsafe { sys::mln_offline_region_snapshot_destroy(native) };
+        return Err(Error::invalid_argument(
+            "failed to allocate OfflineRegionSnapshotHandle",
+        ));
+    }
+    // SAFETY: `handle` points to a newly allocated snapshot wrapper.
+    unsafe {
+        (*handle).native = native;
+    }
+    Ok(handle)
+}
+
+fn wrap_offline_region_list(
+    native: *mut sys::mln_offline_region_list,
+) -> error::Result<*mut OfflineRegionListHandle> {
+    if native.is_null() {
+        return Err(Error::invalid_argument(
+            "native offline region list is null",
+        ));
+    }
+    let handle =
+        glib::new_object::<OfflineRegionListHandle>(mln_vala_offline_region_list_handle_get_type());
+    if handle.is_null() {
+        // SAFETY: `native` came from a successful take-result operation.
+        unsafe { sys::mln_offline_region_list_destroy(native) };
+        return Err(Error::invalid_argument(
+            "failed to allocate OfflineRegionListHandle",
+        ));
+    }
+    // SAFETY: `handle` points to a newly allocated list wrapper.
+    unsafe {
+        (*handle).native = native;
+    }
+    Ok(handle)
+}
+
+fn offline_region_list_native(
+    handle: *mut OfflineRegionListHandle,
+) -> error::Result<*mut sys::mln_offline_region_list> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument("OfflineRegionListHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe { (*handle).native };
+    if native.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "OfflineRegionListHandle is closed",
+        ));
+    }
+    Ok(native)
+}
+
+fn offline_region_list_count(
+    handle: *mut OfflineRegionListHandle,
+    out_count: *mut usize,
+) -> error::Result<()> {
+    let native = offline_region_list_native(handle)?;
+    let mut count = 0;
+    // SAFETY: `native` is live and `count` is valid output storage.
+    error::check(unsafe { sys::mln_offline_region_list_count(native, &mut count) })?;
+    glib::clear_optional_out_pointer(out_count, count)
+}
+
+fn close_offline_region_snapshot(handle: *mut OfflineRegionSnapshotHandle) {
+    if handle.is_null() {
+        return;
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe {
+        let native = (*handle).native;
+        (*handle).native = ptr::null_mut();
+        native
+    };
+    if !native.is_null() {
+        // SAFETY: This wrapper owns the native snapshot and closes it exactly once.
+        unsafe { sys::mln_offline_region_snapshot_destroy(native) };
+    }
+}
+
+fn close_offline_region_list(handle: *mut OfflineRegionListHandle) {
+    if handle.is_null() {
+        return;
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe {
+        let native = (*handle).native;
+        (*handle).native = ptr::null_mut();
+        native
+    };
+    if !native.is_null() {
+        // SAFETY: This wrapper owns the native list and closes it exactly once.
+        unsafe { sys::mln_offline_region_list_destroy(native) };
+    }
+}
+
 fn string_view_from_c(value: *const c_char, label: &str) -> error::Result<sys::mln_string_view> {
     if value.is_null() {
         return Err(Error::invalid_argument(format!("{label} is null")));
@@ -3754,6 +3991,101 @@ fn offline_region_delete_start(
     error::check(unsafe {
         sys::mln_runtime_offline_region_delete_start(runtime, region_id, out_operation_id)
     })
+}
+
+fn offline_region_create_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+    let runtime = runtime_native(handle)?;
+    let mut snapshot = ptr::null_mut();
+    // SAFETY: `runtime` is live and output storage is valid. The C API
+    // validates operation state.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_create_take_result(runtime, operation_id, &mut snapshot)
+    })?;
+    wrap_offline_region_snapshot(snapshot)
+}
+
+fn offline_region_get_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    out_found: *mut GBoolean,
+) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+    if out_found.is_null() {
+        return Err(Error::invalid_argument(
+            "offline region found output pointer is null",
+        ));
+    }
+    let runtime = runtime_native(handle)?;
+    let mut snapshot = ptr::null_mut();
+    let mut found = false;
+    // SAFETY: `runtime` is live and output storage is valid. The C API
+    // validates operation state.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_get_take_result(
+            runtime,
+            operation_id,
+            &mut snapshot,
+            &mut found,
+        )
+    })?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })?;
+    if found {
+        wrap_offline_region_snapshot(snapshot)
+    } else {
+        Ok(ptr::null_mut())
+    }
+}
+
+fn offline_regions_list_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+) -> error::Result<*mut OfflineRegionListHandle> {
+    let runtime = runtime_native(handle)?;
+    let mut list = ptr::null_mut();
+    // SAFETY: `runtime` is live and output storage is valid. The C API
+    // validates operation state.
+    error::check(unsafe {
+        sys::mln_runtime_offline_regions_list_take_result(runtime, operation_id, &mut list)
+    })?;
+    wrap_offline_region_list(list)
+}
+
+fn offline_regions_merge_database_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+) -> error::Result<*mut OfflineRegionListHandle> {
+    let runtime = runtime_native(handle)?;
+    let mut list = ptr::null_mut();
+    // SAFETY: `runtime` is live and output storage is valid. The C API
+    // validates operation state.
+    error::check(unsafe {
+        sys::mln_runtime_offline_regions_merge_database_take_result(
+            runtime,
+            operation_id,
+            &mut list,
+        )
+    })?;
+    wrap_offline_region_list(list)
+}
+
+fn offline_region_update_metadata_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+) -> error::Result<*mut OfflineRegionSnapshotHandle> {
+    let runtime = runtime_native(handle)?;
+    let mut snapshot = ptr::null_mut();
+    // SAFETY: `runtime` is live and output storage is valid. The C API
+    // validates operation state.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_update_metadata_take_result(
+            runtime,
+            operation_id,
+            &mut snapshot,
+        )
+    })?;
+    wrap_offline_region_snapshot(snapshot)
 }
 
 fn offline_region_get_status_take_result(
