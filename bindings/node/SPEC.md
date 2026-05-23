@@ -155,6 +155,7 @@ src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice and root exports
 src/runtime.rs    runtime handle, runtime option materialization, and event polling proof slice
 src/map.rs        map handle, map option materialization, style-loading, and repaint proof slice
+src/values.rs     copied coordinate values and projection helper proof slice
 ```
 
 Planned internal Rust modules own implementation roles:
@@ -164,7 +165,7 @@ src/render.rs     render sessions, targets, readback, and frame scopes
 src/resource.rs   resource request/response conversion and one-shot handles
 src/style.rs      style source, layer, image, and custom geometry conversion
 src/query.rs      feature query descriptors and copied query results
-src/values.rs     JSON, GeoJSON, geometry, camera, and copied value conversion
+src/values.rs     JSON, GeoJSON, geometry, camera, and remaining copied value conversion
 src/callback.rs   `ThreadsafeFunction` state and callback lifetime helpers
 src/env.rs        N-API environment ownership and cleanup hooks
 src/handle.rs     close-once native handle state and parent retention
@@ -539,7 +540,8 @@ area instead of retesting all native C validation rules.
    retention. _(Initial lifecycle, options, style-loading, and parent-retention
    proof slice complete.)_
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,
-   and TypeScript concept modules.
+   and TypeScript concept modules. _(Initial coordinate value and projection
+   helper proof slice complete.)_
 7. Add logging, resource transforms, resource providers, and one-shot resource
    request completion through `ThreadsafeFunction` handoff.
 8. Add camera, projection, query, style, and offline APIs.

@@ -1,0 +1,75 @@
+use maplibre_native_core as core;
+use maplibre_native_sys as sys;
+use napi::bindgen_prelude::Result;
+use napi_derive::napi;
+
+use crate::error;
+
+#[napi(object)]
+pub struct LatLng {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+#[napi(object)]
+pub struct ProjectedMeters {
+    pub northing: f64,
+    pub easting: f64,
+}
+
+#[napi(js_name = "nativeProjectedMetersForLatLng")]
+pub fn native_projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeters> {
+    let mut raw_meters = sys::mln_projected_meters {
+        northing: 0.0,
+        easting: 0.0,
+    };
+    core::check(unsafe {
+        sys::mln_projected_meters_for_lat_lng(coordinate.into_native(), &mut raw_meters)
+    })
+    .map_err(error::from_core)?;
+    Ok(ProjectedMeters::from_native(raw_meters))
+}
+
+#[napi(js_name = "nativeLatLngForProjectedMeters")]
+pub fn native_lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
+    let mut raw_coordinate = sys::mln_lat_lng {
+        latitude: 0.0,
+        longitude: 0.0,
+    };
+    core::check(unsafe {
+        sys::mln_lat_lng_for_projected_meters(meters.into_native(), &mut raw_coordinate)
+    })
+    .map_err(error::from_core)?;
+    Ok(LatLng::from_native(raw_coordinate))
+}
+
+impl LatLng {
+    fn into_native(self) -> sys::mln_lat_lng {
+        core::values::lat_lng_to_native(core::LatLng::new(self.latitude, self.longitude))
+    }
+
+    fn from_native(raw: sys::mln_lat_lng) -> Self {
+        let value = core::values::lat_lng_from_native(raw);
+        Self {
+            latitude: value.latitude,
+            longitude: value.longitude,
+        }
+    }
+}
+
+impl ProjectedMeters {
+    fn into_native(self) -> sys::mln_projected_meters {
+        core::values::projected_meters_to_native(core::ProjectedMeters::new(
+            self.northing,
+            self.easting,
+        ))
+    }
+
+    fn from_native(raw: sys::mln_projected_meters) -> Self {
+        let value = core::values::projected_meters_from_native(raw);
+        Self {
+            northing: value.northing,
+            easting: value.easting,
+        }
+    }
+}

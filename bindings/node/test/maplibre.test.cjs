@@ -7,8 +7,10 @@ const {
   InvalidStateError,
   MaplibreError,
   MapHandle,
+  latLngForProjectedMeters,
   MaplibreStatus,
   networkStatus,
+  projectedMetersForLatLng,
   RuntimeHandle,
   setNetworkStatus,
   supportedRenderBackends,
@@ -34,6 +36,17 @@ test("process-global proof slice crosses the native add-on", () => {
   if (original.kind === "online" || original.kind === "offline") {
     setNetworkStatus(original.kind);
   }
+});
+
+test("projection helpers round trip copied coordinate values", () => {
+  const coordinate = { latitude: 45, longitude: -122 };
+  const meters = projectedMetersForLatLng(coordinate);
+  const roundTripped = latLngForProjectedMeters(meters);
+
+  assert.equal(typeof meters.northing, "number");
+  assert.equal(typeof meters.easting, "number");
+  assert.ok(Math.abs(roundTripped.latitude - coordinate.latitude) < 1e-9);
+  assert.ok(Math.abs(roundTripped.longitude - coordinate.longitude) < 1e-9);
 });
 
 test("runtime handle supports options, explicit close, and idempotent disposal", () => {

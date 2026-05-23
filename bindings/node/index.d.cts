@@ -118,7 +118,23 @@ export declare class MapHandle {
   [Symbol.dispose](): void;
 }
 
+export interface LatLng {
+  latitude: number;
+  longitude: number;
+}
+
+export interface ProjectedMeters {
+  northing: number;
+  easting: number;
+}
+
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;
 export declare function networkStatus(): NetworkStatusValue;
 export declare function setNetworkStatus(status: "online" | "offline"): void;
+export declare function projectedMetersForLatLng(
+  coordinate: LatLng,
+): ProjectedMeters;
+export declare function latLngForProjectedMeters(
+  meters: ProjectedMeters,
+): LatLng;

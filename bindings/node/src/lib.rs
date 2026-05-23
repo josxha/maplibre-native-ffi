@@ -10,7 +10,9 @@ mod error;
 mod map;
 mod maplibre;
 mod runtime;
+mod values;
 
 pub use map::*;
 pub use maplibre::*;
 pub use runtime::*;
+pub use values::*;

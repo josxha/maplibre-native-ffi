@@ -93,6 +93,18 @@ function setNetworkStatus(status) {
   return translateNativeErrors(() => native.setNetworkStatus(status));
 }
 
+function projectedMetersForLatLng(coordinate) {
+  return translateNativeErrors(() =>
+    native.nativeProjectedMetersForLatLng(coordinate),
+  );
+}
+
+function latLngForProjectedMeters(meters) {
+  return translateNativeErrors(() =>
+    native.nativeLatLngForProjectedMeters(meters),
+  );
+}
+
 class RuntimeHandle {
   constructor(options) {
     this.native = translateNativeErrors(() =>
@@ -268,4 +280,6 @@ module.exports = {
   supportedRenderBackends,
   networkStatus,
   setNetworkStatus,
+  projectedMetersForLatLng,
+  latLngForProjectedMeters,
 };
