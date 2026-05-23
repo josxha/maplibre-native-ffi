@@ -4,7 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import render
+from maplibre_native import render, resource
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -212,3 +212,65 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_resource_values_preserve_native_shape() -> None:
+    request = resource.ResourceRequest.from_native(
+        {
+            "url": "https://example.test/tile.pbf",
+            "kind": resource.ResourceKind.TILE.native_code,
+            "loading_method": resource.ResourceLoadingMethod.NETWORK_ONLY,
+            "priority": resource.ResourcePriority.LOW,
+            "usage": resource.ResourceUsage.OFFLINE,
+            "storage_policy": resource.ResourceStoragePolicy.VOLATILE,
+            "range": {"start": 5, "end": 10},
+            "prior_modified_unix_ms": 123,
+            "prior_expires_unix_ms": 456,
+            "prior_etag": "abc",
+            "prior_data": b"old",
+        }
+    )
+    response = resource.ResourceResponse.error(
+        resource.ResourceErrorReason.NOT_FOUND,
+        "missing",
+    )
+
+    assert request.kind == resource.ResourceKind.TILE
+    assert request.range == resource.ByteRange(5, 10)
+    assert request.prior_data == b"old"
+    assert response.to_native()["status"] == resource.ResourceResponseStatus.ERROR
+    assert (
+        response.to_native()["error_reason"] == resource.ResourceErrorReason.NOT_FOUND
+    )
+
+
+def test_resource_transform_registers_and_clears() -> None:
+    seen: list[resource.ResourceTransformRequest] = []
+
+    def transform(request: resource.ResourceTransformRequest) -> str | None:
+        seen.append(request)
+        return None
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_transform(transform, max_pending_callbacks=1)
+        with runtime.create_map():
+            runtime.set_resource_transform(transform, max_pending_callbacks=1)
+            runtime.clear_resource_transform()
+
+
+def test_resource_callback_registration_validates_bounds_and_lifecycle() -> None:
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        handle.close()
+        return resource.ResourceProviderDecision.PASS_THROUGH
+
+    with mln.RuntimeHandle() as runtime:
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.set_resource_provider(provider, max_pending_callbacks=0)
+
+        runtime.set_resource_provider(provider, max_pending_callbacks=1)
+        with runtime.create_map():
+            with pytest.raises(mln.InvalidStateError):
+                runtime.set_resource_provider(provider, max_pending_callbacks=1)

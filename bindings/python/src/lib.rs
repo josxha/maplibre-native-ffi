@@ -1,15 +1,19 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use maplibre_native_core::{
-    self as maplibre_core, Error, ErrorKind, NetworkStatus, RenderMode, RuntimeEventPayload,
-    RuntimeEventType, TileOperation,
+    self as maplibre_core, Error, ErrorKind, NetworkStatus, RenderMode, ResourceErrorReason,
+    ResourceResponseStatus, RuntimeEventPayload, RuntimeEventType, TileOperation,
 };
 use maplibre_native_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict};
-use std::ffi::c_void;
+use std::collections::HashMap;
+use std::ffi::{CString, c_char, c_void};
+use std::ptr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread::ThreadId;
 
 mod py_errors {
     pyo3::import_exception!(maplibre_native.errors, InvalidArgumentError);
@@ -23,6 +27,26 @@ mod py_errors {
 #[pyclass(name = "_RuntimeHandle")]
 struct RuntimeHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_runtime>>,
+    resource_provider: Mutex<Option<Box<PyResourceProviderState>>>,
+    resource_transform: Mutex<Option<Box<PyResourceTransformState>>>,
+}
+
+struct PyResourceProviderState {
+    callback: Py<PyAny>,
+    pending_callbacks: AtomicUsize,
+    max_pending_callbacks: usize,
+}
+
+struct PyResourceTransformState {
+    callback: Py<PyAny>,
+    pending_callbacks: AtomicUsize,
+    max_pending_callbacks: usize,
+    replacement_urls: Mutex<HashMap<ThreadId, CString>>,
+}
+
+#[pyclass(name = "_ResourceRequestHandle")]
+struct ResourceRequestHandle {
+    state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
 }
 
 #[pyclass(name = "_MapHandle")]
@@ -141,7 +165,16 @@ impl RuntimeHandle {
         let state = self.state();
         // SAFETY: state owns an mln_runtime pointer created by mln_runtime_create
         // and pairs it with the matching status-returning destroy function.
-        unsafe { state.close_status(sys::mln_runtime_destroy) }.map_err(map_error)
+        unsafe { state.close_status(sys::mln_runtime_destroy) }.map_err(map_error)?;
+        self.resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        self.resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        Ok(())
     }
 
     fn run_once(&self) -> PyResult<()> {
@@ -150,6 +183,80 @@ impl RuntimeHandle {
         // and that the call occurs on the runtime owner thread.
         maplibre_core::check(unsafe { sys::mln_runtime_run_once(state.as_ptr()) })
             .map_err(map_error)
+    }
+
+    fn set_resource_provider(
+        &self,
+        callback: Py<PyAny>,
+        max_pending_callbacks: usize,
+    ) -> PyResult<()> {
+        if max_pending_callbacks == 0 {
+            return Err(invalid_argument_error(
+                "max_pending_callbacks must be greater than zero",
+            ));
+        }
+        let replacement = Box::new(PyResourceProviderState::new(
+            callback,
+            max_pending_callbacks,
+        ));
+        let descriptor = replacement.descriptor();
+        let state = self.state();
+        // SAFETY: state owns or has released the runtime pointer. The C API
+        // validates that it is live. descriptor points to replacement state,
+        // which is retained after a successful native registration.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_resource_provider(state.as_ptr(), &descriptor)
+        })
+        .map_err(map_error)?;
+        self.resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(replacement);
+        Ok(())
+    }
+
+    fn set_resource_transform(
+        &self,
+        callback: Py<PyAny>,
+        max_pending_callbacks: usize,
+    ) -> PyResult<()> {
+        if max_pending_callbacks == 0 {
+            return Err(invalid_argument_error(
+                "max_pending_callbacks must be greater than zero",
+            ));
+        }
+        let replacement = Box::new(PyResourceTransformState::new(
+            callback,
+            max_pending_callbacks,
+        ));
+        let descriptor = replacement.descriptor();
+        let state = self.state();
+        // SAFETY: state owns or has released the runtime pointer. The C API
+        // validates that it is live. descriptor points to replacement state,
+        // which is retained after a successful native registration.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_resource_transform(state.as_ptr(), &descriptor)
+        })
+        .map_err(map_error)?;
+        self.resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(replacement);
+        Ok(())
+    }
+
+    fn clear_resource_transform(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: state owns or has released the runtime pointer. The C API
+        // validates that it is live and waits for in-flight callbacks before
+        // returning success.
+        maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_transform(state.as_ptr()) })
+            .map_err(map_error)?;
+        self.resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        Ok(())
     }
 
     fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
@@ -438,6 +545,225 @@ impl DetachedRenderSessionHandle {
     }
 }
 
+#[pymethods]
+impl ResourceRequestHandle {
+    fn complete(&self, response: &Bound<'_, PyAny>) -> PyResult<()> {
+        let response = resource_response_from_py(response)?;
+        self.state.complete(&response).map_err(map_error)
+    }
+
+    fn is_cancelled(&self) -> PyResult<bool> {
+        self.state.is_cancelled().map_err(map_error)
+    }
+
+    fn close(&self) {
+        self.state.close();
+    }
+}
+
+struct CallbackPermit<'a> {
+    pending: &'a AtomicUsize,
+}
+
+impl Drop for CallbackPermit<'_> {
+    fn drop(&mut self) {
+        self.pending.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+fn try_acquire_callback_permit(
+    pending: &AtomicUsize,
+    max_pending_callbacks: usize,
+) -> Option<CallbackPermit<'_>> {
+    let mut current = pending.load(Ordering::Acquire);
+    loop {
+        if current >= max_pending_callbacks {
+            return None;
+        }
+        match pending.compare_exchange_weak(
+            current,
+            current + 1,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => return Some(CallbackPermit { pending }),
+            Err(actual) => current = actual,
+        }
+    }
+}
+
+impl PyResourceProviderState {
+    fn new(callback: Py<PyAny>, max_pending_callbacks: usize) -> Self {
+        Self {
+            callback,
+            pending_callbacks: AtomicUsize::new(0),
+            max_pending_callbacks,
+        }
+    }
+
+    fn descriptor(&self) -> sys::mln_resource_provider {
+        maplibre_core::resource::resource_provider_descriptor(
+            Some(resource_provider_trampoline),
+            ptr::from_ref(self).cast_mut().cast::<c_void>(),
+        )
+    }
+
+    fn invoke(
+        &self,
+        request: *const sys::mln_resource_request,
+        handle: *mut sys::mln_resource_request_handle,
+    ) -> u32 {
+        let Some(_permit) =
+            try_acquire_callback_permit(&self.pending_callbacks, self.max_pending_callbacks)
+        else {
+            return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
+        };
+        let Some(raw_request) = ptr::NonNull::new(request.cast_mut()) else {
+            return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
+        };
+        // SAFETY: handle is received from the C provider callback and paired
+        // with the native request-handle functions.
+        let handle_state = match unsafe {
+            maplibre_core::resource::ResourceRequestHandleState::new(
+                handle,
+                maplibre_core::resource::ResourceRequestHandleFns::NATIVE,
+            )
+        } {
+            Ok(handle_state) => handle_state,
+            Err(_) => return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION,
+        };
+        // SAFETY: raw_request is non-null and borrowed for callback duration.
+        let request =
+            match unsafe { maplibre_core::resource::copy_resource_request(raw_request.as_ref()) } {
+                Ok(request) => request,
+                Err(_) => return handle_state.finish_provider_exception(),
+            };
+
+        Python::attach(|py| -> PyResult<u32> {
+            let py_request = resource_request_to_py(py, request)?;
+            let py_handle = Py::new(
+                py,
+                ResourceRequestHandle {
+                    state: Arc::clone(&handle_state),
+                },
+            )?;
+            let decision = self
+                .callback
+                .bind(py)
+                .call1((py_request, py_handle))?
+                .extract::<u32>()?;
+            Ok(match decision {
+                sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE => handle_state
+                    .finish_provider_decision(maplibre_core::ResourceProviderDecision::Handle),
+                _ => handle_state
+                    .finish_provider_decision(maplibre_core::ResourceProviderDecision::PassThrough),
+            })
+        })
+        .unwrap_or_else(|_| handle_state.finish_provider_exception())
+    }
+}
+
+unsafe extern "C" fn resource_provider_trampoline(
+    user_data: *mut c_void,
+    request: *const sys::mln_resource_request,
+    handle: *mut sys::mln_resource_request_handle,
+) -> u32 {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceProviderState>()) else {
+        return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
+    };
+    // SAFETY: user_data points to PyResourceProviderState retained by RuntimeHandle
+    // until replacement or runtime teardown; native waits for in-flight callbacks.
+    unsafe { state.as_ref() }.invoke(request, handle)
+}
+
+impl PyResourceTransformState {
+    fn new(callback: Py<PyAny>, max_pending_callbacks: usize) -> Self {
+        Self {
+            callback,
+            pending_callbacks: AtomicUsize::new(0),
+            max_pending_callbacks,
+            replacement_urls: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn descriptor(&self) -> sys::mln_resource_transform {
+        maplibre_core::resource::resource_transform_descriptor(
+            Some(resource_transform_trampoline),
+            ptr::from_ref(self).cast_mut().cast::<c_void>(),
+        )
+    }
+
+    fn invoke(
+        &self,
+        raw_kind: u32,
+        url: *const c_char,
+        out_response: *mut sys::mln_resource_transform_response,
+    ) -> sys::mln_status {
+        // SAFETY: out_response is callback-duration output storage provided by native.
+        let status = unsafe {
+            maplibre_core::resource::initialize_resource_transform_response(out_response)
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        let Some(_permit) =
+            try_acquire_callback_permit(&self.pending_callbacks, self.max_pending_callbacks)
+        else {
+            return sys::MLN_STATUS_OK;
+        };
+        // SAFETY: url is borrowed for callback duration by native.
+        let request = match unsafe {
+            maplibre_core::resource::copy_resource_transform_request(raw_kind, url)
+        } {
+            Ok(request) => request,
+            Err(error) => return maplibre_core::resource::status_for_error(&error),
+        };
+        let replacement = Python::attach(|py| -> PyResult<Option<String>> {
+            let py_request = resource_transform_request_to_py(py, request)?;
+            self.callback
+                .bind(py)
+                .call1((py_request,))?
+                .extract::<Option<String>>()
+        });
+        let Ok(Some(replacement)) = replacement else {
+            return sys::MLN_STATUS_OK;
+        };
+        if replacement.is_empty() {
+            return sys::MLN_STATUS_OK;
+        }
+        let Ok(replacement) = CString::new(replacement) else {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        };
+        let replacement_ptr = replacement.as_ptr();
+        let mut replacements = match self.replacement_urls.lock() {
+            Ok(replacements) => replacements,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        replacements.insert(std::thread::current().id(), replacement);
+        // SAFETY: out_response was initialized above and is non-null. The CString
+        // is retained in replacement_urls until this thread's next callback or
+        // callback state teardown.
+        unsafe {
+            (*out_response).url = replacement_ptr;
+        }
+        sys::MLN_STATUS_OK
+    }
+}
+
+unsafe extern "C" fn resource_transform_trampoline(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceTransformState>()) else {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    };
+    // SAFETY: user_data points to PyResourceTransformState retained by RuntimeHandle
+    // until replacement, clear, or runtime teardown; native waits for in-flight callbacks.
+    unsafe { state.as_ref() }.invoke(kind, url, out_response)
+}
+
 fn event_to_py(py: Python<'_>, event: maplibre_core::CopiedRuntimeEvent) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("event_type", event_type_raw(event.event_type))?;
@@ -603,6 +929,68 @@ fn image_to_py(
     dict.set_item("info", texture_image_info_to_py(py, info)?)?;
     dict.set_item("data", PyBytes::new(py, data))?;
     Ok(dict.into_any().unbind())
+}
+
+fn resource_request_to_py(
+    py: Python<'_>,
+    request: maplibre_core::ResourceRequest,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("url", request.url)?;
+    dict.set_item("kind", request.raw_kind)?;
+    dict.set_item("loading_method", request.raw_loading_method)?;
+    dict.set_item("priority", request.raw_priority)?;
+    dict.set_item("usage", request.raw_usage)?;
+    dict.set_item("storage_policy", request.raw_storage_policy)?;
+    if let Some(range) = request.range {
+        let range_dict = PyDict::new(py);
+        range_dict.set_item("start", range.start)?;
+        range_dict.set_item("end", range.end)?;
+        dict.set_item("range", range_dict)?;
+    } else {
+        dict.set_item("range", py.None())?;
+    }
+    dict.set_item("prior_modified_unix_ms", request.prior_modified_unix_ms)?;
+    dict.set_item("prior_expires_unix_ms", request.prior_expires_unix_ms)?;
+    dict.set_item("prior_etag", request.prior_etag)?;
+    dict.set_item("prior_data", PyBytes::new(py, &request.prior_data))?;
+    Ok(dict.into_any().unbind())
+}
+
+fn resource_transform_request_to_py(
+    py: Python<'_>,
+    request: maplibre_core::ResourceTransformRequest,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("kind", request.raw_kind)?;
+    dict.set_item("url", request.url)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn resource_response_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::ResourceResponse> {
+    let mut response = maplibre_core::ResourceResponse::default();
+    response.status = resource_response_status_from_raw(raw.get_item("status")?.extract::<u32>()?)?;
+    response.error_reason = ResourceErrorReason::from_raw(raw.get_item("error_reason")?.extract()?);
+    response.bytes = raw.get_item("bytes")?.extract()?;
+    response.error_message = raw.get_item("error_message")?.extract()?;
+    response.must_revalidate = raw.get_item("must_revalidate")?.extract()?;
+    response.modified_unix_ms = raw.get_item("modified_unix_ms")?.extract()?;
+    response.expires_unix_ms = raw.get_item("expires_unix_ms")?.extract()?;
+    response.etag = raw.get_item("etag")?.extract()?;
+    response.retry_after_unix_ms = raw.get_item("retry_after_unix_ms")?.extract()?;
+    Ok(response)
+}
+
+fn resource_response_status_from_raw(raw: u32) -> PyResult<ResourceResponseStatus> {
+    match raw {
+        sys::MLN_RESOURCE_RESPONSE_STATUS_OK => Ok(ResourceResponseStatus::Ok),
+        sys::MLN_RESOURCE_RESPONSE_STATUS_ERROR => Ok(ResourceResponseStatus::Error),
+        sys::MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT => Ok(ResourceResponseStatus::NoContent),
+        sys::MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED => Ok(ResourceResponseStatus::NotModified),
+        _ => Err(invalid_argument_error(format!(
+            "unknown resource response status cannot be set: {raw}"
+        ))),
+    }
 }
 
 fn probe_texture_image_info(
@@ -1067,6 +1455,8 @@ fn create_runtime(
     let state = unsafe { maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_runtime") };
     Ok(RuntimeHandle {
         state: Mutex::new(state),
+        resource_provider: Mutex::new(None),
+        resource_transform: Mutex::new(None),
     })
 }
 
@@ -1338,6 +1728,7 @@ fn vulkan_context_fields(
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<MapHandle>()?;
+    module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<DetachedRenderSessionHandle>()?;
     module.add_class::<MetalOwnedTextureFrameHandle>()?;

@@ -165,6 +165,38 @@ class RuntimeHandle:
         """Run one pending owner-thread task for this runtime."""
         self._native.run_once()
 
+    def set_resource_transform(
+        self,
+        callback: object,
+        *,
+        max_pending_callbacks: int = 64,
+    ) -> None:
+        """Install or replace the runtime-scoped network URL transform."""
+        from .resource import adapt_resource_transform_callback
+
+        self._native.set_resource_transform(
+            adapt_resource_transform_callback(callback),
+            max_pending_callbacks,
+        )
+
+    def clear_resource_transform(self) -> None:
+        """Clear the runtime-scoped network URL transform."""
+        self._native.clear_resource_transform()
+
+    def set_resource_provider(
+        self,
+        callback: object,
+        *,
+        max_pending_callbacks: int = 64,
+    ) -> None:
+        """Install or replace the runtime-scoped network resource provider."""
+        from .resource import adapt_resource_provider_callback
+
+        self._native.set_resource_provider(
+            adapt_resource_provider_callback(callback),
+            max_pending_callbacks,
+        )
+
     def poll_event(self) -> RuntimeEvent | None:
         """Poll and copy one queued runtime event."""
         event = self._native.poll_event()
