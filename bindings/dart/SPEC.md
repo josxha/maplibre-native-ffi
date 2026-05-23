@@ -49,9 +49,10 @@ above this package.
 
 Record Dart-only differences and current implementation omissions here.
 
-| Item             | Difference or omission                                                                                                                                    | Reason                                                                | User-visible behavior                              | Tests/docs impact                                                                                      |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Proof slice only | The current scaffold implements process-global ABI/version/backend/network-status calls and `NativePointer`; the remaining C API areas are planned below. | The scaffold establishes package shape before broad wrapper coverage. | Users can exercise only the proof-slice API today. | Current tests cover the proof slice; future rows in the testing map describe planned binding coverage. |
+| Item                      | Difference or omission                                                                                                                                                                                                                                                                                                      | Reason                                                                             | User-visible behavior                                                                                                      | Tests/docs impact                                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Incremental API coverage  | The binding advances by coherent concept slices. Implemented areas keep their public Dart surface stable while unimplemented areas remain absent instead of exposing raw C declarations.                                                                                                                                    | The package grows from a verified scaffold into broad C ABI coverage.              | Users can exercise only landed Dart APIs; raw generated declarations stay private.                                         | Tests cover landed slices through Dart adaptation behavior; the coverage map below names remaining slices.                      |
+| Callback handoff strategy | Arbitrary-thread MapLibre callbacks use a native shim to copy payloads, enqueue owner-isolate work, and return immediate C results from routing/queue/cancellation rules. Resource transforms use native-owned synchronous rewrite rules. Resource providers and custom geometry complete later where the C API permits it. | Dart user code does not run safely as arbitrary-thread synchronous callback state. | Dart callbacks run on the owning isolate; provider request handles and custom-geometry tile updates complete through APIs. | Callback tests cover copied payloads, queue failure behavior, exception containment, and one-shot completion/release semantics. |
 
 ## Current scaffold
 
@@ -73,18 +74,15 @@ bindings/dart/
   test/maplibre_native_ffi_test.dart
 ```
 
-The scaffold implements one proof slice:
+The initial scaffold established these package foundations:
 
 - `pubspec.yaml` defines a Dart 3.10+ package with `ffi`, `ffigen`, `lints`, and
   `test` dependencies.
 - `ffigen.yaml` points at the public umbrella header and records the generated
   private C declaration output path. The generated file is committed and used
-  through the curated proof-slice facade.
-- `Maplibre.cVersion()` calls `mln_c_version()` through a private C facade.
-- `Maplibre.supportedRenderBackends()` preserves backend mask bits in a Dart
-  value type.
-- `Maplibre.networkStatus()` and `Maplibre.setNetworkStatus()` cross the real C
-  ABI and translate native status failures into `MaplibreException` subtypes.
+  through the curated internal C facade.
+- Process-global proof-slice calls exercise the real C ABI and translate native
+  status failures into `MaplibreException` subtypes.
 - `NativePointer` establishes borrowed opaque address semantics for render
   backend interop.
 
@@ -141,7 +139,10 @@ future distribution policy.
 - conversion from C enum values and structs into Dart-friendly raw values;
 - native handle state, close-once helpers, and leak-reporting hooks;
 - descriptor materializers and copied-result readers;
-- C callback trampolines and retained Dart callback boxes.
+- native callback shim entry points that copy arbitrary-thread callback
+  payloads, queue owner-isolate work, and return immediate C results;
+- C callback trampolines, retained Dart callback boxes, and one-shot request
+  handle state.
 
 Raw generated declarations do not appear in public signatures.
 
@@ -153,8 +154,38 @@ Raw generated declarations do not appear in public signatures.
 - status checking and exception construction;
 - `calloc`, arena, UTF-8, string-view, and array helpers;
 - isolate ownership checks for binding-owned handles;
-- callback state and active-upcall accounting;
+- callback state, native-port queues, and active-upcall accounting;
+- resource-provider routing, one-shot completion, and release guards;
 - scoped native-memory and texture-frame borrow state.
+
+## Callback handoff plan
+
+Dart uses the same callback boundary shape as the planned Node binding: native
+code handles arbitrary-thread C callbacks, and Dart user callbacks run on the
+owning isolate. The Dart package includes a small native shim when direct
+`dart:ffi` callbacks cannot satisfy a C callback contract. The shim owns the C
+trampoline, copies borrowed payloads into native-owned queue records, posts
+those records to the owning isolate through a native port or equivalent
+mechanism, and returns the immediate C result selected by native routing, queue
+success, cancellation, or documented failure rules.
+
+Resource transforms stay synchronous through native-owned rewrite rules
+configured from Dart. Public Dart transform APIs update those rules; MapLibre
+network threads evaluate them without entering Dart user code. Replacement URL
+storage stays native-owned until the transform invocation has copied it.
+
+Resource providers use native-owned routing before Dart receives a request.
+Non-matching requests pass through immediately. Matching requests copy the
+request into a Dart-owned value and retain the provider's native request
+reference in a `ResourceRequestHandle`. The handle enforces one-shot completion,
+reports cancellation, and releases exactly once after completion or explicit
+close. Completion may happen during the queued Dart callback or later from the
+owning isolate when the C API permits cross-thread completion.
+
+Custom geometry callbacks copy fetch and cancel payloads, notify the owning
+isolate, and return quickly. Dart supplies tile data later through owner-thread
+map/style APIs. Callback replacement keeps old callback state alive until native
+unregistration completes and active upcalls drain.
 
 ## Dart public API inventory
 
@@ -240,9 +271,12 @@ exposes in a milestone; public wrappers advance by coherent concept slices.
   until empty, and close.
 - `RuntimeOptions` materialization.
 - Network status get/set.
-- Resource transform set/clear and provider callbacks.
+- Resource transform set/clear through native-owned synchronous rewrite rules.
+- Resource provider callbacks through native-owned routing, copied request
+  payloads, owner-isolate handoff, and immediate C return rules.
 - Resource request and response copying.
-- Resource request cancellation checks, one-shot completion, and release.
+- Resource request cancellation checks, one-shot completion, and exactly-once
+  release.
 
 ### Offline
 
@@ -307,7 +341,8 @@ exposes in a milestone; public wrappers advance by coherent concept slices.
 - Style source, layer, image, light, and property operations.
 - Style source/layer ID lists with copied Dart lists.
 - GeoJSON, vector, raster, raster DEM, image, and custom geometry sources.
-- Custom geometry source callbacks and tile-data materialization.
+- Custom geometry source callbacks through native queued fetch/cancel
+  notifications and later owner-thread tile-data submission.
 - Style image data, image info, and premultiplied RGBA8 copying.
 
 ## Example migration target
@@ -329,20 +364,20 @@ application lifecycle belong in adapters above this package.
 
 ## Testing map
 
-This table describes planned binding coverage. The current scaffold test suite
-covers only the proof-slice process globals and `NativePointer` value semantics.
+This table describes planned binding coverage. Tests advance with landed API
+slices and stay focused on Dart adaptation behavior.
 
-| Area                 | Tests                                                                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Process globals      | ABI version, supported backend mask, network status get/set, invalid raw network status.                                     |
-| Errors               | Native status-to-exception mapping, diagnostic capture, binding-side validation with null raw status.                        |
-| Handles              | Idempotent close after success, failed close leaves handle live, closed-handle validation, parent retention.                 |
-| Runtime events       | Polling returns copied events independent of the next native poll; map-originated events identify the live Dart map wrapper. |
-| Strings and bytes    | Embedded-NUL rejection, string-view byte lengths, copied C strings, copied typed-data payloads.                              |
-| Callbacks            | Strong callback retention, replacement release, exception containment, resource request one-shot completion.                 |
-| Rendering            | Descriptor materialization, `NativePointer` values, frame acquisition invalidation, readback buffer sizing and copying.      |
-| Offline              | Operation start, completion event matching, take/discard semantics, result handle release.                                   |
-| Isolates and threads | Detectable isolate-owner misuse, native wrong-thread propagation, callback threads that avoid thread-affine APIs.            |
+| Area                 | Tests                                                                                                                                                                                              |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Process globals      | ABI version, supported backend mask, network status get/set, invalid raw network status.                                                                                                           |
+| Errors               | Native status-to-exception mapping, diagnostic capture, binding-side validation with null raw status.                                                                                              |
+| Handles              | Idempotent close after success, failed close leaves handle live, closed-handle validation, parent retention.                                                                                       |
+| Runtime events       | Polling returns copied events independent of the next native poll; map-originated events identify the live Dart map wrapper.                                                                       |
+| Strings and bytes    | Embedded-NUL rejection, string-view byte lengths, copied C strings, copied typed-data payloads.                                                                                                    |
+| Callbacks            | Strong callback retention, native-shim queue handoff, replacement release after active upcalls drain, exception containment, resource request one-shot completion/release, queue failure behavior. |
+| Rendering            | Descriptor materialization, `NativePointer` values, frame acquisition invalidation, readback buffer sizing and copying.                                                                            |
+| Offline              | Operation start, completion event matching, take/discard semantics, result handle release.                                                                                                         |
+| Isolates and threads | Detectable isolate-owner misuse, native wrong-thread propagation, callback threads that avoid thread-affine APIs.                                                                                  |
 
 Prefer small adaptation tests around real C calls. Raw C validation already
 lives in the C ABI tests; Dart tests prove the language boundary preserves that
@@ -360,9 +395,11 @@ behavior.
    query, and resource APIs.
 5. Implement render session attachment, texture frames, CPU readback, and
    backend-native pointer descriptors.
-6. Implement resource transforms/providers, custom geometry callbacks, and
-   offline operation handles.
-7. Add examples and generated API reference integration after package artifact
+6. Keep the Dart callback handoff plan documented in this spec and in the Dart
+   binding conventions before implementing arbitrary-thread callback APIs.
+7. Implement resource transforms/providers, custom geometry callbacks, and
+   offline operation handles through the native-shim owner-isolate handoff plan.
+8. Add examples and generated API reference integration after package artifact
    policy is chosen.
 
 ## Completion checklist
@@ -381,6 +418,9 @@ behavior.
   API documents longer ownership.
 - Callback state is retained for the native owner scope and released exactly
   once.
+- Arbitrary-thread callbacks copy payloads in native trampolines, queue
+  owner-isolate work, and return immediate C results without running Dart user
+  code on MapLibre worker threads.
 - Callback exceptions are contained and converted to documented C callback
   behavior.
 - Runtime events, result handles, strings, and lists copy into Dart-owned values
@@ -390,5 +430,6 @@ behavior.
   scope.
 - `NativePointer` remains an opaque borrowed address value with no memory
   access.
-- Tests cover Dart-owned lifetime, copying, error, callback, thread, and frame
-  invariants through real C calls where practical.
+- Tests cover Dart-owned lifetime, copying, error, callback queue handoff,
+  one-shot request completion, thread, and frame invariants through real C calls
+  where practical.

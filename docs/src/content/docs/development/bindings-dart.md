@@ -107,25 +107,44 @@ Internal adapters copy or scope callback arguments, catch Dart exceptions, and
 convert failures to the documented C callback behavior. Dart exceptions never
 escape through native frames.
 
-Use `NativeCallable.listener` for void MapLibre upcalls that can post copied
-arguments to Dart, such as custom geometry fetch and cancel notifications.
-Reserve `NativeCallable.isolateLocal` for binding-owned helpers that call back
-on the same native thread during the initiating FFI call. Use `ReceivePort` with
-`sendPort.nativePort`, usually behind a native shim, when logging, resource
-providers, or owner-thread handoff need to return quickly while queuing copied
-work for the owning isolate. Keep isolate-group callback support in experimental
-adapters, outside the core binding design.
+MapLibre callbacks may arrive on worker, network, logging, or render-related
+threads. The core binding does not run Dart user callbacks directly on those
+threads. A small native shim owns the C callback trampolines for
+arbitrary-thread callback contracts. The shim copies borrowed C payloads,
+enqueues copied work to the owning Dart isolate through a native port or
+equivalent mechanism, and returns the immediate C result selected by native
+routing, queue success, cancellation, or documented failure rules. Later Dart
+work runs on the owning isolate and must not call thread-affine C APIs from the
+callback thread.
 
-Resource transforms stay synchronous. Implement them with native-owned rewrite
-rules or a callback shape that can return quickly without touching thread-affine
-handles. Copy borrowed request fields before Dart code can retain them, and keep
-replacement URL storage alive until native consumes it.
+Use `NativeCallable.listener` for void callbacks whose native caller can accept
+asynchronous delivery. Reserve `NativeCallable.isolateLocal` for binding-owned
+helpers that call back on the same native thread during the initiating FFI call.
+Use `ReceivePort` with `sendPort.nativePort`, behind the native shim, when
+logging, resource providers, custom geometry notifications, or owner-isolate
+handoff must return quickly while queuing copied work. Isolate-group-bound
+callbacks stay outside the core binding design unless their callback state is
+trivially shareable and the callback contract allows that restriction.
 
-Resource provider callbacks copy request data before posting to Dart. Matching
-requests own a `ResourceRequestHandle` that enforces one-shot completion and
-exactly-once release. Pass-through requests return immediately and do not retain
-the native request handle. Handled requests may complete inline or later through
-a queue when the C API allows cross-thread completion.
+Resource transforms stay synchronous. Implement public Dart transform APIs as
+native-owned rewrite rules configured from Dart, or as a callback shape that can
+return immediately without Dart user code on a MapLibre network thread. The shim
+copies rule data into native storage and keeps replacement URL storage valid
+until native consumes it.
+
+Resource provider callbacks use native-owned routing before crossing into Dart.
+Non-matching requests pass through immediately. Matching requests copy request
+data, retain the native request reference in a `ResourceRequestHandle`, and
+queue a Dart request object on the owning isolate. The request object enforces
+one-shot completion and exactly-once release. Handled requests complete during
+the Dart callback or later from the owning isolate when the C API permits
+cross-thread completion.
+
+Custom geometry callbacks use the same handoff model. Fetch and cancel callbacks
+copy tile identifiers and source state, notify the owning isolate, and return
+quickly. Dart submits tile data later through owner-thread map/style APIs.
+Callback replacement keeps the old callback state alive until native
+unregistration completes and in-flight callbacks drain.
 
 ## Rendering and Tests
 
