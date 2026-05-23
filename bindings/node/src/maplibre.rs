@@ -1,4 +1,9 @@
+use std::ffi::CStr;
+use std::os::raw::{c_char, c_void};
+use std::sync::{Arc, Mutex, OnceLock};
+
 use napi::bindgen_prelude::Result;
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
 use crate::error;
@@ -15,6 +20,18 @@ pub struct NetworkStatusValue {
     pub kind: String,
     pub raw: u32,
 }
+
+#[napi(object)]
+pub struct LogRecord {
+    pub severity: String,
+    pub raw_severity: u32,
+    pub event: String,
+    pub raw_event: u32,
+    pub code: i64,
+    pub message: String,
+}
+
+static LOG_CALLBACK: OnceLock<Mutex<Option<Arc<ThreadsafeFunction<LogRecord>>>>> = OnceLock::new();
 
 #[napi(js_name = "cVersion")]
 pub fn c_version() -> u32 {
@@ -64,6 +81,27 @@ pub fn set_network_status(status: String) -> Result<()> {
         .map_err(error::from_core)
 }
 
+#[napi(js_name = "nativeSetLogCallback")]
+pub fn native_set_log_callback(callback: ThreadsafeFunction<LogRecord>) -> Result<()> {
+    *log_callback_slot()
+        .lock()
+        .expect("log callback mutex poisoned") = Some(Arc::new(callback));
+    maplibre_native_core::check(unsafe {
+        maplibre_native_sys::mln_log_set_callback(Some(log_trampoline), std::ptr::null_mut())
+    })
+    .map_err(error::from_core)
+}
+
+#[napi(js_name = "nativeClearLogCallback")]
+pub fn native_clear_log_callback() -> Result<()> {
+    maplibre_native_core::check(unsafe { maplibre_native_sys::mln_log_clear_callback() })
+        .map_err(error::from_core)?;
+    *log_callback_slot()
+        .lock()
+        .expect("log callback mutex poisoned") = None;
+    Ok(())
+}
+
 #[napi(js_name = "nativeSetAsyncLogSeverityMask")]
 pub fn native_set_async_log_severity_mask(mask: u32) -> Result<()> {
     maplibre_native_core::check(unsafe {
@@ -86,6 +124,79 @@ pub fn native_log_severity_mask_bit(severity: String) -> Result<u32> {
         other => Err(error::invalid_argument(format!(
             "log severity must be 'info', 'warning', or 'error', got '{other}'"
         ))),
+    }
+}
+
+extern "C" fn log_trampoline(
+    _user_data: *mut c_void,
+    severity: u32,
+    event: u32,
+    code: i64,
+    message: *const c_char,
+) -> u32 {
+    let callback = log_callback_slot()
+        .lock()
+        .expect("log callback mutex poisoned")
+        .clone();
+    if let Some(callback) = callback {
+        callback.call(
+            Ok(LogRecord {
+                severity: log_severity_name(severity).to_owned(),
+                raw_severity: severity,
+                event: log_event_name(event).to_owned(),
+                raw_event: event,
+                code,
+                message: copy_log_message(message),
+            }),
+            ThreadsafeFunctionCallMode::NonBlocking,
+        );
+    }
+    0
+}
+
+fn log_callback_slot() -> &'static Mutex<Option<Arc<ThreadsafeFunction<LogRecord>>>> {
+    LOG_CALLBACK.get_or_init(|| Mutex::new(None))
+}
+
+fn copy_log_message(message: *const c_char) -> String {
+    if message.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(message) }
+            .to_string_lossy()
+            .into_owned()
+    }
+}
+
+fn log_severity_name(severity: u32) -> &'static str {
+    match severity {
+        maplibre_native_sys::MLN_LOG_SEVERITY_INFO => "info",
+        maplibre_native_sys::MLN_LOG_SEVERITY_WARNING => "warning",
+        maplibre_native_sys::MLN_LOG_SEVERITY_ERROR => "error",
+        _ => "unknown",
+    }
+}
+
+fn log_event_name(event: u32) -> &'static str {
+    match event {
+        maplibre_native_sys::MLN_LOG_EVENT_GENERAL => "general",
+        maplibre_native_sys::MLN_LOG_EVENT_SETUP => "setup",
+        maplibre_native_sys::MLN_LOG_EVENT_SHADER => "shader",
+        maplibre_native_sys::MLN_LOG_EVENT_PARSE_STYLE => "parseStyle",
+        maplibre_native_sys::MLN_LOG_EVENT_PARSE_TILE => "parseTile",
+        maplibre_native_sys::MLN_LOG_EVENT_RENDER => "render",
+        maplibre_native_sys::MLN_LOG_EVENT_STYLE => "style",
+        maplibre_native_sys::MLN_LOG_EVENT_DATABASE => "database",
+        maplibre_native_sys::MLN_LOG_EVENT_HTTP_REQUEST => "httpRequest",
+        maplibre_native_sys::MLN_LOG_EVENT_SPRITE => "sprite",
+        maplibre_native_sys::MLN_LOG_EVENT_IMAGE => "image",
+        maplibre_native_sys::MLN_LOG_EVENT_OPENGL => "openGl",
+        maplibre_native_sys::MLN_LOG_EVENT_JNI => "jni",
+        maplibre_native_sys::MLN_LOG_EVENT_ANDROID => "android",
+        maplibre_native_sys::MLN_LOG_EVENT_CRASH => "crash",
+        maplibre_native_sys::MLN_LOG_EVENT_GLYPH => "glyph",
+        maplibre_native_sys::MLN_LOG_EVENT_TIMING => "timing",
+        _ => "unknown",
     }
 }
 

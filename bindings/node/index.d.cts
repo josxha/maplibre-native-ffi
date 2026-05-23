@@ -215,7 +215,20 @@ export declare function supportedRenderBackends(): RenderBackends;
 export declare function networkStatus(): NetworkStatusValue;
 export type LogSeverity = "info" | "warning" | "error";
 
+export interface LogRecord {
+  severity: LogSeverity | "unknown";
+  rawSeverity: number;
+  event: string;
+  rawEvent: number;
+  code: number;
+  message: string;
+}
+
+export type LogCallback = (record: LogRecord) => void;
+
 export declare function setNetworkStatus(status: "online" | "offline"): void;
+export declare function setLogCallback(callback: LogCallback): void;
+export declare function clearLogCallback(): void;
 export declare function setAsyncLogSeverities(
   severities: Iterable<LogSeverity>,
 ): void;

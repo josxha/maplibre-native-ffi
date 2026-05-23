@@ -105,6 +105,24 @@ function latLngForProjectedMeters(meters) {
   );
 }
 
+function setLogCallback(callback) {
+  if (typeof callback !== "function") {
+    throw new InvalidArgumentError(null, "log callback must be a function");
+  }
+  return translateNativeErrors(() =>
+    native.nativeSetLogCallback((error, record) => {
+      if (error) {
+        throw error;
+      }
+      callback(record);
+    }),
+  );
+}
+
+function clearLogCallback() {
+  return translateNativeErrors(() => native.nativeClearLogCallback());
+}
+
 function setAsyncLogSeverities(severities) {
   let mask = 0;
   for (const severity of severities) {
@@ -581,6 +599,8 @@ module.exports = {
   setNetworkStatus,
   projectedMetersForLatLng,
   latLngForProjectedMeters,
+  setLogCallback,
+  clearLogCallback,
   setAsyncLogSeverities,
   restoreDefaultAsyncLogSeverities,
 };

@@ -4,6 +4,7 @@ const test = require("node:test");
 const { Worker } = require("node:worker_threads");
 
 const {
+  clearLogCallback,
   cVersion,
   InvalidArgumentError,
   InvalidStateError,
@@ -19,6 +20,7 @@ const {
   restoreDefaultAsyncLogSeverities,
   RuntimeHandle,
   setAsyncLogSeverities,
+  setLogCallback,
   setNetworkStatus,
   supportedRenderBackends,
 } = require("..");
@@ -54,6 +56,26 @@ test("projection helpers round trip copied coordinate values", () => {
   assert.equal(typeof meters.easting, "number");
   assert.ok(Math.abs(roundTripped.latitude - coordinate.latitude) < 1e-9);
   assert.ok(Math.abs(roundTripped.longitude - coordinate.longitude) < 1e-9);
+});
+
+test("log callback copies records through the Node event loop", async () => {
+  /** @type {import("..").LogRecord[]} */
+  const records = [];
+  setLogCallback((record) => records.push(record));
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.dumpDebugLogs();
+    await eventually(() => records.length > 0);
+    assert.equal(typeof records[0].message, "string");
+    assert.equal(typeof records[0].rawSeverity, "number");
+    assert.equal(typeof records[0].rawEvent, "number");
+  } finally {
+    map.close();
+    runtime.close();
+    clearLogCallback();
+  }
 });
 
 test("async log severities map string values and reject unknown values", () => {
@@ -376,6 +398,18 @@ test("runtime options reject invalid bigint values", () => {
     },
   );
 });
+
+/** @param {() => boolean} predicate */
+async function eventually(predicate) {
+  const deadline = Date.now() + 500;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.equal(predicate(), true);
+}
 
 test("binding-owned validation rejects unknown network status strings", () => {
   assert.throws(
