@@ -18,7 +18,7 @@ from .errors import (
     WrongThreadError,
 )
 from .render import NativePointer, RenderBackend
-from .runtime import NetworkStatus
+from .runtime import NetworkStatus, RuntimeHandle, RuntimeOptions
 
 __all__ = [
     "EXPECTED_C_ABI_VERSION",
@@ -30,6 +30,8 @@ __all__ = [
     "NativePointer",
     "NetworkStatus",
     "RenderBackend",
+    "RuntimeHandle",
+    "RuntimeOptions",
     "UnknownStatusError",
     "UnsupportedFeatureError",
     "WrongThreadError",

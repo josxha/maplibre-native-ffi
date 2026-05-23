@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 
 import maplibre_native as mln
@@ -56,3 +58,50 @@ def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
         == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
     )
     assert "network status" in raised.value.diagnostic
+
+
+def test_runtime_handle_context_manager_closes_once() -> None:
+    with mln.RuntimeHandle() as runtime:
+        assert not runtime.closed
+        runtime.run_once()
+
+    assert runtime.closed
+    runtime.close()
+    assert runtime.closed
+
+
+def test_duplicate_runtime_reports_invalid_state() -> None:
+    runtime = mln.RuntimeHandle()
+    try:
+        with pytest.raises(mln.InvalidStateError) as raised:
+            mln.RuntimeHandle()
+
+        assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
+        assert (
+            raised.value.native_status_code
+            == mln.MaplibreStatus.INVALID_STATE.native_code
+        )
+    finally:
+        runtime.close()
+
+
+def test_runtime_close_from_wrong_thread_reports_wrong_thread() -> None:
+    runtime = mln.RuntimeHandle()
+    raised_error: list[BaseException] = []
+
+    def close_runtime() -> None:
+        try:
+            runtime.close()
+        except BaseException as error:
+            raised_error.append(error)
+
+    thread = threading.Thread(target=close_runtime)
+    thread.start()
+    thread.join()
+
+    try:
+        assert len(raised_error) == 1
+        assert isinstance(raised_error[0], mln.WrongThreadError)
+        assert raised_error[0].status == mln.MaplibreStatus.WRONG_THREAD
+    finally:
+        runtime.close()

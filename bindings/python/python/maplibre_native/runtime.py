@@ -1,6 +1,10 @@
 """Runtime values and handles for the Python binding."""
 
+from dataclasses import dataclass
 from enum import IntEnum
+from types import TracebackType
+
+from . import _native
 
 
 class NetworkStatus(IntEnum):
@@ -28,3 +32,48 @@ class NetworkStatus(IntEnum):
     def is_unknown(self) -> bool:
         """Return whether this value preserves an unknown native status."""
         return self.name.startswith("UNKNOWN_")
+
+
+@dataclass(slots=True)
+class RuntimeOptions:
+    """Options used when creating a runtime."""
+
+    asset_path: str | None = None
+    cache_path: str | None = None
+    maximum_cache_size: int | None = None
+
+
+class RuntimeHandle:
+    """Owner-thread runtime handle."""
+
+    def __init__(self, options: RuntimeOptions | None = None) -> None:
+        options = options or RuntimeOptions()
+        self._native = _native.create_runtime(
+            options.asset_path,
+            options.cache_path,
+            options.maximum_cache_size,
+        )
+
+    @property
+    def closed(self) -> bool:
+        """Return whether this handle has been closed."""
+        return bool(self._native.closed)
+
+    def close(self) -> None:
+        """Release this runtime handle exactly once."""
+        self._native.close()
+
+    def run_once(self) -> None:
+        """Run one pending owner-thread task for this runtime."""
+        self._native.run_once()
+
+    def __enter__(self) -> "RuntimeHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()

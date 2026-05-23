@@ -109,6 +109,8 @@ This scaffold implements one proof slice:
 - `maplibre_native.network_status()` and `maplibre_native.set_network_status()`
   cross native status-returning APIs and raise Python `MaplibreError` subclasses
   for failures.
+- `RuntimeHandle` creates, runs, closes, and supports context-manager cleanup
+  for a native runtime handle.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish naming and value semantics for later concept
   implementations.
@@ -116,13 +118,13 @@ This scaffold implements one proof slice:
 
 ## Build artifacts and tasks
 
-| Artifact                 | Path                         | Contents                                                                                                                         |
-| ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Python project           | `bindings/python`            | Public Python package, PyO3 crate, tests, maturin metadata.                                                                      |
-| PyO3 extension crate     | `bindings/python/Cargo.toml` | `maplibre-native-python` cdylib compiled as `maplibre_native._native`.                                                           |
-| Public Python package    | `python/maplibre_native`     | Typed public facade, exceptions, values, handles, and concept modules.                                                           |
-| Private extension module | `maplibre_native._native`    | Proof-slice bridge functions, native status conversion, and later handle state, callback trampolines, and copied result helpers. |
-| Test suite               | `tests`                      | Python tests against the real native C library.                                                                                  |
+| Artifact                 | Path                         | Contents                                                                                                                                |
+| ------------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Python project           | `bindings/python`            | Public Python package, PyO3 crate, tests, maturin metadata.                                                                             |
+| PyO3 extension crate     | `bindings/python/Cargo.toml` | `maplibre-native-python` cdylib compiled as `maplibre_native._native`.                                                                  |
+| Public Python package    | `python/maplibre_native`     | Typed public facade, exceptions, values, handles, and concept modules.                                                                  |
+| Private extension module | `maplibre_native._native`    | Proof-slice bridge functions, native status conversion, runtime handle state, and later callback trampolines and copied result helpers. |
+| Test suite               | `tests`                      | Python tests against the real native C library.                                                                                         |
 
 Implemented tasks:
 
@@ -144,11 +146,11 @@ the native library exists before maturin invokes Cargo.
 
 ### `maplibre_native._native`
 
-`_native` is private. The current scaffold exposes proof-slice bridge functions
-and status-converting network status entry points needed by the Python package.
-As coverage grows, `_native` owns PyO3-specific conversion, GIL handling, Python
-exception construction, buffer guards, callback queues, and free-threaded
-synchronization.
+`_native` is private. The current scaffold exposes proof-slice bridge functions,
+status-converting network status entry points, and runtime handle state needed
+by the Python package. As coverage grows, `_native` owns PyO3-specific
+conversion, GIL handling, Python exception construction, buffer guards, callback
+queues, and free-threaded synchronization.
 
 `_native` may call `maplibre-native-sys` directly only for the initial proof
 slice or host-runtime trampoline code. Repeated C ABI adaptation moves into
@@ -174,6 +176,8 @@ NetworkStatus
 RenderBackend
 UnknownStatusError
 UnsupportedFeatureError
+RuntimeHandle
+RuntimeOptions
 WrongThreadError
 ```
 
@@ -393,7 +397,7 @@ Coverage targets:
 - [x] Implement native status-to-Python exception conversion in `_native`.
 - [x] Add `network_status()` and `set_network_status()` over native status
       conversion.
-- [ ] Add `RuntimeHandle` with context-manager close and owner-thread error
+- [x] Add `RuntimeHandle` with context-manager close and owner-thread error
       propagation.
 - [ ] Add `MapHandle`, map options, and parent retention.
 - [ ] Add runtime event polling with copied Python event values.
