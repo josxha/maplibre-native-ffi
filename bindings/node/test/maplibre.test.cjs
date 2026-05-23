@@ -190,6 +190,13 @@ test("offline operations expose discardable handles", () => {
     list.close();
     const get = runtime.offlineRegionGet(1n);
     get.close();
+    const status = runtime.offlineRegionGetStatus(1n);
+    status.close();
+    const updateMetadata = runtime.offlineRegionUpdateMetadata(
+      1n,
+      new Uint8Array([4, 5]),
+    );
+    updateMetadata.close();
     const create = runtime.offlineRegionCreate(
       {
         kind: "tilePyramid",

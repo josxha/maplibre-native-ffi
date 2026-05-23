@@ -313,6 +313,12 @@ export declare class RuntimeHandle {
   ): OfflineOperationHandle;
   offlineRegionsList(): OfflineOperationHandle;
   offlineRegionGet(regionId: bigint): OfflineOperationHandle;
+  offlineRegionsMergeDatabase(path: string): OfflineOperationHandle;
+  offlineRegionUpdateMetadata(
+    regionId: bigint,
+    metadata?: Uint8Array | null,
+  ): OfflineOperationHandle;
+  offlineRegionGetStatus(regionId: bigint): OfflineOperationHandle;
   offlineRegionSetObserved(
     regionId: bigint,
     observed: boolean,

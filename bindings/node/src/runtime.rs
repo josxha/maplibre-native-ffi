@@ -300,6 +300,58 @@ impl NativeRuntimeHandle {
         Ok(offline_operation_start(operation_id))
     }
 
+    #[napi(js_name = "offlineRegionsMergeDatabase")]
+    pub fn offline_regions_merge_database(&self, path: String) -> Result<OfflineOperationStart> {
+        let path = core::string::c_string(&path).map_err(error::from_core)?;
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_regions_merge_database_start(
+                self.state.as_ptr(),
+                path.as_ptr(),
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionUpdateMetadata")]
+    pub fn offline_region_update_metadata(
+        &self,
+        region_id: BigInt,
+        metadata: Option<Uint8Array>,
+    ) -> Result<OfflineOperationStart> {
+        let metadata = metadata
+            .map(|metadata| metadata.to_vec())
+            .unwrap_or_default();
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_update_metadata_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                core::runtime::metadata_ptr(&metadata),
+                metadata.len(),
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionGetStatus")]
+    pub fn offline_region_get_status(&self, region_id: BigInt) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_get_status_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
     #[napi(js_name = "offlineRegionSetObserved")]
     pub fn offline_region_set_observed(
         &self,

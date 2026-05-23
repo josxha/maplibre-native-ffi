@@ -413,6 +413,24 @@ class RuntimeHandle {
     return this.#offlineOperation(() => this.native.offlineRegionGet(regionId));
   }
 
+  offlineRegionsMergeDatabase(path) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionsMergeDatabase(path),
+    );
+  }
+
+  offlineRegionUpdateMetadata(regionId, metadata = null) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionUpdateMetadata(regionId, metadata),
+    );
+  }
+
+  offlineRegionGetStatus(regionId) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionGetStatus(regionId),
+    );
+  }
+
   offlineRegionSetObserved(regionId, observed) {
     return this.#offlineOperation(() =>
       this.native.offlineRegionSetObserved(regionId, observed),
