@@ -585,6 +585,65 @@ class MapProjectionHandle {
   }
 }
 
+class RenderSessionHandle {
+  constructor(nativeHandle) {
+    this.native = nativeHandle;
+  }
+
+  static attachMetalOwnedTexture(map, descriptor) {
+    if (!(map instanceof MapHandle)) {
+      throw new InvalidArgumentError(null, "map must be a MapHandle");
+    }
+    return new RenderSessionHandle(
+      translateNativeErrors(() =>
+        native.createMetalOwnedTextureRenderSession(map.native, descriptor),
+      ),
+    );
+  }
+
+  close() {
+    return translateNativeErrors(() => this.native.close());
+  }
+
+  get closed() {
+    return this.native.closed;
+  }
+
+  resize(width, height, scaleFactor) {
+    return translateNativeErrors(() =>
+      this.native.resize(width, height, scaleFactor),
+    );
+  }
+
+  renderUpdate() {
+    return translateNativeErrors(() => this.native.renderUpdate());
+  }
+
+  detach() {
+    return translateNativeErrors(() => this.native.detach());
+  }
+
+  reduceMemoryUse() {
+    return translateNativeErrors(() => this.native.reduceMemoryUse());
+  }
+
+  clearData() {
+    return translateNativeErrors(() => this.native.clearData());
+  }
+
+  dumpDebugLogs() {
+    return translateNativeErrors(() => this.native.dumpDebugLogs());
+  }
+
+  readPremultipliedRgba8() {
+    return translateNativeErrors(() => this.native.readPremultipliedRgba8());
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
 class MapHandle {
   constructor(runtime, options) {
     if (!(runtime instanceof RuntimeHandle)) {
@@ -606,6 +665,10 @@ class MapHandle {
 
   createProjection() {
     return new MapProjectionHandle(this);
+  }
+
+  attachMetalOwnedTexture(descriptor) {
+    return RenderSessionHandle.attachMetalOwnedTexture(this, descriptor);
   }
 
   requestRepaint() {
@@ -1236,6 +1299,7 @@ module.exports = {
   OfflineOperationHandle,
   MapHandle,
   MapProjectionHandle,
+  RenderSessionHandle,
   NativePointer,
   NativeBuffer,
   cVersion,

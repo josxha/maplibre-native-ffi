@@ -20,6 +20,7 @@ const {
   networkStatus,
   projectedMetersForLatLng,
   restoreDefaultAsyncLogSeverities,
+  RenderSessionHandle,
   RuntimeHandle,
   setAsyncLogSeverities,
   setLogCallback,
@@ -285,6 +286,29 @@ test("map handle retains runtime parent and closes before runtime", () => {
   assert.equal(map.closed, true);
   map.close();
   runtime.close();
+});
+
+test("render session attach descriptors translate native failures", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    assert.throws(
+      () =>
+        map.attachMetalOwnedTexture({
+          extent: { width: 16, height: 16, scaleFactor: 1 },
+          context: { deviceAddress: 0n },
+        }),
+      MaplibreError,
+    );
+    assert.equal(
+      typeof RenderSessionHandle.attachMetalOwnedTexture,
+      "function",
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
 });
 
 test("map utility methods expose copied booleans and native commands", () => {

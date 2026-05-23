@@ -419,6 +419,51 @@ export declare class OfflineOperationHandle {
   [Symbol.dispose](): void;
 }
 
+export interface RenderTargetExtent {
+  width: number;
+  height: number;
+  scaleFactor: number;
+}
+
+export interface MetalContextDescriptor {
+  deviceAddress?: bigint | null;
+}
+
+export interface MetalOwnedTextureDescriptor {
+  extent: RenderTargetExtent;
+  context: MetalContextDescriptor;
+}
+
+export interface TextureImageInfo {
+  width: number;
+  height: number;
+  stride: number;
+  byteLength: number;
+}
+
+export interface TextureReadback {
+  info: TextureImageInfo;
+  pixels: Uint8Array;
+}
+
+export declare class RenderSessionHandle {
+  private constructor(nativeHandle: unknown);
+  static attachMetalOwnedTexture(
+    map: MapHandle,
+    descriptor: MetalOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  readonly closed: boolean;
+  close(): void;
+  resize(width: number, height: number, scaleFactor: number): void;
+  renderUpdate(): void;
+  detach(): void;
+  reduceMemoryUse(): void;
+  clearData(): void;
+  dumpDebugLogs(): void;
+  readPremultipliedRgba8(): TextureReadback;
+  [Symbol.dispose](): void;
+}
+
 export declare class MapProjectionHandle {
   constructor(map: MapHandle);
   readonly closed: boolean;
@@ -438,6 +483,9 @@ export declare class MapHandle {
   renderingStatsViewEnabled: boolean;
   close(): void;
   createProjection(): MapProjectionHandle;
+  attachMetalOwnedTexture(
+    descriptor: MetalOwnedTextureDescriptor,
+  ): RenderSessionHandle;
   requestRepaint(): void;
   requestStillImage(): void;
   isFullyLoaded(): boolean;

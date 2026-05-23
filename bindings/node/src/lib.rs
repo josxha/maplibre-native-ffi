@@ -10,11 +10,13 @@ mod error;
 mod map;
 mod maplibre;
 mod projection;
+mod render;
 mod runtime;
 mod values;
 
 pub use map::*;
 pub use maplibre::*;
 pub use projection::*;
+pub use render::*;
 pub use runtime::*;
 pub use values::*;
