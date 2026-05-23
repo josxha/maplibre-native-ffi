@@ -96,14 +96,18 @@ void main() {
 
     test('retired callback state waits for active upcalls', () async {
       final state = _FakeCallbackState();
-      state.runUpcall(() {
-        state.close();
-        expect(state.closes, 0);
-      });
+      expect(
+        state.runUpcall(() {
+          state.close();
+          expect(state.closes, 0);
+        }),
+        isTrue,
+      );
 
       expect(state.closes, 0);
       await Future<void>.delayed(Duration.zero);
       expect(state.closes, 1);
+      expect(state.runUpcall(() {}), isFalse);
     });
   });
 

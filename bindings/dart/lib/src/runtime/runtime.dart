@@ -545,6 +545,7 @@ final class _ResourceProviderRulesState {
   _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
     for (final rule in rules) {
       _checkNativeCString(rule.url);
+      _checkResourceResponseNativeStrings(rule.response);
     }
     pointer = calloc<_NativeResourceProviderRules>();
     pointer.ref.count = rules.length;
@@ -586,9 +587,12 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     callback = NativeCallable<_QueuedResourceRequestListenerFunction>.listener((
       Pointer<Void> request,
     ) {
-      runUpcall(
+      final ran = runUpcall(
         () => _invokeQueuedResourceProvider(provider.callback, request),
       );
+      if (!ran) {
+        _dropQueuedResourceProviderRequest(request);
+      }
     });
     pointer = calloc<_NativeQueuedResourceProvider>();
     pointer.ref.routeCount = provider.routes.length;
@@ -618,6 +622,28 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     }
     calloc.free(pointer);
     callback.close();
+  }
+}
+
+void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
+  try {
+    final request = rawRequest.cast<_NativeQueuedResourceRequest>().ref;
+    final handle = ResourceRequestHandle._(request.handle);
+    if (!handle.isReleased) {
+      try {
+        handle.complete(
+          const ResourceResponse(
+            status: ResourceResponseStatus.error,
+            errorReason: ResourceErrorReason.other,
+            errorMessage: 'Dart resource provider callback was retired',
+          ),
+        );
+      } catch (_) {
+        handle.close();
+      }
+    }
+  } finally {
+    _c.dartResourceProviderRequestDestroy(rawRequest);
   }
 }
 
@@ -918,6 +944,17 @@ void _checkNativeCString(String value) {
       'null-terminated strings must not contain embedded NUL',
     );
   }
+}
+
+void _checkOptionalNativeCString(String? value) {
+  if (value != null) {
+    _checkNativeCString(value);
+  }
+}
+
+void _checkResourceResponseNativeStrings(ResourceResponse response) {
+  _checkOptionalNativeCString(response.errorMessage);
+  _checkOptionalNativeCString(response.etag);
 }
 
 int _uint32(int value, String name) {

@@ -8,9 +8,13 @@ abstract base class RetainedCallbackState {
   var _closed = false;
 
   /// Runs [body] as one active Dart upcall.
-  void runUpcall(void Function() body) {
+  ///
+  /// Returns false when this state is already closed and [body] was not run.
+  /// Callers that own copied native payloads must release them on a false
+  /// return.
+  bool runUpcall(void Function() body) {
     if (_closed) {
-      return;
+      return false;
     }
     _activeUpcalls += 1;
     try {
@@ -19,6 +23,7 @@ abstract base class RetainedCallbackState {
       _activeUpcalls -= 1;
       _scheduleCloseIfReady();
     }
+    return true;
   }
 
   /// Retires this callback state after queued and active upcalls drain.

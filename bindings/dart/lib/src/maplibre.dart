@@ -40,7 +40,7 @@ final class _LogCallbackState extends RetainedCallbackState {
     listener = NativeCallable<_LogRecordListenerFunction>.listener((
       Pointer<Void> record,
     ) {
-      runUpcall(() {
+      final ran = runUpcall(() {
         try {
           try {
             callback(_copyLogRecord(record.cast<_NativeLogRecord>().ref));
@@ -52,6 +52,9 @@ final class _LogCallbackState extends RetainedCallbackState {
           Maplibre._c.dartLogRecordDestroy(record);
         }
       });
+      if (!ran) {
+        Maplibre._c.dartLogRecordDestroy(record);
+      }
     });
     pointer = calloc<_NativeLogCallbackState>();
     pointer.ref.listener = listener.nativeFunction;

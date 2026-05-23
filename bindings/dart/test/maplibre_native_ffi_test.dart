@@ -199,6 +199,30 @@ void main() {
         throwsA(isA<InvalidArgumentException>()),
       );
       expect(
+        () => runtime.setResourceProviderRules([
+          ResourceProviderRule(
+            url: 'https://example.com/provider-error-message',
+            response: const ResourceResponse(
+              status: ResourceResponseStatus.error,
+              errorMessage: 'bad\u0000message',
+            ),
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => runtime.setResourceProviderRules([
+          ResourceProviderRule(
+            url: 'https://example.com/provider-etag',
+            response: const ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              etag: 'etag\u0000tail',
+            ),
+          ),
+        ]),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
         () => runtime.setResourceProvider(
           ResourceProvider(
             routes: const [
