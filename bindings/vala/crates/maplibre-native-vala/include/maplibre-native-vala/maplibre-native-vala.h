@@ -158,6 +158,41 @@ typedef char* (*MlnValaResourceTransformCallback)(
   MlnValaResourceKind kind, const char* url, gpointer user_data
 );
 
+typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
+
+typedef struct {
+  uint32_t size;
+  const char* url;
+  MlnValaResourceKind kind;
+  MlnValaResourceLoadingMethod loading_method;
+  MlnValaResourcePriority priority;
+  MlnValaResourceUsage usage;
+  MlnValaResourceStoragePolicy storage_policy;
+  bool has_range;
+  uint64_t range_start;
+  uint64_t range_end;
+  bool has_prior_modified;
+  int64_t prior_modified_unix_ms;
+  bool has_prior_expires;
+  int64_t prior_expires_unix_ms;
+  const char* prior_etag;
+  const uint8_t* prior_data;
+  size_t prior_data_size;
+} MlnValaResourceRequest;
+
+/**
+ * MlnValaResourceProviderCallback:
+ * @request: (not nullable): borrowed request descriptor for the callback
+ * duration.
+ * @handle: (not nullable): request handle for handled decisions.
+ *
+ * Returns: provider decision for this request.
+ */
+typedef MlnValaResourceProviderDecision (*MlnValaResourceProviderCallback)(
+  const MlnValaResourceRequest* request, MlnValaResourceRequestHandle* handle,
+  gpointer user_data
+);
+
 typedef enum {
   MLN_VALA_LOG_SEVERITY_INFO = 1,
   MLN_VALA_LOG_SEVERITY_WARNING = 2,
@@ -992,6 +1027,23 @@ gboolean mln_vala_runtime_handle_set_resource_transform(
  */
 gboolean mln_vala_runtime_handle_clear_resource_transform(
   MlnValaRuntimeHandle* self, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_set_resource_provider:
+ * @self: a runtime handle.
+ * @callback: (scope async) (closure user_data) (destroy destroy_notify):
+ * resource provider callback.
+ * @user_data: closure data for @callback.
+ * @destroy_notify: destroy notify for @user_data.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_set_resource_provider(
+  MlnValaRuntimeHandle* self, MlnValaResourceProviderCallback callback,
+  gpointer user_data, GDestroyNotify destroy_notify, GError** error
 );
 
 /**

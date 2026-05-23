@@ -7,6 +7,9 @@ use maplibre_native_sys as sys;
 
 use crate::events::RuntimeEvent;
 use crate::glib::{self, GBoolean, GDestroyNotify, GError, GFALSE, GObject, GTRUE, GType};
+use crate::resource::{
+    ResourceRequestHandle, resource_request_handle_disarm, resource_request_handle_from_native,
+};
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
@@ -17,16 +20,29 @@ pub struct RuntimeHandle {
     parent_instance: GObject,
     native: *mut sys::mln_runtime,
     resource_transform: *mut ResourceTransformState,
+    resource_provider: *mut ResourceProviderState,
 }
 
 pub type ResourceTransformCallback =
     unsafe extern "C" fn(kind: u32, url: *const c_char, user_data: *mut c_void) -> *mut c_char;
+
+pub type ResourceProviderCallback = unsafe extern "C" fn(
+    request: *const sys::mln_resource_request,
+    handle: *mut ResourceRequestHandle,
+    user_data: *mut c_void,
+) -> u32;
 
 struct ResourceTransformState {
     callback: ResourceTransformCallback,
     user_data: *mut c_void,
     destroy_notify: GDestroyNotify,
     returned_urls: Mutex<Vec<*mut c_char>>,
+}
+
+struct ResourceProviderState {
+    callback: ResourceProviderCallback,
+    user_data: *mut c_void,
+    destroy_notify: GDestroyNotify,
 }
 
 #[repr(C)]
@@ -179,6 +195,23 @@ pub extern "C" fn mln_vala_runtime_handle_clear_resource_transform(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match clear_resource_transform(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_set_resource_provider(
+    handle: *mut RuntimeHandle,
+    callback: Option<ResourceProviderCallback>,
+    user_data: *mut c_void,
+    destroy_notify: GDestroyNotify,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_resource_provider(handle, callback, user_data, destroy_notify) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -2697,6 +2730,85 @@ fn destroy_resource_transform_state(state: *mut ResourceTransformState) {
     }
 }
 
+fn set_resource_provider(
+    handle: *mut RuntimeHandle,
+    callback: Option<ResourceProviderCallback>,
+    user_data: *mut c_void,
+    destroy_notify: GDestroyNotify,
+) -> error::Result<()> {
+    let Some(callback) = callback else {
+        return Err(Error::invalid_argument(
+            "resource provider callback is null",
+        ));
+    };
+
+    let runtime = runtime_native(handle)?;
+    let new_state = Box::into_raw(Box::new(ResourceProviderState {
+        callback,
+        user_data,
+        destroy_notify,
+    }));
+    let provider = sys::mln_resource_provider {
+        size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
+        callback: Some(resource_provider_trampoline),
+        user_data: new_state.cast::<c_void>(),
+    };
+    // SAFETY: `runtime` is live and the provider references adapter-owned state
+    // retained until replacement or runtime close.
+    if let Err(error) =
+        error::check(unsafe { sys::mln_runtime_set_resource_provider(runtime, &provider) })
+    {
+        destroy_resource_provider_state(new_state);
+        return Err(error);
+    }
+    // SAFETY: `handle` was checked by `runtime_native`. Replacing the provider
+    // is only possible before maps exist; destroy the old adapter state after
+    // native accepts the new one.
+    let old_state = unsafe {
+        let old_state = (*handle).resource_provider;
+        (*handle).resource_provider = new_state;
+        old_state
+    };
+    destroy_resource_provider_state(old_state);
+    Ok(())
+}
+
+unsafe extern "C" fn resource_provider_trampoline(
+    user_data: *mut c_void,
+    request: *const sys::mln_resource_request,
+    native_handle: *mut sys::mln_resource_request_handle,
+) -> u32 {
+    let state = user_data.cast::<ResourceProviderState>();
+    // SAFETY: Native passes a provider-owned request handle for the callback.
+    let handle = unsafe { resource_request_handle_from_native(native_handle) };
+    if handle.is_null() {
+        return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+    }
+    // SAFETY: `state` is the installed provider state and remains valid for the
+    // runtime lifetime. The callback must obey provider threading rules.
+    let decision = unsafe { ((*state).callback)(request, handle, (*state).user_data) };
+    if decision != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
+        // SAFETY: Pass-through/invalid decisions leave request ownership with
+        // the C API. Disarm and unref the temporary wrapper without releasing.
+        unsafe { resource_request_handle_disarm(handle) };
+        glib::unref_object(handle);
+    }
+    decision
+}
+
+fn destroy_resource_provider_state(state: *mut ResourceProviderState) {
+    if state.is_null() {
+        return;
+    }
+    // SAFETY: `state` was allocated by Box::into_raw and is no longer reachable
+    // from native provider storage after replacement or runtime close.
+    let state = unsafe { Box::from_raw(state) };
+    if let Some(destroy_notify) = state.destroy_notify {
+        // SAFETY: Destroy notify belongs to stored user data and is called once.
+        unsafe { destroy_notify(state.user_data) };
+    }
+}
+
 fn run_ambient_cache_operation_start(
     handle: *mut RuntimeHandle,
     operation: u32,
@@ -2779,6 +2891,7 @@ fn create_runtime_handle(
     unsafe {
         (*handle).native = native;
         (*handle).resource_transform = ptr::null_mut();
+        (*handle).resource_provider = ptr::null_mut();
     }
     Ok(handle)
 }
@@ -2789,13 +2902,16 @@ fn close_runtime_handle(handle: *mut RuntimeHandle) -> error::Result<()> {
     error::check(unsafe { sys::mln_runtime_destroy(runtime) })?;
     // SAFETY: `handle` was checked by `runtime_native`. Successful runtime
     // destruction makes resource transform callbacks unreachable.
-    let resource_transform = unsafe {
+    let (resource_transform, resource_provider) = unsafe {
         (*handle).native = ptr::null_mut();
         let resource_transform = (*handle).resource_transform;
         (*handle).resource_transform = ptr::null_mut();
-        resource_transform
+        let resource_provider = (*handle).resource_provider;
+        (*handle).resource_provider = ptr::null_mut();
+        (resource_transform, resource_provider)
     };
     destroy_resource_transform_state(resource_transform);
+    destroy_resource_provider_state(resource_provider);
     Ok(())
 }
 
@@ -2896,6 +3012,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static TRANSFORM_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static PROVIDER_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     unsafe extern "C" fn passthrough_transform(
         _kind: u32,
@@ -2907,6 +3024,18 @@ mod tests {
 
     unsafe extern "C" fn transform_destroy_notify(_user_data: *mut c_void) {
         TRANSFORM_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
+
+    unsafe extern "C" fn passthrough_provider(
+        _request: *const sys::mln_resource_request,
+        _handle: *mut ResourceRequestHandle,
+        _user_data: *mut c_void,
+    ) -> u32 {
+        sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+    }
+
+    unsafe extern "C" fn provider_destroy_notify(_user_data: *mut c_void) {
+        PROVIDER_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 
     #[test]
@@ -3003,6 +3132,31 @@ mod tests {
             mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
             GTRUE
         );
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn resource_provider_registration_runs_destroy_notify_on_close() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        PROVIDER_DESTROY_COUNT.store(0, Ordering::SeqCst);
+
+        assert_eq!(
+            mln_vala_runtime_handle_set_resource_provider(
+                runtime,
+                Some(passthrough_provider),
+                ptr::null_mut(),
+                Some(provider_destroy_notify),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(PROVIDER_DESTROY_COUNT.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(PROVIDER_DESTROY_COUNT.load(Ordering::SeqCst), 1);
         glib::unref_object(runtime);
     }
 

@@ -6,6 +6,13 @@ string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
   return null;
 }
 
+MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceRequestHandle handle) {
+  if (request.url == null) {
+    return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
+  }
+  return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
+}
+
 void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
   uint64 generation;
   uint32 width;
@@ -80,6 +87,7 @@ int main(string[] args) {
     MaplibreNative.RuntimeOptions runtime_options = {};
     runtime_options.default();
     var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
+    runtime.set_resource_provider(provide_resource);
     runtime.set_resource_transform(transform_resource);
     runtime.run_once();
     MaplibreNative.RuntimeEvent event;

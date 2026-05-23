@@ -73,7 +73,6 @@ pub extern "C" fn mln_vala_resource_request_handle_close(handle: *mut ResourceRe
     release_request(handle);
 }
 
-#[allow(dead_code)]
 pub(crate) unsafe fn resource_request_handle_from_native(
     native: *mut sys::mln_resource_request_handle,
 ) -> *mut ResourceRequestHandle {
@@ -95,6 +94,18 @@ pub(crate) unsafe fn resource_request_handle_from_native(
         (*handle).native = native;
     }
     handle
+}
+
+pub(crate) unsafe fn resource_request_handle_disarm(handle: *mut ResourceRequestHandle) {
+    if handle.is_null() {
+        return;
+    }
+    // SAFETY: `handle` is non-null and points to this GObject subtype. This
+    // makes pass-through callback handles unusable without releasing the native
+    // request, because pass-through returns ownership to the C API.
+    unsafe {
+        (*handle).native = ptr::null_mut();
+    }
 }
 
 fn default_resource_response(out_response: *mut sys::mln_resource_response) -> error::Result<()> {

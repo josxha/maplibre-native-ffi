@@ -93,7 +93,7 @@ The scaffold implements one proof slice in Rust:
   exposes only opaque address bits.
 - Logging severity/event enums, callback registration with destroy-notify
   replacement, and async severity-mask operations are exposed in generated Vala.
-- Resource response descriptors, resource transform callbacks, and
+- Resource response descriptors, resource transform/provider callbacks, and
   `ResourceRequestHandle` one-shot completion/cancellation/release methods are
   visible in generated Vala.
 - Basic style-source operations for GeoJSON URL sources, vector/raster/raster
