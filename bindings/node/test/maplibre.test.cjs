@@ -198,6 +198,23 @@ test("map screen projection helpers copy point values", () => {
   }
 });
 
+test("style existence and removal probes return copied booleans", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
+    runtime.runOnce();
+    assert.equal(map.styleSourceExists("missing-source"), false);
+    assert.equal(map.removeStyleSource("missing-source"), false);
+    assert.equal(map.styleLayerExists("missing-layer"), false);
+    assert.equal(map.removeStyleLayer("missing-layer"), false);
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map debug options map stable strings to native bitmasks", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });

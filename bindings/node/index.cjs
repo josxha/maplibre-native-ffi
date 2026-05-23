@@ -354,6 +354,22 @@ class MapHandle {
     });
   }
 
+  styleSourceExists(sourceId) {
+    return translateNativeErrors(() => this.native.styleSourceExists(sourceId));
+  }
+
+  removeStyleSource(sourceId) {
+    return translateNativeErrors(() => this.native.removeStyleSource(sourceId));
+  }
+
+  styleLayerExists(layerId) {
+    return translateNativeErrors(() => this.native.styleLayerExists(layerId));
+  }
+
+  removeStyleLayer(layerId) {
+    return translateNativeErrors(() => this.native.removeStyleLayer(layerId));
+  }
+
   setStyleJson(json) {
     return translateNativeErrors(() => this.native.setStyleJson(json));
   }

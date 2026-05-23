@@ -159,6 +159,10 @@ export declare class MapHandle {
   jumpTo(camera: CameraOptions): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
+  styleSourceExists(sourceId: string): boolean;
+  removeStyleSource(sourceId: string): boolean;
+  styleLayerExists(layerId: string): boolean;
+  removeStyleLayer(layerId: string): boolean;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;

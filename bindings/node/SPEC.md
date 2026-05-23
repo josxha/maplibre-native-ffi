@@ -154,7 +154,7 @@ index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, async log severity controls, and root exports
 src/runtime.rs    runtime handle, runtime option materialization, and event polling proof slice
-src/map.rs        map handle, map option materialization, style-loading, camera, repaint, debug-option, and utility proof slices
+src/map.rs        map handle, map option materialization, style-loading/probes, camera, repaint, debug-option, and utility proof slices
 src/values.rs     copied coordinate and screen point values plus projection helper proof slices
 ```
 
@@ -537,9 +537,9 @@ area instead of retesting all native C validation rules.
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
    polling. _(Initial event envelope polling proof slice complete.)_
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent
-   retention. _(Initial lifecycle, options, style-loading, camera descriptor,
-   map utility methods, debug-option string mapping, and parent-retention proof
-   slice complete.)_
+   retention. _(Initial lifecycle, options, style-loading/probes, camera
+   descriptor, map utility methods, debug-option string mapping, and
+   parent-retention proof slice complete.)_
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,
    and TypeScript concept modules. _(Initial coordinate value and projection
    helper proof slice complete.)_
@@ -547,7 +547,8 @@ area instead of retesting all native C validation rules.
    request completion through `ThreadsafeFunction` handoff. _(Async log severity
    control proof slice complete; callback handoff remains.)_
 8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
-   descriptor and screen projection helper proof slices complete.)_
+   descriptor, screen projection helper, and style probe proof slices
+   complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result

@@ -166,6 +166,50 @@ impl NativeMapHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "styleSourceExists")]
+    pub fn style_source_exists(&self, source_id: String) -> Result<bool> {
+        let source_id = core::string::string_view(&source_id);
+        let mut exists = false;
+        core::check(unsafe {
+            sys::mln_map_style_source_exists(self.state.as_ptr(), source_id.raw(), &mut exists)
+        })
+        .map_err(error::from_core)?;
+        Ok(exists)
+    }
+
+    #[napi(js_name = "removeStyleSource")]
+    pub fn remove_style_source(&self, source_id: String) -> Result<bool> {
+        let source_id = core::string::string_view(&source_id);
+        let mut removed = false;
+        core::check(unsafe {
+            sys::mln_map_remove_style_source(self.state.as_ptr(), source_id.raw(), &mut removed)
+        })
+        .map_err(error::from_core)?;
+        Ok(removed)
+    }
+
+    #[napi(js_name = "styleLayerExists")]
+    pub fn style_layer_exists(&self, layer_id: String) -> Result<bool> {
+        let layer_id = core::string::string_view(&layer_id);
+        let mut exists = false;
+        core::check(unsafe {
+            sys::mln_map_style_layer_exists(self.state.as_ptr(), layer_id.raw(), &mut exists)
+        })
+        .map_err(error::from_core)?;
+        Ok(exists)
+    }
+
+    #[napi(js_name = "removeStyleLayer")]
+    pub fn remove_style_layer(&self, layer_id: String) -> Result<bool> {
+        let layer_id = core::string::string_view(&layer_id);
+        let mut removed = false;
+        core::check(unsafe {
+            sys::mln_map_remove_style_layer(self.state.as_ptr(), layer_id.raw(), &mut removed)
+        })
+        .map_err(error::from_core)?;
+        Ok(removed)
+    }
+
     #[napi(js_name = "setStyleJson")]
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;
