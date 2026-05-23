@@ -751,4 +751,5 @@ Review artifacts:
 
 - Reviewers rechecked generated-surface gates for both sanitized GIR and
   typelib-derived GIR.
-- Reviewers verified the branch was clean and pushed at `5062c2a`.
+- Reviewers verified the branch was clean and pushed at `5062c2a`; the follow-up
+  `8c60ee0` commit records this final review outcome only.
