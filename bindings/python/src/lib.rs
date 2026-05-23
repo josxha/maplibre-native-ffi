@@ -289,6 +289,13 @@ impl RuntimeOperationGate {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .closing = false;
     }
+
+    fn is_closed(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .closed
+    }
 }
 
 impl Drop for RuntimeDetachedOperationGuard<'_> {
@@ -1078,7 +1085,7 @@ impl RuntimeHandle {
 
     #[getter]
     fn closed(&self) -> bool {
-        self.state().is_closed()
+        self.operation_gate.is_closed()
     }
 }
 

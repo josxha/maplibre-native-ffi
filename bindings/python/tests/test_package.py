@@ -89,6 +89,7 @@ def test_public_type_hints_are_resolvable() -> None:
         map_module.MapHandle.set_layer_filter,
         map_module.MapHandle.set_style_image,
         render.RenderSessionHandle.query_feature_extensions,
+        render.RenderSessionHandle.query_rendered_features,
         render.RenderSessionHandle.set_feature_state,
         mln.RuntimeHandle.create_map,
         mln.RuntimeHandle.create_offline_region,
@@ -112,11 +113,30 @@ def test_public_type_hints_are_resolvable() -> None:
     assert style_hints["return"] != typing.Any
     assert "maplibre_native.json.JsonObject" in repr(style_hints["return"])
 
+    image_hints = typing.get_type_hints(map_module.MapHandle.set_style_image)
+    assert image_hints["image"] is render.PremultipliedRgba8Image
+
+    provider_hints = typing.get_type_hints(mln.RuntimeHandle.set_resource_provider)
+    assert provider_hints["callback"] != typing.Any
+    assert "ResourceRequest" in repr(provider_hints["callback"])
+
+    transform_hints = typing.get_type_hints(mln.RuntimeHandle.set_resource_transform)
+    assert transform_hints["callback"] != typing.Any
+    assert "ResourceTransformRequest" in repr(transform_hints["callback"])
+
     extension_hints = typing.get_type_hints(
         render.RenderSessionHandle.query_feature_extensions
     )
+    assert extension_hints["feature"] is geo.Feature
+    assert extension_hints["return"] is query.FeatureExtensionResult
     assert extension_hints["arguments"] != typing.Any
     assert "maplibre_native.json.JsonObject" in repr(extension_hints["arguments"])
+
+    rendered_hints = typing.get_type_hints(
+        render.RenderSessionHandle.query_rendered_features
+    )
+    assert rendered_hints["geometry"] is query.RenderedQueryGeometry
+    assert rendered_hints["options"] != typing.Any
 
 
 def test_runtime_handle_context_manager_closes_once() -> None:

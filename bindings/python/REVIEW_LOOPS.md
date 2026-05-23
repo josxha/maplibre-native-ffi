@@ -429,3 +429,62 @@ typing/API correctness, and review-record accuracy.
   `uv run ty check --error-on-warning .mise`, and
   `mise run //bindings/python:ci` (59 Python tests, wheel build, and
   metadata/`_native` import check) passed.
+
+## Round 9
+
+Review fanout: post-Round-8 lifecycle/threading, public typing/API correctness,
+and review-record accuracy.
+
+### Applied findings
+
+- Report `RuntimeHandle.closed` from the terminal close state, not the transient
+  native pointer state.
+  - Evidence: lifecycle review found `close()` temporarily marks the native
+    pointer closed while native teardown runs detached, then restores it if
+    teardown fails. A concurrent reader of `runtime.closed` could observe `True`
+    while close was still in flight and might later fail.
+  - Resolution: added `RuntimeOperationGate::is_closed()` and made the Python
+    `closed` getter use the gate's terminal `closed` flag, which is set only
+    after successful native destroy.
+- Preserve precise runtime hints for additional acyclic public annotation
+  dependencies.
+  - Evidence: public API review found several public annotations still resolved
+    to `Any` even though their dependency graph is acyclic, including resource
+    callbacks in `runtime.py`, query/feature types in `render.py`, and
+    render/style inputs in `map.py`.
+  - Resolution: import resource callback aliases, offline operation/definition
+    types, render/query/geo types, and map-facing render/style/camera/geo types
+    unconditionally where they do not create import cycles. Strengthened the
+    type-hint smoke test with representative non-`Any` assertions for resource
+    callbacks, feature extension inputs/results, rendered query options, and
+    style image inputs.
+
+### Rejected or deferred findings
+
+- Runtime `create_map()` annotations still use `Any` fallbacks for
+  `MapHandle`/`MapOptions` because importing `map.py` from `runtime.py` at
+  module load time would create the real module cycle. Static `TYPE_CHECKING`
+  imports keep type-checker behavior precise.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, broad enum deduplication, and
+  broader root export expansion.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_public_type_hints_are_resolvable
+  tests/test_package.py::test_runtime_close_from_wrong_thread_reports_wrong_thread
+  tests/test_package.py::test_runtime_handle_context_manager_closes_once
+  tests/test_package.py::test_resource_transform_registers_and_clears`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`,
+  `uv run ty check --error-on-warning .mise`, and
+  `mise run //bindings/python:ci` (59 Python tests, wheel build, and
+  metadata/`_native` import check) passed.

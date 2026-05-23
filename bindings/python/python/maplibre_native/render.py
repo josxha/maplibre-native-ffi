@@ -8,29 +8,22 @@ from enum import IntFlag
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
+from .geo import Feature
 from .json import JsonLike, JsonObjectLike, JsonValue
+from .query import (
+    FeatureExtensionResult,
+    FeatureStateSelector,
+    QueriedFeature,
+    RenderedFeatureQueryOptions,
+    RenderedQueryGeometry,
+    SourceFeatureQueryOptions,
+)
 
 if TYPE_CHECKING:
-    from .geo import Feature
     from .map import MapHandle
-    from .query import (
-        FeatureExtensionResult,
-        FeatureStateSelector,
-        QueriedFeature,
-        RenderedFeatureQueryOptions,
-        RenderedQueryGeometry,
-        SourceFeatureQueryOptions,
-    )
 
 else:
-    Feature = Any
     MapHandle = Any
-    FeatureExtensionResult = Any
-    FeatureStateSelector = Any
-    QueriedFeature = Any
-    RenderedFeatureQueryOptions = Any
-    RenderedQueryGeometry = Any
-    SourceFeatureQueryOptions = Any
 
 
 class RenderBackend(IntFlag):

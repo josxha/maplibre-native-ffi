@@ -9,26 +9,20 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
 from . import _native
+from .offline import (
+    AmbientCacheOperation,
+    OfflineOperationHandle,
+    OfflineRegionDefinition,
+    OfflineRegionDownloadState,
+)
+from .resource import ResourceProviderCallback, ResourceTransformCallback
 
 if TYPE_CHECKING:
     from .map import MapHandle, MapOptions
-    from .offline import (
-        AmbientCacheOperation,
-        OfflineOperationHandle,
-        OfflineRegionDefinition,
-        OfflineRegionDownloadState,
-    )
-    from .resource import ResourceProviderCallback, ResourceTransformCallback
 
 else:
     MapHandle = Any
     MapOptions = Any
-    AmbientCacheOperation = Any
-    OfflineOperationHandle = Any
-    OfflineRegionDefinition = Any
-    OfflineRegionDownloadState = Any
-    ResourceProviderCallback = Any
-    ResourceTransformCallback = Any
 
 
 class NetworkStatus(IntEnum):
