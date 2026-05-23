@@ -40,6 +40,14 @@ pub fn c_version() -> u32 {
     unsafe { maplibre_native_sys::mln_c_version() }
 }
 
+#[napi(js_name = "threadLastErrorMessage")]
+pub fn thread_last_error_message() -> String {
+    // SAFETY: The C API returns a process-owned null-terminated diagnostic
+    // pointer for the current thread, or null defensively on older builds.
+    let message = unsafe { maplibre_native_sys::mln_thread_last_error_message() };
+    copy_log_message(message)
+}
+
 #[napi(js_name = "supportedRenderBackends")]
 pub fn supported_render_backends() -> RenderBackends {
     // SAFETY: mln_supported_render_backend_mask takes no arguments and returns a

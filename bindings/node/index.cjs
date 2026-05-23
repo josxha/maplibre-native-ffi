@@ -79,6 +79,10 @@ function supportedRenderBackends() {
   return native.supportedRenderBackends();
 }
 
+function threadLastErrorMessage() {
+  return native.threadLastErrorMessage();
+}
+
 function networkStatus() {
   return translateNativeErrors(() => native.networkStatus());
 }
@@ -1043,6 +1047,7 @@ module.exports = {
   NativeBuffer,
   cVersion,
   supportedRenderBackends,
+  threadLastErrorMessage,
   networkStatus,
   setNetworkStatus,
   projectedMetersForLatLng,

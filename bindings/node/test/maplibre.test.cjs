@@ -24,6 +24,7 @@ const {
   setLogCallback,
   setNetworkStatus,
   supportedRenderBackends,
+  threadLastErrorMessage,
 } = require("..");
 
 test("process-global proof slice crosses the native add-on", () => {
@@ -33,6 +34,7 @@ test("process-global proof slice crosses the native add-on", () => {
   assert.equal(typeof backends.rawMask, "number");
   assert.equal(typeof backends.metal, "boolean");
   assert.equal(typeof backends.vulkan, "boolean");
+  assert.equal(typeof threadLastErrorMessage(), "string");
 
   const original = networkStatus();
   assert.match(original.kind, /^(online|offline|unknown)$/);

@@ -504,6 +504,7 @@ export type LocationIndicatorImageKind = "top" | "bearing" | "shadow";
 
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;
+export declare function threadLastErrorMessage(): string;
 export declare function networkStatus(): NetworkStatusValue;
 export type LogSeverity = "info" | "warning" | "error";
 

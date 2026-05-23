@@ -152,7 +152,7 @@ Current internal Rust modules:
 index.cjs          public JavaScript wrapper, error classes, NativePointer, and NativeBuffer values
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
-src/maplibre.rs   process-global proof slice, log callback bridge, async log severity controls, and root exports
+src/maplibre.rs   process-global proof slice, thread-local diagnostics, log callback bridge, async log severity controls, and root exports
 src/runtime.rs    runtime handle, runtime option materialization, event polling, and ambient cache operation proof slices
 src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile source helpers, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility proof slices
 src/projection.rs standalone map projection handle proof slice
@@ -185,6 +185,7 @@ contract intact.
 
 - `cVersion`
 - `supportedRenderBackends`
+- `threadLastErrorMessage`
 - `networkStatus`
 - `setNetworkStatus`
 - `setLogCallback`
