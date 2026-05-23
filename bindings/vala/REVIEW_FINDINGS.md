@@ -575,3 +575,29 @@ Review artifacts:
 
 - `mise run fix`
 - `mise run //bindings/vala:ci`
+
+## Round 15
+
+Review artifacts:
+
+- `review-loop/round15-sanity.md`
+
+### Applied findings
+
+- None. The sanity review found the Round 14 regression-test tightening and
+  review-log update correct.
+
+### Rejected or deferred findings
+
+- Existing deferred/user-input-needed API-policy items remain recorded in prior
+  rounds and were not expanded.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- `mise run //bindings/vala:test -- feature_state_selector_setters_initialize_hidden_size`
+- `mise run //bindings/vala:test -- custom_geometry_destroy_waits_for_in_flight_callback`
+- `git diff --check 6bb8bd6..HEAD`
