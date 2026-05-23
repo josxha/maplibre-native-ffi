@@ -1,11 +1,10 @@
 export {
   ResourceRequestHandle,
   type ResourceKind,
-  type ResourceTransformRequest,
-  type ResourceTransformCallback,
+  type ResourceRoute,
+  type ResourceTransformRule,
   type ResourceByteRange,
   type ResourceProviderRequest,
   type ResourceResponseInput,
-  type ResourceProviderDecision,
   type ResourceProviderCallback,
 } from "./index.cjs";

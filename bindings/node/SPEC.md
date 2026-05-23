@@ -224,12 +224,27 @@ contract intact.
 Session-owned texture frame access uses synchronous callback scopes. The public
 frame values are scoped views, not explicitly releasable `*Handle` objects.
 
-### Callbacks
+### Resource routing and callbacks
 
-- `LogCallback`
+Resource transforms use native-owned `ResourceTransformRule` values configured
+through `RuntimeHandle.setResourceTransformRules()`. Rules match by resource
+kind, exact URL, and/or URL prefix, then provide either a replacement URL or a
+replacement URL prefix. The native transform callback applies these rules
+synchronously and never waits for a JavaScript return value on a MapLibre worker
+or network thread.
+
+Resource providers use native-owned `ResourceRoute` values configured through
+`RuntimeHandle.setResourceProviderRoutes(routes, callback)`. Non-matching
+requests pass through immediately. Matching requests enqueue copied request data
+and a one-shot `ResourceRequestHandle` to the owner JavaScript environment; the
+callback returns `void`, and JavaScript completes or closes the request handle
+later.
+
+- `ResourceRoute`
+- `ResourceTransformRule`
 - `ResourceProviderCallback`
-- `ResourceTransformCallback`
 - `CustomGeometrySourceCallback`
+- `LogCallback`
 
 ### Values, descriptors, and events
 

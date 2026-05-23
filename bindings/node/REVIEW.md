@@ -170,3 +170,40 @@ Findings requiring user input:
   low-level Node surface, so it needs an explicit scope/API decision before this
   review loop can either redesign the callbacks or record the synchronous
   callback API as an accepted limitation.
+
+## Resource callback design correction
+
+Review evidence:
+
+- Revisited `bindings/node/SPEC.md` against
+  `docs/src/content/docs/development/bindings-node.md`, especially the callback
+  and event-loop handoff rules.
+- Updated the SPEC to require native-owned resource transform rules and provider
+  routes instead of synchronous JavaScript-return-value decisions on native
+  worker/network threads.
+- Implemented the corrected API and validated with Rust formatting for the Node
+  crate, `cargo check -p maplibre-native-node`, `mise run fix`, and
+  `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. Resource transform callbacks blocked native threads waiting for JavaScript
+   return values.
+   - Action: replaced the public callback API with
+     `RuntimeHandle.setResourceTransformRules()`. Native transform callbacks now
+     apply stored exact-URL and URL-prefix rewrite rules synchronously without
+     crossing into JavaScript.
+2. Resource provider callbacks blocked native threads waiting for JavaScript
+   routing decisions.
+   - Action: replaced the return-value decision API with
+     `RuntimeHandle.setResourceProviderRoutes(routes, callback)`. Native
+     callbacks pass through non-matching requests immediately and enqueue
+     matching requests to JavaScript with a one-shot `ResourceRequestHandle`.
+3. Type declarations and tests still described the drifted callback API.
+   - Action: TypeScript declarations, the resource subpath declarations, and
+     Node tests now cover resource routes, transform rules, void provider
+     callbacks, and binding-owned validation for invalid rule shapes.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.

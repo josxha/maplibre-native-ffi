@@ -231,15 +231,16 @@ export type ResourceKind =
   | "sprite-json"
   | "image";
 
-export interface ResourceTransformRequest {
-  kind: ResourceKind;
-  rawKind: number;
-  url: string;
+export interface ResourceRoute {
+  kind?: ResourceKind | null;
+  url?: string | null;
+  urlPrefix?: string | null;
 }
 
-export type ResourceTransformCallback = (
-  request: ResourceTransformRequest,
-) => string | null | undefined;
+export interface ResourceTransformRule extends ResourceRoute {
+  replacementUrl?: string | null;
+  replacementUrlPrefix?: string | null;
+}
 
 export interface ResourceByteRange {
   start: string;
@@ -285,11 +286,9 @@ export interface ResourceResponseInput {
   retryAfterUnixMs?: number | null;
 }
 
-export type ResourceProviderDecision = "passThrough" | "handle";
-
 export type ResourceProviderCallback = (
   request: ResourceProviderRequest,
-) => ResourceProviderDecision | null | undefined;
+) => void;
 
 export declare class ResourceRequestHandle {
   private constructor(nativeHandle: unknown);
@@ -306,9 +305,12 @@ export declare class RuntimeHandle {
   createMap(options?: MapOptions | null): MapHandle;
   close(): void;
   runOnce(): void;
-  setResourceTransform(callback: ResourceTransformCallback): void;
+  setResourceTransformRules(rules: readonly ResourceTransformRule[]): void;
   clearResourceTransform(): void;
-  setResourceProvider(callback: ResourceProviderCallback): void;
+  setResourceProviderRoutes(
+    routes: readonly ResourceRoute[],
+    callback: ResourceProviderCallback,
+  ): void;
   runAmbientCacheOperation(
     operation: AmbientCacheOperation,
   ): OfflineOperationHandle;

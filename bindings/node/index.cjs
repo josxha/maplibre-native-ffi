@@ -596,19 +596,25 @@ class RuntimeHandle {
     return translateNativeErrors(() => this.native.runOnce());
   }
 
-  setResourceTransform(callback) {
-    if (typeof callback !== "function") {
+  setResourceTransformRules(rules) {
+    if (!Array.isArray(rules)) {
       throw new InvalidArgumentError(
         null,
-        "resource transform callback must be a function",
+        "resource transform rules must be an array",
       );
     }
     return translateNativeErrors(() =>
-      this.native.setResourceTransform(callback),
+      this.native.setResourceTransformRules(rules),
     );
   }
 
-  setResourceProvider(callback) {
+  setResourceProviderRoutes(routes, callback) {
+    if (!Array.isArray(routes)) {
+      throw new InvalidArgumentError(
+        null,
+        "resource provider routes must be an array",
+      );
+    }
     if (typeof callback !== "function") {
       throw new InvalidArgumentError(
         null,
@@ -616,16 +622,22 @@ class RuntimeHandle {
       );
     }
     return translateNativeErrors(() =>
-      this.native.setResourceProvider((request) => {
+      this.native.setResourceProviderRoutes(routes, (request) => {
+        const handle = new ResourceRequestHandle(
+          CONSTRUCTION_TOKEN,
+          request.handleId,
+        );
         const wrapped = {
           ...request,
-          handle: new ResourceRequestHandle(
-            CONSTRUCTION_TOKEN,
-            request.handleId,
-          ),
+          handle,
         };
         delete wrapped.handleId;
-        return callback(wrapped);
+        try {
+          callback(wrapped);
+        } catch (error) {
+          handle.close();
+          throw error;
+        }
       }),
     );
   }

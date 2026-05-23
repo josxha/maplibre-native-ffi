@@ -18,6 +18,8 @@ import {
 import {
   ResourceRequestHandle,
   type ResourceResponseInput,
+  type ResourceRoute,
+  type ResourceTransformRule,
 } from "@maplibre/native-ffi-node/resource";
 import {
   RuntimeHandle,
@@ -48,6 +50,11 @@ const geometry: RenderedQueryGeometry = {
   point: { x: 0, y: 0 },
 };
 const response: ResourceResponseInput = { status: "ok" };
+const route: ResourceRoute = { urlPrefix: "custom://", kind: "source" };
+const transformRule: ResourceTransformRule = {
+  urlPrefix: "http://example.test/",
+  replacementUrlPrefix: "https://example.test/",
+};
 const image: StyleImageInput = {
   width: 1,
   height: 1,
@@ -58,5 +65,7 @@ void camera;
 void descriptor;
 void geometry;
 void response;
+void route;
+void transformRule;
 void image;
 void json;

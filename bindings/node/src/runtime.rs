@@ -3,7 +3,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, mpsc};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, ThreadId};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
@@ -82,10 +82,19 @@ pub struct RuntimeEvent {
 }
 
 #[napi(object)]
-pub struct ResourceTransformRequest {
-    pub kind: String,
-    pub raw_kind: u32,
-    pub url: String,
+pub struct ResourceRouteInput {
+    pub kind: Option<String>,
+    pub url: Option<String>,
+    pub url_prefix: Option<String>,
+}
+
+#[napi(object)]
+pub struct ResourceTransformRuleInput {
+    pub kind: Option<String>,
+    pub url: Option<String>,
+    pub url_prefix: Option<String>,
+    pub replacement_url: Option<String>,
+    pub replacement_url_prefix: Option<String>,
 }
 
 #[napi(object)]
@@ -133,13 +142,26 @@ static RESOURCE_REQUEST_HANDLES: OnceLock<
     Mutex<HashMap<u64, Arc<core::resource::ResourceRequestHandleState>>>,
 > = OnceLock::new();
 
+struct ResourceMatcher {
+    kind: Option<u32>,
+    url: Option<String>,
+    url_prefix: Option<String>,
+}
+
+struct ResourceTransformRule {
+    matcher: ResourceMatcher,
+    replacement_url: Option<CString>,
+    replacement_url_prefix: Option<String>,
+}
+
 struct ResourceTransformState {
-    callback: ThreadsafeFunction<ResourceTransformRequest, Option<String>>,
+    rules: Vec<ResourceTransformRule>,
     replacements: Mutex<HashMap<ThreadId, CString>>,
 }
 
 struct ResourceProviderState {
-    callback: ThreadsafeFunction<ResourceProviderRequest, Option<String>>,
+    routes: Vec<ResourceMatcher>,
+    callback: ThreadsafeFunction<ResourceProviderRequest>,
 }
 
 #[napi(js_name = "NativeRuntimeHandle")]
@@ -240,12 +262,19 @@ impl NativeRuntimeHandle {
             .map_err(error::from_core)
     }
 
-    #[napi(js_name = "setResourceProvider")]
-    pub fn set_resource_provider(
+    #[napi(js_name = "setResourceProviderRoutes")]
+    pub fn set_resource_provider_routes(
         &self,
-        callback: ThreadsafeFunction<ResourceProviderRequest, Option<String>>,
+        routes: Vec<ResourceRouteInput>,
+        callback: ThreadsafeFunction<ResourceProviderRequest>,
     ) -> Result<()> {
-        let provider = Arc::new(ResourceProviderState { callback });
+        let provider = Arc::new(ResourceProviderState {
+            routes: routes
+                .into_iter()
+                .map(resource_matcher_from_input)
+                .collect::<Result<Vec<_>>>()?,
+            callback,
+        });
         let descriptor = core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
             Arc::as_ptr(&provider) as *mut c_void,
@@ -262,13 +291,16 @@ impl NativeRuntimeHandle {
         Ok(())
     }
 
-    #[napi(js_name = "setResourceTransform")]
-    pub fn set_resource_transform(
+    #[napi(js_name = "setResourceTransformRules")]
+    pub fn set_resource_transform_rules(
         &self,
-        callback: ThreadsafeFunction<ResourceTransformRequest, Option<String>>,
+        rules: Vec<ResourceTransformRuleInput>,
     ) -> Result<()> {
         let transform = Arc::new(ResourceTransformState {
-            callback,
+            rules: rules
+                .into_iter()
+                .map(resource_transform_rule_from_input)
+                .collect::<Result<Vec<_>>>()?,
             replacements: Mutex::new(HashMap::new()),
         });
         let descriptor = core::resource::resource_transform_descriptor(
@@ -632,6 +664,13 @@ unsafe extern "C" fn resource_provider_trampoline(
         Ok(request) => request,
         Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
     };
+    if !provider
+        .routes
+        .iter()
+        .any(|route| resource_matcher_matches(route, request.raw_kind, &request.url))
+    {
+        return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+    }
     let handle_state = match unsafe {
         core::resource::ResourceRequestHandleState::new(
             handle,
@@ -643,32 +682,15 @@ unsafe extern "C" fn resource_provider_trampoline(
     };
     let handle_id = register_resource_request_handle(handle_state.clone());
     let provider_request = resource_provider_request_from_core(request, handle_id);
-    let (sender, receiver) = mpsc::sync_channel(1);
-    let decision_state = handle_state.clone();
-    let decision_handle_id = handle_id;
-    let status = provider.callback.call_with_return_value(
+    let status = provider.callback.call(
         Ok(provider_request),
-        ThreadsafeFunctionCallMode::Blocking,
-        move |result, _env| {
-            let decision = match result.ok().flatten().as_deref() {
-                Some("handle") => core::resource::ResourceProviderDecision::Handle,
-                _ => core::resource::ResourceProviderDecision::PassThrough,
-            };
-            if !matches!(decision, core::resource::ResourceProviderDecision::Handle) {
-                unregister_resource_request_handle(decision_handle_id);
-            }
-            let _ = sender.send(decision_state.finish_provider_decision(decision));
-            Ok(())
-        },
+        ThreadsafeFunctionCallMode::NonBlocking,
     );
     if !matches!(status, napi::Status::Ok) {
         unregister_resource_request_handle(handle_id);
         return handle_state.finish_provider_exception();
     }
-    receiver.recv().unwrap_or_else(|_| {
-        unregister_resource_request_handle(handle_id);
-        handle_state.finish_provider_exception()
-    })
+    handle_state.finish_provider_decision(core::resource::ResourceProviderDecision::Handle)
 }
 
 unsafe extern "C" fn resource_transform_trampoline(
@@ -687,34 +709,30 @@ unsafe extern "C" fn resource_transform_trampoline(
     }
 
     let transform = unsafe { &*(user_data as *const ResourceTransformState) };
-    let url = unsafe { CStr::from_ptr(url) }
-        .to_string_lossy()
-        .into_owned();
-    let request = ResourceTransformRequest {
-        kind: resource_kind_name(core::enums::resource_kind_from_raw(kind)).to_owned(),
-        raw_kind: kind,
-        url,
+    let url = unsafe { CStr::from_ptr(url) }.to_string_lossy();
+    let Some(rule) = transform
+        .rules
+        .iter()
+        .find(|rule| resource_matcher_matches(&rule.matcher, kind, &url))
+    else {
+        return sys::MLN_STATUS_OK;
     };
-    let (sender, receiver) = mpsc::sync_channel(1);
-    let status = transform.callback.call_with_return_value(
-        Ok(request),
-        ThreadsafeFunctionCallMode::Blocking,
-        move |result, _env| {
-            let _ = sender.send(result.ok().flatten());
-            Ok(())
-        },
-    );
-    if !matches!(status, napi::Status::Ok) {
+
+    if let Some(replacement) = &rule.replacement_url {
+        unsafe {
+            (*out_response).url = replacement.as_ptr();
+        }
         return sys::MLN_STATUS_OK;
     }
 
-    let Ok(Some(replacement)) = receiver.recv() else {
+    let Some(replacement_url_prefix) = &rule.replacement_url_prefix else {
         return sys::MLN_STATUS_OK;
     };
-    if replacement.is_empty() {
+    let Some(url_prefix) = &rule.matcher.url_prefix else {
         return sys::MLN_STATUS_OK;
-    }
-    let Ok(replacement) = CString::new(replacement) else {
+    };
+    let suffix = url.strip_prefix(url_prefix).unwrap_or_default();
+    let Ok(replacement) = CString::new(format!("{replacement_url_prefix}{suffix}")) else {
         return sys::MLN_STATUS_OK;
     };
     let Ok(mut replacements) = transform.replacements.lock() else {
@@ -764,6 +782,76 @@ fn unregister_resource_request_handle(handle_id: u64) {
     if let Ok(mut handles) = resource_request_handles().lock() {
         handles.remove(&handle_id);
     }
+}
+
+fn resource_matcher_from_input(input: ResourceRouteInput) -> Result<ResourceMatcher> {
+    Ok(ResourceMatcher {
+        kind: input
+            .kind
+            .as_deref()
+            .map(resource_kind_from_name)
+            .transpose()?,
+        url: input.url,
+        url_prefix: input.url_prefix,
+    })
+}
+
+fn resource_transform_rule_from_input(
+    input: ResourceTransformRuleInput,
+) -> Result<ResourceTransformRule> {
+    let replacement_url = input
+        .replacement_url
+        .map(|url| {
+            CString::new(url)
+                .map_err(|_| error::invalid_argument("replacementUrl must not contain null bytes"))
+        })
+        .transpose()?;
+    let replacement_url_prefix = input.replacement_url_prefix;
+    if replacement_url.is_some() == replacement_url_prefix.is_some() {
+        return Err(error::invalid_argument(
+            "resource transform rule must set exactly one of replacementUrl or replacementUrlPrefix",
+        ));
+    }
+    if replacement_url_prefix.is_some() && input.url_prefix.is_none() {
+        return Err(error::invalid_argument(
+            "resource transform rule with replacementUrlPrefix must also set urlPrefix",
+        ));
+    }
+    if let Some(prefix) = &replacement_url_prefix {
+        CString::new(prefix.as_str()).map_err(|_| {
+            error::invalid_argument("replacementUrlPrefix must not contain null bytes")
+        })?;
+    }
+    Ok(ResourceTransformRule {
+        matcher: resource_matcher_from_input(ResourceRouteInput {
+            kind: input.kind,
+            url: input.url,
+            url_prefix: input.url_prefix,
+        })?,
+        replacement_url,
+        replacement_url_prefix,
+    })
+}
+
+fn resource_matcher_matches(matcher: &ResourceMatcher, raw_kind: u32, url: &str) -> bool {
+    if matcher.kind.is_some_and(|kind| kind != raw_kind) {
+        return false;
+    }
+    if matcher
+        .url
+        .as_deref()
+        .is_some_and(|expected| expected != url)
+    {
+        return false;
+    }
+    if matcher
+        .url_prefix
+        .as_deref()
+        .is_some_and(|prefix| !url.starts_with(prefix))
+    {
+        return false;
+    }
+    true
 }
 
 fn parse_resource_request_handle_id(handle_id: &str) -> Result<u64> {
@@ -855,6 +943,22 @@ fn resource_kind_name(kind: core::ResourceKind) -> &'static str {
         core::ResourceKind::Image => "image",
         core::ResourceKind::UnknownRaw(_) => "unknown",
         _ => "unknown",
+    }
+}
+
+fn resource_kind_from_name(kind: &str) -> Result<u32> {
+    match kind {
+        "unknown" => Ok(sys::MLN_RESOURCE_KIND_UNKNOWN),
+        "style" => Ok(sys::MLN_RESOURCE_KIND_STYLE),
+        "source" => Ok(sys::MLN_RESOURCE_KIND_SOURCE),
+        "tile" => Ok(sys::MLN_RESOURCE_KIND_TILE),
+        "glyphs" => Ok(sys::MLN_RESOURCE_KIND_GLYPHS),
+        "sprite-image" => Ok(sys::MLN_RESOURCE_KIND_SPRITE_IMAGE),
+        "sprite-json" => Ok(sys::MLN_RESOURCE_KIND_SPRITE_JSON),
+        "image" => Ok(sys::MLN_RESOURCE_KIND_IMAGE),
+        other => Err(error::invalid_argument(format!(
+            "resource kind must be 'unknown', 'style', 'source', 'tile', 'glyphs', 'sprite-image', 'sprite-json', or 'image', got '{other}'"
+        ))),
     }
 }
 

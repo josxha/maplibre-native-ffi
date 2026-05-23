@@ -360,18 +360,25 @@ test("offline operations expose discardable handles", () => {
   }
 });
 
-test("resource provider callback registration validates Node handoff shape", () => {
+test("resource provider routes validate Node handoff shape", () => {
   const runtime = new RuntimeHandle();
 
   try {
-    runtime.setResourceProvider((request) => {
-      assert.equal(typeof request.url, "string");
-      assert.equal(typeof request.rawKind, "number");
-      assert.equal(request.handle instanceof ResourceRequestHandle, true);
-      return "passThrough";
-    });
+    runtime.setResourceProviderRoutes(
+      [{ urlPrefix: "custom://", kind: "source" }],
+      (request) => {
+        assert.equal(typeof request.url, "string");
+        assert.equal(typeof request.rawKind, "number");
+        assert.equal(request.handle instanceof ResourceRequestHandle, true);
+      },
+    );
     assert.throws(
-      () => runtime.setResourceProvider(/** @type {any} */ (null)),
+      () =>
+        runtime.setResourceProviderRoutes(/** @type {any} */ (null), () => {}),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () => runtime.setResourceProviderRoutes([], /** @type {any} */ (null)),
       InvalidArgumentError,
     );
   } finally {
@@ -385,14 +392,28 @@ test("runtime handle supports options, resource transform, explicit close, and i
   assert.equal(runtime.closed, false);
   runtime.runOnce();
   assert.equal(runtime.pollEvent(), null);
-  runtime.setResourceTransform((request) => {
-    assert.equal(typeof request.url, "string");
-    assert.equal(typeof request.rawKind, "number");
-    return null;
-  });
+  runtime.setResourceTransformRules([
+    {
+      kind: "source",
+      urlPrefix: "http://example.test/",
+      replacementUrlPrefix: "https://example.test/",
+    },
+    {
+      url: "custom://style.json",
+      replacementUrl: "https://example.test/style.json",
+    },
+  ]);
   runtime.clearResourceTransform();
   assert.throws(
-    () => runtime.setResourceTransform(/** @type {any} */ (null)),
+    () => runtime.setResourceTransformRules(/** @type {any} */ (null)),
+    InvalidArgumentError,
+  );
+  assert.throws(
+    () =>
+      runtime.setResourceTransformRules([
+        { urlPrefix: "http://", replacementUrlPrefix: "https://" },
+        { replacementUrl: "https://a", replacementUrlPrefix: "https://b" },
+      ]),
     InvalidArgumentError,
   );
   runtime.close();
