@@ -153,7 +153,7 @@ index.cjs          public JavaScript wrapper and error classes
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice and root exports
-src/runtime.rs    runtime handle proof slice and runtime option materialization
+src/runtime.rs    runtime handle, runtime option materialization, and event polling proof slice
 ```
 
 Planned internal Rust modules own implementation roles:
@@ -534,7 +534,7 @@ area instead of retesting all native C validation rules.
    reporting, `close()`, and `Symbol.dispose`. _(Initial `RuntimeHandle`
    close-once proof slice complete.)_
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
-   polling.
+   polling. _(Initial event envelope polling proof slice complete.)_
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent
    retention.
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,

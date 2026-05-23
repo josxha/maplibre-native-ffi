@@ -39,6 +39,7 @@ test("runtime handle supports options, explicit close, and idempotent disposal",
 
   assert.equal(runtime.closed, false);
   runtime.runOnce();
+  assert.equal(runtime.pollEvent(), null);
   runtime.close();
   assert.equal(runtime.closed, true);
   runtime.close();

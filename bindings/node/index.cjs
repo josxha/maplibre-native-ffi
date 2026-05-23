@@ -112,6 +112,10 @@ class RuntimeHandle {
     return translateNativeErrors(() => this.native.runOnce());
   }
 
+  pollEvent() {
+    return translateNativeErrors(() => this.native.pollEvent());
+  }
+
   [Symbol.dispose]() {
     this.close();
   }

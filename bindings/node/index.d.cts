@@ -80,11 +80,23 @@ export interface RuntimeOptions {
   maximumCacheSize?: bigint | null;
 }
 
+export interface RuntimeEvent {
+  eventType: string;
+  rawEventType: number;
+  sourceType: string;
+  rawSourceType: number;
+  sourceAddress: string;
+  code: number;
+  message?: string | null;
+  payloadKind: string;
+}
+
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
   readonly closed: boolean;
   close(): void;
   runOnce(): void;
+  pollEvent(): RuntimeEvent | null;
   [Symbol.dispose](): void;
 }
 
