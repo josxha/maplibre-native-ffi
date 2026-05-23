@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'internal/c/maplibre_native_c.dart';
 import 'internal/memory/memory.dart';
 import 'internal/status/status.dart';
+import 'log/log.dart';
 
 /// Process-global entry points for the Dart binding.
 final class Maplibre {
@@ -29,6 +30,21 @@ final class Maplibre {
   /// Sets MapLibre Native's process-global network status.
   static void setNetworkStatus(NetworkStatus status) {
     _checkStatus(_c.networkStatusSet(status.rawValueForSet()));
+  }
+
+  /// Clears the process-global native log callback.
+  static void clearLogCallback() {
+    _checkStatus(_c.logClearCallback());
+  }
+
+  /// Sets which log severities MapLibre Native may dispatch asynchronously.
+  static void setAsyncLogSeverityMask(LogSeverityMask mask) {
+    _checkStatus(_c.logSetAsyncSeverityMask(mask.bits));
+  }
+
+  /// Restores MapLibre Native's default async log severity mask.
+  static void restoreDefaultAsyncLogSeverityMask() {
+    setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
   }
 
   static void _checkStatus(int statusCode) {

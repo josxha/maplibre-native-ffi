@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
 
+const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
+
 void main() {
   final nativeLibraryPath = _nativeLibraryPath();
   final hasNativeLibrary =
@@ -20,6 +22,29 @@ void main() {
         isIn([NetworkStatus.online.rawValue, NetworkStatus.offline.rawValue]),
       );
       Maplibre.setNetworkStatus(status);
+      Maplibre.setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
+      Maplibre.restoreDefaultAsyncLogSeverityMask();
+      Maplibre.clearLogCallback();
+    },
+    skip: hasNativeLibrary ? false : 'Native C library is not built.',
+  );
+
+  test(
+    'runtime and map handles use the native C ABI',
+    () {
+      final runtime = RuntimeHandle.create();
+      expect(runtime.isClosed, isFalse);
+
+      final map = runtime.createMap();
+      expect(map.isClosed, isFalse);
+      map.setStyleJson(_emptyStyleJson);
+      runtime.runOnce();
+      runtime.drainEvents();
+
+      map.close();
+      expect(map.isClosed, isTrue);
+      runtime.close();
+      expect(runtime.isClosed, isTrue);
     },
     skip: hasNativeLibrary ? false : 'Native C library is not built.',
   );

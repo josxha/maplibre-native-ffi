@@ -38,4 +38,53 @@ final class MaplibreNativeCApi {
 
   /// Sets MapLibre Native's process-global network status.
   int networkStatusSet(int status) => _raw.mln_network_status_set(status).value;
+
+  /// Clears the process-global native log callback.
+  int logClearCallback() => _raw.mln_log_clear_callback().value;
+
+  /// Sets the asynchronous native log severity mask.
+  int logSetAsyncSeverityMask(int mask) =>
+      _raw.mln_log_set_async_severity_mask(mask).value;
+
+  /// Creates a runtime handle.
+  int runtimeCreate(
+    Pointer<raw.mln_runtime_options> options,
+    Pointer<Pointer<raw.mln_runtime>> outRuntime,
+  ) => _raw.mln_runtime_create(options, outRuntime).value;
+
+  /// Destroys a runtime handle.
+  int runtimeDestroy(Pointer<raw.mln_runtime> runtime) =>
+      _raw.mln_runtime_destroy(runtime).value;
+
+  /// Runs one pending owner-thread task for a runtime.
+  int runtimeRunOnce(Pointer<raw.mln_runtime> runtime) =>
+      _raw.mln_runtime_run_once(runtime).value;
+
+  /// Polls one queued runtime event.
+  int runtimePollEvent(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<raw.mln_runtime_event> outEvent,
+    Pointer<Bool> outHasEvent,
+  ) => _raw.mln_runtime_poll_event(runtime, outEvent, outHasEvent).value;
+
+  /// Returns native default map options.
+  raw.mln_map_options mapOptionsDefault() => _raw.mln_map_options_default();
+
+  /// Creates a map handle.
+  int mapCreate(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<raw.mln_map_options> options,
+    Pointer<Pointer<raw.mln_map>> outMap,
+  ) => _raw.mln_map_create(runtime, options, outMap).value;
+
+  /// Destroys a map handle.
+  int mapDestroy(Pointer<raw.mln_map> map) => _raw.mln_map_destroy(map).value;
+
+  /// Sets the map style URL.
+  int mapSetStyleUrl(Pointer<raw.mln_map> map, Pointer<Char> url) =>
+      _raw.mln_map_set_style_url(map, url).value;
+
+  /// Sets the map style JSON.
+  int mapSetStyleJson(Pointer<raw.mln_map> map, Pointer<Char> json) =>
+      _raw.mln_map_set_style_json(map, json).value;
 }
