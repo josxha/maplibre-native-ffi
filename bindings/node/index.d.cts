@@ -105,6 +105,43 @@ export interface CameraOptions {
   zoom?: number | null;
   bearing?: number | null;
   pitch?: number | null;
+  centerAltitude?: number | null;
+  padding?: EdgeInsets | null;
+  anchor?: ScreenPoint | null;
+  roll?: number | null;
+  fieldOfView?: number | null;
+}
+
+export interface UnitBezier {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface AnimationOptions {
+  durationMs?: number | null;
+  velocity?: number | null;
+  minZoom?: number | null;
+  easing?: UnitBezier | null;
+}
+
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface Quaternion {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+}
+
+export interface FreeCameraOptions {
+  position?: Vec3 | null;
+  orientation?: Quaternion | null;
 }
 
 export interface EdgeInsets {
@@ -233,15 +270,35 @@ export declare class MapHandle {
   setTileOptions(options: MapTileOptions): void;
   getBounds(): BoundOptions;
   setBounds(options: BoundOptions): void;
+  getFreeCameraOptions(): FreeCameraOptions;
+  setFreeCameraOptions(options: FreeCameraOptions): void;
   getProjectionMode(): ProjectionMode;
   setProjectionMode(mode: ProjectionMode): void;
   moveBy(deltaX: number, deltaY: number): void;
   scaleBy(scale: number, anchor?: ScreenPoint | null): void;
   rotateBy(first: ScreenPoint, second: ScreenPoint): void;
   pitchBy(pitch: number): void;
+  moveByAnimated(
+    deltaX: number,
+    deltaY: number,
+    animation?: AnimationOptions | null,
+  ): void;
+  scaleByAnimated(
+    scale: number,
+    anchor?: ScreenPoint | null,
+    animation?: AnimationOptions | null,
+  ): void;
+  rotateByAnimated(
+    first: ScreenPoint,
+    second: ScreenPoint,
+    animation?: AnimationOptions | null,
+  ): void;
+  pitchByAnimated(pitch: number, animation?: AnimationOptions | null): void;
   cancelTransitions(): void;
   getCamera(): CameraOptions;
   jumpTo(camera: CameraOptions): void;
+  easeTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
+  flyTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
   cameraForLatLngBounds(bounds: LatLngBounds): CameraOptions;
   cameraForLatLngs(coordinates: LatLng[]): CameraOptions;
   latLngBoundsForCamera(camera: CameraOptions): LatLngBounds;

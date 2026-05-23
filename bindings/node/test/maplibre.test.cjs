@@ -384,6 +384,13 @@ test("map camera commands copy descriptor values", () => {
     assert.equal(camera.zoom, 3);
     assert.equal(camera.bearing, 10);
     assert.equal(camera.pitch, 20);
+    map.easeTo(
+      { center: { latitude: 13, longitude: 35 }, zoom: 4 },
+      { durationMs: 0, easing: { x1: 0, y1: 0, x2: 1, y2: 1 } },
+    );
+    map.flyTo({ center: { latitude: 14, longitude: 36 }, zoom: 5 }, null);
+    map.setFreeCameraOptions({ orientation: { x: 0, y: 0, z: 0, w: 1 } });
+    assert.equal(typeof map.getFreeCameraOptions().orientation?.w, "number");
   } finally {
     map.close();
     runtime.close();
@@ -400,6 +407,10 @@ test("map camera movement commands adapt point descriptors", () => {
     map.scaleBy(1.0);
     map.rotateBy({ x: 10, y: 10 }, { x: 12, y: 12 });
     map.pitchBy(1);
+    map.moveByAnimated(1, 2, { durationMs: 0 });
+    map.scaleByAnimated(1.1, { x: 10, y: 10 }, { durationMs: 0 });
+    map.rotateByAnimated({ x: 10, y: 10 }, { x: 12, y: 12 }, { durationMs: 0 });
+    map.pitchByAnimated(1, { durationMs: 0 });
     map.cancelTransitions();
   } finally {
     map.close();

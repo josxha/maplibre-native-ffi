@@ -25,6 +25,48 @@ pub struct CameraOptions {
     pub zoom: Option<f64>,
     pub bearing: Option<f64>,
     pub pitch: Option<f64>,
+    pub center_altitude: Option<f64>,
+    pub padding: Option<EdgeInsets>,
+    pub anchor: Option<ScreenPoint>,
+    pub roll: Option<f64>,
+    pub field_of_view: Option<f64>,
+}
+
+#[napi(object)]
+pub struct UnitBezier {
+    pub x1: f64,
+    pub y1: f64,
+    pub x2: f64,
+    pub y2: f64,
+}
+
+#[napi(object)]
+pub struct AnimationOptions {
+    pub duration_ms: Option<f64>,
+    pub velocity: Option<f64>,
+    pub min_zoom: Option<f64>,
+    pub easing: Option<UnitBezier>,
+}
+
+#[napi(object)]
+pub struct Vec3 {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+#[napi(object)]
+pub struct Quaternion {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub w: f64,
+}
+
+#[napi(object)]
+pub struct FreeCameraOptions {
+    pub position: Option<Vec3>,
+    pub orientation: Option<Quaternion>,
 }
 
 #[napi(object)]
@@ -225,6 +267,82 @@ impl NativeMapHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "moveByAnimated")]
+    pub fn move_by_animated(
+        &self,
+        delta_x: f64,
+        delta_y: f64,
+        animation: Option<AnimationOptions>,
+    ) -> Result<()> {
+        let animation = animation
+            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
+            animation as *const sys::mln_animation_options
+        });
+        core::check(unsafe {
+            sys::mln_map_move_by_animated(self.state.as_ptr(), delta_x, delta_y, animation_ptr)
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "scaleByAnimated")]
+    pub fn scale_by_animated(
+        &self,
+        scale: f64,
+        anchor: Option<ScreenPoint>,
+        animation: Option<AnimationOptions>,
+    ) -> Result<()> {
+        let anchor = anchor.map(ScreenPoint::into_native);
+        let anchor_ptr = anchor.as_ref().map_or(std::ptr::null(), |anchor| {
+            anchor as *const sys::mln_screen_point
+        });
+        let animation = animation
+            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
+            animation as *const sys::mln_animation_options
+        });
+        core::check(unsafe {
+            sys::mln_map_scale_by_animated(self.state.as_ptr(), scale, anchor_ptr, animation_ptr)
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "rotateByAnimated")]
+    pub fn rotate_by_animated(
+        &self,
+        first: ScreenPoint,
+        second: ScreenPoint,
+        animation: Option<AnimationOptions>,
+    ) -> Result<()> {
+        let animation = animation
+            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
+            animation as *const sys::mln_animation_options
+        });
+        core::check(unsafe {
+            sys::mln_map_rotate_by_animated(
+                self.state.as_ptr(),
+                first.into_native(),
+                second.into_native(),
+                animation_ptr,
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "pitchByAnimated")]
+    pub fn pitch_by_animated(&self, pitch: f64, animation: Option<AnimationOptions>) -> Result<()> {
+        let animation = animation
+            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
+            animation as *const sys::mln_animation_options
+        });
+        core::check(unsafe {
+            sys::mln_map_pitch_by_animated(self.state.as_ptr(), pitch, animation_ptr)
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "cancelTransitions")]
     pub fn cancel_transitions(&self) -> Result<()> {
         core::check(unsafe { sys::mln_map_cancel_transitions(self.state.as_ptr()) })
@@ -282,6 +400,23 @@ impl NativeMapHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "getFreeCameraOptions")]
+    pub fn get_free_camera_options(&self) -> Result<FreeCameraOptions> {
+        let mut raw = unsafe { sys::mln_free_camera_options_default() };
+        core::check(unsafe { sys::mln_map_get_free_camera_options(self.state.as_ptr(), &mut raw) })
+            .map_err(error::from_core)?;
+        Ok(FreeCameraOptions::from_core(
+            core::camera::free_camera_options_from_native(raw),
+        ))
+    }
+
+    #[napi(js_name = "setFreeCameraOptions")]
+    pub fn set_free_camera_options(&self, options: FreeCameraOptions) -> Result<()> {
+        let options = core::camera::free_camera_options_to_native(&options.into_core());
+        core::check(unsafe { sys::mln_map_set_free_camera_options(self.state.as_ptr(), &options) })
+            .map_err(error::from_core)
+    }
+
     #[napi(js_name = "getProjectionMode")]
     pub fn get_projection_mode(&self) -> Result<ProjectionMode> {
         let mut raw = unsafe { sys::mln_projection_mode_default() };
@@ -313,6 +448,34 @@ impl NativeMapHandle {
     pub fn jump_to(&self, camera: CameraOptions) -> Result<()> {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
         core::check(unsafe { sys::mln_map_jump_to(self.state.as_ptr(), &camera) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "easeTo")]
+    pub fn ease_to(
+        &self,
+        camera: CameraOptions,
+        animation: Option<AnimationOptions>,
+    ) -> Result<()> {
+        let camera = core::camera::camera_options_to_native(&camera.into_core());
+        let animation = animation
+            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
+            animation as *const sys::mln_animation_options
+        });
+        core::check(unsafe { sys::mln_map_ease_to(self.state.as_ptr(), &camera, animation_ptr) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "flyTo")]
+    pub fn fly_to(&self, camera: CameraOptions, animation: Option<AnimationOptions>) -> Result<()> {
+        let camera = core::camera::camera_options_to_native(&camera.into_core());
+        let animation = animation
+            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
+            animation as *const sys::mln_animation_options
+        });
+        core::check(unsafe { sys::mln_map_fly_to(self.state.as_ptr(), &camera, animation_ptr) })
             .map_err(error::from_core)
     }
 
@@ -1455,6 +1618,21 @@ impl CameraOptions {
         if let Some(pitch) = self.pitch {
             camera = camera.with_pitch(pitch);
         }
+        if let Some(center_altitude) = self.center_altitude {
+            camera = camera.with_center_altitude(center_altitude);
+        }
+        if let Some(padding) = self.padding {
+            camera = camera.with_padding(padding.into_core());
+        }
+        if let Some(anchor) = self.anchor {
+            camera = camera.with_anchor(anchor.into_core());
+        }
+        if let Some(roll) = self.roll {
+            camera = camera.with_roll(roll);
+        }
+        if let Some(field_of_view) = self.field_of_view {
+            camera = camera.with_field_of_view(field_of_view);
+        }
         camera
     }
 
@@ -1464,6 +1642,85 @@ impl CameraOptions {
             zoom: camera.zoom,
             bearing: camera.bearing,
             pitch: camera.pitch,
+            center_altitude: camera.center_altitude,
+            padding: camera.padding.map(EdgeInsets::from_core),
+            anchor: camera.anchor.map(ScreenPoint::from_core),
+            roll: camera.roll,
+            field_of_view: camera.field_of_view,
+        }
+    }
+}
+
+impl UnitBezier {
+    fn into_core(self) -> core::values::UnitBezier {
+        core::values::UnitBezier::new(self.x1, self.y1, self.x2, self.y2)
+    }
+}
+
+impl AnimationOptions {
+    fn into_core(self) -> core::AnimationOptions {
+        let mut animation = core::AnimationOptions::new();
+        if let Some(duration_ms) = self.duration_ms {
+            animation = animation.with_duration_ms(duration_ms);
+        }
+        if let Some(velocity) = self.velocity {
+            animation = animation.with_velocity(velocity);
+        }
+        if let Some(min_zoom) = self.min_zoom {
+            animation = animation.with_min_zoom(min_zoom);
+        }
+        if let Some(easing) = self.easing {
+            animation = animation.with_easing(easing.into_core());
+        }
+        animation
+    }
+}
+
+impl Vec3 {
+    fn into_core(self) -> core::values::Vec3 {
+        core::values::Vec3::new(self.x, self.y, self.z)
+    }
+
+    fn from_core(value: core::values::Vec3) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
+    }
+}
+
+impl Quaternion {
+    fn into_core(self) -> core::values::Quaternion {
+        core::values::Quaternion::new(self.x, self.y, self.z, self.w)
+    }
+
+    fn from_core(value: core::values::Quaternion) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+            w: value.w,
+        }
+    }
+}
+
+impl FreeCameraOptions {
+    fn into_core(self) -> core::FreeCameraOptions {
+        let mut options = core::FreeCameraOptions::new();
+        if let Some(position) = self.position {
+            options = options.with_position(position.into_core());
+        }
+        if let Some(orientation) = self.orientation {
+            options = options.with_orientation(orientation.into_core());
+        }
+        options
+    }
+
+    fn from_core(options: core::FreeCameraOptions) -> Self {
+        Self {
+            position: options.position.map(Vec3::from_core),
+            orientation: options.orientation.map(Quaternion::from_core),
         }
     }
 }

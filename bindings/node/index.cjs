@@ -447,6 +447,30 @@ class MapHandle {
     return translateNativeErrors(() => this.native.pitchBy(pitch));
   }
 
+  moveByAnimated(deltaX, deltaY, animation = null) {
+    return translateNativeErrors(() =>
+      this.native.moveByAnimated(deltaX, deltaY, animation),
+    );
+  }
+
+  scaleByAnimated(scale, anchor = null, animation = null) {
+    return translateNativeErrors(() =>
+      this.native.scaleByAnimated(scale, anchor, animation),
+    );
+  }
+
+  rotateByAnimated(first, second, animation = null) {
+    return translateNativeErrors(() =>
+      this.native.rotateByAnimated(first, second, animation),
+    );
+  }
+
+  pitchByAnimated(pitch, animation = null) {
+    return translateNativeErrors(() =>
+      this.native.pitchByAnimated(pitch, animation),
+    );
+  }
+
   cancelTransitions() {
     return translateNativeErrors(() => this.native.cancelTransitions());
   }
@@ -475,6 +499,16 @@ class MapHandle {
     return translateNativeErrors(() => this.native.setBounds(options));
   }
 
+  getFreeCameraOptions() {
+    return translateNativeErrors(() => this.native.getFreeCameraOptions());
+  }
+
+  setFreeCameraOptions(options) {
+    return translateNativeErrors(() =>
+      this.native.setFreeCameraOptions(options),
+    );
+  }
+
   getProjectionMode() {
     return translateNativeErrors(() => this.native.getProjectionMode());
   }
@@ -489,6 +523,14 @@ class MapHandle {
 
   jumpTo(camera) {
     return translateNativeErrors(() => this.native.jumpTo(camera));
+  }
+
+  easeTo(camera, animation = null) {
+    return translateNativeErrors(() => this.native.easeTo(camera, animation));
+  }
+
+  flyTo(camera, animation = null) {
+    return translateNativeErrors(() => this.native.flyTo(camera, animation));
   }
 
   cameraForLatLngBounds(bounds) {
