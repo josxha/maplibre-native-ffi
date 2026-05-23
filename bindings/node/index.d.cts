@@ -220,12 +220,32 @@ export type AmbientCacheOperation =
   | "invalidate"
   | "clear";
 
+export interface ResourceTransformRequest {
+  kind:
+    | "unknown"
+    | "style"
+    | "source"
+    | "tile"
+    | "glyphs"
+    | "sprite-image"
+    | "sprite-json"
+    | "image";
+  rawKind: number;
+  url: string;
+}
+
+export type ResourceTransformCallback = (
+  request: ResourceTransformRequest,
+) => string | null | undefined;
+
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
   readonly closed: boolean;
   createMap(options?: MapOptions | null): MapHandle;
   close(): void;
   runOnce(): void;
+  setResourceTransform(callback: ResourceTransformCallback): void;
+  clearResourceTransform(): void;
   runAmbientCacheOperation(
     operation: AmbientCacheOperation,
   ): OfflineOperationHandle;

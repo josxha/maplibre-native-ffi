@@ -326,6 +326,22 @@ class RuntimeHandle {
     return translateNativeErrors(() => this.native.runOnce());
   }
 
+  setResourceTransform(callback) {
+    if (typeof callback !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "resource transform callback must be a function",
+      );
+    }
+    return translateNativeErrors(() =>
+      this.native.setResourceTransform(callback),
+    );
+  }
+
+  clearResourceTransform() {
+    return translateNativeErrors(() => this.native.clearResourceTransform());
+  }
+
   runAmbientCacheOperation(operation) {
     const start = translateNativeErrors(() =>
       this.native.runAmbientCacheOperation(operation),

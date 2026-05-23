@@ -193,12 +193,22 @@ test("ambient cache operations expose discardable handles", () => {
   }
 });
 
-test("runtime handle supports options, explicit close, and idempotent disposal", () => {
+test("runtime handle supports options, resource transform, explicit close, and idempotent disposal", () => {
   const runtime = new RuntimeHandle({ maximumCacheSize: 1n });
 
   assert.equal(runtime.closed, false);
   runtime.runOnce();
   assert.equal(runtime.pollEvent(), null);
+  runtime.setResourceTransform((request) => {
+    assert.equal(typeof request.url, "string");
+    assert.equal(typeof request.rawKind, "number");
+    return null;
+  });
+  runtime.clearResourceTransform();
+  assert.throws(
+    () => runtime.setResourceTransform(/** @type {any} */ (null)),
+    InvalidArgumentError,
+  );
   runtime.close();
   assert.equal(runtime.closed, true);
   runtime.close();

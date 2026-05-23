@@ -1,6 +1,11 @@
+use std::ffi::{CStr, CString, c_void};
+use std::os::raw::c_char;
+use std::sync::{Arc, Mutex, mpsc};
+
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
 use napi::bindgen_prelude::{BigInt, Result};
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
 use crate::error;
@@ -29,9 +34,22 @@ pub struct RuntimeEvent {
     pub payload_kind: String,
 }
 
+#[napi(object)]
+pub struct ResourceTransformRequest {
+    pub kind: String,
+    pub raw_kind: u32,
+    pub url: String,
+}
+
+struct ResourceTransformState {
+    callback: ThreadsafeFunction<ResourceTransformRequest, Option<String>>,
+    replacements: Mutex<Vec<CString>>,
+}
+
 #[napi(js_name = "NativeRuntimeHandle")]
 pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
+    resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -47,7 +65,10 @@ pub fn create_native_runtime_handle(
         .map_err(error::from_core)?;
     let state = unsafe { NativeHandleState::from_raw_ptr(runtime, "RuntimeHandle") }
         .map_err(error::from_core)?;
-    Ok(NativeRuntimeHandle { state })
+    Ok(NativeRuntimeHandle {
+        state,
+        resource_transform: Mutex::new(None),
+    })
 }
 
 #[napi]
@@ -66,6 +87,43 @@ impl NativeRuntimeHandle {
     pub fn run_once(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_run_once(self.state.as_ptr()) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setResourceTransform")]
+    pub fn set_resource_transform(
+        &self,
+        callback: ThreadsafeFunction<ResourceTransformRequest, Option<String>>,
+    ) -> Result<()> {
+        let transform = Arc::new(ResourceTransformState {
+            callback,
+            replacements: Mutex::new(Vec::new()),
+        });
+        let descriptor = core::resource::resource_transform_descriptor(
+            Some(resource_transform_trampoline),
+            Arc::as_ptr(&transform) as *mut c_void,
+        );
+        core::check(unsafe {
+            sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
+        })
+        .map_err(error::from_core)?;
+        *self
+            .resource_transform
+            .lock()
+            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))? =
+            Some(transform);
+        Ok(())
+    }
+
+    #[napi(js_name = "clearResourceTransform")]
+    pub fn clear_resource_transform(&self) -> Result<()> {
+        core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.as_ptr()) })
+            .map_err(error::from_core)?;
+        *self
+            .resource_transform
+            .lock()
+            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))? =
+            None;
+        Ok(())
     }
 
     #[napi(js_name = "runAmbientCacheOperation")]
@@ -114,6 +172,64 @@ impl NativeRuntimeHandle {
     }
 }
 
+unsafe extern "C" fn resource_transform_trampoline(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    let init_status =
+        unsafe { core::resource::initialize_resource_transform_response(out_response) };
+    if init_status != sys::MLN_STATUS_OK {
+        return init_status;
+    }
+    if user_data.is_null() || url.is_null() {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    }
+
+    let transform = unsafe { &*(user_data as *const ResourceTransformState) };
+    let url = unsafe { CStr::from_ptr(url) }
+        .to_string_lossy()
+        .into_owned();
+    let request = ResourceTransformRequest {
+        kind: resource_kind_name(core::enums::resource_kind_from_raw(kind)).to_owned(),
+        raw_kind: kind,
+        url,
+    };
+    let (sender, receiver) = mpsc::sync_channel(1);
+    let status = transform.callback.call_with_return_value(
+        Ok(request),
+        ThreadsafeFunctionCallMode::Blocking,
+        move |result, _env| {
+            let _ = sender.send(result.ok().flatten());
+            Ok(())
+        },
+    );
+    if !matches!(status, napi::Status::Ok) {
+        return sys::MLN_STATUS_OK;
+    }
+
+    let Ok(Some(replacement)) = receiver.recv() else {
+        return sys::MLN_STATUS_OK;
+    };
+    if replacement.is_empty() {
+        return sys::MLN_STATUS_OK;
+    }
+    let Ok(replacement) = CString::new(replacement) else {
+        return sys::MLN_STATUS_OK;
+    };
+    let Ok(mut replacements) = transform.replacements.lock() else {
+        return sys::MLN_STATUS_OK;
+    };
+    replacements.push(replacement);
+    if let Some(replacement) = replacements.last() {
+        unsafe {
+            (*out_response).url = replacement.as_ptr();
+        }
+    }
+    sys::MLN_STATUS_OK
+}
+
 impl RuntimeEvent {
     fn from_copied(event: core::CopiedRuntimeEvent, raw_event_type: u32) -> Self {
         Self {
@@ -126,6 +242,21 @@ impl RuntimeEvent {
             message: event.message,
             payload_kind: runtime_event_payload_kind(&event.payload).to_owned(),
         }
+    }
+}
+
+fn resource_kind_name(kind: core::ResourceKind) -> &'static str {
+    match kind {
+        core::ResourceKind::Unknown => "unknown",
+        core::ResourceKind::Style => "style",
+        core::ResourceKind::Source => "source",
+        core::ResourceKind::Tile => "tile",
+        core::ResourceKind::Glyphs => "glyphs",
+        core::ResourceKind::SpriteImage => "sprite-image",
+        core::ResourceKind::SpriteJson => "sprite-json",
+        core::ResourceKind::Image => "image",
+        core::ResourceKind::UnknownRaw(_) => "unknown",
+        _ => "unknown",
     }
 }
 
