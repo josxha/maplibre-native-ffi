@@ -34,6 +34,12 @@ void main() {
     () {
       final runtime = RuntimeHandle.create();
       expect(runtime.isClosed, isFalse);
+      final offlineOperation = runtime.runAmbientCacheOperation(
+        AmbientCacheOperation.clear,
+      );
+      expect(offlineOperation.id, isNonZero);
+      offlineOperation.discard();
+      expect(offlineOperation.isDiscarded, isTrue);
 
       final map = runtime.createMap();
       expect(map.isClosed, isFalse);

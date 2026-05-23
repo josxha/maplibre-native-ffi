@@ -56,6 +56,25 @@ final class MaplibreNativeCApi {
   int runtimeDestroy(Pointer<raw.mln_runtime> runtime) =>
       _raw.mln_runtime_destroy(runtime).value;
 
+  /// Starts an ambient cache maintenance operation.
+  int runtimeRunAmbientCacheOperationStart(
+    Pointer<raw.mln_runtime> runtime,
+    int operation,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_run_ambient_cache_operation_start(
+        runtime,
+        operation,
+        outOperationId,
+      )
+      .value;
+
+  /// Discards runtime-owned state for an offline database operation.
+  int runtimeOfflineOperationDiscard(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+  ) => _raw.mln_runtime_offline_operation_discard(runtime, operationId).value;
+
   /// Runs one pending owner-thread task for a runtime.
   int runtimeRunOnce(Pointer<raw.mln_runtime> runtime) =>
       _raw.mln_runtime_run_once(runtime).value;

@@ -14,6 +14,7 @@ import '../internal/struct/geometry.dart' as native_geometry;
 import '../internal/struct/json.dart' as native_json;
 import '../internal/struct/struct.dart' as native_struct;
 import '../json/json.dart';
+import '../offline/offline.dart';
 import '../query/query.dart';
 import '../render/native_pointer.dart';
 import '../render/targets.dart';
@@ -75,6 +76,23 @@ final class RuntimeHandle {
     return count;
   }
 
+  /// Starts an ambient cache maintenance operation.
+  OfflineOperationHandle runAmbientCacheOperation(
+    AmbientCacheOperation operation,
+  ) {
+    return withNativeArena((arena) {
+      final outOperationId = arena<Uint64>();
+      _check(
+        _c.runtimeRunAmbientCacheOperationStart(
+          _pointer,
+          operation.rawValue,
+          outOperationId,
+        ),
+      );
+      return OfflineOperationHandle._(this, outOperationId.value);
+    });
+  }
+
   /// Creates a map owned by this runtime.
   MapHandle createMap({MapOptions options = const MapOptions()}) =>
       MapHandle.create(this, options: options);
@@ -82,6 +100,30 @@ final class RuntimeHandle {
   /// Explicitly destroys this runtime.
   void close() {
     _state.close(_c.runtimeDestroy, _c.threadLastErrorMessage);
+  }
+}
+
+/// Runtime-owned offline operation handle.
+final class OfflineOperationHandle {
+  OfflineOperationHandle._(this._runtime, this.id);
+
+  final RuntimeHandle _runtime;
+
+  /// Native operation identifier copied into Dart.
+  final int id;
+
+  var _discarded = false;
+
+  /// Whether this operation has been discarded by Dart.
+  bool get isDiscarded => _discarded;
+
+  /// Discards runtime-owned state for this operation.
+  void discard() {
+    if (_discarded) {
+      return;
+    }
+    _check(_c.runtimeOfflineOperationDiscard(_runtime._pointer, id));
+    _discarded = true;
   }
 }
 
