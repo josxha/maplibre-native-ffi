@@ -371,6 +371,17 @@ final class MapHandle {
     });
   }
 
+  /// Adds a GeoJSON source that loads from [url].
+  void addGeoJsonSourceUrl(String sourceId, String url) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapAddGeoJsonSourceUrl(_pointer, nativeId.value, nativeUrl.value),
+      );
+    });
+  }
+
   /// Adds a GeoJSON source with inline data.
   void addGeoJsonSourceData(String sourceId, GeoJson data) {
     withNativeArena((arena) {
@@ -386,6 +397,17 @@ final class MapHandle {
     });
   }
 
+  /// Updates one GeoJSON source to load from [url].
+  void setGeoJsonSourceUrl(String sourceId, String url) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapSetGeoJsonSourceUrl(_pointer, nativeId.value, nativeUrl.value),
+      );
+    });
+  }
+
   /// Updates one GeoJSON source with inline data.
   void setGeoJsonSourceData(String sourceId, GeoJson data) {
     withNativeArena((arena) {
@@ -396,6 +418,54 @@ final class MapHandle {
           _pointer,
           nativeId.value,
           nativeData.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Adds a vector source with a TileJSON URL.
+  void addVectorSourceUrl(String sourceId, String url) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapAddVectorSourceUrl(
+          _pointer,
+          nativeId.value,
+          nativeUrl.value,
+          nullptr,
+        ),
+      );
+    });
+  }
+
+  /// Adds a raster source with a TileJSON URL.
+  void addRasterSourceUrl(String sourceId, String url) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapAddRasterSourceUrl(
+          _pointer,
+          nativeId.value,
+          nativeUrl.value,
+          nullptr,
+        ),
+      );
+    });
+  }
+
+  /// Adds a raster DEM source with a TileJSON URL.
+  void addRasterDemSourceUrl(String sourceId, String url) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapAddRasterDemSourceUrl(
+          _pointer,
+          nativeId.value,
+          nativeUrl.value,
+          nullptr,
         ),
       );
     });

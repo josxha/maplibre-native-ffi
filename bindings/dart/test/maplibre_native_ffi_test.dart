@@ -65,6 +65,29 @@ void main() {
       expect(map.removeStyleSource('missing-source'), isFalse);
       expect(map.removeStyleLayer('missing-layer'), isFalse);
 
+      map.addGeoJsonSourceUrl(
+        'dart-geojson-url-source',
+        'https://example.com/a.geojson',
+      );
+      expect(
+        map.getStyleSourceInfo('dart-geojson-url-source')!.type,
+        SourceType.geoJson,
+      );
+      map.setGeoJsonSourceUrl(
+        'dart-geojson-url-source',
+        'https://example.com/b.geojson',
+      );
+      expect(map.removeStyleSource('dart-geojson-url-source'), isTrue);
+      map.addVectorSourceUrl(
+        'dart-vector-source',
+        'https://example.com/vector.json',
+      );
+      expect(
+        map.getStyleSourceInfo('dart-vector-source')!.type,
+        SourceType.vector,
+      );
+      expect(map.removeStyleSource('dart-vector-source'), isTrue);
+
       map.addGeoJsonSourceData(
         'dart-geojson-source',
         const FeatureGeoJson(

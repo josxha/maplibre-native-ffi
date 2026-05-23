@@ -221,6 +221,13 @@ final class MaplibreNativeCApi {
     Pointer<raw.mln_json_value> sourceJson,
   ) => _raw.mln_map_add_style_source_json(map, sourceId, sourceJson).value;
 
+  /// Adds a GeoJSON source with URL data.
+  int mapAddGeoJsonSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view url,
+  ) => _raw.mln_map_add_geojson_source_url(map, sourceId, url).value;
+
   /// Adds a GeoJSON source with inline data.
   int mapAddGeoJsonSourceData(
     Pointer<raw.mln_map> map,
@@ -228,12 +235,44 @@ final class MaplibreNativeCApi {
     Pointer<raw.mln_geojson> data,
   ) => _raw.mln_map_add_geojson_source_data(map, sourceId, data).value;
 
+  /// Updates a GeoJSON source to load data from a URL.
+  int mapSetGeoJsonSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view url,
+  ) => _raw.mln_map_set_geojson_source_url(map, sourceId, url).value;
+
   /// Updates a GeoJSON source with inline data.
   int mapSetGeoJsonSourceData(
     Pointer<raw.mln_map> map,
     raw.mln_string_view sourceId,
     Pointer<raw.mln_geojson> data,
   ) => _raw.mln_map_set_geojson_source_data(map, sourceId, data).value;
+
+  /// Adds a vector source with a TileJSON URL.
+  int mapAddVectorSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view url,
+    Pointer<raw.mln_style_tile_source_options> options,
+  ) => _raw.mln_map_add_vector_source_url(map, sourceId, url, options).value;
+
+  /// Adds a raster source with a TileJSON URL.
+  int mapAddRasterSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view url,
+    Pointer<raw.mln_style_tile_source_options> options,
+  ) => _raw.mln_map_add_raster_source_url(map, sourceId, url, options).value;
+
+  /// Adds a raster DEM source with a TileJSON URL.
+  int mapAddRasterDemSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view url,
+    Pointer<raw.mln_style_tile_source_options> options,
+  ) =>
+      _raw.mln_map_add_raster_dem_source_url(map, sourceId, url, options).value;
 
   /// Reports whether a style source exists.
   int mapStyleSourceExists(
