@@ -126,10 +126,65 @@ pub extern "C" fn mln_vala_map_handle_request_repaint(
     handle: *mut MapHandle,
     error_out: *mut *mut GError,
 ) -> GBoolean {
-    match map_native(handle).and_then(|map| {
-        // SAFETY: `map_native` returns a live native map pointer.
-        error::check(unsafe { sys::mln_map_request_repaint(map) })
-    }) {
+    match request_repaint(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_request_still_image(
+    handle: *mut MapHandle,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match request_still_image(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_is_fully_loaded(
+    handle: *mut MapHandle,
+    out_loaded: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match is_fully_loaded(handle, out_loaded) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_dump_debug_logs(
+    handle: *mut MapHandle,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match dump_debug_logs(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_style_url(
+    handle: *mut MapHandle,
+    url: *const std::ffi::c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_url(handle, url) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -151,6 +206,42 @@ pub extern "C" fn mln_vala_map_handle_set_style_json(
             GFALSE
         }
     }
+}
+
+fn request_repaint(handle: *mut MapHandle) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map_native` returns a live native map pointer.
+    error::check(unsafe { sys::mln_map_request_repaint(map) })
+}
+
+fn request_still_image(handle: *mut MapHandle) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map_native` returns a live native map pointer.
+    error::check(unsafe { sys::mln_map_request_still_image(map) })
+}
+
+fn is_fully_loaded(handle: *mut MapHandle, out_loaded: *mut GBoolean) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let mut loaded = false;
+    // SAFETY: `map` is live and `loaded` is valid output storage.
+    error::check(unsafe { sys::mln_map_is_fully_loaded(map, &mut loaded) })?;
+    glib::clear_optional_out_pointer(out_loaded, if loaded { GTRUE } else { GFALSE })
+}
+
+fn dump_debug_logs(handle: *mut MapHandle) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map_native` returns a live native map pointer.
+    error::check(unsafe { sys::mln_map_dump_debug_logs(map) })
+}
+
+fn set_style_url(handle: *mut MapHandle, url: *const std::ffi::c_char) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if url.is_null() {
+        return Err(Error::invalid_argument("style URL is null"));
+    }
+    // SAFETY: `url` is a caller-provided NUL-terminated string pointer and
+    // `map_native` returns a live map pointer. The C API copies the input.
+    error::check(unsafe { sys::mln_map_set_style_url(map, url) })
 }
 
 fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> error::Result<()> {

@@ -321,6 +321,56 @@ gboolean mln_vala_map_handle_request_repaint(
 );
 
 /**
+ * mln_vala_map_handle_request_still_image:
+ * @self: a map handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_request_still_image(
+  MlnValaMapHandle* self, GError** error
+);
+
+/**
+ * mln_vala_map_handle_is_fully_loaded:
+ * @self: a map handle.
+ * @out_loaded: (out): return location for fully-loaded state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_is_fully_loaded(
+  MlnValaMapHandle* self, gboolean* out_loaded, GError** error
+);
+
+/**
+ * mln_vala_map_handle_dump_debug_logs:
+ * @self: a map handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_dump_debug_logs(
+  MlnValaMapHandle* self, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_style_url:
+ * @self: a map handle.
+ * @url: (not nullable): NUL-terminated style URL.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_style_url(
+  MlnValaMapHandle* self, const char* url, GError** error
+);
+
+/**
  * mln_vala_map_handle_set_style_json:
  * @self: a map handle.
  * @json: (not nullable): NUL-terminated style JSON.

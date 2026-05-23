@@ -25,7 +25,11 @@ int main(string[] args) {
     runtime.poll_event(out event);
 
     var map = new MaplibreNative.MapHandle(runtime, 512, 512, 1.0);
+    map.set_style_url("asset://missing-style.json");
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    bool loaded = false;
+    map.is_fully_loaded(out loaded);
+    map.dump_debug_logs();
 
     var projection = new MaplibreNative.MapProjectionHandle(map);
     MaplibreNative.ScreenPoint point;
