@@ -577,3 +577,38 @@ audit.
   `uv run ty check --error-on-warning .mise`, and
   `mise run //bindings/python:ci` (60 Python tests, wheel build, and
   metadata/`_native` import check) passed.
+
+## Round 12
+
+Review fanout: final post-Round-11 lifecycle, typing/API, validation, and
+review-record audit.
+
+### Applied findings
+
+- None. Reviewers found no actionable in-scope findings worth fixing now.
+
+### Rejected or deferred findings
+
+- Broader coordination between `RuntimeHandle.close()` and still-live
+  offline-operation wrapper objects remains deferred as ownership-policy work
+  beyond the current PR's narrow closed-handle validation.
+- Remaining `Any` fallbacks are tied to real import cycles: `render.MapHandle`,
+  `runtime.MapHandle`/`MapOptions`, and `offline.RuntimeHandle`. Static
+  `TYPE_CHECKING` imports keep type-checker behavior precise.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, broad enum deduplication, and
+  broader root export expansion.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Independent review fanout found no actionable lifecycle, typing/API,
+  validation, or review-record findings.
+- Reviewer validation included
+  `uv run pytest bindings/python/tests/test_package.py` (60 tests),
+  `mise run //bindings/python:ci`, `uv run ty check --error-on-warning .mise`,
+  and `cargo check -p maplibre-native-python`; all passed.
