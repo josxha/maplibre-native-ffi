@@ -182,6 +182,31 @@ def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
             assert snapshot.padding == target.padding
 
 
+def test_camera_transition_commands_accept_public_values() -> None:
+    animation = camera.AnimationOptions(
+        duration_ms=0.0,
+        velocity=1.0,
+        min_zoom=0.0,
+        easing=camera.UnitBezier(0.0, 0.0, 1.0, 1.0),
+    )
+    target = camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=1.0)
+    first = camera.ScreenPoint(0.0, 0.0)
+    second = camera.ScreenPoint(1.0, 1.0)
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.ease_to(target, animation)
+            map_handle.fly_to(target, animation)
+            map_handle.move_by_animated(1.0, 1.0, animation)
+            map_handle.scale_by(1.0, first)
+            map_handle.scale_by_animated(1.0, first, animation)
+            map_handle.rotate_by(first, second)
+            map_handle.rotate_by_animated(first, second, animation)
+            map_handle.pitch_by(0.0)
+            map_handle.pitch_by_animated(0.0, animation)
+            map_handle.cancel_transitions()
+
+
 def test_poll_event_returns_none_when_queue_is_empty() -> None:
     with mln.RuntimeHandle() as runtime:
         assert runtime.poll_event() is None

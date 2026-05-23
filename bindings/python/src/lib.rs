@@ -694,11 +694,206 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn ease_to(
+        &self,
+        center: Option<(f64, f64)>,
+        zoom: Option<f64>,
+        bearing: Option<f64>,
+        pitch: Option<f64>,
+        padding: Option<(f64, f64, f64, f64)>,
+        anchor: Option<(f64, f64)>,
+        animation: Option<(
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<(f64, f64, f64, f64)>,
+        )>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        let animation = animation.map(animation_options_from_parts);
+        // SAFETY: The C API validates the map pointer, camera fields, and
+        // optional animation fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_ease_to(
+                state.as_ptr(),
+                &camera,
+                optional_ref_ptr(animation.as_ref()),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn fly_to(
+        &self,
+        center: Option<(f64, f64)>,
+        zoom: Option<f64>,
+        bearing: Option<f64>,
+        pitch: Option<f64>,
+        padding: Option<(f64, f64, f64, f64)>,
+        anchor: Option<(f64, f64)>,
+        animation: Option<(
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<(f64, f64, f64, f64)>,
+        )>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        let animation = animation.map(animation_options_from_parts);
+        // SAFETY: The C API validates the map pointer, camera fields, and
+        // optional animation fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_fly_to(
+                state.as_ptr(),
+                &camera,
+                optional_ref_ptr(animation.as_ref()),
+            )
+        })
+        .map_err(map_error)
+    }
+
     fn move_by(&self, delta_x: f64, delta_y: f64) -> PyResult<()> {
         let state = self.state();
         // SAFETY: The C API validates the map pointer and delta values.
         maplibre_core::check(unsafe { sys::mln_map_move_by(state.as_ptr(), delta_x, delta_y) })
             .map_err(map_error)
+    }
+
+    fn move_by_animated(
+        &self,
+        delta_x: f64,
+        delta_y: f64,
+        animation: Option<(
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<(f64, f64, f64, f64)>,
+        )>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let animation = animation.map(animation_options_from_parts);
+        // SAFETY: The C API validates the map pointer, delta values, and
+        // optional animation fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_move_by_animated(
+                state.as_ptr(),
+                delta_x,
+                delta_y,
+                optional_ref_ptr(animation.as_ref()),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn scale_by(&self, scale: f64, anchor: Option<(f64, f64)>) -> PyResult<()> {
+        let state = self.state();
+        let anchor = anchor.map(screen_point_from_tuple);
+        // SAFETY: The C API validates the map pointer, scale, and optional anchor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_scale_by(state.as_ptr(), scale, optional_ref_ptr(anchor.as_ref()))
+        })
+        .map_err(map_error)
+    }
+
+    fn scale_by_animated(
+        &self,
+        scale: f64,
+        anchor: Option<(f64, f64)>,
+        animation: Option<(
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<(f64, f64, f64, f64)>,
+        )>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let anchor = anchor.map(screen_point_from_tuple);
+        let animation = animation.map(animation_options_from_parts);
+        // SAFETY: The C API validates the map pointer, scale, optional anchor,
+        // and optional animation fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_scale_by_animated(
+                state.as_ptr(),
+                scale,
+                optional_ref_ptr(anchor.as_ref()),
+                optional_ref_ptr(animation.as_ref()),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn rotate_by(&self, first: (f64, f64), second: (f64, f64)) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and points.
+        maplibre_core::check(unsafe {
+            sys::mln_map_rotate_by(
+                state.as_ptr(),
+                screen_point_from_tuple(first),
+                screen_point_from_tuple(second),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn rotate_by_animated(
+        &self,
+        first: (f64, f64),
+        second: (f64, f64),
+        animation: Option<(
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<(f64, f64, f64, f64)>,
+        )>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let animation = animation.map(animation_options_from_parts);
+        // SAFETY: The C API validates the map pointer, points, and optional
+        // animation fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_rotate_by_animated(
+                state.as_ptr(),
+                screen_point_from_tuple(first),
+                screen_point_from_tuple(second),
+                optional_ref_ptr(animation.as_ref()),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn pitch_by(&self, pitch: f64) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and pitch value.
+        maplibre_core::check(unsafe { sys::mln_map_pitch_by(state.as_ptr(), pitch) })
+            .map_err(map_error)
+    }
+
+    fn pitch_by_animated(
+        &self,
+        pitch: f64,
+        animation: Option<(
+            Option<f64>,
+            Option<f64>,
+            Option<f64>,
+            Option<(f64, f64, f64, f64)>,
+        )>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let animation = animation.map(animation_options_from_parts);
+        // SAFETY: The C API validates the map pointer, pitch value, and optional
+        // animation fields.
+        maplibre_core::check(unsafe {
+            sys::mln_map_pitch_by_animated(
+                state.as_ptr(),
+                pitch,
+                optional_ref_ptr(animation.as_ref()),
+            )
+        })
+        .map_err(map_error)
     }
 
     fn cancel_transitions(&self) -> PyResult<()> {
@@ -1602,6 +1797,14 @@ fn log_event_raw(event: LogEvent) -> u32 {
     }
 }
 
+fn optional_ref_ptr<T>(value: Option<&T>) -> *const T {
+    value.map_or(ptr::null(), |value| value as *const T)
+}
+
+fn screen_point_from_tuple((x, y): (f64, f64)) -> sys::mln_screen_point {
+    sys::mln_screen_point { x, y }
+}
+
 fn edge_insets_from_tuple(
     (top, left, bottom, right): (f64, f64, f64, f64),
 ) -> sys::mln_edge_insets {
@@ -1625,6 +1828,35 @@ fn screen_point_to_py(py: Python<'_>, point: sys::mln_screen_point) -> PyResult<
     dict.set_item("x", point.x)?;
     dict.set_item("y", point.y)?;
     Ok(dict.into_any().unbind())
+}
+
+fn animation_options_from_parts(
+    (duration_ms, velocity, min_zoom, easing): (
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+        Option<(f64, f64, f64, f64)>,
+    ),
+) -> sys::mln_animation_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_animation_options_default() };
+    if let Some(duration_ms) = duration_ms {
+        raw.fields |= sys::MLN_ANIMATION_OPTION_DURATION;
+        raw.duration_ms = duration_ms;
+    }
+    if let Some(velocity) = velocity {
+        raw.fields |= sys::MLN_ANIMATION_OPTION_VELOCITY;
+        raw.velocity = velocity;
+    }
+    if let Some(min_zoom) = min_zoom {
+        raw.fields |= sys::MLN_ANIMATION_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if let Some((x1, y1, x2, y2)) = easing {
+        raw.fields |= sys::MLN_ANIMATION_OPTION_EASING;
+        raw.easing = sys::mln_unit_bezier { x1, y1, x2, y2 };
+    }
+    raw
 }
 
 fn camera_options_from_parts(
@@ -1658,9 +1890,9 @@ fn camera_options_from_parts(
         raw.fields |= sys::MLN_CAMERA_OPTION_PADDING;
         raw.padding = edge_insets_from_tuple(padding);
     }
-    if let Some((x, y)) = anchor {
+    if let Some(anchor) = anchor {
         raw.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
-        raw.anchor = sys::mln_screen_point { x, y };
+        raw.anchor = screen_point_from_tuple(anchor);
     }
     raw
 }

@@ -11,7 +11,7 @@ from . import _native
 from .runtime import RuntimeHandle
 
 if TYPE_CHECKING:
-    from .camera import CameraOptions, EdgeInsets, ScreenPoint
+    from .camera import AnimationOptions, CameraOptions, EdgeInsets, ScreenPoint
     from .geo import LatLng
     from .render import (
         MetalBorrowedTextureDescriptor,
@@ -83,6 +83,32 @@ def _camera_parts(
     )
     anchor = (camera.anchor.x, camera.anchor.y) if camera.anchor is not None else None
     return center, camera.zoom, camera.bearing, camera.pitch, padding, anchor
+
+
+def _animation_parts(
+    animation: AnimationOptions | None,
+) -> (
+    tuple[
+        float | None,
+        float | None,
+        float | None,
+        tuple[float, float, float, float] | None,
+    ]
+    | None
+):
+    if animation is None:
+        return None
+    easing = (
+        (
+            animation.easing.p1x,
+            animation.easing.p1y,
+            animation.easing.p2x,
+            animation.easing.p2y,
+        )
+        if animation.easing is not None
+        else None
+    )
+    return animation.duration_ms, animation.velocity, animation.min_zoom, easing
 
 
 def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
@@ -223,9 +249,78 @@ class MapHandle:
         """Apply a camera jump command."""
         self._native.jump_to(*_camera_parts(camera))
 
+    def ease_to(
+        self,
+        camera: CameraOptions,
+        animation: AnimationOptions | None = None,
+    ) -> None:
+        """Apply a camera ease transition command."""
+        self._native.ease_to(*_camera_parts(camera), _animation_parts(animation))
+
+    def fly_to(
+        self,
+        camera: CameraOptions,
+        animation: AnimationOptions | None = None,
+    ) -> None:
+        """Apply a camera fly transition command."""
+        self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
+
     def move_by(self, delta_x: float, delta_y: float) -> None:
         """Apply a screen-space pan command."""
         self._native.move_by(delta_x, delta_y)
+
+    def move_by_animated(
+        self,
+        delta_x: float,
+        delta_y: float,
+        animation: AnimationOptions | None = None,
+    ) -> None:
+        """Apply an animated screen-space pan command."""
+        self._native.move_by_animated(delta_x, delta_y, _animation_parts(animation))
+
+    def scale_by(self, scale: float, anchor: ScreenPoint | None = None) -> None:
+        """Apply a screen-space zoom command."""
+        raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
+        self._native.scale_by(scale, raw_anchor)
+
+    def scale_by_animated(
+        self,
+        scale: float,
+        anchor: ScreenPoint | None = None,
+        animation: AnimationOptions | None = None,
+    ) -> None:
+        """Apply an animated screen-space zoom command."""
+        raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
+        self._native.scale_by_animated(scale, raw_anchor, _animation_parts(animation))
+
+    def rotate_by(self, first: ScreenPoint, second: ScreenPoint) -> None:
+        """Apply a screen-space rotate command."""
+        self._native.rotate_by((first.x, first.y), (second.x, second.y))
+
+    def rotate_by_animated(
+        self,
+        first: ScreenPoint,
+        second: ScreenPoint,
+        animation: AnimationOptions | None = None,
+    ) -> None:
+        """Apply an animated screen-space rotate command."""
+        self._native.rotate_by_animated(
+            (first.x, first.y),
+            (second.x, second.y),
+            _animation_parts(animation),
+        )
+
+    def pitch_by(self, pitch: float) -> None:
+        """Apply a pitch delta command."""
+        self._native.pitch_by(pitch)
+
+    def pitch_by_animated(
+        self,
+        pitch: float,
+        animation: AnimationOptions | None = None,
+    ) -> None:
+        """Apply an animated pitch delta command."""
+        self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:
         """Cancel active camera transitions."""
