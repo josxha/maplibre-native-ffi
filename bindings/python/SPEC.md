@@ -115,8 +115,9 @@ The current implementation includes these completed slices:
   map options.
 - `MapHandle` exposes map debug overlay options, rendering-stats view state,
   loaded-state queries, viewport options, and tile options.
-- `MapHandle` exposes style source URL insertion, removal, existence checks,
-  type/info lookup, attribution copying, and source ID listing.
+- `MapHandle` exposes GeoJSON, vector, raster, and raster DEM style source URL
+  insertion, source removal, existence checks, type/info lookup, attribution
+  copying, and source ID listing.
 - `MapHandle` exposes style layer removal, existence checks, type lookup, ID
   listing, and layer reordering.
 - `MapHandle` exposes runtime style image set, removal, existence checks,

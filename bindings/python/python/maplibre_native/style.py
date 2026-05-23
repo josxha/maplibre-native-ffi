@@ -6,7 +6,43 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
+from .geo import LatLngBounds
 from .render import PremultipliedRgba8Image, TextureImageInfo
+
+
+class TileScheme(IntEnum):
+    """Tile URL coordinate scheme values."""
+
+    XYZ = 0
+    TMS = 1
+
+
+class VectorTileEncoding(IntEnum):
+    """Vector tile encoding values."""
+
+    MVT = 0
+    MLT = 1
+
+
+class RasterDemEncoding(IntEnum):
+    """DEM raster encoding values."""
+
+    MAPBOX = 0
+    TERRARIUM = 1
+
+
+@dataclass(frozen=True, slots=True)
+class TileSourceOptions:
+    """Options for vector, raster, and raster DEM tile sources."""
+
+    min_zoom: float | None = None
+    max_zoom: float | None = None
+    attribution: str | None = None
+    scheme: TileScheme | None = None
+    bounds: LatLngBounds | None = None
+    tile_size: int | None = None
+    vector_encoding: VectorTileEncoding | None = None
+    raster_dem_encoding: RasterDemEncoding | None = None
 
 
 class StyleSourceType(IntEnum):
@@ -191,9 +227,13 @@ __all__ = [
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "RasterDemEncoding",
     "StyleImage",
     "StyleImageInfo",
     "StyleImageOptions",
     "StyleSourceInfo",
     "StyleSourceType",
+    "TileScheme",
+    "TileSourceOptions",
+    "VectorTileEncoding",
 ]

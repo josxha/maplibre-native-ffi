@@ -1029,6 +1029,126 @@ impl MapHandle {
         .map_err(map_error)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn add_vector_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        attribution: Option<String>,
+        scheme: Option<u32>,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        tile_size: Option<u32>,
+        vector_encoding: Option<u32>,
+        raster_dem_encoding: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        let options = tile_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            attribution,
+            scheme,
+            bounds,
+            tile_size,
+            vector_encoding,
+            raster_dem_encoding,
+        )?;
+        let options = maplibre_core::style::tile_source_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer, string views, and options.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_vector_source_url(
+                state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                options.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_raster_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        attribution: Option<String>,
+        scheme: Option<u32>,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        tile_size: Option<u32>,
+        vector_encoding: Option<u32>,
+        raster_dem_encoding: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        let options = tile_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            attribution,
+            scheme,
+            bounds,
+            tile_size,
+            vector_encoding,
+            raster_dem_encoding,
+        )?;
+        let options = maplibre_core::style::tile_source_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer, string views, and options.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_raster_source_url(
+                state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                options.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_raster_dem_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        attribution: Option<String>,
+        scheme: Option<u32>,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        tile_size: Option<u32>,
+        vector_encoding: Option<u32>,
+        raster_dem_encoding: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        let options = tile_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            attribution,
+            scheme,
+            bounds,
+            tile_size,
+            vector_encoding,
+            raster_dem_encoding,
+        )?;
+        let options = maplibre_core::style::tile_source_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer, string views, and options.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_raster_dem_source_url(
+                state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                options.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
     fn remove_style_source(&self, source_id: String) -> PyResult<bool> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
@@ -2252,6 +2372,78 @@ fn screen_point_to_py(py: Python<'_>, point: sys::mln_screen_point) -> PyResult<
     dict.set_item("x", point.x)?;
     dict.set_item("y", point.y)?;
     Ok(dict.into_any().unbind())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tile_source_options_from_parts(
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    attribution: Option<String>,
+    scheme: Option<u32>,
+    bounds: Option<((f64, f64), (f64, f64))>,
+    tile_size: Option<u32>,
+    vector_encoding: Option<u32>,
+    raster_dem_encoding: Option<u32>,
+) -> PyResult<maplibre_core::TileSourceOptions> {
+    let mut options = maplibre_core::TileSourceOptions::new();
+    if let Some(min_zoom) = min_zoom {
+        options = options.with_min_zoom(min_zoom);
+    }
+    if let Some(max_zoom) = max_zoom {
+        options = options.with_max_zoom(max_zoom);
+    }
+    if let Some(attribution) = attribution {
+        options = options.with_attribution(attribution);
+    }
+    if let Some(scheme) = scheme {
+        options = options.with_scheme(match scheme {
+            sys::MLN_STYLE_TILE_SCHEME_XYZ => maplibre_core::TileScheme::Xyz,
+            sys::MLN_STYLE_TILE_SCHEME_TMS => maplibre_core::TileScheme::Tms,
+            raw => {
+                return Err(invalid_argument_error(format!(
+                    "unknown tile scheme: {raw}"
+                )));
+            }
+        });
+    }
+    if let Some((
+        (southwest_latitude, southwest_longitude),
+        (northeast_latitude, northeast_longitude),
+    )) = bounds
+    {
+        options = options.with_bounds(maplibre_core::LatLngBounds::new(
+            maplibre_core::LatLng::new(southwest_latitude, southwest_longitude),
+            maplibre_core::LatLng::new(northeast_latitude, northeast_longitude),
+        ));
+    }
+    if let Some(tile_size) = tile_size {
+        options = options.with_tile_size(tile_size);
+    }
+    if let Some(vector_encoding) = vector_encoding {
+        options = options.with_vector_encoding(match vector_encoding {
+            sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT => maplibre_core::VectorTileEncoding::Mvt,
+            sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT => maplibre_core::VectorTileEncoding::Mlt,
+            raw => {
+                return Err(invalid_argument_error(format!(
+                    "unknown vector tile encoding: {raw}"
+                )));
+            }
+        });
+    }
+    if let Some(raster_dem_encoding) = raster_dem_encoding {
+        options = options.with_raster_dem_encoding(match raster_dem_encoding {
+            sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX => maplibre_core::RasterDemEncoding::Mapbox,
+            sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM => {
+                maplibre_core::RasterDemEncoding::Terrarium
+            }
+            raw => {
+                return Err(invalid_argument_error(format!(
+                    "unknown raster DEM encoding: {raw}"
+                )));
+            }
+        });
+    }
+    Ok(options)
 }
 
 fn viewport_options_from_parts(

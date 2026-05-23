@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         StyleImageOptions,
         StyleSourceInfo,
         StyleSourceType,
+        TileSourceOptions,
     )
 
 
@@ -220,6 +221,42 @@ def _animation_parts(
     return animation.duration_ms, animation.velocity, animation.min_zoom, easing
 
 
+def _tile_source_parts(
+    options: TileSourceOptions | None,
+) -> tuple[
+    float | None,
+    float | None,
+    str | None,
+    int | None,
+    tuple[tuple[float, float], tuple[float, float]] | None,
+    int | None,
+    int | None,
+    int | None,
+]:
+    if options is None:
+        return None, None, None, None, None, None, None, None
+    bounds = (
+        (
+            (options.bounds.southwest.latitude, options.bounds.southwest.longitude),
+            (options.bounds.northeast.latitude, options.bounds.northeast.longitude),
+        )
+        if options.bounds is not None
+        else None
+    )
+    return (
+        options.min_zoom,
+        options.max_zoom,
+        options.attribution,
+        int(options.scheme) if options.scheme is not None else None,
+        bounds,
+        options.tile_size,
+        int(options.vector_encoding) if options.vector_encoding is not None else None,
+        int(options.raster_dem_encoding)
+        if options.raster_dem_encoding is not None
+        else None,
+    )
+
+
 def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
     """Convert a geographic coordinate to spherical Mercator projected meters."""
     raw = _native.projected_meters_for_lat_lng(
@@ -407,6 +444,35 @@ class MapHandle:
     def add_geojson_source_url(self, source_id: str, url: str) -> None:
         """Add a GeoJSON source that loads data from a URL."""
         self._native.add_geojson_source_url(source_id, url)
+
+    def add_vector_source_url(
+        self,
+        source_id: str,
+        url: str,
+        options: TileSourceOptions | None = None,
+    ) -> None:
+        """Add a vector source with a TileJSON URL."""
+        self._native.add_vector_source_url(source_id, url, *_tile_source_parts(options))
+
+    def add_raster_source_url(
+        self,
+        source_id: str,
+        url: str,
+        options: TileSourceOptions | None = None,
+    ) -> None:
+        """Add a raster source with a TileJSON URL."""
+        self._native.add_raster_source_url(source_id, url, *_tile_source_parts(options))
+
+    def add_raster_dem_source_url(
+        self,
+        source_id: str,
+        url: str,
+        options: TileSourceOptions | None = None,
+    ) -> None:
+        """Add a raster DEM source with a TileJSON URL."""
+        self._native.add_raster_dem_source_url(
+            source_id, url, *_tile_source_parts(options)
+        )
 
     def remove_style_source(self, source_id: str) -> bool:
         """Remove a style source by ID and report whether it existed."""
