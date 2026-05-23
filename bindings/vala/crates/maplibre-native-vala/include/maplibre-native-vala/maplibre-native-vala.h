@@ -1902,6 +1902,26 @@ gboolean mln_vala_map_handle_get_style_source_info(
 );
 
 /**
+ * mln_vala_map_handle_copy_style_source_attribution:
+ * @self: a map handle.
+ * @source_id: (not nullable): source identifier.
+ * @out_attribution: (out caller-allocates) (array length=attribution_capacity):
+ * output buffer.
+ * @attribution_capacity: byte length of @out_attribution.
+ * @out_attribution_size: (out): return location for required byte length.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_copy_style_source_attribution(
+  MlnValaMapHandle* self, const char* source_id, char* out_attribution,
+  size_t attribution_capacity, size_t* out_attribution_size,
+  gboolean* out_found, GError** error
+);
+
+/**
  * mln_vala_map_handle_remove_style_source:
  * @self: a map handle.
  * @source_id: (not nullable): source identifier.

@@ -122,6 +122,9 @@ int main(string[] args) {
     map.get_style_source_type("fixture-source", out source_type, out source_found);
     MaplibreNative.StyleSourceInfo source_info;
     map.get_style_source_info("fixture-source", out source_info, out source_found);
+    size_t attribution_size = 0;
+    bool attribution_found = false;
+    map.copy_style_source_attribution("fixture-source", null, out attribution_size, out attribution_found);
     map.set_geojson_source_url("fixture-source", "asset://fixture-updated.geojson");
     var source_ids = map.list_style_source_ids();
     size_t source_id_count;

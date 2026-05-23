@@ -1174,6 +1174,32 @@ pub extern "C" fn mln_vala_map_handle_get_style_source_info(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_copy_style_source_attribution(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_attribution: *mut c_char,
+    attribution_capacity: usize,
+    out_attribution_size: *mut usize,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match copy_style_source_attribution(
+        handle,
+        source_id,
+        out_attribution,
+        attribution_capacity,
+        out_attribution_size,
+        out_found,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_remove_style_source(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -2351,6 +2377,34 @@ fn get_style_source_info(
         sys::mln_map_get_style_source_info(map, source_id, &mut info, &mut found)
     })?;
     glib::clear_optional_out_pointer(out_info, info)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
+fn copy_style_source_attribution(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_attribution: *mut c_char,
+    attribution_capacity: usize,
+    out_attribution_size: *mut usize,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let mut attribution_size = 0;
+    let mut found = false;
+    // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
+    // and the C API validates caller-allocated output storage.
+    error::check(unsafe {
+        sys::mln_map_copy_style_source_attribution(
+            map,
+            source_id,
+            out_attribution,
+            attribution_capacity,
+            &mut attribution_size,
+            &mut found,
+        )
+    })?;
+    glib::clear_optional_out_pointer(out_attribution_size, attribution_size)?;
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
 }
 
