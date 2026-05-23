@@ -7096,53 +7096,67 @@ mod tests {
 
     #[test]
     fn feature_state_selector_setters_initialize_hidden_size() {
-        // SAFETY: Zeroed storage is initialized by semantic setters.
-        let mut selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
+        let expected_size = std::mem::size_of::<sys::mln_feature_state_selector>() as u32;
 
+        // SAFETY: Zeroed storage is initialized by the semantic setter.
+        let mut source_selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
         assert_eq!(
             mln_vala_feature_state_selector_set_source_id(
-                &mut selector,
+                &mut source_selector,
                 c"source".as_ptr(),
                 ptr::null_mut(),
             ),
             GTRUE
         );
-        assert_eq!(
-            selector.size,
-            std::mem::size_of::<sys::mln_feature_state_selector>() as u32
-        );
+        assert_eq!(source_selector.size, expected_size);
+
+        // SAFETY: Zeroed storage is initialized by the semantic setter.
+        let mut source_layer_selector: sys::mln_feature_state_selector =
+            unsafe { std::mem::zeroed() };
         assert_eq!(
             mln_vala_feature_state_selector_set_source_layer_id(
-                &mut selector,
+                &mut source_layer_selector,
                 c"source-layer".as_ptr(),
                 ptr::null_mut(),
             ),
             GTRUE
         );
+        assert_eq!(source_layer_selector.size, expected_size);
+        assert_ne!(
+            source_layer_selector.fields & sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
+            0
+        );
+
+        // SAFETY: Zeroed storage is initialized by the semantic setter.
+        let mut feature_selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
         assert_eq!(
             mln_vala_feature_state_selector_set_feature_id(
-                &mut selector,
+                &mut feature_selector,
                 c"feature".as_ptr(),
                 ptr::null_mut(),
             ),
             GTRUE
         );
+        assert_eq!(feature_selector.size, expected_size);
+        assert_ne!(
+            feature_selector.fields & sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+            0
+        );
+
+        // SAFETY: Zeroed storage is initialized by the semantic setter.
+        let mut state_key_selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
         assert_eq!(
             mln_vala_feature_state_selector_set_state_key(
-                &mut selector,
+                &mut state_key_selector,
                 c"state-key".as_ptr(),
                 ptr::null_mut(),
             ),
             GTRUE
         );
-        assert_eq!(
-            selector.fields
-                & (sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-                    | sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-                    | sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY),
-            sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-                | sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-                | sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+        assert_eq!(state_key_selector.size, expected_size);
+        assert_ne!(
+            state_key_selector.fields & sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY,
+            0
         );
     }
 
@@ -7209,17 +7223,20 @@ mod tests {
         while !teardown_started.load(Ordering::SeqCst) {
             std::thread::yield_now();
         }
-        for _ in 0..1_000 {
+        let mut observed_closing = false;
+        for _ in 0..10_000 {
             let closing = unsafe { &*state }
                 .lifecycle
                 .lock()
                 .expect("custom geometry lifecycle lock should not be poisoned")
                 .closing;
             if closing {
+                observed_closing = true;
                 break;
             }
             std::thread::yield_now();
         }
+        assert!(observed_closing);
         assert_eq!(destroy_count.load(Ordering::SeqCst), 0);
 
         drop(guard);

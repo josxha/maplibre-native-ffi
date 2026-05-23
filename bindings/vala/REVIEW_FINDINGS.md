@@ -545,3 +545,33 @@ Review artifacts:
 - `mise run fix`
 - `mise run //bindings/vala:ci`
 - `mise run test`
+
+## Round 14
+
+Review artifacts:
+
+- `review-loop/round14-api-runtime.md`
+- `review-loop/round14-validation-docs.md`
+
+### Applied findings
+
+- Strengthened the feature-state selector regression test so each semantic
+  setter is proven to initialize hidden ABI size when called first on zeroed
+  storage.
+- Made the custom-geometry in-flight teardown test assert that teardown entered
+  the closing/wait path before the active callback guard is released.
+
+### Rejected or deferred findings
+
+- `set_style_url()` custom-geometry teardown, non-Vala GI union ergonomics, and
+  the recorded descriptor/result-handle API policy choices remain deferred or
+  user-input-needed as recorded in Rounds 12 and 13.
+
+### User-input-needed findings
+
+- No new user-input-needed findings beyond the recorded API-policy decisions.
+
+### Validation
+
+- `mise run fix`
+- `mise run //bindings/vala:ci`
