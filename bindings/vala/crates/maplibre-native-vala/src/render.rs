@@ -5,7 +5,7 @@ use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
-use crate::handles::{self, MapHandle};
+use crate::handles::{self, JsonSnapshotHandle, MapHandle};
 use crate::native_pointer::NativePointer;
 
 const RENDER_SESSION_TYPE_NAME: &CStr = c"MlnValaRenderSessionHandle";
@@ -261,6 +261,52 @@ pub extern "C" fn mln_vala_render_session_handle_render_update(
     match session_call(handle, |session| unsafe {
         sys::mln_render_session_render_update(session)
     }) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_set_feature_state(
+    handle: *mut RenderSessionHandle,
+    selector: *const sys::mln_feature_state_selector,
+    state: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_feature_state(handle, selector, state) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_get_feature_state(
+    handle: *mut RenderSessionHandle,
+    selector: *const sys::mln_feature_state_selector,
+    error_out: *mut *mut GError,
+) -> *mut JsonSnapshotHandle {
+    match get_feature_state(handle, selector) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_remove_feature_state(
+    handle: *mut RenderSessionHandle,
+    selector: *const sys::mln_feature_state_selector,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match remove_feature_state(handle, selector) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -797,6 +843,51 @@ fn resize(
     let session = session_native(handle)?;
     // SAFETY: `session` is live. The C API validates dimensions and scale.
     error::check(unsafe { sys::mln_render_session_resize(session, width, height, scale_factor) })
+}
+
+fn set_feature_state(
+    handle: *mut RenderSessionHandle,
+    selector: *const sys::mln_feature_state_selector,
+    state: *const sys::mln_json_value,
+) -> error::Result<()> {
+    if selector.is_null() {
+        return Err(Error::invalid_argument("feature state selector is null"));
+    }
+    if state.is_null() {
+        return Err(Error::invalid_argument("feature state JSON is null"));
+    }
+    let session = session_native(handle)?;
+    // SAFETY: `session` is live; selector and state are borrowed for this call.
+    error::check(unsafe { sys::mln_render_session_set_feature_state(session, selector, state) })
+}
+
+fn get_feature_state(
+    handle: *mut RenderSessionHandle,
+    selector: *const sys::mln_feature_state_selector,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    if selector.is_null() {
+        return Err(Error::invalid_argument("feature state selector is null"));
+    }
+    let session = session_native(handle)?;
+    let mut snapshot = ptr::null_mut();
+    // SAFETY: `session` is live; selector is borrowed for this call, and output
+    // storage is valid and null-initialized.
+    error::check(unsafe {
+        sys::mln_render_session_get_feature_state(session, selector, &mut snapshot)
+    })?;
+    handles::wrap_json_snapshot(snapshot)
+}
+
+fn remove_feature_state(
+    handle: *mut RenderSessionHandle,
+    selector: *const sys::mln_feature_state_selector,
+) -> error::Result<()> {
+    if selector.is_null() {
+        return Err(Error::invalid_argument("feature state selector is null"));
+    }
+    let session = session_native(handle)?;
+    // SAFETY: `session` is live; selector is borrowed for this call.
+    error::check(unsafe { sys::mln_render_session_remove_feature_state(session, selector) })
 }
 
 fn read_premultiplied_rgba8(

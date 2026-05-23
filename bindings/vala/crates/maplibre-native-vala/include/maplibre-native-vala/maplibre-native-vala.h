@@ -199,6 +199,12 @@ typedef enum {
 } MlnValaQueriedFeatureFields;
 
 typedef enum {
+  MLN_VALA_FEATURE_STATE_SELECTOR_FIELDS_SOURCE_LAYER_ID = 1u << 0u,
+  MLN_VALA_FEATURE_STATE_SELECTOR_FIELDS_FEATURE_ID = 1u << 1u,
+  MLN_VALA_FEATURE_STATE_SELECTOR_FIELDS_STATE_KEY = 1u << 2u,
+} MlnValaFeatureStateSelectorFields;
+
+typedef enum {
   MLN_VALA_FEATURE_IDENTIFIER_TYPE_NULL = 0,
   MLN_VALA_FEATURE_IDENTIFIER_TYPE_UINT = 1,
   MLN_VALA_FEATURE_IDENTIFIER_TYPE_INT = 2,
@@ -464,6 +470,15 @@ typedef struct {
   MlnValaStringView key;
   const MlnValaJsonValue* value;
 } MlnValaJsonMember;
+
+typedef struct {
+  uint32_t size;
+  MlnValaFeatureStateSelectorFields fields;
+  MlnValaStringView source_id;
+  MlnValaStringView source_layer_id;
+  MlnValaStringView feature_id;
+  MlnValaStringView state_key;
+} MlnValaFeatureStateSelector;
 
 typedef struct {
   uint32_t size;
@@ -3163,6 +3178,27 @@ gboolean mln_vala_render_session_handle_resize(
 );
 gboolean mln_vala_render_session_handle_render_update(
   MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_render_session_handle_set_feature_state(
+  MlnValaRenderSessionHandle* self, const MlnValaFeatureStateSelector* selector,
+  const MlnValaJsonValue* state, GError** error
+);
+/**
+ * mln_vala_render_session_handle_get_feature_state:
+ * @self: a render session handle.
+ * @selector: (not nullable): feature state selector.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned JSON snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaJsonSnapshotHandle* mln_vala_render_session_handle_get_feature_state(
+  MlnValaRenderSessionHandle* self, const MlnValaFeatureStateSelector* selector,
+  GError** error
+);
+gboolean mln_vala_render_session_handle_remove_feature_state(
+  MlnValaRenderSessionHandle* self, const MlnValaFeatureStateSelector* selector,
+  GError** error
 );
 gboolean mln_vala_render_session_handle_detach(
   MlnValaRenderSessionHandle* self, GError** error

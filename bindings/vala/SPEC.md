@@ -110,8 +110,8 @@ The scaffold implements one proof slice in Rust:
   close-once lifecycle, camera, visible-coordinate/geometry fitting, and
   coordinate conversion methods.
 - `RenderSessionHandle` is registered as a GObject class with descriptor
-  defaults, render-target attach methods, readback helpers, texture frame
-  handles, and basic session lifecycle methods.
+  defaults, render-target attach methods, feature-state JSON snapshot helpers,
+  readback helpers, texture frame handles, and basic session lifecycle methods.
 - Rendered/source feature query option descriptors, rendered query geometry
   constructors, queried feature views, feature query result handles, and feature
   extension result handles are exposed for Vala bindability.

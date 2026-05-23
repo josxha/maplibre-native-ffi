@@ -3921,7 +3921,7 @@ fn wrap_nullable_json_snapshot(
     }
 }
 
-fn wrap_json_snapshot(
+pub(crate) fn wrap_json_snapshot(
     native: *mut sys::mln_json_snapshot,
 ) -> error::Result<*mut JsonSnapshotHandle> {
     if native.is_null() {

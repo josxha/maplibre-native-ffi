@@ -78,6 +78,20 @@ void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue 
   }
 }
 
+void exercise_feature_state(MaplibreNative.RenderSessionHandle session, MaplibreNative.JsonValue state) throws GLib.Error {
+  string source_id = "fixture-source";
+  string feature_id = "feature-1";
+  MaplibreNative.FeatureStateSelector selector = {};
+  selector.size = (uint32) sizeof(MaplibreNative.FeatureStateSelector);
+  selector.fields = MaplibreNative.FeatureStateSelectorFields.FEATURE_ID;
+  selector.source_id = { source_id, source_id.length };
+  selector.feature_id = { feature_id, feature_id.length };
+  session.set_feature_state(selector, state);
+  var snapshot = session.get_feature_state(selector);
+  snapshot.close();
+  session.remove_feature_state(selector);
+}
+
 void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws GLib.Error {
   MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
   rendered_options.default();
