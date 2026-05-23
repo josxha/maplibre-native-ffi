@@ -21,6 +21,19 @@ if TYPE_CHECKING:
         SourceFeatureQueryOptions,
     )
 
+else:
+    Feature = Any
+    JsonLike = Any
+    JsonObjectLike = Any
+    JsonValue = Any
+    MapHandle = Any
+    FeatureExtensionResult = Any
+    FeatureStateSelector = Any
+    QueriedFeature = Any
+    RenderedFeatureQueryOptions = Any
+    RenderedQueryGeometry = Any
+    SourceFeatureQueryOptions = Any
+
 
 class RenderBackend(IntFlag):
     """Render backend support bits reported by the native library."""

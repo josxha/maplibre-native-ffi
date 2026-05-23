@@ -20,6 +20,16 @@ if TYPE_CHECKING:
     )
     from .resource import ResourceProviderCallback, ResourceTransformCallback
 
+else:
+    MapHandle = Any
+    MapOptions = Any
+    AmbientCacheOperation = Any
+    OfflineOperationHandle = Any
+    OfflineRegionDefinition = Any
+    OfflineRegionDownloadState = Any
+    ResourceProviderCallback = Any
+    ResourceTransformCallback = Any
+
 
 class NetworkStatus(IntEnum):
     """Process-global network reachability state."""

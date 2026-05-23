@@ -29,8 +29,24 @@ mod py_errors {
 #[pyclass(name = "_RuntimeHandle")]
 struct RuntimeHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_runtime>>,
+    operation_gate: RuntimeOperationGate,
     resource_provider: Mutex<Option<Box<PyResourceProviderState>>>,
     resource_transform: Mutex<Option<Box<PyResourceTransformState>>>,
+}
+
+#[derive(Debug)]
+struct RuntimeOperationGate {
+    state: Mutex<RuntimeOperationGateState>,
+}
+
+#[derive(Debug, Default)]
+struct RuntimeOperationGateState {
+    active_detached_operation: bool,
+    closing: bool,
+}
+
+struct RuntimeDetachedOperationGuard<'a> {
+    gate: &'a RuntimeOperationGate,
 }
 
 struct PyResourceProviderState {
@@ -210,6 +226,65 @@ impl RuntimeHandle {
     }
 }
 
+impl RuntimeOperationGate {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(RuntimeOperationGateState::default()),
+        }
+    }
+
+    fn begin_detached_operation(&self) -> PyResult<RuntimeDetachedOperationGuard<'_>> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.closing {
+            return Err(invalid_state_error("runtime is closing"));
+        }
+        if state.active_detached_operation {
+            return Err(invalid_state_error(
+                "runtime has an active native operation",
+            ));
+        }
+        state.active_detached_operation = true;
+        Ok(RuntimeDetachedOperationGuard { gate: self })
+    }
+
+    fn begin_close(&self) -> PyResult<()> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.active_detached_operation {
+            return Err(invalid_state_error(
+                "runtime has an active native operation",
+            ));
+        }
+        if state.closing {
+            return Err(invalid_state_error("runtime is closing"));
+        }
+        state.closing = true;
+        Ok(())
+    }
+
+    fn finish_failed_close(&self) {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .closing = false;
+    }
+}
+
+impl Drop for RuntimeDetachedOperationGuard<'_> {
+    fn drop(&mut self) {
+        self.gate
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .active_detached_operation = false;
+    }
+}
+
 fn start_offline_operation<F>(runtime: &RuntimeHandle, start: F) -> PyResult<u64>
 where
     F: FnOnce(*mut sys::mln_runtime, *mut u64) -> i32,
@@ -218,6 +293,58 @@ where
     let mut operation_id = 0;
     maplibre_core::check(start(state.as_ptr(), &mut operation_id)).map_err(map_error)?;
     Ok(operation_id)
+}
+
+fn leak_optional_box<T>(slot: &Mutex<Option<Box<T>>>) {
+    let Some(value) = slot
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take()
+    else {
+        return;
+    };
+    Box::leak(value);
+}
+
+impl Drop for RuntimeHandle {
+    fn drop(&mut self) {
+        let native_live = self
+            .state
+            .lock()
+            .map(|state| !state.is_closed())
+            .unwrap_or(true);
+        if native_live {
+            leak_optional_box(&self.resource_provider);
+            leak_optional_box(&self.resource_transform);
+        }
+    }
+}
+
+impl Drop for MapHandle {
+    fn drop(&mut self) {
+        let native_live = self
+            .state
+            .lock()
+            .map(|state| !state.is_closed())
+            .unwrap_or(true);
+        if !native_live {
+            return;
+        }
+        let mut active = self
+            .custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (_, state) in active.drain() {
+            Box::leak(state);
+        }
+        let mut retired = self
+            .retired_custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for state in retired.drain(..) {
+            Box::leak(state);
+        }
+    }
 }
 
 impl PyLogCallbackState {
@@ -494,9 +621,14 @@ impl RenderSessionState {
 #[pymethods]
 impl RuntimeHandle {
     fn close(&self, py: Python<'_>) -> PyResult<()> {
+        if self.state().address().is_none() {
+            return Ok(());
+        }
+        self.operation_gate.begin_close()?;
         let runtime_address = {
             let state = self.state();
             let Some(runtime_address) = state.address() else {
+                self.operation_gate.finish_failed_close();
                 return Ok(());
             };
             state.mark_closed();
@@ -511,6 +643,7 @@ impl RuntimeHandle {
         });
         if let Err(error) = maplibre_core::check(status) {
             self.state().restore_address_for_retry(runtime_address);
+            self.operation_gate.finish_failed_close();
             return Err(map_error(error));
         }
         self.resource_provider
@@ -843,7 +976,14 @@ impl RuntimeHandle {
             max_pending_callbacks,
         ));
         let descriptor = replacement.descriptor();
-        let runtime_address = self.state().as_ptr() as usize;
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state();
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
@@ -874,7 +1014,14 @@ impl RuntimeHandle {
     }
 
     fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<()> {
-        let runtime_address = self.state().as_ptr() as usize;
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state();
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
         // SAFETY: state owns or has released the runtime pointer. The C API
         // validates that it is live and waits for in-flight callbacks before
         // returning success, so release the GIL while it runs without holding
@@ -6106,6 +6253,7 @@ fn create_runtime(
     let state = unsafe { maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_runtime") };
     Ok(RuntimeHandle {
         state: Mutex::new(state),
+        operation_gate: RuntimeOperationGate::new(),
         resource_provider: Mutex::new(None),
         resource_transform: Mutex::new(None),
     })

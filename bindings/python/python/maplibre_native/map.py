@@ -6,13 +6,13 @@ from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 from types import TracebackType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from . import _native
 from .camera import EdgeInsets
-from .runtime import RuntimeHandle
 
 if TYPE_CHECKING:
+    from .runtime import RuntimeHandle
     from .camera import (
         AnimationOptions,
         BoundOptions,
@@ -47,6 +47,41 @@ if TYPE_CHECKING:
         StyleSourceType,
         TileSourceOptions,
     )
+
+else:
+    AnimationOptions = Any
+    BoundOptions = Any
+    CameraFitOptions = Any
+    CameraOptions = Any
+    FreeCameraOptions = Any
+    ProjectionMode = Any
+    ScreenPoint = Any
+    GeoJson = Any
+    Geometry = Any
+    LatLng = Any
+    LatLngBounds = Any
+    JsonLike = Any
+    JsonObjectLike = Any
+    JsonValue = Any
+    MetalBorrowedTextureDescriptor = Any
+    MetalOwnedTextureDescriptor = Any
+    MetalSurfaceDescriptor = Any
+    PremultipliedRgba8Image = Any
+    RenderSessionHandle = Any
+    VulkanBorrowedTextureDescriptor = Any
+    VulkanOwnedTextureDescriptor = Any
+    VulkanSurfaceDescriptor = Any
+    CanonicalTileId = Any
+    CustomGeometrySourceHandle = Any
+    CustomGeometrySourceOptions = Any
+    StyleImage = Any
+    StyleImageInfo = Any
+    LocationIndicatorImageKind = Any
+    StyleImageOptions = Any
+    StyleSourceInfo = Any
+    StyleSourceType = Any
+    TileSourceOptions = Any
+    RuntimeHandle = Any
 
 
 class MapDebugOptions(IntFlag):

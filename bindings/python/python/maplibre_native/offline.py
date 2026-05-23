@@ -6,13 +6,17 @@ from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .geo import Geometry, LatLngBounds
 
 if TYPE_CHECKING:
     from .resource import ResourceErrorReason
     from .runtime import RuntimeHandle
+
+else:
+    ResourceErrorReason = Any
+    RuntimeHandle = Any
 
 
 class AmbientCacheOperation(IntEnum):

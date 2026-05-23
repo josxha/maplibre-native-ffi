@@ -311,3 +311,64 @@ Review fanout: final API/type-surface and lifecycle/callback review after Round
   `uv run ruff format --check bindings/python`,
   `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
   (58 Python tests, wheel build, and metadata/`_native` import check) passed.
+
+## Round 7
+
+Review fanout: final lifecycle/callback, API typing, and review-record check
+after Round 6 runtime wait fix.
+
+### Applied findings
+
+- Preserve callback `user_data` boxes when Python finalizers intentionally leak
+  native runtime/map handles.
+  - Evidence: final lifecycle review found Python finalizers warn without
+    closing thread-affine native owners, but dropping the PyO3 owner could still
+    drop boxed callback state used as native `user_data`.
+  - Resolution: added `Drop` handling for `_RuntimeHandle` and `_MapHandle` that
+    intentionally leaks retained callback boxes when the native owner is still
+    live. Explicit close still releases retained callback state normally.
+- Serialize detached runtime wait operations without holding the GIL or
+  handle-state mutex.
+  - Evidence: after Round 6, detached native waits no longer held the
+    handle-state mutex, but a concurrent close/transform operation could race on
+    the same raw runtime pointer.
+  - Resolution: added a runtime operation gate that rejects concurrent detached
+    runtime operations and close while another detached operation is active,
+    without waiting while holding the GIL.
+- Make public annotations resolvable through `typing.get_type_hints()`.
+  - Evidence: final API review found several public annotations used names
+    imported only under `TYPE_CHECKING`, causing `typing.get_type_hints()` to
+    raise `NameError` for public `py.typed` APIs.
+  - Resolution: added runtime fallback aliases for annotation-only imports and a
+    focused smoke test covering the affected map/render/runtime/offline public
+    methods.
+
+### Rejected or deferred findings
+
+- Annotation-only fallback aliases resolve to `Any` at runtime for cyclic type
+  dependencies while preserving static `TYPE_CHECKING` imports for type
+  checkers. This avoids runtime import cycles without weakening static
+  `py.typed` consumers.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, broad enum deduplication, and
+  broader root export expansion.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused lifecycle/type-hints regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_public_type_hints_are_resolvable
+  tests/test_package.py::test_resource_transform_registers_and_clears
+  tests/test_package.py::test_runtime_handle_context_manager_closes_once
+  tests/test_package.py::test_runtime_rejects_close_while_map_is_live`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`,
+  `uv run ty check --error-on-warning .mise`, and
+  `mise run //bindings/python:ci` (59 Python tests, wheel build, and
+  metadata/`_native` import check) passed.

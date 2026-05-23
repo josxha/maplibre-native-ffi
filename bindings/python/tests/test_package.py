@@ -4,6 +4,7 @@ import subprocess
 import sys
 import textwrap
 import threading
+import typing
 import warnings
 
 import pytest
@@ -76,6 +77,28 @@ def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
         == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
     )
     assert "network status" in raised.value.diagnostic
+
+
+def test_public_type_hints_are_resolvable() -> None:
+    targets = (
+        map_module.MapHandle.add_style_source_json,
+        map_module.MapHandle.add_style_layer_json,
+        map_module.MapHandle.set_style_light_json,
+        map_module.MapHandle.set_style_light_property,
+        map_module.MapHandle.set_layer_property,
+        map_module.MapHandle.set_layer_filter,
+        map_module.MapHandle.set_style_image,
+        render.RenderSessionHandle.query_feature_extensions,
+        render.RenderSessionHandle.set_feature_state,
+        mln.RuntimeHandle.create_map,
+        mln.RuntimeHandle.create_offline_region,
+        mln.RuntimeHandle.set_resource_transform,
+        mln.RuntimeHandle.set_resource_provider,
+        offline.OfflineOperationHandle.__init__,
+    )
+
+    for target in targets:
+        assert isinstance(typing.get_type_hints(target), dict)
 
 
 def test_runtime_handle_context_manager_closes_once() -> None:
