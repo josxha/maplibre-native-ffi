@@ -73,6 +73,25 @@ typedef enum {
   MLN_VALA_MAP_DEBUG_OPTIONS_DEPTH_BUFFER = 1u << 7u,
 } MlnValaMapDebugOptions;
 
+typedef enum {
+  MLN_VALA_CAMERA_OPTION_FIELDS_CENTER = 1u << 0u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_ZOOM = 1u << 1u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_BEARING = 1u << 2u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_PITCH = 1u << 3u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_CENTER_ALTITUDE = 1u << 4u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_PADDING = 1u << 5u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_ANCHOR = 1u << 6u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_ROLL = 1u << 7u,
+  MLN_VALA_CAMERA_OPTION_FIELDS_FOV = 1u << 8u,
+} MlnValaCameraOptionFields;
+
+typedef enum {
+  MLN_VALA_ANIMATION_OPTION_FIELDS_DURATION = 1u << 0u,
+  MLN_VALA_ANIMATION_OPTION_FIELDS_VELOCITY = 1u << 1u,
+  MLN_VALA_ANIMATION_OPTION_FIELDS_MIN_ZOOM = 1u << 2u,
+  MLN_VALA_ANIMATION_OPTION_FIELDS_EASING = 1u << 3u,
+} MlnValaAnimationOptionFields;
+
 GQuark mln_vala_error_quark(void);
 
 typedef struct {
@@ -89,6 +108,68 @@ typedef struct {
   double x;
   double y;
 } MlnValaScreenPoint;
+
+typedef struct {
+  double top;
+  double left;
+  double bottom;
+  double right;
+} MlnValaEdgeInsets;
+
+typedef struct {
+  double x1;
+  double y1;
+  double x2;
+  double y2;
+} MlnValaUnitBezier;
+
+typedef struct {
+  uint32_t size;
+  MlnValaCameraOptionFields fields;
+  double latitude;
+  double longitude;
+  double center_altitude;
+  MlnValaEdgeInsets padding;
+  MlnValaScreenPoint anchor;
+  double zoom;
+  double bearing;
+  double pitch;
+  double roll;
+  double field_of_view;
+} MlnValaCameraOptions;
+
+typedef struct {
+  uint32_t size;
+  MlnValaAnimationOptionFields fields;
+  double duration_ms;
+  double velocity;
+  double min_zoom;
+  MlnValaUnitBezier easing;
+} MlnValaAnimationOptions;
+
+/**
+ * mln_vala_camera_options_default:
+ * @out_options: (out): return location for initialized camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_camera_options_default(
+  MlnValaCameraOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_animation_options_default:
+ * @out_options: (out): return location for initialized animation options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_animation_options_default(
+  MlnValaAnimationOptions* out_options, GError** error
+);
 
 #define MLN_VALA_TYPE_NATIVE_POINTER (mln_vala_native_pointer_get_type())
 typedef struct _MlnValaNativePointer MlnValaNativePointer;
@@ -392,6 +473,195 @@ gboolean mln_vala_map_handle_set_rendering_stats_view_enabled(
  */
 gboolean mln_vala_map_handle_get_rendering_stats_view_enabled(
   MlnValaMapHandle* self, gboolean* out_enabled, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_camera:
+ * @self: a map handle.
+ * @out_camera: (out): return location for a camera snapshot.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_camera(
+  MlnValaMapHandle* self, MlnValaCameraOptions* out_camera, GError** error
+);
+
+/**
+ * mln_vala_map_handle_jump_to:
+ * @self: a map handle.
+ * @camera: (not nullable): camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_jump_to(
+  MlnValaMapHandle* self, const MlnValaCameraOptions* camera, GError** error
+);
+
+/**
+ * mln_vala_map_handle_ease_to:
+ * @self: a map handle.
+ * @camera: (not nullable): camera options.
+ * @animation: (nullable): animation options, or `NULL` for native defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_ease_to(
+  MlnValaMapHandle* self, const MlnValaCameraOptions* camera,
+  const MlnValaAnimationOptions* animation, GError** error
+);
+
+/**
+ * mln_vala_map_handle_fly_to:
+ * @self: a map handle.
+ * @camera: (not nullable): camera options.
+ * @animation: (nullable): animation options, or `NULL` for native defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_fly_to(
+  MlnValaMapHandle* self, const MlnValaCameraOptions* camera,
+  const MlnValaAnimationOptions* animation, GError** error
+);
+
+/**
+ * mln_vala_map_handle_move_by:
+ * @self: a map handle.
+ * @delta_x: horizontal delta in logical pixels.
+ * @delta_y: vertical delta in logical pixels.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_move_by(
+  MlnValaMapHandle* self, double delta_x, double delta_y, GError** error
+);
+
+/**
+ * mln_vala_map_handle_move_by_animated:
+ * @self: a map handle.
+ * @delta_x: horizontal delta in logical pixels.
+ * @delta_y: vertical delta in logical pixels.
+ * @animation: (nullable): animation options, or `NULL` for native defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_move_by_animated(
+  MlnValaMapHandle* self, double delta_x, double delta_y,
+  const MlnValaAnimationOptions* animation, GError** error
+);
+
+/**
+ * mln_vala_map_handle_scale_by:
+ * @self: a map handle.
+ * @scale: scale factor.
+ * @anchor: (nullable): optional screen anchor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_scale_by(
+  MlnValaMapHandle* self, double scale, const MlnValaScreenPoint* anchor,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_scale_by_animated:
+ * @self: a map handle.
+ * @scale: scale factor.
+ * @anchor: (nullable): optional screen anchor.
+ * @animation: (nullable): animation options, or `NULL` for native defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_scale_by_animated(
+  MlnValaMapHandle* self, double scale, const MlnValaScreenPoint* anchor,
+  const MlnValaAnimationOptions* animation, GError** error
+);
+
+/**
+ * mln_vala_map_handle_rotate_by:
+ * @self: a map handle.
+ * @first: first screen point.
+ * @second: second screen point.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_rotate_by(
+  MlnValaMapHandle* self, const MlnValaScreenPoint* first,
+  const MlnValaScreenPoint* second, GError** error
+);
+
+/**
+ * mln_vala_map_handle_rotate_by_animated:
+ * @self: a map handle.
+ * @first: first screen point.
+ * @second: second screen point.
+ * @animation: (nullable): animation options, or `NULL` for native defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_rotate_by_animated(
+  MlnValaMapHandle* self, const MlnValaScreenPoint* first,
+  const MlnValaScreenPoint* second, const MlnValaAnimationOptions* animation,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_pitch_by:
+ * @self: a map handle.
+ * @pitch: pitch delta.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_pitch_by(
+  MlnValaMapHandle* self, double pitch, GError** error
+);
+
+/**
+ * mln_vala_map_handle_pitch_by_animated:
+ * @self: a map handle.
+ * @pitch: pitch delta.
+ * @animation: (nullable): animation options, or `NULL` for native defaults.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_pitch_by_animated(
+  MlnValaMapHandle* self, double pitch,
+  const MlnValaAnimationOptions* animation, GError** error
+);
+
+/**
+ * mln_vala_map_handle_cancel_transitions:
+ * @self: a map handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_cancel_transitions(
+  MlnValaMapHandle* self, GError** error
 );
 
 /**

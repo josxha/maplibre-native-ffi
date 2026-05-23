@@ -91,6 +91,34 @@ pub extern "C" fn mln_vala_runtime_handle_poll_event(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_camera_options_default(
+    out_options: *mut sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_camera_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_animation_options_default(
+    out_options: *mut sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_animation_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_new(
     runtime: *mut RuntimeHandle,
     width: u32,
@@ -239,6 +267,212 @@ pub extern "C" fn mln_vala_map_handle_dump_debug_logs(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_camera(
+    handle: *mut MapHandle,
+    out_camera: *mut sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_camera(handle, out_camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_jump_to(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match jump_to(handle, camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_ease_to(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    animation: *const sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match ease_to(handle, camera, animation) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_fly_to(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    animation: *const sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match fly_to(handle, camera, animation) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_move_by(
+    handle: *mut MapHandle,
+    delta_x: f64,
+    delta_y: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match move_by(handle, delta_x, delta_y) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_move_by_animated(
+    handle: *mut MapHandle,
+    delta_x: f64,
+    delta_y: f64,
+    animation: *const sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match move_by_animated(handle, delta_x, delta_y, animation) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_scale_by(
+    handle: *mut MapHandle,
+    scale: f64,
+    anchor: *const sys::mln_screen_point,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match scale_by(handle, scale, anchor) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_scale_by_animated(
+    handle: *mut MapHandle,
+    scale: f64,
+    anchor: *const sys::mln_screen_point,
+    animation: *const sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match scale_by_animated(handle, scale, anchor, animation) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_rotate_by(
+    handle: *mut MapHandle,
+    first: *const sys::mln_screen_point,
+    second: *const sys::mln_screen_point,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match rotate_by(handle, first, second) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_rotate_by_animated(
+    handle: *mut MapHandle,
+    first: *const sys::mln_screen_point,
+    second: *const sys::mln_screen_point,
+    animation: *const sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match rotate_by_animated(handle, first, second, animation) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_pitch_by(
+    handle: *mut MapHandle,
+    pitch: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match pitch_by(handle, pitch) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_pitch_by_animated(
+    handle: *mut MapHandle,
+    pitch: f64,
+    animation: *const sys::mln_animation_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match pitch_by_animated(handle, pitch, animation) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_cancel_transitions(
+    handle: *mut MapHandle,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match cancel_transitions(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_set_style_url(
     handle: *mut MapHandle,
     url: *const std::ffi::c_char,
@@ -313,6 +547,160 @@ fn get_rendering_stats_view_enabled(
     // SAFETY: `map` is live and `enabled` is valid output storage.
     error::check(unsafe { sys::mln_map_get_rendering_stats_view_enabled(map, &mut enabled) })?;
     glib::clear_optional_out_pointer(out_enabled, if enabled { GTRUE } else { GFALSE })
+}
+
+fn default_camera_options(out_options: *mut sys::mln_camera_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_camera_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_animation_options(out_options: *mut sys::mln_animation_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_animation_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn get_camera(
+    handle: *mut MapHandle,
+    out_camera: *mut sys::mln_camera_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_camera.is_null() {
+        return Err(Error::invalid_argument("camera output pointer is null"));
+    }
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut camera = unsafe { sys::mln_camera_options_default() };
+    // SAFETY: `map` is live and `camera` is valid output storage initialized
+    // with the current ABI size.
+    error::check(unsafe { sys::mln_map_get_camera(map, &mut camera) })?;
+    glib::clear_optional_out_pointer(out_camera, camera)
+}
+
+fn jump_to(handle: *mut MapHandle, camera: *const sys::mln_camera_options) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if camera.is_null() {
+        return Err(Error::invalid_argument("camera options are null"));
+    }
+    // SAFETY: `map` is live, and `camera` points to caller-owned options.
+    error::check(unsafe { sys::mln_map_jump_to(map, camera) })
+}
+
+fn ease_to(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    animation: *const sys::mln_animation_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if camera.is_null() {
+        return Err(Error::invalid_argument("camera options are null"));
+    }
+    // SAFETY: `map` is live, `camera` points to caller-owned options, and the
+    // nullable animation pointer is borrowed for this call.
+    error::check(unsafe { sys::mln_map_ease_to(map, camera, animation) })
+}
+
+fn fly_to(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    animation: *const sys::mln_animation_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if camera.is_null() {
+        return Err(Error::invalid_argument("camera options are null"));
+    }
+    // SAFETY: `map` is live, `camera` points to caller-owned options, and the
+    // nullable animation pointer is borrowed for this call.
+    error::check(unsafe { sys::mln_map_fly_to(map, camera, animation) })
+}
+
+fn move_by(handle: *mut MapHandle, delta_x: f64, delta_y: f64) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live. The C API validates numeric values.
+    error::check(unsafe { sys::mln_map_move_by(map, delta_x, delta_y) })
+}
+
+fn move_by_animated(
+    handle: *mut MapHandle,
+    delta_x: f64,
+    delta_y: f64,
+    animation: *const sys::mln_animation_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live, and nullable animation is borrowed for this call.
+    error::check(unsafe { sys::mln_map_move_by_animated(map, delta_x, delta_y, animation) })
+}
+
+fn scale_by(
+    handle: *mut MapHandle,
+    scale: f64,
+    anchor: *const sys::mln_screen_point,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live, and nullable anchor is borrowed for this call.
+    error::check(unsafe { sys::mln_map_scale_by(map, scale, anchor) })
+}
+
+fn scale_by_animated(
+    handle: *mut MapHandle,
+    scale: f64,
+    anchor: *const sys::mln_screen_point,
+    animation: *const sys::mln_animation_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live. Nullable anchor and animation are borrowed for
+    // this call.
+    error::check(unsafe { sys::mln_map_scale_by_animated(map, scale, anchor, animation) })
+}
+
+fn rotate_by(
+    handle: *mut MapHandle,
+    first: *const sys::mln_screen_point,
+    second: *const sys::mln_screen_point,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if first.is_null() || second.is_null() {
+        return Err(Error::invalid_argument("rotation screen point is null"));
+    }
+    // SAFETY: `map` is live and point pointers were null-checked above.
+    error::check(unsafe { sys::mln_map_rotate_by(map, *first, *second) })
+}
+
+fn rotate_by_animated(
+    handle: *mut MapHandle,
+    first: *const sys::mln_screen_point,
+    second: *const sys::mln_screen_point,
+    animation: *const sys::mln_animation_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if first.is_null() || second.is_null() {
+        return Err(Error::invalid_argument("rotation screen point is null"));
+    }
+    // SAFETY: `map` is live, point pointers were null-checked above, and
+    // nullable animation is borrowed for this call.
+    error::check(unsafe { sys::mln_map_rotate_by_animated(map, *first, *second, animation) })
+}
+
+fn pitch_by(handle: *mut MapHandle, pitch: f64) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live. The C API validates pitch.
+    error::check(unsafe { sys::mln_map_pitch_by(map, pitch) })
+}
+
+fn pitch_by_animated(
+    handle: *mut MapHandle,
+    pitch: f64,
+    animation: *const sys::mln_animation_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live, and nullable animation is borrowed for this call.
+    error::check(unsafe { sys::mln_map_pitch_by_animated(map, pitch, animation) })
+}
+
+fn cancel_transitions(handle: *mut MapHandle) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live.
+    error::check(unsafe { sys::mln_map_cancel_transitions(map) })
 }
 
 fn is_fully_loaded(handle: *mut MapHandle, out_loaded: *mut GBoolean) -> error::Result<()> {
@@ -570,6 +958,70 @@ mod tests {
             GTRUE
         );
         assert_eq!(rendering_stats_enabled, GTRUE);
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn map_camera_commands_accept_default_descriptors() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        // SAFETY: Zeroed storage is immediately initialized through the public
+        // default entry point before use.
+        let mut camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_camera_options_default(&mut camera, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(camera.size, 0);
+        assert_eq!(
+            mln_vala_map_handle_get_camera(map, &mut camera, ptr::null_mut()),
+            GTRUE
+        );
+
+        // SAFETY: Zeroed storage is immediately initialized through the public
+        // default entry point before use.
+        let mut animation: sys::mln_animation_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_animation_options_default(&mut animation, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(animation.size, 0);
+
+        assert_eq!(
+            mln_vala_map_handle_jump_to(map, &camera, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_ease_to(map, &camera, &animation, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_move_by(map, 0.0, 0.0, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_scale_by(map, 1.0, ptr::null(), ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_pitch_by(map, 0.0, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_cancel_transitions(map, ptr::null_mut()),
+            GTRUE
+        );
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

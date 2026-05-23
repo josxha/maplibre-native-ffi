@@ -33,6 +33,25 @@ int main(string[] args) {
     map.set_rendering_stats_view_enabled(true);
     bool rendering_stats_enabled = false;
     map.get_rendering_stats_view_enabled(out rendering_stats_enabled);
+    MaplibreNative.CameraOptions camera = {};
+    camera.default();
+    map.get_camera(out camera);
+    MaplibreNative.AnimationOptions animation = {};
+    animation.default();
+    map.jump_to(camera);
+    map.ease_to(camera, animation);
+    map.fly_to(camera, null);
+    map.move_by(0.0, 0.0);
+    map.move_by_animated(0.0, 0.0, animation);
+    map.scale_by(1.0, null);
+    map.scale_by_animated(1.0, null, animation);
+    MaplibreNative.ScreenPoint origin = { 0.0, 0.0 };
+    map.rotate_by(origin, origin);
+    map.rotate_by_animated(origin, origin, animation);
+    map.pitch_by(0.0);
+    map.pitch_by_animated(0.0, animation);
+    map.cancel_transitions();
+
     bool loaded = false;
     map.is_fully_loaded(out loaded);
     map.dump_debug_logs();
