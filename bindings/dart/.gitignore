@@ -1,3 +1,2 @@
 .dart_tool/
 pubspec.lock
-lib/src/internal/c/*.g.dart

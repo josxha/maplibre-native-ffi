@@ -9,7 +9,7 @@ import 'internal/c/maplibre_native_c.dart';
 final class Maplibre {
   Maplibre._();
 
-  static final MaplibreNativeC _c = MaplibreNativeC.open();
+  static final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
   /// Returns the native C ABI contract version.
   static int cVersion() => _c.cVersion();

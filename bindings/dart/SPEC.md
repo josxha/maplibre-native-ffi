@@ -78,8 +78,8 @@ The scaffold implements one proof slice:
 - `pubspec.yaml` defines a Dart 3.10+ package with `ffi`, `ffigen`, `lints`, and
   `test` dependencies.
 - `ffigen.yaml` points at the public umbrella header and records the generated
-  private C declaration output path. The generated file is produced on demand,
-  ignored by Git, and not used by the hand-written proof-slice facade yet.
+  private C declaration output path. The generated file is committed and used
+  through the curated proof-slice facade.
 - `Maplibre.cVersion()` calls `mln_c_version()` through a private C facade.
 - `Maplibre.supportedRenderBackends()` preserves backend mask bits in a Dart
   value type.
@@ -90,12 +90,12 @@ The scaffold implements one proof slice:
 
 ## Build artifacts and tasks
 
-| Artifact                 | Path                                          | Contents                                                                                                  |
-| ------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Dart package             | `bindings/dart`                               | Public Dart binding, private FFI layer, tests, ffigen config.                                             |
-| Generated C declarations | `lib/src/internal/c/maplibre_native_c.g.dart` | Private generated-on-demand `ffigen` output for the public C ABI.                                         |
-| Internal C facade        | `lib/src/internal/c`                          | Curated calls over generated declarations after ffigen integration; hand-written proof-slice calls today. |
-| Public library           | `lib/maplibre_native_ffi.dart`                | Exports handles, values, descriptors, exceptions, callbacks, and backend interop values.                  |
+| Artifact                 | Path                                          | Contents                                                                                    |
+| ------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Dart package             | `bindings/dart`                               | Public Dart binding, private FFI layer, tests, ffigen config.                               |
+| Generated C declarations | `lib/src/internal/c/maplibre_native_c.g.dart` | Private committed `ffigen` output for the public C ABI.                                     |
+| Internal C facade        | `lib/src/internal/c`                          | Curated proof-slice calls over generated declarations, status capture, and raw conversions. |
+| Public library           | `lib/maplibre_native_ffi.dart`                | Exports handles, values, descriptors, exceptions, callbacks, and backend interop values.    |
 
 Implemented tasks:
 
@@ -136,7 +136,7 @@ future distribution policy.
 
 - private `ffigen` declarations generated from the public umbrella header;
 - a curated facade used by public and support code;
-- direct calls to imported `mln_*` functions;
+- generated raw calls to imported `mln_*` functions;
 - immediate thread-local diagnostic capture after non-OK statuses;
 - conversion from C enum values and structs into Dart-friendly raw values;
 - native handle state, close-once helpers, and leak-reporting hooks;
@@ -350,8 +350,8 @@ behavior.
 
 ## Implementation milestones
 
-1. Replace the proof-slice hand-written C facade with a facade over generated
-   private `ffigen` declarations.
+1. Expand the generated-FFI-backed internal C layer beyond the proof slice as
+   each public API area is implemented.
 2. Complete status, diagnostic, UTF-8, scoped allocation, and handle-state
    support helpers.
 3. Implement process globals, logging, runtime create/run/events, map
