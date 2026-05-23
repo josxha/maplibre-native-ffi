@@ -328,6 +328,14 @@ class MapHandle {
     return translateNativeErrors(() => this.native.setDebugOptionsRaw(mask));
   }
 
+  getCamera() {
+    return translateNativeErrors(() => this.native.getCamera());
+  }
+
+  jumpTo(camera) {
+    return translateNativeErrors(() => this.native.jumpTo(camera));
+  }
+
   get renderingStatsViewEnabled() {
     return translateNativeErrors(() => this.native.renderingStatsViewEnabled);
   }

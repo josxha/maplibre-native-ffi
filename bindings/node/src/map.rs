@@ -5,7 +5,7 @@ use maplibre_native_sys as sys;
 use napi::bindgen_prelude::Result;
 use napi_derive::napi;
 
-use crate::{error, runtime::NativeRuntimeHandle};
+use crate::{error, runtime::NativeRuntimeHandle, values::LatLng};
 
 #[napi(object)]
 pub struct MapOptions {
@@ -13,6 +13,14 @@ pub struct MapOptions {
     pub height: Option<u32>,
     pub scale_factor: Option<f64>,
     pub map_mode: Option<String>,
+}
+
+#[napi(object)]
+pub struct CameraOptions {
+    pub center: Option<LatLng>,
+    pub zoom: Option<f64>,
+    pub bearing: Option<f64>,
+    pub pitch: Option<f64>,
 }
 
 #[napi(js_name = "NativeMapHandle")]
@@ -92,6 +100,23 @@ impl NativeMapHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "getCamera")]
+    pub fn get_camera(&self) -> Result<CameraOptions> {
+        let mut raw = unsafe { sys::mln_camera_options_default() };
+        core::check(unsafe { sys::mln_map_get_camera(self.state.as_ptr(), &mut raw) })
+            .map_err(error::from_core)?;
+        Ok(CameraOptions::from_core(
+            core::camera::camera_options_from_native(raw),
+        ))
+    }
+
+    #[napi(js_name = "jumpTo")]
+    pub fn jump_to(&self, camera: CameraOptions) -> Result<()> {
+        let camera = core::camera::camera_options_to_native(&camera.into_core());
+        core::check(unsafe { sys::mln_map_jump_to(self.state.as_ptr(), &camera) })
+            .map_err(error::from_core)
+    }
+
     #[napi(js_name = "getDebugOptionsRaw")]
     pub fn get_debug_options_raw(&self) -> Result<u32> {
         let mut options = 0;
@@ -134,6 +159,34 @@ impl Default for MapOptions {
             height: None,
             scale_factor: None,
             map_mode: None,
+        }
+    }
+}
+
+impl CameraOptions {
+    fn into_core(self) -> core::CameraOptions {
+        let mut camera = core::CameraOptions::new();
+        if let Some(center) = self.center {
+            camera = camera.with_center(center.into_core());
+        }
+        if let Some(zoom) = self.zoom {
+            camera = camera.with_zoom(zoom);
+        }
+        if let Some(bearing) = self.bearing {
+            camera = camera.with_bearing(bearing);
+        }
+        if let Some(pitch) = self.pitch {
+            camera = camera.with_pitch(pitch);
+        }
+        camera
+    }
+
+    fn from_core(camera: core::CameraOptions) -> Self {
+        Self {
+            center: camera.center.map(LatLng::from_core),
+            zoom: camera.zoom,
+            bearing: camera.bearing,
+            pitch: camera.pitch,
         }
     }
 }

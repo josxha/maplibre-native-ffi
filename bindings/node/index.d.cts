@@ -100,6 +100,13 @@ export type MapDebugOption =
   | "stencilClip"
   | "depthBuffer";
 
+export interface CameraOptions {
+  center?: LatLng | null;
+  zoom?: number | null;
+  bearing?: number | null;
+  pitch?: number | null;
+}
+
 export interface MapOptions {
   width?: number | null;
   height?: number | null;
@@ -148,6 +155,8 @@ export declare class MapHandle {
   dumpDebugLogs(): void;
   getDebugOptions(): MapDebugOption[];
   setDebugOptions(options: Iterable<MapDebugOption>): void;
+  getCamera(): CameraOptions;
+  jumpTo(camera: CameraOptions): void;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;

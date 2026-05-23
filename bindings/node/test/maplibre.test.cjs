@@ -155,6 +155,30 @@ test("map utility methods expose copied booleans and native commands", () => {
   }
 });
 
+test("map camera commands copy descriptor values", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.jumpTo({
+      center: { latitude: 12.5, longitude: 34.5 },
+      zoom: 3,
+      bearing: 10,
+      pitch: 20,
+    });
+    const camera = map.getCamera();
+    assert.ok(camera.center);
+    assert.ok(Math.abs(camera.center.latitude - 12.5) < 1e-9);
+    assert.ok(Math.abs(camera.center.longitude - 34.5) < 1e-9);
+    assert.equal(camera.zoom, 3);
+    assert.equal(camera.bearing, 10);
+    assert.equal(camera.pitch, 20);
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map debug options map stable strings to native bitmasks", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });

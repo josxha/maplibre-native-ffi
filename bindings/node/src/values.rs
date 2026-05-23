@@ -44,16 +44,23 @@ pub fn native_lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<La
 }
 
 impl LatLng {
-    fn into_native(self) -> sys::mln_lat_lng {
-        core::values::lat_lng_to_native(core::LatLng::new(self.latitude, self.longitude))
+    pub(crate) fn into_core(self) -> core::LatLng {
+        core::LatLng::new(self.latitude, self.longitude)
     }
 
-    fn from_native(raw: sys::mln_lat_lng) -> Self {
-        let value = core::values::lat_lng_from_native(raw);
+    pub(crate) fn from_core(value: core::LatLng) -> Self {
         Self {
             latitude: value.latitude,
             longitude: value.longitude,
         }
+    }
+
+    fn into_native(self) -> sys::mln_lat_lng {
+        core::values::lat_lng_to_native(self.into_core())
+    }
+
+    fn from_native(raw: sys::mln_lat_lng) -> Self {
+        Self::from_core(core::values::lat_lng_from_native(raw))
     }
 }
 
