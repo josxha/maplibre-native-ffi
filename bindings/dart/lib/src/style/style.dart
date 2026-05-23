@@ -223,10 +223,15 @@ final class StyleImageInfo {
   final bool sdf;
 }
 
+/// Callback invoked when a custom geometry source needs or cancels one tile.
+typedef CustomGeometryTileCallback = void Function(CanonicalTileId tileId);
+
 /// Custom geometry source options.
 final class CustomGeometrySourceOptions {
   /// Creates custom geometry source options.
   const CustomGeometrySourceOptions({
+    required this.fetchTile,
+    this.cancelTile,
     this.minZoom,
     this.maxZoom,
     this.tolerance,
@@ -236,11 +241,17 @@ final class CustomGeometrySourceOptions {
     this.wrap,
   });
 
+  /// Required tile fetch notification.
+  final CustomGeometryTileCallback fetchTile;
+
+  /// Optional best-effort tile cancel notification.
+  final CustomGeometryTileCallback? cancelTile;
+
   /// Optional minimum zoom.
-  final int? minZoom;
+  final double? minZoom;
 
   /// Optional maximum zoom.
-  final int? maxZoom;
+  final double? maxZoom;
 
   /// Optional tolerance.
   final double? tolerance;

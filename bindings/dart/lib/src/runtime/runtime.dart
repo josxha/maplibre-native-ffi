@@ -238,6 +238,7 @@ final class MapHandle {
 
   final RuntimeHandle _runtime;
   final NativeHandleState<raw.mln_map> _state;
+  final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -253,6 +254,7 @@ final class MapHandle {
       final nativeUrl = nativeUtf8CString(url, arena);
       _check(_c.mapSetStyleUrl(_pointer, nativeUrl.pointer.cast<Char>()));
     });
+    _clearCustomGeometryCallbacks();
   }
 
   /// Loads inline style JSON through MapLibre Native style APIs.
@@ -261,6 +263,7 @@ final class MapHandle {
       final nativeJson = nativeUtf8CString(json, arena);
       _check(_c.mapSetStyleJson(_pointer, nativeJson.pointer.cast<Char>()));
     });
+    _clearCustomGeometryCallbacks();
   }
 
   /// Attaches a Metal texture render target owned by the render session.
@@ -588,6 +591,90 @@ final class MapHandle {
     });
   }
 
+  /// Adds a custom geometry source with queued fetch/cancel notifications.
+  void addCustomGeometrySource(
+    String sourceId,
+    CustomGeometrySourceOptions options,
+  ) {
+    final callbackState = _CustomGeometryCallbackState(options);
+    try {
+      withNativeArena((arena) {
+        final nativeId = nativeStringView(sourceId, arena);
+        final nativeOptions = arena<raw.mln_custom_geometry_source_options>();
+        nativeOptions.ref = _customGeometrySourceOptionsToNative(
+          options,
+          callbackState,
+        );
+        _check(
+          _c.mapAddCustomGeometrySource(
+            _pointer,
+            nativeId.value,
+            nativeOptions,
+          ),
+        );
+      });
+      _customGeometryCallbacks.remove(sourceId)?.close();
+      _customGeometryCallbacks[sourceId] = callbackState;
+    } catch (_) {
+      callbackState.close();
+      rethrow;
+    }
+  }
+
+  /// Sets custom geometry source data for one canonical tile.
+  void setCustomGeometrySourceTileData(
+    String sourceId,
+    CanonicalTileId tileId,
+    GeoJson data,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeData = native_geometry.nativeGeoJson(data, arena);
+      _check(
+        _c.mapSetCustomGeometrySourceTileData(
+          _pointer,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+          nativeData.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Invalidates custom geometry source data for one canonical tile.
+  void invalidateCustomGeometrySourceTile(
+    String sourceId,
+    CanonicalTileId tileId,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        _c.mapInvalidateCustomGeometrySourceTile(
+          _pointer,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+        ),
+      );
+    });
+  }
+
+  /// Invalidates custom geometry source data inside one geographic region.
+  void invalidateCustomGeometrySourceRegion(
+    String sourceId,
+    LatLngBounds bounds,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        _c.mapInvalidateCustomGeometrySourceRegion(
+          _pointer,
+          nativeId.value,
+          native_struct.latLngBoundsToNative(bounds),
+        ),
+      );
+    });
+  }
+
   /// Reports whether a style source ID exists.
   bool styleSourceExists(String sourceId) {
     return withNativeArena((arena) {
@@ -600,12 +687,16 @@ final class MapHandle {
 
   /// Removes one style source by ID and returns whether one was removed.
   bool removeStyleSource(String sourceId) {
-    return withNativeArena((arena) {
+    final removed = withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final outRemoved = arena<Bool>();
       _check(_c.mapRemoveStyleSource(_pointer, nativeId.value, outRemoved));
       return outRemoved.value;
     });
+    if (removed) {
+      _customGeometryCallbacks.remove(sourceId)?.close();
+    }
+    return removed;
   }
 
   /// Copies fixed style source metadata, or returns null when the source is absent.
@@ -831,6 +922,14 @@ final class MapHandle {
   /// Explicitly destroys this map.
   void close() {
     _state.close(_c.mapDestroy, _c.threadLastErrorMessage);
+    _clearCustomGeometryCallbacks();
+  }
+
+  void _clearCustomGeometryCallbacks() {
+    for (final state in _customGeometryCallbacks.values) {
+      state.close();
+    }
+    _customGeometryCallbacks.clear();
   }
 }
 
@@ -1221,6 +1320,125 @@ final class VulkanOwnedTextureFrame {
     final _ = _session._pointer;
     return NativePointer(pointer.address);
   }
+}
+
+final class _CustomGeometryCallbackState {
+  _CustomGeometryCallbackState(CustomGeometrySourceOptions options)
+    : fetchTile =
+          NativeCallable<
+            raw.mln_custom_geometry_source_tile_callbackFunction
+          >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+            _invokeTileCallback(options.fetchTile, tileId);
+          }),
+      cancelTile = options.cancelTile == null
+          ? null
+          : NativeCallable<
+              raw.mln_custom_geometry_source_tile_callbackFunction
+            >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+              _invokeTileCallback(options.cancelTile!, tileId);
+            });
+
+  final NativeCallable<raw.mln_custom_geometry_source_tile_callbackFunction>
+  fetchTile;
+  final NativeCallable<raw.mln_custom_geometry_source_tile_callbackFunction>?
+  cancelTile;
+
+  void close() {
+    fetchTile.close();
+    cancelTile?.close();
+  }
+}
+
+void _invokeTileCallback(
+  CustomGeometryTileCallback callback,
+  raw.mln_canonical_tile_id tileId,
+) {
+  try {
+    callback(CanonicalTileId(z: tileId.z, x: tileId.x, y: tileId.y));
+  } catch (_) {
+    // Listener callbacks are asynchronous notifications; exceptions are
+    // contained so they never escape through native callback machinery.
+  }
+}
+
+raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
+  CustomGeometrySourceOptions options,
+  _CustomGeometryCallbackState callbackState,
+) {
+  final result = _c.customGeometrySourceOptionsDefault();
+  result.fetch_tile = callbackState.fetchTile.nativeFunction;
+  result.cancel_tile =
+      callbackState.cancelTile?.nativeFunction ??
+      nullptr
+          .cast<
+            NativeFunction<raw.mln_custom_geometry_source_tile_callbackFunction>
+          >();
+
+  final minZoom = options.minZoom;
+  if (minZoom != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
+        .value;
+    result.min_zoom = minZoom;
+  }
+  final maxZoom = options.maxZoom;
+  if (maxZoom != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
+        .value;
+    result.max_zoom = maxZoom;
+  }
+  final tolerance = options.tolerance;
+  if (tolerance != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
+        .value;
+    result.tolerance = tolerance;
+  }
+  final tileSize = options.tileSize;
+  if (tileSize != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
+        .value;
+    result.tile_size = tileSize;
+  }
+  final buffer = options.buffer;
+  if (buffer != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
+        .value;
+    result.buffer = buffer;
+  }
+  final clip = options.clip;
+  if (clip != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
+        .value;
+    result.clip = clip;
+  }
+  final wrap = options.wrap;
+  if (wrap != null) {
+    result.fields |= raw
+        .mln_custom_geometry_source_option_field
+        .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+        .value;
+    result.wrap = wrap;
+  }
+  return result;
+}
+
+raw.mln_canonical_tile_id _canonicalTileIdToNative(CanonicalTileId tileId) {
+  final result = Struct.create<raw.mln_canonical_tile_id>();
+  result.z = tileId.z;
+  result.x = tileId.x;
+  result.y = tileId.y;
+  return result;
 }
 
 raw.mln_resource_response _resourceResponseToNative(

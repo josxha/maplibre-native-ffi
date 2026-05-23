@@ -519,6 +519,45 @@ final class MaplibreNativeCApi {
   ) =>
       _raw.mln_map_add_raster_dem_source_url(map, sourceId, url, options).value;
 
+  /// Returns default custom geometry source options.
+  raw.mln_custom_geometry_source_options customGeometrySourceOptionsDefault() =>
+      _raw.mln_custom_geometry_source_options_default();
+
+  /// Adds a custom geometry source.
+  int mapAddCustomGeometrySource(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_custom_geometry_source_options> options,
+  ) => _raw.mln_map_add_custom_geometry_source(map, sourceId, options).value;
+
+  /// Sets custom geometry source data for one canonical tile.
+  int mapSetCustomGeometrySourceTileData(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_canonical_tile_id tileId,
+    Pointer<raw.mln_geojson> data,
+  ) => _raw
+      .mln_map_set_custom_geometry_source_tile_data(map, sourceId, tileId, data)
+      .value;
+
+  /// Invalidates custom geometry source data for one canonical tile.
+  int mapInvalidateCustomGeometrySourceTile(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_canonical_tile_id tileId,
+  ) => _raw
+      .mln_map_invalidate_custom_geometry_source_tile(map, sourceId, tileId)
+      .value;
+
+  /// Invalidates custom geometry source data inside one geographic region.
+  int mapInvalidateCustomGeometrySourceRegion(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_lat_lng_bounds bounds,
+  ) => _raw
+      .mln_map_invalidate_custom_geometry_source_region(map, sourceId, bounds)
+      .value;
+
   /// Reports whether a style source exists.
   int mapStyleSourceExists(
     Pointer<raw.mln_map> map,

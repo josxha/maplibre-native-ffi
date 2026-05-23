@@ -103,6 +103,30 @@ void main() {
       );
       expect(map.removeStyleSource('dart-vector-source'), isTrue);
 
+      final fetchedTiles = <CanonicalTileId>[];
+      map.addCustomGeometrySource(
+        'dart-custom-source',
+        CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),
+      );
+      expect(
+        map.getStyleSourceInfo('dart-custom-source')!.type,
+        SourceType.customVector,
+      );
+      map.setCustomGeometrySourceTileData(
+        'dart-custom-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+        const FeatureCollectionGeoJson([]),
+      );
+      map.invalidateCustomGeometrySourceTile(
+        'dart-custom-source',
+        const CanonicalTileId(z: 0, x: 0, y: 0),
+      );
+      map.invalidateCustomGeometrySourceRegion(
+        'dart-custom-source',
+        const LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
+      );
+      expect(map.removeStyleSource('dart-custom-source'), isTrue);
+
       map.addGeoJsonSourceData(
         'dart-geojson-source',
         const FeatureGeoJson(
