@@ -409,12 +409,12 @@ void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws
   MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
   rendered_options.default();
   string rendered_layer_id = "background";
-  MaplibreNative.StringView[] rendered_layers = { { rendered_layer_id, rendered_layer_id.length } };
+  var rendered_layers = new MaplibreNative.StringList({ rendered_layer_id });
   rendered_options.set_layer_ids(rendered_layers);
   MaplibreNative.SourceFeatureQueryOptions source_options = {};
   source_options.default();
   string source_layer_id = "fixture-layer";
-  MaplibreNative.StringView[] source_layers = { { source_layer_id, source_layer_id.length } };
+  var source_layers = new MaplibreNative.StringList({ source_layer_id });
   source_options.set_source_layer_ids(source_layers);
   MaplibreNative.ScreenPoint point = { 0.0, 0.0 };
   MaplibreNative.RenderedQueryGeometry geometry;
@@ -507,12 +507,12 @@ int main(string[] args) {
     MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
     rendered_query_options.default();
     string rendered_option_layer_id = "background";
-    MaplibreNative.StringView[] rendered_option_layers = { { rendered_option_layer_id, rendered_option_layer_id.length } };
+    var rendered_option_layers = new MaplibreNative.StringList({ rendered_option_layer_id });
     rendered_query_options.set_layer_ids(rendered_option_layers);
     MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
     source_query_options.default();
     string source_option_layer_id = "fixture-layer";
-    MaplibreNative.StringView[] source_option_layers = { { source_option_layer_id, source_option_layer_id.length } };
+    var source_option_layers = new MaplibreNative.StringList({ source_option_layer_id });
     source_query_options.set_source_layer_ids(source_option_layers);
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
@@ -590,9 +590,9 @@ int main(string[] args) {
     string vector_tile_url = "asset://vector/{z}/{x}/{y}.pbf";
     string raster_tile_url = "asset://raster/{z}/{x}/{y}.png";
     string dem_tile_url = "asset://dem/{z}/{x}/{y}.png";
-    MaplibreNative.StringView[] vector_tile_urls = { { vector_tile_url, vector_tile_url.length } };
-    MaplibreNative.StringView[] raster_tile_urls = { { raster_tile_url, raster_tile_url.length } };
-    MaplibreNative.StringView[] dem_tile_urls = { { dem_tile_url, dem_tile_url.length } };
+    var vector_tile_urls = new MaplibreNative.StringList({ vector_tile_url });
+    var raster_tile_urls = new MaplibreNative.StringList({ raster_tile_url });
+    var dem_tile_urls = new MaplibreNative.StringList({ dem_tile_url });
     map.add_vector_source_url("vector-source", "asset://vector-source.json", tile_source_options);
     map.remove_style_source("vector-source", out source_removed);
     map.add_vector_source_tiles("vector-tiles-source", vector_tile_urls, tile_source_options);

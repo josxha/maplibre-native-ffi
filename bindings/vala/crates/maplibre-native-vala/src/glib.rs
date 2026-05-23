@@ -1,3 +1,4 @@
+use std::any::type_name;
 use std::ffi::{CStr, CString, c_char, c_int, c_uint, c_void};
 use std::mem;
 use std::ptr;
@@ -10,6 +11,9 @@ pub type GBoolean = c_int;
 pub type GDestroyNotify = Option<unsafe extern "C" fn(*mut c_void)>;
 pub type GQuark = c_uint;
 pub type GType = usize;
+type GObjectFinalize = unsafe extern "C" fn(*mut GObject);
+type ParentFinalizeEntry = (&'static str, Option<GObjectFinalize>);
+type ParentFinalizeRegistry = std::sync::Mutex<Vec<ParentFinalizeEntry>>;
 
 pub const GTRUE: GBoolean = 1;
 pub const GFALSE: GBoolean = 0;
@@ -255,8 +259,46 @@ unsafe extern "C" fn object_class_init<T: ObjectFinalize>(
     // registered. The prefix layout matches GObjectClass through `finalize`.
     unsafe {
         let class = klass.cast::<GObjectClassPrefix>();
-        (*class).finalize = Some(T::finalize);
+        remember_parent_finalize::<T>((*class).finalize);
+        (*class).finalize = Some(object_finalize_shim::<T>);
     }
+}
+
+unsafe extern "C" fn object_finalize_shim<T: ObjectFinalize>(object: *mut GObject) {
+    unsafe { T::finalize(object) };
+    if let Some(parent_finalize) = parent_finalize::<T>() {
+        unsafe { parent_finalize(object) };
+    }
+}
+
+fn parent_finalizer_registry() -> &'static ParentFinalizeRegistry {
+    static REGISTRY: OnceLock<ParentFinalizeRegistry> = OnceLock::new();
+    REGISTRY.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+}
+
+fn remember_parent_finalize<T: ObjectFinalize>(finalize: Option<GObjectFinalize>) {
+    let key = type_name::<T>();
+    let registry = parent_finalizer_registry();
+    let mut registry = registry
+        .lock()
+        .expect("GObject parent finalizer registry lock poisoned");
+    if let Some((_, stored)) = registry.iter_mut().find(|(name, _)| *name == key) {
+        *stored = finalize;
+    } else {
+        registry.push((key, finalize));
+    }
+}
+
+fn parent_finalize<T: ObjectFinalize>() -> Option<GObjectFinalize> {
+    let key = type_name::<T>();
+    let registry = parent_finalizer_registry();
+    let registry = registry
+        .lock()
+        .expect("GObject parent finalizer registry lock poisoned");
+    registry
+        .iter()
+        .find(|(name, _)| *name == key)
+        .and_then(|(_, finalize)| *finalize)
 }
 
 pub fn new_object<T>(gtype: GType) -> *mut T {

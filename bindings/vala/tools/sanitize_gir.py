@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -17,72 +18,32 @@ ET.register_namespace("c", C_NS)
 ET.register_namespace("doc", DOC_NS)
 ET.register_namespace("glib", GLIB_NS)
 
-TOP_LEVEL_SKIP = {
-    "AnimationOptionFields",
-    "BoundOptionFields",
-    "CameraFitOptionFields",
-    "CameraOptionFields",
-    "CustomGeometrySourceOptionFields",
-    "CustomGeometrySourceTileCallback",
-    "Feature",
-    "FeatureCollection",
-    "FeatureStateSelectorFields",
-    "FreeCameraOptionFields",
-    "JsonMember",
-    "MapTileOptionFields",
-    "MapViewportOptionFields",
-    "ProjectionModeFields",
-    "QueriedFeatureFields",
-    "RenderedFeatureQueryOptionFields",
-    "RuntimeOptionFlags",
-    "ScreenLineString",
-    "SourceFeatureQueryOptionFields",
-    "StyleImageOptionFields",
-    "StyleTileSourceOptionFields",
-}
-
-FIELD_SKIP = {
-    "attribution_size",
-    "byte_count",
-    "byte_length",
-    "bytes",
-    "cancel_tile",
-    "data",
-    "device",
-    "feature",
-    "feature_count",
-    "fields",
-    "fetch_tile",
-    "filter",
-    "graphics_queue",
-    "graphics_queue_family_index",
-    "id_size",
-    "image",
-    "image_view",
-    "instance",
-    "layer_id_count",
-    "layer_ids",
-    "layer",
-    "metadata",
-    "metadata_size",
-    "physical_device",
-    "pixels",
-    "point_count",
-    "prior_data",
-    "prior_data_size",
-    "property_count",
-    "size",
-    "source_layer_id_count",
-    "source_layer_ids",
-    "state",
-    "surface",
-    "texture",
-    "user_data",
-}
+ROOT = Path(__file__).resolve().parents[1]
+VAPIGEN_METADATA = ROOT / "metadata" / "MaplibreNative-0.1.vapigen.metadata"
 
 METHOD_SKIP = {
     "RenderSessionHandle": {"query_feature_extensions"},
 }
+
+TOP_LEVEL_RE = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s+skip$")
+FIELD_RE = re.compile(
+    r"^(?P<owner>[A-Za-z_][A-Za-z0-9_]*)\.(?P<field>[A-Za-z_][A-Za-z0-9_]*)(?:\.\*)?\s+skip$"
+)
+
+
+def metadata_skips() -> tuple[set[str], dict[str, set[str]]]:
+    top_level: set[str] = set()
+    fields: dict[str, set[str]] = {}
+    for raw_line in VAPIGEN_METADATA.read_text().splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line or line.startswith("MaplibreNative "):
+            continue
+        if match := TOP_LEVEL_RE.match(line):
+            top_level.add(match.group("name"))
+            continue
+        if match := FIELD_RE.match(line):
+            fields.setdefault(match.group("owner"), set()).add(match.group("field"))
+    return top_level, fields
 
 
 def tag(name: str) -> str:
@@ -93,14 +54,16 @@ def local_name(element: ET.Element) -> str:
     return element.tag.rsplit("}", 1)[-1]
 
 
-def sanitize_child(parent: ET.Element, owner_name: str | None) -> None:
+def sanitize_child(
+    parent: ET.Element,
+    owner_name: str | None,
+    field_skip: dict[str, set[str]],
+) -> None:
+    owner_fields = field_skip.get(owner_name or "", set())
     for child in list(parent):
         child_tag = local_name(child)
         child_name = child.attrib.get("name")
-        if child_tag == "field" and child_name in FIELD_SKIP:
-            parent.remove(child)
-            continue
-        if child_tag == "union" and child_name in FIELD_SKIP:
+        if child_tag in {"field", "union"} and child_name in owner_fields:
             parent.remove(child)
             continue
         if child_tag in {"method", "function"} and child_name in METHOD_SKIP.get(
@@ -109,10 +72,12 @@ def sanitize_child(parent: ET.Element, owner_name: str | None) -> None:
         ):
             parent.remove(child)
             continue
-        sanitize_child(child, owner_name)
+        sanitize_child(child, owner_name, field_skip)
 
 
-def sanitize(path: Path) -> None:
+def sanitize(
+    path: Path, top_level_skip: set[str], field_skip: dict[str, set[str]]
+) -> None:
     tree = ET.parse(path)
     root = tree.getroot()
     namespace = root.find(tag("namespace"))
@@ -121,10 +86,10 @@ def sanitize(path: Path) -> None:
 
     for child in list(namespace):
         child_name = child.attrib.get("name")
-        if child_name in TOP_LEVEL_SKIP:
+        if child_name in top_level_skip:
             namespace.remove(child)
             continue
-        sanitize_child(child, child_name)
+        sanitize_child(child, child_name, field_skip)
 
     tree.write(path, encoding="utf-8", xml_declaration=True)
 
@@ -132,8 +97,9 @@ def sanitize(path: Path) -> None:
 def main() -> None:
     if len(sys.argv) < 2:
         raise SystemExit("usage: sanitize_gir.py GIR [GIR ...]")
+    top_level_skip, field_skip = metadata_skips()
     for arg in sys.argv[1:]:
-        sanitize(Path(arg))
+        sanitize(Path(arg), top_level_skip, field_skip)
 
 
 if __name__ == "__main__":

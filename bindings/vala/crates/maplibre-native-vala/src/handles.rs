@@ -1,8 +1,8 @@
-use std::collections::hash_map::DefaultHasher;
-use std::ffi::{CStr, c_char, c_void};
+use std::collections::{HashMap, hash_map::DefaultHasher};
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::hash::{Hash, Hasher};
 use std::ptr;
-use std::sync::{Condvar, Mutex};
+use std::sync::{Condvar, Mutex, OnceLock};
 
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
@@ -14,6 +14,7 @@ use crate::resource::{
     ResourceRequestHandle, resource_request_handle_finish_provider_decision,
     resource_request_handle_from_native,
 };
+use crate::string_list::{self, StringList};
 use crate::values::{self, GeoJson, Geometry, JsonValue};
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
@@ -45,6 +46,7 @@ pub type CustomGeometrySourceTileDelegate =
     unsafe extern "C" fn(tile_id: sys::mln_canonical_tile_id, user_data: *mut c_void);
 
 struct CustomGeometrySourceCallbackState {
+    source_id: CString,
     fetch_tile: CustomGeometrySourceTileDelegate,
     fetch_user_data: *mut c_void,
     fetch_destroy_notify: GDestroyNotify,
@@ -2215,19 +2217,11 @@ pub extern "C" fn mln_vala_map_handle_add_raster_dem_source_url(
 pub extern "C" fn mln_vala_map_handle_add_vector_source_tiles(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    tiles: *const sys::mln_string_view,
-    tile_count: usize,
+    tiles: *const StringList,
     options: *const sys::mln_style_tile_source_options,
     error_out: *mut *mut GError,
 ) -> GBoolean {
-    match add_tile_source_tiles(
-        handle,
-        source_id,
-        tiles,
-        tile_count,
-        options,
-        TileSourceKind::Vector,
-    ) {
+    match add_tile_source_tiles(handle, source_id, tiles, options, TileSourceKind::Vector) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -2240,19 +2234,11 @@ pub extern "C" fn mln_vala_map_handle_add_vector_source_tiles(
 pub extern "C" fn mln_vala_map_handle_add_raster_source_tiles(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    tiles: *const sys::mln_string_view,
-    tile_count: usize,
+    tiles: *const StringList,
     options: *const sys::mln_style_tile_source_options,
     error_out: *mut *mut GError,
 ) -> GBoolean {
-    match add_tile_source_tiles(
-        handle,
-        source_id,
-        tiles,
-        tile_count,
-        options,
-        TileSourceKind::Raster,
-    ) {
+    match add_tile_source_tiles(handle, source_id, tiles, options, TileSourceKind::Raster) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -2265,19 +2251,11 @@ pub extern "C" fn mln_vala_map_handle_add_raster_source_tiles(
 pub extern "C" fn mln_vala_map_handle_add_raster_dem_source_tiles(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    tiles: *const sys::mln_string_view,
-    tile_count: usize,
+    tiles: *const StringList,
     options: *const sys::mln_style_tile_source_options,
     error_out: *mut *mut GError,
 ) -> GBoolean {
-    match add_tile_source_tiles(
-        handle,
-        source_id,
-        tiles,
-        tile_count,
-        options,
-        TileSourceKind::RasterDem,
-    ) {
+    match add_tile_source_tiles(handle, source_id, tiles, options, TileSourceKind::RasterDem) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -3355,14 +3333,23 @@ fn set_style_tile_tile_size(
     Ok(())
 }
 
+fn style_tile_attribution_storage() -> &'static Mutex<HashMap<usize, CString>> {
+    static STORAGE: OnceLock<Mutex<HashMap<usize, CString>>> = OnceLock::new();
+    STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 fn set_style_tile_attribution(
     options: *mut sys::mln_style_tile_source_options,
     attribution: *const c_char,
 ) -> error::Result<()> {
-    let options = style_tile_options_mut(options)?;
-    let view = string_view_from_c(attribution, "style tile attribution")?;
-    options.attribution = view;
-    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+    let options_ref = style_tile_options_mut(options)?;
+    let (owned, view) = owned_string_view(attribution, "style tile attribution")?;
+    style_tile_attribution_storage()
+        .lock()
+        .expect("style tile attribution storage lock poisoned")
+        .insert(options as usize, owned);
+    options_ref.attribution = view;
+    options_ref.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
     Ok(())
 }
 
@@ -3863,13 +3850,51 @@ fn set_style_image_sdf(options: *mut sys::mln_style_image_options, sdf: bool) ->
     Ok(())
 }
 
+#[derive(Default)]
+struct FeatureStateSelectorStringStorage {
+    source_id: Option<CString>,
+    source_layer_id: Option<CString>,
+    feature_id: Option<CString>,
+    state_key: Option<CString>,
+}
+
+fn feature_state_selector_storage()
+-> &'static Mutex<HashMap<usize, FeatureStateSelectorStringStorage>> {
+    static STORAGE: OnceLock<Mutex<HashMap<usize, FeatureStateSelectorStringStorage>>> =
+        OnceLock::new();
+    STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn owned_string_view(
+    value: *const c_char,
+    label: &str,
+) -> error::Result<(CString, sys::mln_string_view)> {
+    if value.is_null() {
+        return Err(Error::invalid_argument(format!("{label} is null")));
+    }
+    let bytes = unsafe { CStr::from_ptr(value) }.to_bytes();
+    let owned = CString::new(bytes)
+        .map_err(|_| Error::invalid_argument(format!("{label} contains embedded NUL")))?;
+    let view = sys::mln_string_view {
+        data: owned.as_ptr(),
+        size: owned.as_bytes().len(),
+    };
+    Ok((owned, view))
+}
+
 fn set_feature_state_source_id(
     selector: *mut sys::mln_feature_state_selector,
     source_id: *const c_char,
 ) -> error::Result<()> {
-    let source_id = string_view_from_c(source_id, "feature-state source ID")?;
-    let selector = mut_struct(selector, "feature-state selector")?;
-    selector.source_id = source_id;
+    let (owned, view) = owned_string_view(source_id, "feature-state source ID")?;
+    let selector_ref = mut_struct(selector, "feature-state selector")?;
+    feature_state_selector_storage()
+        .lock()
+        .expect("feature-state selector storage lock poisoned")
+        .entry(selector as usize)
+        .or_default()
+        .source_id = Some(owned);
+    selector_ref.source_id = view;
     Ok(())
 }
 
@@ -3877,10 +3902,16 @@ fn set_feature_state_source_layer_id(
     selector: *mut sys::mln_feature_state_selector,
     source_layer_id: *const c_char,
 ) -> error::Result<()> {
-    let source_layer_id = string_view_from_c(source_layer_id, "feature-state source layer ID")?;
-    let selector = mut_struct(selector, "feature-state selector")?;
-    selector.source_layer_id = source_layer_id;
-    selector.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+    let (owned, view) = owned_string_view(source_layer_id, "feature-state source layer ID")?;
+    let selector_ref = mut_struct(selector, "feature-state selector")?;
+    feature_state_selector_storage()
+        .lock()
+        .expect("feature-state selector storage lock poisoned")
+        .entry(selector as usize)
+        .or_default()
+        .source_layer_id = Some(owned);
+    selector_ref.source_layer_id = view;
+    selector_ref.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
     Ok(())
 }
 
@@ -3888,10 +3919,16 @@ fn set_feature_state_feature_id(
     selector: *mut sys::mln_feature_state_selector,
     feature_id: *const c_char,
 ) -> error::Result<()> {
-    let feature_id = string_view_from_c(feature_id, "feature-state feature ID")?;
-    let selector = mut_struct(selector, "feature-state selector")?;
-    selector.feature_id = feature_id;
-    selector.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+    let (owned, view) = owned_string_view(feature_id, "feature-state feature ID")?;
+    let selector_ref = mut_struct(selector, "feature-state selector")?;
+    feature_state_selector_storage()
+        .lock()
+        .expect("feature-state selector storage lock poisoned")
+        .entry(selector as usize)
+        .or_default()
+        .feature_id = Some(owned);
+    selector_ref.feature_id = view;
+    selector_ref.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
     Ok(())
 }
 
@@ -3899,10 +3936,16 @@ fn set_feature_state_state_key(
     selector: *mut sys::mln_feature_state_selector,
     state_key: *const c_char,
 ) -> error::Result<()> {
-    let state_key = string_view_from_c(state_key, "feature-state state key")?;
-    let selector = mut_struct(selector, "feature-state selector")?;
-    selector.state_key = state_key;
-    selector.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+    let (owned, view) = owned_string_view(state_key, "feature-state state key")?;
+    let selector_ref = mut_struct(selector, "feature-state selector")?;
+    feature_state_selector_storage()
+        .lock()
+        .expect("feature-state selector storage lock poisoned")
+        .entry(selector as usize)
+        .or_default()
+        .state_key = Some(owned);
+    selector_ref.state_key = view;
+    selector_ref.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
     Ok(())
 }
 
@@ -4471,7 +4514,9 @@ fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> erro
     }
     // SAFETY: `json` is a caller-provided NUL-terminated string pointer and
     // `map_native` returns a live map pointer. The C API copies the input.
-    error::check(unsafe { sys::mln_map_set_style_json(map, json) })
+    error::check(unsafe { sys::mln_map_set_style_json(map, json) })?;
+    unsafe { destroy_all_custom_geometry_callbacks(handle) };
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -4573,35 +4618,46 @@ fn add_tile_source_url(
 fn add_tile_source_tiles(
     handle: *mut MapHandle,
     source_id: *const c_char,
-    tiles: *const sys::mln_string_view,
-    tile_count: usize,
+    tiles: *const StringList,
     options: *const sys::mln_style_tile_source_options,
     kind: TileSourceKind,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
     let source_id = string_view_from_c(source_id, "source ID")?;
-    if tiles.is_null() {
+    let Some(tiles) = string_list::string_list_ref(tiles) else {
         return Err(Error::invalid_argument("tile URLs are null"));
-    }
+    };
     if options.is_null() {
         return Err(Error::invalid_argument(
             "style tile source options are null",
         ));
     }
     // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
-    // tiles points to caller-owned string views borrowed for this call, and
-    // options points to caller-owned options borrowed for this call.
+    // tiles owns validated string views borrowed for this call, and options
+    // points to caller-owned options borrowed for this call.
     let status = unsafe {
         match kind {
-            TileSourceKind::Vector => {
-                sys::mln_map_add_vector_source_tiles(map, source_id, tiles, tile_count, options)
-            }
-            TileSourceKind::Raster => {
-                sys::mln_map_add_raster_source_tiles(map, source_id, tiles, tile_count, options)
-            }
-            TileSourceKind::RasterDem => {
-                sys::mln_map_add_raster_dem_source_tiles(map, source_id, tiles, tile_count, options)
-            }
+            TileSourceKind::Vector => sys::mln_map_add_vector_source_tiles(
+                map,
+                source_id,
+                tiles.as_ptr(),
+                tiles.len(),
+                options,
+            ),
+            TileSourceKind::Raster => sys::mln_map_add_raster_source_tiles(
+                map,
+                source_id,
+                tiles.as_ptr(),
+                tiles.len(),
+                options,
+            ),
+            TileSourceKind::RasterDem => sys::mln_map_add_raster_dem_source_tiles(
+                map,
+                source_id,
+                tiles.as_ptr(),
+                tiles.len(),
+                options,
+            ),
         }
     };
     error::check(status)
@@ -4642,6 +4698,12 @@ fn add_custom_geometry_source_with_callbacks(
         ));
     };
     let map = map_native(handle)?;
+    if source_id.is_null() {
+        return Err(Error::invalid_argument("source ID is null"));
+    }
+    let source_id_bytes = unsafe { CStr::from_ptr(source_id) }.to_bytes();
+    let source_id_copy = CString::new(source_id_bytes)
+        .map_err(|_| Error::invalid_argument("source ID contains embedded NUL"))?;
     let source_id = string_view_from_c(source_id, "source ID")?;
     let mut native_options = if options.is_null() {
         unsafe { sys::mln_custom_geometry_source_options_default() }
@@ -4649,6 +4711,7 @@ fn add_custom_geometry_source_with_callbacks(
         unsafe { *options }
     };
     let state = Box::into_raw(Box::new(CustomGeometrySourceCallbackState {
+        source_id: source_id_copy,
         fetch_tile,
         fetch_user_data,
         fetch_destroy_notify,
@@ -4715,6 +4778,42 @@ fn destroy_custom_geometry_callbacks(callbacks: *mut Vec<*mut CustomGeometrySour
     let callbacks = unsafe { Box::from_raw(callbacks) };
     for state in callbacks.into_iter() {
         destroy_custom_geometry_state(state);
+    }
+}
+
+unsafe fn destroy_all_custom_geometry_callbacks(handle: *mut MapHandle) {
+    if handle.is_null() {
+        return;
+    }
+    let callbacks = unsafe { (*handle).custom_geometry_callbacks };
+    if callbacks.is_null() {
+        return;
+    }
+    let callbacks = unsafe { &mut *callbacks };
+    for state in callbacks.drain(..) {
+        destroy_custom_geometry_state(state);
+    }
+}
+
+unsafe fn destroy_custom_geometry_callbacks_for_source(handle: *mut MapHandle, source_id: &[u8]) {
+    if handle.is_null() {
+        return;
+    }
+    let callbacks = unsafe { (*handle).custom_geometry_callbacks };
+    if callbacks.is_null() {
+        return;
+    }
+    let callbacks = unsafe { &mut *callbacks };
+    let mut index = 0;
+    while index < callbacks.len() {
+        let state = callbacks[index];
+        let matches = !state.is_null() && unsafe { (*state).source_id.as_bytes() == source_id };
+        if matches {
+            let state = callbacks.remove(index);
+            destroy_custom_geometry_state(state);
+        } else {
+            index += 1;
+        }
     }
 }
 
@@ -4877,11 +4976,18 @@ fn remove_style_source(
     out_removed: *mut GBoolean,
 ) -> error::Result<()> {
     let map = map_native(handle)?;
+    if source_id.is_null() {
+        return Err(Error::invalid_argument("source ID is null"));
+    }
+    let source_id_bytes = unsafe { CStr::from_ptr(source_id) }.to_bytes().to_vec();
     let source_id = string_view_from_c(source_id, "source ID")?;
     let mut removed = false;
     // SAFETY: `map` is live, `source_id` borrows a caller string for this call,
     // and `removed` is valid output storage.
     error::check(unsafe { sys::mln_map_remove_style_source(map, source_id, &mut removed) })?;
+    if removed {
+        unsafe { destroy_custom_geometry_callbacks_for_source(handle, &source_id_bytes) };
+    }
     glib::clear_optional_out_pointer(out_removed, if removed { GTRUE } else { GFALSE })
 }
 
@@ -7164,16 +7270,18 @@ mod tests {
             GTRUE
         );
         let vector_tile_url = c"asset://vector/{z}/{x}/{y}.pbf";
-        let vector_tiles = [sys::mln_string_view {
-            data: vector_tile_url.as_ptr(),
-            size: vector_tile_url.to_bytes().len(),
-        }];
+        let vector_tile_values = [vector_tile_url.as_ptr()];
+        let vector_tiles = crate::string_list::mln_vala_string_list_new(
+            vector_tile_values.as_ptr(),
+            vector_tile_values.len(),
+            ptr::null_mut(),
+        );
+        assert!(!vector_tiles.is_null());
         assert_eq!(
             mln_vala_map_handle_add_vector_source_tiles(
                 map,
                 c"vector-tiles-source".as_ptr(),
-                vector_tiles.as_ptr(),
-                vector_tiles.len(),
+                vector_tiles,
                 &tile_options,
                 ptr::null_mut(),
             ),
@@ -7189,16 +7297,18 @@ mod tests {
             GTRUE
         );
         let raster_tile_url = c"asset://raster/{z}/{x}/{y}.png";
-        let raster_tiles = [sys::mln_string_view {
-            data: raster_tile_url.as_ptr(),
-            size: raster_tile_url.to_bytes().len(),
-        }];
+        let raster_tile_values = [raster_tile_url.as_ptr()];
+        let raster_tiles = crate::string_list::mln_vala_string_list_new(
+            raster_tile_values.as_ptr(),
+            raster_tile_values.len(),
+            ptr::null_mut(),
+        );
+        assert!(!raster_tiles.is_null());
         assert_eq!(
             mln_vala_map_handle_add_raster_source_tiles(
                 map,
                 c"raster-tiles-source".as_ptr(),
-                raster_tiles.as_ptr(),
-                raster_tiles.len(),
+                raster_tiles,
                 &tile_options,
                 ptr::null_mut(),
             ),
@@ -7214,16 +7324,18 @@ mod tests {
             GTRUE
         );
         let dem_tile_url = c"asset://dem/{z}/{x}/{y}.png";
-        let dem_tiles = [sys::mln_string_view {
-            data: dem_tile_url.as_ptr(),
-            size: dem_tile_url.to_bytes().len(),
-        }];
+        let dem_tile_values = [dem_tile_url.as_ptr()];
+        let dem_tiles = crate::string_list::mln_vala_string_list_new(
+            dem_tile_values.as_ptr(),
+            dem_tile_values.len(),
+            ptr::null_mut(),
+        );
+        assert!(!dem_tiles.is_null());
         assert_eq!(
             mln_vala_map_handle_add_raster_dem_source_tiles(
                 map,
                 c"dem-tiles-source".as_ptr(),
-                dem_tiles.as_ptr(),
-                dem_tiles.len(),
+                dem_tiles,
                 &tile_options,
                 ptr::null_mut(),
             ),
@@ -7238,6 +7350,10 @@ mod tests {
             ),
             GTRUE
         );
+
+        crate::string_list::mln_vala_string_list_free(vector_tiles);
+        crate::string_list::mln_vala_string_list_free(raster_tiles);
+        crate::string_list::mln_vala_string_list_free(dem_tiles);
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

@@ -5,6 +5,7 @@ MapHandle.get_image_source_coordinates.out_coordinates out="0"
 MapHandle.lat_lngs_for_pixels.out_coordinates out="0"
 MapHandle.pixels_for_lat_lngs.out_points out="0"
 RenderSessionHandle.read_premultiplied_rgba8.out_data out="0"
+StringView skip
 AnimationOptions.size skip
 AnimationOptions.fields skip
 BoundOptions.size skip
@@ -151,6 +152,8 @@ SourceFeatureQueryOptions.filter skip
 StyleTileSourceOptions.attribution_size skip
 QueriedFeature.feature skip
 QueriedFeature.state skip
+QueriedFeature.source_id skip
+QueriedFeature.source_layer_id skip
 StyleSourceInfo.id_size skip
 StyleSourceInfo.attribution_size skip
 StyleImageInfo.byte_length skip

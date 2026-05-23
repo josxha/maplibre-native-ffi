@@ -217,13 +217,17 @@ pub(crate) unsafe fn resource_request_handle_finish_provider_decision(
         if state.closed {
             release_if_owned_locked(&mut state);
         }
-        sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
-    } else {
-        state.decision_finalized = true;
-        state.release_accounted_for = true;
-        state.closed = true;
-        state.native = ptr::null_mut();
+        return sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+    }
+
+    state.decision_finalized = true;
+    state.release_accounted_for = true;
+    state.closed = true;
+    state.native = ptr::null_mut();
+    if decision == sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH {
         sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
+    } else {
+        decision
     }
 }
 
@@ -399,5 +403,31 @@ mod tests {
             GFALSE
         );
         assert!(!error.is_null());
+    }
+
+    #[test]
+    fn unknown_provider_decision_is_not_collapsed_to_pass_through() {
+        let mut handle = ResourceRequestHandle {
+            parent_instance: unsafe { std::mem::zeroed() },
+            state: Mutex::new(RequestState {
+                native: std::ptr::dangling_mut::<sys::mln_resource_request_handle>(),
+                decision_finalized: false,
+                provider_owned: false,
+                release_accounted_for: false,
+                closed: false,
+                completed: false,
+            }),
+        };
+
+        let decision =
+            unsafe { resource_request_handle_finish_provider_decision(&mut handle, u32::MAX) };
+
+        assert_eq!(decision, u32::MAX);
+        assert_ne!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);
+        let state = handle.state.lock().expect("request state lock");
+        assert!(state.decision_finalized);
+        assert!(state.release_accounted_for);
+        assert!(state.closed);
+        assert!(state.native.is_null());
     }
 }

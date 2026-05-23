@@ -76,7 +76,11 @@ bindings/vala/
     src/render.rs
     src/resource.rs
     src/status.rs
+    src/string_list.rs
+    src/values.rs
   tools/generate.py
+  tools/sanitize_gir.py
+  tools/check_generated_surfaces.py
   tests/compile/minimal.vala
 ```
 
@@ -326,26 +330,26 @@ completion.
 
 ## Internal implementation inventory
 
-Implement these Rust modules as the binding grows:
+These source modules and tools contain the current adapter implementation:
 
-| Module           | Contents                                                                                                       |
-| ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| `error`          | GLib error-domain quark, status mapping, diagnostic capture, `GError` helpers.                                 |
-| `handle`         | Private native pointer storage, close-once state, parent retention, dispose/finalize ordering, leak reporting. |
-| `string`         | UTF-8 conversion, string-view storage, embedded-NUL rejection.                                                 |
-| `memory`         | Scoped temporary storage for arrays, strings, out-pointers, and descriptor graphs.                             |
-| `boxed`          | Boxed value registration and copy/free hooks.                                                                  |
-| `native_pointer` | Non-null borrowed opaque pointer value and nullable metadata helpers.                                          |
-| `core_values`    | Coordinates, bounds, screen points, tile IDs, image info, rendering stats.                                     |
-| `camera`         | Camera, animation, bounds, viewport, tile, and projection materializers.                                       |
-| `runtime`        | Runtime options, event copying, offline operation result copying.                                              |
-| `map`            | Map options, map lifecycle, source metadata, and map result readers.                                           |
-| `query`          | Query descriptors and copied query result readers.                                                             |
-| `render`         | Render target descriptors, native buffers, texture frames, readback helpers.                                   |
-| `resource`       | Resource request, response, transform, provider, and one-shot request state.                                   |
-| `style`          | Style source, image, layer, light, and custom geometry conversion.                                             |
-| `callbacks`      | Closure storage, destroy notify, atomic replacement, and active-upcall accounting.                             |
-| `generator`      | Metadata reader, public inventory/annotation verifier, and scanner-facing header emission.                     |
+| File / module                 | Contents                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `glib.rs`                     | GLib type registration, boxed/object helpers, `GBytes`, `GError`, quarks, and object reference utilities.    |
+| `status.rs`                   | Public error-domain constants and raw C status to GLib error mapping support.                                |
+| `string_list.rs`              | Boxed string-list storage that hides string-view pointer/length arrays behind copied Vala-visible values.    |
+| `handles.rs`                  | Runtime/map handles, style/source/camera/offline/resource callbacks, descriptor setters, and list handles.   |
+| `events.rs`                   | Runtime event copying, typed event/source/payload accessors, and unknown payload storage.                    |
+| `values.rs`                   | Boxed JSON, geometry, and GeoJSON values plus native materialization helpers.                                |
+| `geo.rs`                      | Coordinate, bounds, screen point, tile ID, projected-meter, and small geometry-compatible value helpers.     |
+| `native_pointer.rs`           | Non-null borrowed opaque pointer value and nullable metadata helpers.                                        |
+| `projection.rs`               | Standalone map projection handle and projection/camera/visible-coordinate helpers.                           |
+| `query.rs`                    | Query descriptors, rendered geometry constructors, query execution, and copied query result readers.         |
+| `render.rs`                   | Render target descriptors, native pointer setters, render sessions, texture frames, and readback helpers.    |
+| `resource.rs`                 | Resource request, response, byte helpers, async retain, provider decision finalization, and request release. |
+| `logging.rs`                  | Logging callback registration, destroy-notify replacement, and severity-mask operations.                     |
+| `generate.py`                 | Metadata reader, public inventory/annotation verifier, and scanner-facing header emission.                   |
+| `sanitize_gir.py`             | Review-artifact sanitizer that removes C-ABI bookkeeping from generated GIR while preserving Vala surfaces.  |
+| `check_generated_surfaces.py` | Generated VAPI/GIR safety-surface check for raw ABI leaks.                                                   |
 
 ## Naming and packaging
 

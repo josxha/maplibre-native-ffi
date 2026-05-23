@@ -473,6 +473,32 @@ typedef struct {
   size_t size;
 } MlnValaStringView;
 
+#define MLN_VALA_TYPE_STRING_LIST (mln_vala_string_list_get_type())
+typedef struct _MlnValaStringList MlnValaStringList;
+
+GType mln_vala_string_list_get_type(void);
+/**
+ * mln_vala_string_list_copy:
+ * @list: (nullable): string list to copy.
+ *
+ * Returns: (transfer full) (nullable): copied string list, or `NULL` when
+ *   @list is `NULL`.
+ */
+MlnValaStringList* mln_vala_string_list_copy(const MlnValaStringList* list);
+void mln_vala_string_list_free(MlnValaStringList* list);
+/**
+ * mln_vala_string_list_new:
+ * @values: (array length=value_count) (nullable): NUL-terminated UTF-8 strings.
+ * @value_count: number of strings.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): copied string list, or `NULL` on error.
+ * Throws: MlnValaError
+ */
+MlnValaStringList* mln_vala_string_list_new(
+  const char* const* values, size_t value_count, GError** error
+);
+
 #define MLN_VALA_TYPE_JSON_VALUE (mln_vala_json_value_get_type())
 typedef struct _MlnValaJsonValue MlnValaJsonValue;
 #define MLN_VALA_TYPE_GEOMETRY (mln_vala_geometry_get_type())
@@ -482,13 +508,59 @@ typedef struct _MlnValaGeoJson MlnValaGeoJson;
 typedef struct _MlnValaJsonSnapshotHandle MlnValaJsonSnapshotHandle;
 
 GType mln_vala_json_value_get_type(void);
+/**
+ * mln_vala_json_value_copy:
+ * @value: (nullable): JSON value to copy.
+ *
+ * Returns: (transfer full) (nullable): copied JSON value, or `NULL` when
+ *   @value is `NULL`.
+ */
 MlnValaJsonValue* mln_vala_json_value_copy(const MlnValaJsonValue* value);
 void mln_vala_json_value_free(MlnValaJsonValue* value);
+/**
+ * mln_vala_json_value_new_null:
+ *
+ * Returns: (transfer full): JSON null value.
+ */
 MlnValaJsonValue* mln_vala_json_value_new_null(void);
+/**
+ * mln_vala_json_value_new_bool:
+ * @value: boolean value.
+ *
+ * Returns: (transfer full): JSON boolean value.
+ */
 MlnValaJsonValue* mln_vala_json_value_new_bool(bool value);
+/**
+ * mln_vala_json_value_new_uint:
+ * @value: unsigned integer value.
+ *
+ * Returns: (transfer full): JSON unsigned integer value.
+ */
 MlnValaJsonValue* mln_vala_json_value_new_uint(uint64_t value);
+/**
+ * mln_vala_json_value_new_int:
+ * @value: signed integer value.
+ *
+ * Returns: (transfer full): JSON signed integer value.
+ */
 MlnValaJsonValue* mln_vala_json_value_new_int(int64_t value);
+/**
+ * mln_vala_json_value_new_double:
+ * @value: finite double value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): JSON double value, or `NULL` on error.
+ * Throws: MlnValaError
+ */
 MlnValaJsonValue* mln_vala_json_value_new_double(double value, GError** error);
+/**
+ * mln_vala_json_value_new_string:
+ * @value: (not nullable): NUL-terminated UTF-8 string.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): JSON string value, or `NULL` on error.
+ * Throws: MlnValaError
+ */
 MlnValaJsonValue* mln_vala_json_value_new_string(
   const char* value, GError** error
 );
@@ -519,9 +591,29 @@ MlnValaJsonValue* mln_vala_json_value_new_object(
   size_t member_count, GError** error
 );
 GType mln_vala_geometry_get_type(void);
+/**
+ * mln_vala_geometry_copy:
+ * @value: (nullable): geometry value to copy.
+ *
+ * Returns: (transfer full) (nullable): copied geometry value, or `NULL` when
+ *   @value is `NULL`.
+ */
 MlnValaGeometry* mln_vala_geometry_copy(const MlnValaGeometry* value);
 void mln_vala_geometry_free(MlnValaGeometry* value);
+/**
+ * mln_vala_geometry_new_empty:
+ *
+ * Returns: (transfer full): empty geometry value.
+ */
 MlnValaGeometry* mln_vala_geometry_new_empty(void);
+/**
+ * mln_vala_geometry_new_point:
+ * @point: (not nullable): point coordinate.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): point geometry, or `NULL` on error.
+ * Throws: MlnValaError
+ */
 MlnValaGeometry* mln_vala_geometry_new_point(
   const MlnValaLatLng* point, GError** error
 );
@@ -538,11 +630,36 @@ MlnValaGeometry* mln_vala_geometry_new_line_string(
   const MlnValaLatLng* coordinates, size_t coordinate_count, GError** error
 );
 GType mln_vala_geo_json_get_type(void);
+/**
+ * mln_vala_geo_json_copy:
+ * @value: (nullable): GeoJSON value to copy.
+ *
+ * Returns: (transfer full) (nullable): copied GeoJSON value, or `NULL` when
+ *   @value is `NULL`.
+ */
 MlnValaGeoJson* mln_vala_geo_json_copy(const MlnValaGeoJson* value);
 void mln_vala_geo_json_free(MlnValaGeoJson* value);
+/**
+ * mln_vala_geo_json_new_geometry:
+ * @geometry: (not nullable): geometry value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): GeoJSON geometry value, or `NULL` on
+ *   error.
+ * Throws: MlnValaError
+ */
 MlnValaGeoJson* mln_vala_geo_json_new_geometry(
   const MlnValaGeometry* geometry, GError** error
 );
+/**
+ * mln_vala_geo_json_new_feature:
+ * @geometry: (not nullable): feature geometry value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): GeoJSON feature value, or `NULL` on
+ *   error.
+ * Throws: MlnValaError
+ */
 MlnValaGeoJson* mln_vala_geo_json_new_feature(
   const MlnValaGeometry* geometry, GError** error
 );
@@ -1298,8 +1415,7 @@ gboolean mln_vala_rendered_feature_query_options_default(
 /**
  * mln_vala_rendered_feature_query_options_set_layer_ids:
  * @options: query options.
- * @layer_ids: (array length=n_layer_ids) (nullable): layer IDs.
- * @n_layer_ids: number of layer IDs.
+ * @layer_ids: (nullable): copied layer IDs; pass `NULL` to clear.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
@@ -1307,7 +1423,7 @@ gboolean mln_vala_rendered_feature_query_options_default(
  */
 gboolean mln_vala_rendered_feature_query_options_set_layer_ids(
   MlnValaRenderedFeatureQueryOptions* options,
-  const MlnValaStringView* layer_ids, size_t n_layer_ids, GError** error
+  const MlnValaStringList* layer_ids, GError** error
 );
 gboolean mln_vala_source_feature_query_options_default(
   MlnValaSourceFeatureQueryOptions* out_options, GError** error
@@ -1315,9 +1431,7 @@ gboolean mln_vala_source_feature_query_options_default(
 /**
  * mln_vala_source_feature_query_options_set_source_layer_ids:
  * @options: query options.
- * @source_layer_ids: (array length=n_source_layer_ids) (nullable): source-layer
- * IDs.
- * @n_source_layer_ids: number of source-layer IDs.
+ * @source_layer_ids: (nullable): copied source-layer IDs; pass `NULL` to clear.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
@@ -1325,8 +1439,7 @@ gboolean mln_vala_source_feature_query_options_default(
  */
 gboolean mln_vala_source_feature_query_options_set_source_layer_ids(
   MlnValaSourceFeatureQueryOptions* options,
-  const MlnValaStringView* source_layer_ids, size_t n_source_layer_ids,
-  GError** error
+  const MlnValaStringList* source_layer_ids, GError** error
 );
 
 /**
@@ -1521,6 +1634,13 @@ gboolean mln_vala_native_pointer_new(
  */
 size_t mln_vala_native_pointer_get_bits(const MlnValaNativePointer* pointer);
 
+/**
+ * mln_vala_native_pointer_copy:
+ * @pointer: (nullable): native pointer value to copy.
+ *
+ * Returns: (transfer full) (nullable): copied native pointer value, or `NULL`
+ *   when @pointer is `NULL`.
+ */
 MlnValaNativePointer* mln_vala_native_pointer_copy(
   const MlnValaNativePointer* pointer
 );
@@ -1689,6 +1809,13 @@ typedef struct {
 } MlnValaRuntimeEventOfflineOperationCompleted;
 
 GType mln_vala_runtime_event_get_type(void);
+/**
+ * mln_vala_runtime_event_copy:
+ * @event: (nullable): runtime event to copy.
+ *
+ * Returns: (transfer full) (nullable): copied runtime event, or `NULL` when
+ *   @event is `NULL`.
+ */
 MlnValaRuntimeEvent* mln_vala_runtime_event_copy(
   const MlnValaRuntimeEvent* event
 );
@@ -3277,8 +3404,7 @@ gboolean mln_vala_map_handle_add_raster_dem_source_url(
  * mln_vala_map_handle_add_vector_source_tiles:
  * @self: a map handle.
  * @source_id: (not nullable): source identifier.
- * @tiles: (array length=tile_count): tile URL views.
- * @tile_count: number of tile URL views.
+ * @tiles: (not nullable): copied tile URLs.
  * @options: (not nullable): tile source options.
  * @error: return location for a `GError`, or `NULL`.
  *
@@ -3286,17 +3412,15 @@ gboolean mln_vala_map_handle_add_raster_dem_source_url(
  * Throws: MlnValaError
  */
 gboolean mln_vala_map_handle_add_vector_source_tiles(
-  MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
-  size_t tile_count, const MlnValaStyleTileSourceOptions* options,
-  GError** error
+  MlnValaMapHandle* self, const char* source_id, const MlnValaStringList* tiles,
+  const MlnValaStyleTileSourceOptions* options, GError** error
 );
 
 /**
  * mln_vala_map_handle_add_raster_source_tiles:
  * @self: a map handle.
  * @source_id: (not nullable): source identifier.
- * @tiles: (array length=tile_count): tile URL views.
- * @tile_count: number of tile URL views.
+ * @tiles: (not nullable): copied tile URLs.
  * @options: (not nullable): tile source options.
  * @error: return location for a `GError`, or `NULL`.
  *
@@ -3304,17 +3428,15 @@ gboolean mln_vala_map_handle_add_vector_source_tiles(
  * Throws: MlnValaError
  */
 gboolean mln_vala_map_handle_add_raster_source_tiles(
-  MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
-  size_t tile_count, const MlnValaStyleTileSourceOptions* options,
-  GError** error
+  MlnValaMapHandle* self, const char* source_id, const MlnValaStringList* tiles,
+  const MlnValaStyleTileSourceOptions* options, GError** error
 );
 
 /**
  * mln_vala_map_handle_add_raster_dem_source_tiles:
  * @self: a map handle.
  * @source_id: (not nullable): source identifier.
- * @tiles: (array length=tile_count): tile URL views.
- * @tile_count: number of tile URL views.
+ * @tiles: (not nullable): copied tile URLs.
  * @options: (not nullable): tile source options.
  * @error: return location for a `GError`, or `NULL`.
  *
@@ -3322,9 +3444,8 @@ gboolean mln_vala_map_handle_add_raster_source_tiles(
  * Throws: MlnValaError
  */
 gboolean mln_vala_map_handle_add_raster_dem_source_tiles(
-  MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
-  size_t tile_count, const MlnValaStyleTileSourceOptions* options,
-  GError** error
+  MlnValaMapHandle* self, const char* source_id, const MlnValaStringList* tiles,
+  const MlnValaStyleTileSourceOptions* options, GError** error
 );
 
 gboolean mln_vala_map_handle_add_custom_geometry_source(

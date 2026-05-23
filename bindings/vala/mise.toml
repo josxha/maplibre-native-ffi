@@ -29,10 +29,6 @@ PYTHONPATH="$CONDA_PREFIX/lib/gobject-introspection" \
   build/include/maplibre-native-vala.h \
   --output build/gir/MaplibreNative-0.1.gir
 
-g-ir-compiler \
-  build/gir/MaplibreNative-0.1.gir \
-  --output build/typelib/MaplibreNative-0.1.typelib
-
 python - <<'PY'
 from pathlib import Path
 source = Path("build/gir/MaplibreNative-0.1.gir")
@@ -53,6 +49,21 @@ vapigen \
 python tools/sanitize_gir.py \
   build/gir/MaplibreNative-0.1.gir \
   build/gir/MaplibreNative-0.1.vapigen.gir
+
+g-ir-compiler \
+  build/gir/MaplibreNative-0.1.gir \
+  --output build/typelib/MaplibreNative-0.1.typelib
+
+g-ir-generate \
+  build/typelib/MaplibreNative-0.1.typelib \
+  > build/gir/MaplibreNative-0.1.typelib.gir
+
+python tools/check_generated_surfaces.py \
+  build/vapi/maplibre-native.vapi \
+  build/gir/MaplibreNative-0.1.gir
+python tools/check_generated_surfaces.py \
+  build/vapi/maplibre-native.vapi \
+  build/gir/MaplibreNative-0.1.typelib.gir
 '''
 
 [tasks."compile-tests"]

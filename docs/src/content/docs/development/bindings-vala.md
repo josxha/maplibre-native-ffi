@@ -133,8 +133,9 @@ exactly once. `ResourceRequestHandle.retain_for_async()` makes later completion
 explicit when the C API allows it; retained handles still enforce one-shot
 completion and exactly-once release. Pass-through requests return immediately
 and do not retain the native handle. Custom geometry callbacks use captured Vala
-delegates retained by the map/source scope and hand work to the map owner thread
-before calling thread-affine map APIs.
+delegates retained by the map/source scope. They run on the native callback
+thread; callback code dispatches to the map owner thread before calling
+thread-affine map APIs.
 
 ## Rendering and Memory
 
