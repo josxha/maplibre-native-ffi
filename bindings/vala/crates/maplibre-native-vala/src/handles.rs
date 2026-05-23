@@ -1169,6 +1169,117 @@ pub extern "C" fn mln_vala_map_handle_copy_style_image_premultiplied_rgba8(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_image_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    coordinates: *const sys::mln_lat_lng,
+    coordinate_count: usize,
+    url: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_image_source_url(handle, source_id, coordinates, coordinate_count, url) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_image_source_image(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    coordinates: *const sys::mln_lat_lng,
+    coordinate_count: usize,
+    image: *const sys::mln_premultiplied_rgba8_image,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_image_source_image(handle, source_id, coordinates, coordinate_count, image) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_image_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_image_source_url(handle, source_id, url) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_image_source_image(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    image: *const sys::mln_premultiplied_rgba8_image,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_image_source_image(handle, source_id, image) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_image_source_coordinates(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    coordinates: *const sys::mln_lat_lng,
+    coordinate_count: usize,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_image_source_coordinates(handle, source_id, coordinates, coordinate_count) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_image_source_coordinates(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_coordinates: *mut sys::mln_lat_lng,
+    coordinate_capacity: usize,
+    out_coordinate_count: *mut usize,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_image_source_coordinates(
+        handle,
+        source_id,
+        out_coordinates,
+        coordinate_capacity,
+        out_coordinate_count,
+        out_found,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
 fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_runtime_options_default() };
@@ -1896,6 +2007,117 @@ fn copy_style_image_premultiplied_rgba8(
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
 }
 
+fn add_image_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    coordinates: *const sys::mln_lat_lng,
+    coordinate_count: usize,
+    url: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "image source ID")?;
+    let url = string_view_from_c(url, "image source URL")?;
+    if coordinates.is_null() {
+        return Err(Error::invalid_argument("image source coordinates are null"));
+    }
+    // SAFETY: `map` is live, string views and coordinates borrow caller storage
+    // for this call, and the C API copies accepted values.
+    error::check(unsafe {
+        sys::mln_map_add_image_source_url(map, source_id, coordinates, coordinate_count, url)
+    })
+}
+
+fn add_image_source_image(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    coordinates: *const sys::mln_lat_lng,
+    coordinate_count: usize,
+    image: *const sys::mln_premultiplied_rgba8_image,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "image source ID")?;
+    if coordinates.is_null() {
+        return Err(Error::invalid_argument("image source coordinates are null"));
+    }
+    if image.is_null() {
+        return Err(Error::invalid_argument("image source image is null"));
+    }
+    // SAFETY: `map` is live and borrowed pointers remain valid for this call.
+    error::check(unsafe {
+        sys::mln_map_add_image_source_image(map, source_id, coordinates, coordinate_count, image)
+    })
+}
+
+fn set_image_source_url(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    url: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "image source ID")?;
+    let url = string_view_from_c(url, "image source URL")?;
+    // SAFETY: `map` is live and the C API copies the accepted URL.
+    error::check(unsafe { sys::mln_map_set_image_source_url(map, source_id, url) })
+}
+
+fn set_image_source_image(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    image: *const sys::mln_premultiplied_rgba8_image,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "image source ID")?;
+    if image.is_null() {
+        return Err(Error::invalid_argument("image source image is null"));
+    }
+    // SAFETY: `map` is live and image points to a borrowed descriptor for this call.
+    error::check(unsafe { sys::mln_map_set_image_source_image(map, source_id, image) })
+}
+
+fn set_image_source_coordinates(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    coordinates: *const sys::mln_lat_lng,
+    coordinate_count: usize,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "image source ID")?;
+    if coordinates.is_null() {
+        return Err(Error::invalid_argument("image source coordinates are null"));
+    }
+    // SAFETY: `map` is live and coordinates borrow caller storage for this call.
+    error::check(unsafe {
+        sys::mln_map_set_image_source_coordinates(map, source_id, coordinates, coordinate_count)
+    })
+}
+
+fn get_image_source_coordinates(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    out_coordinates: *mut sys::mln_lat_lng,
+    coordinate_capacity: usize,
+    out_coordinate_count: *mut usize,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "image source ID")?;
+    let mut coordinate_count = 0;
+    let mut found = false;
+    // SAFETY: `map` is live and the C API validates caller-allocated output storage.
+    error::check(unsafe {
+        sys::mln_map_get_image_source_coordinates(
+            map,
+            source_id,
+            out_coordinates,
+            coordinate_capacity,
+            &mut coordinate_count,
+            &mut found,
+        )
+    })?;
+    glib::clear_optional_out_pointer(out_coordinate_count, coordinate_count)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
 fn string_view_from_c(value: *const c_char, label: &str) -> error::Result<sys::mln_string_view> {
     if value.is_null() {
         return Err(Error::invalid_argument(format!("{label} is null")));
@@ -2611,6 +2833,158 @@ mod tests {
             GTRUE
         );
         assert_eq!(removed, GTRUE);
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn image_source_lifecycle_round_trips_coordinates() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+
+        let coordinates = [
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 1.0,
+            },
+            sys::mln_lat_lng {
+                latitude: 1.0,
+                longitude: 1.0,
+            },
+            sys::mln_lat_lng {
+                latitude: 1.0,
+                longitude: 0.0,
+            },
+        ];
+        assert_eq!(
+            mln_vala_map_handle_add_image_source_url(
+                map,
+                c"image-source".as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                c"asset://image.png".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_image_source_url(
+                map,
+                c"image-source".as_ptr(),
+                c"asset://image-updated.png".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_image_source_coordinates(
+                map,
+                c"image-source".as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut copied_coordinates = [sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        }; 4];
+        let mut coordinate_count = 0;
+        let mut found = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_get_image_source_coordinates(
+                map,
+                c"image-source".as_ptr(),
+                copied_coordinates.as_mut_ptr(),
+                copied_coordinates.len(),
+                &mut coordinate_count,
+                &mut found,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(found, GTRUE);
+        assert_eq!(coordinate_count, 4);
+        assert_eq!(copied_coordinates[2].latitude, 1.0);
+        let mut removed = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"image-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
+
+        let pixels = [255_u8, 0, 0, 255];
+        // SAFETY: Zeroed storage is immediately initialized by the public init helper.
+        let mut image: sys::mln_premultiplied_rgba8_image = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_premultiplied_rgba8_image_init(
+                &mut image,
+                1,
+                1,
+                4,
+                pixels.as_ptr(),
+                pixels.len(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_add_image_source_image(
+                map,
+                c"inline-image-source".as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                &image,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_image_source_image(
+                map,
+                c"inline-image-source".as_ptr(),
+                &image,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"inline-image-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

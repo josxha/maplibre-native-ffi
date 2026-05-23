@@ -1765,6 +1765,107 @@ gboolean mln_vala_map_handle_copy_style_image_premultiplied_rgba8(
 );
 
 /**
+ * mln_vala_map_handle_add_image_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): image source identifier.
+ * @coordinates: (array length=coordinate_count): four corner coordinates.
+ * @coordinate_count: number of coordinates.
+ * @url: (not nullable): image URL.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_image_source_url(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaLatLng* coordinates, size_t coordinate_count, const char* url,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_add_image_source_image:
+ * @self: a map handle.
+ * @source_id: (not nullable): image source identifier.
+ * @coordinates: (array length=coordinate_count): four corner coordinates.
+ * @coordinate_count: number of coordinates.
+ * @image: (not nullable): premultiplied RGBA8 image descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_add_image_source_image(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaLatLng* coordinates, size_t coordinate_count,
+  const MlnValaPremultipliedRgba8Image* image, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_image_source_url:
+ * @self: a map handle.
+ * @source_id: (not nullable): image source identifier.
+ * @url: (not nullable): image URL.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_image_source_url(
+  MlnValaMapHandle* self, const char* source_id, const char* url, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_image_source_image:
+ * @self: a map handle.
+ * @source_id: (not nullable): image source identifier.
+ * @image: (not nullable): premultiplied RGBA8 image descriptor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_image_source_image(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaPremultipliedRgba8Image* image, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_image_source_coordinates:
+ * @self: a map handle.
+ * @source_id: (not nullable): image source identifier.
+ * @coordinates: (array length=coordinate_count): four corner coordinates.
+ * @coordinate_count: number of coordinates.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_image_source_coordinates(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaLatLng* coordinates, size_t coordinate_count, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_image_source_coordinates:
+ * @self: a map handle.
+ * @source_id: (not nullable): image source identifier.
+ * @out_coordinates: (out caller-allocates) (array length=coordinate_capacity):
+ * output coordinate buffer.
+ * @coordinate_capacity: coordinate capacity of @out_coordinates.
+ * @out_coordinate_count: (out): return location for required coordinate count.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_image_source_coordinates(
+  MlnValaMapHandle* self, const char* source_id, MlnValaLatLng* out_coordinates,
+  size_t coordinate_capacity, size_t* out_coordinate_count, gboolean* out_found,
+  GError** error
+);
+
+/**
  * mln_vala_map_handle_attach_metal_surface:
  * @self: a map handle.
  * @descriptor: (not nullable): Metal surface descriptor.

@@ -127,6 +127,19 @@ int main(string[] args) {
     map.get_style_image_info("fixture-image", out style_image_info, out image_found);
     bool image_removed = false;
     map.remove_style_image("fixture-image", out image_removed);
+    MaplibreNative.LatLng[] image_coordinates = {
+      { 0.0, 0.0 },
+      { 0.0, 1.0 },
+      { 1.0, 1.0 },
+      { 1.0, 0.0 },
+    };
+    map.add_image_source_url("image-source", image_coordinates, "asset://image.png");
+    map.set_image_source_url("image-source", "asset://image-updated.png");
+    map.set_image_source_coordinates("image-source", image_coordinates);
+    map.remove_style_source("image-source", out source_removed);
+    map.add_image_source_image("inline-image-source", image_coordinates, style_image);
+    map.set_image_source_image("inline-image-source", style_image);
+    map.remove_style_source("inline-image-source", out source_removed);
     MaplibreNative.MetalSurfaceDescriptor metal_surface = {};
     metal_surface.default();
     MaplibreNative.VulkanSurfaceDescriptor vulkan_surface = {};
