@@ -97,6 +97,18 @@ typedef enum {
   MLN_VALA_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
 } MlnValaResourceProviderDecision;
 
+/**
+ * MlnValaResourceTransformCallback:
+ * @kind: resource kind.
+ * @url: (not nullable): original network URL.
+ *
+ * Returns: (transfer full) (nullable): replacement URL, or `NULL` to keep the
+ * original URL.
+ */
+typedef char* (*MlnValaResourceTransformCallback)(
+  MlnValaResourceKind kind, const char* url, gpointer user_data
+);
+
 typedef enum {
   MLN_VALA_LOG_SEVERITY_INFO = 1,
   MLN_VALA_LOG_SEVERITY_WARNING = 2,
@@ -699,6 +711,35 @@ gboolean mln_vala_runtime_handle_run_once(
  */
 gboolean mln_vala_runtime_handle_poll_event(
   MlnValaRuntimeHandle* self, MlnValaRuntimeEvent** out_event, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_set_resource_transform:
+ * @self: a runtime handle.
+ * @callback: (scope async) (closure user_data) (destroy destroy_notify): URL
+ * transform callback.
+ * @user_data: closure data for @callback.
+ * @destroy_notify: destroy notify for @user_data.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_set_resource_transform(
+  MlnValaRuntimeHandle* self, MlnValaResourceTransformCallback callback,
+  gpointer user_data, GDestroyNotify destroy_notify, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_clear_resource_transform:
+ * @self: a runtime handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_clear_resource_transform(
+  MlnValaRuntimeHandle* self, GError** error
 );
 
 /**

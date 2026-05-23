@@ -2,6 +2,10 @@ bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent eve
   return false;
 }
 
+string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
+  return null;
+}
+
 int main(string[] args) {
   uint32 version = MaplibreNative.c_version();
   MaplibreNative.NetworkStatus status;
@@ -29,6 +33,7 @@ int main(string[] args) {
     MaplibreNative.RuntimeOptions runtime_options = {};
     runtime_options.default();
     var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
+    runtime.set_resource_transform(transform_resource);
     runtime.run_once();
     MaplibreNative.RuntimeEvent event;
     runtime.poll_event(out event);
@@ -99,6 +104,7 @@ int main(string[] args) {
     projection.close();
 
     map.close();
+    runtime.clear_resource_transform();
     runtime.close();
 
     if (backends == 0 || pointer_bits != 0x1234) {

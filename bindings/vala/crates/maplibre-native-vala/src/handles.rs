@@ -1,11 +1,12 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, c_char, c_void};
 use std::ptr;
+use std::sync::Mutex;
 
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
 use crate::events::RuntimeEvent;
-use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
+use crate::glib::{self, GBoolean, GDestroyNotify, GError, GFALSE, GObject, GTRUE, GType};
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
@@ -14,6 +15,17 @@ const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
 pub struct RuntimeHandle {
     parent_instance: GObject,
     native: *mut sys::mln_runtime,
+    resource_transform: *mut ResourceTransformState,
+}
+
+pub type ResourceTransformCallback =
+    unsafe extern "C" fn(kind: u32, url: *const c_char, user_data: *mut c_void) -> *mut c_char;
+
+struct ResourceTransformState {
+    callback: ResourceTransformCallback,
+    user_data: *mut c_void,
+    destroy_notify: GDestroyNotify,
+    returned_urls: Mutex<Vec<*mut c_char>>,
 }
 
 #[repr(C)]
@@ -124,6 +136,37 @@ pub extern "C" fn mln_vala_runtime_handle_poll_event(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match poll_runtime_event(handle, out_event) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_set_resource_transform(
+    handle: *mut RuntimeHandle,
+    callback: Option<ResourceTransformCallback>,
+    user_data: *mut c_void,
+    destroy_notify: GDestroyNotify,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_resource_transform(handle, callback, user_data, destroy_notify) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_clear_resource_transform(
+    handle: *mut RuntimeHandle,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match clear_resource_transform(handle) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -1238,6 +1281,117 @@ fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> erro
     error::check(unsafe { sys::mln_map_set_style_json(map, json) })
 }
 
+fn set_resource_transform(
+    handle: *mut RuntimeHandle,
+    callback: Option<ResourceTransformCallback>,
+    user_data: *mut c_void,
+    destroy_notify: GDestroyNotify,
+) -> error::Result<()> {
+    let Some(callback) = callback else {
+        return clear_resource_transform(handle);
+    };
+
+    let runtime = runtime_native(handle)?;
+    let new_state = Box::into_raw(Box::new(ResourceTransformState {
+        callback,
+        user_data,
+        destroy_notify,
+        returned_urls: Mutex::new(Vec::new()),
+    }));
+    let transform = sys::mln_resource_transform {
+        size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
+        callback: Some(resource_transform_trampoline),
+        user_data: new_state.cast::<c_void>(),
+    };
+
+    // SAFETY: `runtime` is live and `transform` points to a descriptor borrowed
+    // for this call. Native stores the callback and user data by reference;
+    // `new_state` stays alive in the RuntimeHandle on success.
+    if let Err(error) =
+        error::check(unsafe { sys::mln_runtime_set_resource_transform(runtime, &transform) })
+    {
+        destroy_resource_transform_state(new_state);
+        return Err(error);
+    }
+
+    let old_state = unsafe {
+        let old_state = (*handle).resource_transform;
+        (*handle).resource_transform = new_state;
+        old_state
+    };
+    destroy_resource_transform_state(old_state);
+    Ok(())
+}
+
+fn clear_resource_transform(handle: *mut RuntimeHandle) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    // SAFETY: `runtime` is live. The C API waits for in-flight transform
+    // callbacks before returning.
+    error::check(unsafe { sys::mln_runtime_clear_resource_transform(runtime) })?;
+    let old_state = unsafe {
+        let old_state = (*handle).resource_transform;
+        (*handle).resource_transform = ptr::null_mut();
+        old_state
+    };
+    destroy_resource_transform_state(old_state);
+    Ok(())
+}
+
+unsafe extern "C" fn resource_transform_trampoline(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    if user_data.is_null() || out_response.is_null() {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    }
+
+    let state = user_data.cast::<ResourceTransformState>();
+    // SAFETY: Native passes the state pointer installed by
+    // `set_resource_transform`; clear/replace waits for in-flight callbacks.
+    let replacement_url = unsafe { ((*state).callback)(kind, url, (*state).user_data) };
+    // SAFETY: `out_response` was null-checked and points to writable response
+    // storage for this callback.
+    unsafe {
+        (*out_response).size = std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
+        (*out_response).url = replacement_url;
+    }
+    if !replacement_url.is_null() {
+        // SAFETY: `state` is the installed transform state and remains valid
+        // for the duration of this callback.
+        unsafe { &*state }
+            .returned_urls
+            .lock()
+            .expect("resource transform URL storage lock poisoned")
+            .push(replacement_url);
+    }
+    sys::MLN_STATUS_OK
+}
+
+fn destroy_resource_transform_state(state: *mut ResourceTransformState) {
+    if state.is_null() {
+        return;
+    }
+
+    // SAFETY: `state` was allocated by Box::into_raw and is no longer reachable
+    // from native code after clear/replace/destroy returns.
+    let state = unsafe { Box::from_raw(state) };
+    for url in state
+        .returned_urls
+        .into_inner()
+        .expect("resource transform URL storage lock poisoned")
+    {
+        // SAFETY: Vala returns owned strings allocated with GLib allocation.
+        unsafe { glib::free(url.cast::<c_void>()) };
+    }
+    if let Some(destroy_notify) = state.destroy_notify {
+        // SAFETY: Destroy notify belongs to the stored user data and is called
+        // exactly once when the transform state is replaced, cleared, or closed.
+        unsafe { destroy_notify(state.user_data) };
+    }
+}
+
 fn run_ambient_cache_operation_start(
     handle: *mut RuntimeHandle,
     operation: u32,
@@ -1319,6 +1473,7 @@ fn create_runtime_handle(
     // `RuntimeHandle`.
     unsafe {
         (*handle).native = native;
+        (*handle).resource_transform = ptr::null_mut();
     }
     Ok(handle)
 }
@@ -1327,10 +1482,15 @@ fn close_runtime_handle(handle: *mut RuntimeHandle) -> error::Result<()> {
     let runtime = runtime_native(handle)?;
     // SAFETY: `runtime_native` returns a live native runtime pointer.
     error::check(unsafe { sys::mln_runtime_destroy(runtime) })?;
-    // SAFETY: `handle` was checked by `runtime_native`.
-    unsafe {
+    // SAFETY: `handle` was checked by `runtime_native`. Successful runtime
+    // destruction makes resource transform callbacks unreachable.
+    let resource_transform = unsafe {
         (*handle).native = ptr::null_mut();
-    }
+        let resource_transform = (*handle).resource_transform;
+        (*handle).resource_transform = ptr::null_mut();
+        resource_transform
+    };
+    destroy_resource_transform_state(resource_transform);
     Ok(())
 }
 
@@ -1428,6 +1588,21 @@ pub(crate) fn map_native(handle: *mut MapHandle) -> error::Result<*mut sys::mln_
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TRANSFORM_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    unsafe extern "C" fn passthrough_transform(
+        _kind: u32,
+        _url: *const c_char,
+        _user_data: *mut c_void,
+    ) -> *mut c_char {
+        ptr::null_mut()
+    }
+
+    unsafe extern "C" fn transform_destroy_notify(_user_data: *mut c_void) {
+        TRANSFORM_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
+    }
 
     #[test]
     fn runtime_handle_create_run_and_close() {
@@ -1480,6 +1655,49 @@ mod tests {
         );
 
         glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn resource_transform_replacement_and_clear_run_destroy_notify() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        TRANSFORM_DESTROY_COUNT.store(0, Ordering::SeqCst);
+
+        assert_eq!(
+            mln_vala_runtime_handle_set_resource_transform(
+                runtime,
+                Some(passthrough_transform),
+                ptr::null_mut(),
+                Some(transform_destroy_notify),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 0);
+
+        assert_eq!(
+            mln_vala_runtime_handle_set_resource_transform(
+                runtime,
+                Some(passthrough_transform),
+                ptr::null_mut(),
+                Some(transform_destroy_notify),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 1);
+
+        assert_eq!(
+            mln_vala_runtime_handle_clear_resource_transform(runtime, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 2);
+
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
         glib::unref_object(runtime);
     }
 

@@ -49,6 +49,7 @@ pub struct GError {
 unsafe extern "C" {
     fn g_quark_from_static_string(string: *const c_char) -> GQuark;
     fn g_error_new_literal(domain: GQuark, code: c_int, message: *const c_char) -> *mut GError;
+    fn g_free(mem: *mut c_void);
     fn g_boxed_type_register_static(
         name: *const c_char,
         boxed_copy: Option<unsafe extern "C" fn(*mut c_void) -> *mut c_void>,
@@ -237,6 +238,22 @@ pub fn unref_object<T>(object: *mut T) {
     // SAFETY: The caller supplied a live GObject instance pointer and releases
     // one reference.
     unsafe { g_object_unref(object.cast::<GObject>()) }
+}
+
+/// Releases GLib-allocated memory.
+///
+/// # Safety
+///
+/// `mem` must be null or point to memory allocated by GLib-compatible
+/// allocation APIs, and ownership must be transferred to this function.
+pub unsafe fn free(mem: *mut c_void) {
+    if mem.is_null() {
+        return;
+    }
+
+    // SAFETY: The caller supplied memory allocated by GLib-compatible
+    // allocation APIs and transfers it for release.
+    unsafe { g_free(mem) }
 }
 
 pub(crate) fn clear_optional_out_pointer<T>(out: *mut T, value: T) -> Result<(), Error> {
