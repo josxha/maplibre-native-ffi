@@ -794,3 +794,36 @@ Review artifacts:
 - `mise run test`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`
+
+## Round 21
+
+Review artifacts:
+
+- `review-loop/round21-api-doc-surface.md`
+- `review-loop/round21-lifecycle-validation.md`
+- `review-loop/round21-completion-audit.md`
+
+### Applied findings
+
+- None. Reviewers found no remaining actionable API-decision, generated-surface,
+  documentation/spec, lifecycle/ownership, validation, or review-log blockers.
+
+### Rejected or deferred findings
+
+- None.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- Independent reviewers verified the generated VAPI, sanitized GIR, and
+  typelib-derived GIR no longer expose the blocked result/list/snapshot handles,
+  weak strings, raw runtime-event surfaces, sidecar-backed setters, raw offline
+  union data, or `OfflineGeometryRegionDefinition.geometry`.
+- Independent reviewers verified custom-geometry callback policy coverage for
+  source removal, inline style replacement, URL style replacement, map close,
+  and in-flight callback teardown.
+- Independent reviewers verified the branch was clean and pushed at `c52c3fa`
+  with `HEAD...@{upstream}` at `0 0`.
