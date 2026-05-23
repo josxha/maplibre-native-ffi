@@ -1470,8 +1470,8 @@ gboolean mln_vala_runtime_handle_run_once(
 /**
  * mln_vala_runtime_handle_poll_event:
  * @self: a runtime handle.
- * @out_event: (out) (transfer full) (optional): return location for a copied
- * event, or `NULL` when no event is queued.
+ * @out_event: (out) (transfer full) (nullable): return location for a copied
+ * event, or `NULL` when no event is queued. The output location is required.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` when polling succeeds; `FALSE` with @error set on failure.

@@ -129,6 +129,18 @@ Review artifacts:
 
 ### Applied findings
 
+- Fixed the `poll_event` GIR annotation so VAPI marks a no-event result as a
+  nullable `RuntimeEvent?` rather than a non-null out value.
+- Left native resource-provider request ownership with the C provider path when
+  the temporary GObject wrapper cannot be allocated, avoiding double release on
+  allocation failure.
+- Narrowed SPEC and Vala convention wording so deferred descriptor, JSON, native
+  pointer, and struct-buffer ergonomics are documented as future wrapper work
+  rather than current API behavior.
+- Added `mln_offline_region_id` and `mln_offline_operation_id` to the SPEC
+  checklist with their current scalar Vala mappings.
+- Added direct owner-thread finalizer coverage for an unclosed projection
+  handle.
 - Moved Metal readback before frame acquisition and assert readback metadata so
   the fixture does not call readback while a texture frame is held.
 - Protected Vala logging fixture counters with a mutex, matching provider-state

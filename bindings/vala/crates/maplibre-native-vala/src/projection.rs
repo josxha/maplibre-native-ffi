@@ -360,6 +360,25 @@ mod tests {
     };
 
     #[test]
+    fn owner_thread_finalize_releases_unclosed_projection() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+        let projection = mln_vala_map_projection_handle_new(map, ptr::null_mut());
+        assert!(!projection.is_null());
+
+        glib::unref_object(projection);
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
     fn projection_converts_coordinate_and_pixel() {
         let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
         assert!(!runtime.is_null());

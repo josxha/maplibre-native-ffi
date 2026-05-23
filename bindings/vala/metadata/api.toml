@@ -771,6 +771,7 @@ nullable_parameters = [
   "mln_vala_runtime_handle_offline_region_get_take_result",
   "mln_vala_runtime_handle_offline_region_update_metadata_start",
   "mln_vala_runtime_handle_offline_regions_merge_database_start",
+  "mln_vala_runtime_handle_poll_event",
   "mln_vala_runtime_options_default",
 ]
 

@@ -65,15 +65,16 @@ exception: it owns a standalone projection snapshot and does not retain its
 source `MapHandle` for native validity after creation.
 
 Copied descriptors, events, snapshots, camera values, geometry values, and
-render metadata are GLib-friendly value objects. Use boxed types for immutable
-or copyable value domains that need identity at the ABI boundary. Mutable C
-option structs become GLib objects or boxed descriptors with explicit setters;
-the adapter writes `size` fields, field masks, UTF-8 views, arrays, and nested
-native descriptors internally.
+render metadata are GLib-friendly value objects where the current GIR/Vala layer
+can preserve the intended ownership. The first low-level surface may expose C
+option and descriptor structs directly with default helpers, including `size`,
+field masks, and backend handle fields. Higher-level descriptor wrappers may add
+explicit setters and hide ABI bookkeeping in a later pass.
 
 `NativePointer` is a boxed value for borrowed backend-native addresses. It wraps
 a non-null `void*`, grants no memory access, and transfers no ownership. Use it
-only where the C API already accepts or returns opaque backend handles.
+for frame accessors and future descriptor wrappers where the C API already
+accepts or returns opaque backend handles.
 
 ## Errors, Metadata, and Ownership
 
@@ -136,9 +137,11 @@ calling thread-affine map APIs.
 ## Rendering and Memory
 
 `RenderSessionHandle` represents one attached render target for one map and
-keeps the map wrapper alive. Surface and borrowed-texture descriptors carry
-backend handles as `NativePointer`; callers keep those backend objects valid and
-synchronized for the C API's documented lifetime.
+keeps the map wrapper alive. Current low-level surface and borrowed-texture
+descriptors may mirror the C ABI with raw backend handle fields; callers keep
+those backend objects valid and synchronized for the C API's documented
+lifetime. Future descriptor wrappers should use `NativePointer` for those
+fields.
 
 Session-owned texture targets expose explicit frame handles. A frame handle
 keeps the native frame acquired, exposes copied metadata and scoped

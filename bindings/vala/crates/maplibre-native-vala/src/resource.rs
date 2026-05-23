@@ -89,9 +89,8 @@ pub(crate) unsafe fn resource_request_handle_from_native(
     let handle =
         glib::new_object::<ResourceRequestHandle>(mln_vala_resource_request_handle_get_type());
     if handle.is_null() {
-        // SAFETY: The caller transfers a provider-owned request reference to
-        // this adapter. If GLib allocation fails, release it to avoid a leak.
-        unsafe { sys::mln_resource_request_release(native) };
+        // Leave native request ownership with the provider trampoline. It will
+        // return pass-through so the C provider path releases exactly once.
         return ptr::null_mut();
     }
 
