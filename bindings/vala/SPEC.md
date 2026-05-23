@@ -111,8 +111,9 @@ The scaffold implements one proof slice in Rust:
 - `RenderSessionHandle` is registered as a GObject class with descriptor
   defaults, render-target attach methods, readback helpers, texture frame
   handles, and basic session lifecycle methods.
-- Rendered/source feature query option descriptors and rendered query geometry
-  constructors are exposed for Vala bindability.
+- Rendered/source feature query option descriptors, rendered query geometry
+  constructors, and feature query result handles are exposed for Vala
+  bindability.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and

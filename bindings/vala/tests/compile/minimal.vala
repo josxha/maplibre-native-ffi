@@ -45,6 +45,24 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   runtime.offline_operation_discard(operation_id);
 }
 
+void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws GLib.Error {
+  MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
+  rendered_options.default();
+  MaplibreNative.SourceFeatureQueryOptions source_options = {};
+  source_options.default();
+  MaplibreNative.ScreenPoint point = { 0.0, 0.0 };
+  MaplibreNative.RenderedQueryGeometry geometry;
+  MaplibreNative.RenderedQueryGeometry.point(point, out geometry);
+  var rendered_result = session.query_rendered_features(geometry, rendered_options);
+  size_t rendered_count;
+  rendered_result.count(out rendered_count);
+  rendered_result.close();
+  var source_result = session.query_source_features("fixture-source", source_options);
+  size_t source_count;
+  source_result.count(out source_count);
+  source_result.close();
+}
+
 void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
   uint64 generation;
   uint32 width;

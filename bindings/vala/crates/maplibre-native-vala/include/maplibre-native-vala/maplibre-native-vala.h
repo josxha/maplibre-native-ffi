@@ -213,6 +213,8 @@ typedef struct {
 } MlnValaOfflineRegionStatus;
 
 typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
+typedef struct _MlnValaRenderSessionHandle MlnValaRenderSessionHandle;
+typedef struct _MlnValaFeatureQueryResultHandle MlnValaFeatureQueryResultHandle;
 typedef struct _MlnValaOfflineRegionSnapshotHandle
   MlnValaOfflineRegionSnapshotHandle;
 typedef struct _MlnValaOfflineRegionListHandle MlnValaOfflineRegionListHandle;
@@ -865,6 +867,56 @@ gboolean mln_vala_rendered_query_geometry_line_string(
   const MlnValaScreenPoint* points, size_t point_count,
   MlnValaRenderedQueryGeometry* out_geometry, GError** error
 );
+
+/**
+ * mln_vala_render_session_handle_query_rendered_features:
+ * @self: a render session handle.
+ * @geometry: (not nullable): rendered query geometry.
+ * @options: (not nullable): rendered feature query options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned feature query result handle.
+ * Throws: MlnValaError
+ */
+MlnValaFeatureQueryResultHandle*
+mln_vala_render_session_handle_query_rendered_features(
+  MlnValaRenderSessionHandle* self,
+  const MlnValaRenderedQueryGeometry* geometry,
+  const MlnValaRenderedFeatureQueryOptions* options, GError** error
+);
+
+/**
+ * mln_vala_render_session_handle_query_source_features:
+ * @self: a render session handle.
+ * @source_id: (not nullable): source identifier.
+ * @options: (not nullable): source feature query options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned feature query result handle.
+ * Throws: MlnValaError
+ */
+MlnValaFeatureQueryResultHandle*
+mln_vala_render_session_handle_query_source_features(
+  MlnValaRenderSessionHandle* self, const char* source_id,
+  const MlnValaSourceFeatureQueryOptions* options, GError** error
+);
+
+/**
+ * mln_vala_feature_query_result_handle_count:
+ * @self: a feature query result handle.
+ * @out_count: (out): return location for the feature count.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_feature_query_result_handle_count(
+  MlnValaFeatureQueryResultHandle* self, size_t* out_count, GError** error
+);
+void mln_vala_feature_query_result_handle_close(
+  MlnValaFeatureQueryResultHandle* self
+);
+
 gboolean mln_vala_metal_surface_descriptor_default(
   MlnValaMetalSurfaceDescriptor* out_descriptor, GError** error
 );
@@ -981,6 +1033,13 @@ G_DECLARE_FINAL_TYPE(
 G_DECLARE_FINAL_TYPE(
   MlnValaRenderSessionHandle, mln_vala_render_session_handle, MLN_VALA,
   RENDER_SESSION_HANDLE, GObject
+)
+
+#define MLN_VALA_TYPE_FEATURE_QUERY_RESULT_HANDLE \
+  (mln_vala_feature_query_result_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaFeatureQueryResultHandle, mln_vala_feature_query_result_handle,
+  MLN_VALA, FEATURE_QUERY_RESULT_HANDLE, GObject
 )
 
 #define MLN_VALA_TYPE_METAL_OWNED_TEXTURE_FRAME_HANDLE \

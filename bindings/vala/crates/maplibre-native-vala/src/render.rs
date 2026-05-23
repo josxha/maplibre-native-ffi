@@ -762,7 +762,9 @@ fn wrap_native_session(
     Ok(handle)
 }
 
-fn session_native(handle: *mut RenderSessionHandle) -> error::Result<*mut sys::mln_render_session> {
+pub(crate) fn session_native(
+    handle: *mut RenderSessionHandle,
+) -> error::Result<*mut sys::mln_render_session> {
     if handle.is_null() {
         return Err(Error::invalid_argument("RenderSessionHandle is null"));
     }
