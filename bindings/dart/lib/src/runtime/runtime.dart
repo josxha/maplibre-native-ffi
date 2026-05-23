@@ -13,6 +13,7 @@ import '../internal/struct/geometry.dart' as native_geometry;
 import '../internal/struct/json.dart' as native_json;
 import '../internal/struct/struct.dart' as native_struct;
 import '../json/json.dart';
+import '../render/targets.dart';
 import '../style/style.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
@@ -213,6 +214,76 @@ final class MapHandle {
     withNativeArena((arena) {
       final nativeJson = nativeUtf8CString(json, arena);
       _check(_c.mapSetStyleJson(_pointer, nativeJson.pointer.cast<Char>()));
+    });
+  }
+
+  /// Attaches a Metal texture render target owned by the render session.
+  RenderSessionHandle attachMetalOwnedTexture(
+    MetalOwnedTextureDescriptor descriptor,
+  ) {
+    return withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_metal_owned_texture_descriptor>();
+      nativeDescriptor.ref = _metalOwnedTextureDescriptorToNative(descriptor);
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.metalOwnedTextureAttach(_pointer, nativeDescriptor, outSession),
+      );
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
+  /// Attaches a Metal caller-owned texture render target.
+  RenderSessionHandle attachMetalBorrowedTexture(
+    MetalBorrowedTextureDescriptor descriptor,
+  ) {
+    return withNativeArena((arena) {
+      final nativeDescriptor =
+          arena<raw.mln_metal_borrowed_texture_descriptor>();
+      nativeDescriptor.ref = _metalBorrowedTextureDescriptorToNative(
+        descriptor,
+      );
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.metalBorrowedTextureAttach(_pointer, nativeDescriptor, outSession),
+      );
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
+  /// Attaches a Vulkan texture render target owned by the render session.
+  RenderSessionHandle attachVulkanOwnedTexture(
+    VulkanOwnedTextureDescriptor descriptor,
+  ) {
+    return withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_vulkan_owned_texture_descriptor>();
+      nativeDescriptor.ref = _vulkanOwnedTextureDescriptorToNative(descriptor);
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.vulkanOwnedTextureAttach(_pointer, nativeDescriptor, outSession),
+      );
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
+  /// Attaches a Vulkan caller-owned texture render target.
+  RenderSessionHandle attachVulkanBorrowedTexture(
+    VulkanBorrowedTextureDescriptor descriptor,
+  ) {
+    return withNativeArena((arena) {
+      final nativeDescriptor =
+          arena<raw.mln_vulkan_borrowed_texture_descriptor>();
+      nativeDescriptor.ref = _vulkanBorrowedTextureDescriptorToNative(
+        descriptor,
+      );
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.vulkanBorrowedTextureAttach(_pointer, nativeDescriptor, outSession),
+      );
+      return RenderSessionHandle._(this, outSession.value);
     });
   }
 
@@ -715,6 +786,140 @@ final class MapHandle {
   void close() {
     _state.close(_c.mapDestroy, _c.threadLastErrorMessage);
   }
+}
+
+/// Owner-thread render session handle attached to a retained map.
+final class RenderSessionHandle {
+  RenderSessionHandle._(this._map, Pointer<raw.mln_render_session> pointer)
+    : _state = NativeHandleState(pointer, 'RenderSessionHandle');
+
+  final MapHandle _map;
+  final NativeHandleState<raw.mln_render_session> _state;
+
+  /// Whether this render session has been closed by the Dart binding.
+  bool get isClosed => _state.isClosed;
+
+  Pointer<raw.mln_render_session> get _pointer {
+    final _ = _map._pointer;
+    return _state.pointer;
+  }
+
+  /// Resizes an attached render session.
+  void resize(int width, int height, {double scaleFactor = 1}) {
+    _check(_c.renderSessionResize(_pointer, width, height, scaleFactor));
+  }
+
+  /// Processes the latest map render update for this session.
+  void renderUpdate() {
+    _check(_c.renderSessionRenderUpdate(_pointer));
+  }
+
+  /// Detaches backend-bound render resources while keeping the handle live.
+  void detach() {
+    _check(_c.renderSessionDetach(_pointer));
+  }
+
+  /// Asks the session renderer to release cached resources where possible.
+  void reduceMemoryUse() {
+    _check(_c.renderSessionReduceMemoryUse(_pointer));
+  }
+
+  /// Clears renderer data for the session.
+  void clearData() {
+    _check(_c.renderSessionClearData(_pointer));
+  }
+
+  /// Dumps renderer debug logs through MapLibre Native logging.
+  void dumpDebugLogs() {
+    _check(_c.renderSessionDumpDebugLogs(_pointer));
+  }
+
+  /// Explicitly destroys this render session.
+  void close() {
+    _state.close(_c.renderSessionDestroy, _c.threadLastErrorMessage);
+  }
+}
+
+raw.mln_render_target_extent _renderTargetExtentToNative(
+  RenderTargetExtent value,
+) {
+  final result = Struct.create<raw.mln_render_target_extent>();
+  result.size = sizeOf<raw.mln_render_target_extent>();
+  result.width = value.width;
+  result.height = value.height;
+  result.scale_factor = value.scaleFactor;
+  return result;
+}
+
+raw.mln_metal_context_descriptor _metalContextDescriptorToNative(
+  MetalContextDescriptor value,
+) {
+  final result = Struct.create<raw.mln_metal_context_descriptor>();
+  result.size = sizeOf<raw.mln_metal_context_descriptor>();
+  result.device = Pointer<Void>.fromAddress(value.device.address);
+  return result;
+}
+
+raw.mln_vulkan_context_descriptor _vulkanContextDescriptorToNative(
+  VulkanContextDescriptor value,
+) {
+  final result = Struct.create<raw.mln_vulkan_context_descriptor>();
+  result.size = sizeOf<raw.mln_vulkan_context_descriptor>();
+  result.instance = Pointer<Void>.fromAddress(value.instance.address);
+  result.physical_device = Pointer<Void>.fromAddress(
+    value.physicalDevice.address,
+  );
+  result.device = Pointer<Void>.fromAddress(value.device.address);
+  result.graphics_queue = Pointer<Void>.fromAddress(
+    value.graphicsQueue.address,
+  );
+  result.graphics_queue_family_index = value.graphicsQueueFamilyIndex;
+  return result;
+}
+
+raw.mln_metal_owned_texture_descriptor _metalOwnedTextureDescriptorToNative(
+  MetalOwnedTextureDescriptor value,
+) {
+  final result = Struct.create<raw.mln_metal_owned_texture_descriptor>();
+  result.size = sizeOf<raw.mln_metal_owned_texture_descriptor>();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _metalContextDescriptorToNative(value.context);
+  return result;
+}
+
+raw.mln_metal_borrowed_texture_descriptor
+_metalBorrowedTextureDescriptorToNative(MetalBorrowedTextureDescriptor value) {
+  final result = Struct.create<raw.mln_metal_borrowed_texture_descriptor>();
+  result.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.texture = Pointer<Void>.fromAddress(value.texture.address);
+  return result;
+}
+
+raw.mln_vulkan_owned_texture_descriptor _vulkanOwnedTextureDescriptorToNative(
+  VulkanOwnedTextureDescriptor value,
+) {
+  final result = Struct.create<raw.mln_vulkan_owned_texture_descriptor>();
+  result.size = sizeOf<raw.mln_vulkan_owned_texture_descriptor>();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _vulkanContextDescriptorToNative(value.context);
+  return result;
+}
+
+raw.mln_vulkan_borrowed_texture_descriptor
+_vulkanBorrowedTextureDescriptorToNative(
+  VulkanBorrowedTextureDescriptor value,
+) {
+  final result = Struct.create<raw.mln_vulkan_borrowed_texture_descriptor>();
+  result.size = sizeOf<raw.mln_vulkan_borrowed_texture_descriptor>();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _vulkanContextDescriptorToNative(value.context);
+  result.image = Pointer<Void>.fromAddress(value.image.address);
+  result.image_view = Pointer<Void>.fromAddress(value.imageView.address);
+  result.format = value.format;
+  result.initial_layout = value.initialLayout;
+  result.final_layout = value.finalLayout;
+  return result;
 }
 
 Pointer<raw.mln_camera_options> _nativeCamera(

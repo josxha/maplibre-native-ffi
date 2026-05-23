@@ -53,6 +53,15 @@ void main() {
       final centerPixel = map.pixelForLatLng(const LatLng(0, 0));
       expect(centerPixel.x.isFinite, isTrue);
       expect(map.latLngForPixel(centerPixel).latitude.isFinite, isTrue);
+      expect(
+        () => map.attachMetalOwnedTexture(
+          const MetalOwnedTextureDescriptor(
+            extent: RenderTargetExtent(width: 16, height: 16),
+            context: MetalContextDescriptor(device: NativePointer.nullPointer),
+          ),
+        ),
+        throwsA(isA<MaplibreException>()),
+      );
 
       final sourceIds = map.listStyleSourceIds();
       expect(sourceIds, contains('org.maplibre.annotations'));

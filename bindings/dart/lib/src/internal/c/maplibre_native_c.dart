@@ -88,6 +88,70 @@ final class MaplibreNativeCApi {
   int mapSetStyleJson(Pointer<raw.mln_map> map, Pointer<Char> json) =>
       _raw.mln_map_set_style_json(map, json).value;
 
+  /// Attaches a Metal texture render target owned by the session.
+  int metalOwnedTextureAttach(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_metal_owned_texture_descriptor> descriptor,
+    Pointer<Pointer<raw.mln_render_session>> outSession,
+  ) => _raw.mln_metal_owned_texture_attach(map, descriptor, outSession).value;
+
+  /// Attaches a Metal caller-owned texture render target.
+  int metalBorrowedTextureAttach(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_metal_borrowed_texture_descriptor> descriptor,
+    Pointer<Pointer<raw.mln_render_session>> outSession,
+  ) =>
+      _raw.mln_metal_borrowed_texture_attach(map, descriptor, outSession).value;
+
+  /// Attaches a Vulkan texture render target owned by the session.
+  int vulkanOwnedTextureAttach(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_vulkan_owned_texture_descriptor> descriptor,
+    Pointer<Pointer<raw.mln_render_session>> outSession,
+  ) => _raw.mln_vulkan_owned_texture_attach(map, descriptor, outSession).value;
+
+  /// Attaches a Vulkan caller-owned texture render target.
+  int vulkanBorrowedTextureAttach(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_vulkan_borrowed_texture_descriptor> descriptor,
+    Pointer<Pointer<raw.mln_render_session>> outSession,
+  ) => _raw
+      .mln_vulkan_borrowed_texture_attach(map, descriptor, outSession)
+      .value;
+
+  /// Resizes an attached render session.
+  int renderSessionResize(
+    Pointer<raw.mln_render_session> session,
+    int width,
+    int height,
+    double scaleFactor,
+  ) =>
+      _raw.mln_render_session_resize(session, width, height, scaleFactor).value;
+
+  /// Processes the latest map render update for a render session.
+  int renderSessionRenderUpdate(Pointer<raw.mln_render_session> session) =>
+      _raw.mln_render_session_render_update(session).value;
+
+  /// Detaches backend-bound render resources.
+  int renderSessionDetach(Pointer<raw.mln_render_session> session) =>
+      _raw.mln_render_session_detach(session).value;
+
+  /// Destroys a render session handle.
+  int renderSessionDestroy(Pointer<raw.mln_render_session> session) =>
+      _raw.mln_render_session_destroy(session).value;
+
+  /// Asks the session renderer to release cached resources.
+  int renderSessionReduceMemoryUse(Pointer<raw.mln_render_session> session) =>
+      _raw.mln_render_session_reduce_memory_use(session).value;
+
+  /// Clears renderer data for the session.
+  int renderSessionClearData(Pointer<raw.mln_render_session> session) =>
+      _raw.mln_render_session_clear_data(session).value;
+
+  /// Dumps renderer debug logs for the session.
+  int renderSessionDumpDebugLogs(Pointer<raw.mln_render_session> session) =>
+      _raw.mln_render_session_dump_debug_logs(session).value;
+
   /// Copies the current camera snapshot.
   int mapGetCamera(
     Pointer<raw.mln_map> map,
