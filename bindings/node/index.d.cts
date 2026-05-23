@@ -493,6 +493,33 @@ export interface FeatureStateSelector {
   stateKey?: string | null;
 }
 
+export interface ScreenBox {
+  min: ScreenPoint;
+  max: ScreenPoint;
+}
+
+export type RenderedQueryGeometry =
+  | { kind: "point"; point: ScreenPoint }
+  | { kind: "box"; box: ScreenBox }
+  | { kind: "lineString"; points: ScreenPoint[] };
+
+export interface RenderedFeatureQueryOptions {
+  layerIds?: string[] | null;
+  filter?: JsonValue | null;
+}
+
+export interface SourceFeatureQueryOptions {
+  sourceLayerIds?: string[] | null;
+  filter?: JsonValue | null;
+}
+
+export interface QueriedFeature {
+  feature: JsonValue;
+  sourceId?: string | null;
+  sourceLayerId?: string | null;
+  state?: JsonValue | null;
+}
+
 export declare class RenderSessionHandle {
   private constructor(nativeHandle: unknown);
   static attachMetalOwnedTexture(
@@ -530,6 +557,14 @@ export declare class RenderSessionHandle {
   setFeatureState(selector: FeatureStateSelector, state: JsonValue): void;
   getFeatureState(selector: FeatureStateSelector): JsonValue;
   removeFeatureState(selector: FeatureStateSelector): void;
+  queryRenderedFeatures(
+    geometry: RenderedQueryGeometry,
+    options?: RenderedFeatureQueryOptions | null,
+  ): QueriedFeature[];
+  querySourceFeatures(
+    sourceId: string,
+    options?: SourceFeatureQueryOptions | null,
+  ): QueriedFeature[];
   readPremultipliedRgba8(): TextureReadback;
   [Symbol.dispose](): void;
 }

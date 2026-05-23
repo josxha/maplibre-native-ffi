@@ -678,6 +678,34 @@ class RenderSessionHandle {
     );
   }
 
+  queryRenderedFeatures(geometry, options = null) {
+    const nativeOptions =
+      options == null
+        ? null
+        : {
+            ...options,
+            filter:
+              options.filter == null ? null : stringifyJson(options.filter),
+          };
+    return translateNativeErrors(() =>
+      JSON.parse(this.native.queryRenderedFeatures(geometry, nativeOptions)),
+    );
+  }
+
+  querySourceFeatures(sourceId, options = null) {
+    const nativeOptions =
+      options == null
+        ? null
+        : {
+            ...options,
+            filter:
+              options.filter == null ? null : stringifyJson(options.filter),
+          };
+    return translateNativeErrors(() =>
+      JSON.parse(this.native.querySourceFeatures(sourceId, nativeOptions)),
+    );
+  }
+
   readPremultipliedRgba8() {
     return translateNativeErrors(() => this.native.readPremultipliedRgba8());
   }

@@ -156,7 +156,7 @@ src/maplibre.rs   process-global proof slice, thread-local diagnostics, log call
 src/runtime.rs    runtime handle, runtime option materialization, event polling, resource provider/transform, ambient cache, and offline region operation start/take-result proof slices
 src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile source helpers, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility proof slices
 src/projection.rs standalone map projection handle proof slice
-src/render.rs     render session handle and Metal/Vulkan descriptor proof slices
+src/render.rs     render session handle, Metal/Vulkan descriptor, feature-state, and feature-query proof slices
 src/values.rs     copied coordinate and screen point values plus projection helper proof slices
 ```
 
@@ -560,8 +560,8 @@ area instead of retesting all native C validation rules.
    style probe proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value and initial
-   render session/Metal and Vulkan descriptor and feature-state proof slices
-   complete.)_
+   render session/Metal and Vulkan descriptor, feature-state, and feature-query
+   proof slices complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result
     adaptation into `maplibre-native-core` as broad coverage replaces the proof
     slice.

@@ -2456,7 +2456,7 @@ pub(crate) fn json_value_to_string(value: core::JsonValue) -> Result<String> {
     })
 }
 
-fn json_value_to_serde(value: core::JsonValue) -> serde_json::Value {
+pub(crate) fn json_value_to_serde(value: core::JsonValue) -> serde_json::Value {
     match value {
         core::JsonValue::Null => serde_json::Value::Null,
         core::JsonValue::Bool(value) => serde_json::Value::Bool(value),

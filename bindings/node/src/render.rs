@@ -7,7 +7,8 @@ use napi_derive::napi;
 
 use crate::{
     error,
-    map::{NativeMapHandle, json_value_to_string, parse_json_value},
+    map::{NativeMapHandle, json_value_to_serde, json_value_to_string, parse_json_value},
+    values::ScreenPoint,
 };
 
 #[napi(object)]
@@ -94,6 +95,32 @@ pub struct FeatureStateSelectorInput {
     pub source_layer_id: Option<String>,
     pub feature_id: Option<String>,
     pub state_key: Option<String>,
+}
+
+#[napi(object)]
+pub struct ScreenBoxInput {
+    pub min: ScreenPoint,
+    pub max: ScreenPoint,
+}
+
+#[napi(object)]
+pub struct RenderedQueryGeometryInput {
+    pub kind: String,
+    pub point: Option<ScreenPoint>,
+    pub box_: Option<ScreenBoxInput>,
+    pub points: Option<Vec<ScreenPoint>>,
+}
+
+#[napi(object)]
+pub struct RenderedFeatureQueryOptionsInput {
+    pub layer_ids: Option<Vec<String>>,
+    pub filter: Option<String>,
+}
+
+#[napi(object)]
+pub struct SourceFeatureQueryOptionsInput {
+    pub source_layer_ids: Option<Vec<String>>,
+    pub filter: Option<String>,
 }
 
 #[napi(js_name = "NativeRenderSessionHandle")]
@@ -292,6 +319,53 @@ impl NativeRenderSessionHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "queryRenderedFeatures")]
+    pub fn query_rendered_features(
+        &self,
+        geometry: RenderedQueryGeometryInput,
+        options: Option<RenderedFeatureQueryOptionsInput>,
+    ) -> Result<String> {
+        let geometry = geometry.into_core()?;
+        let native_geometry = core::query::rendered_query_geometry_to_native(&geometry);
+        let options = options.unwrap_or_default().into_core()?;
+        let native_options = core::query::rendered_feature_query_options_to_native(&options)
+            .map_err(error::from_core)?;
+        let mut result = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_render_session_query_rendered_features(
+                self.state.as_ptr(),
+                native_geometry.as_ptr(),
+                native_options.as_ptr(),
+                &mut result,
+            )
+        })
+        .map_err(error::from_core)?;
+        queried_features_to_string(result)
+    }
+
+    #[napi(js_name = "querySourceFeatures")]
+    pub fn query_source_features(
+        &self,
+        source_id: String,
+        options: Option<SourceFeatureQueryOptionsInput>,
+    ) -> Result<String> {
+        let source_id = core::string::string_view(&source_id);
+        let options = options.unwrap_or_default().into_core()?;
+        let native_options = core::query::source_feature_query_options_to_native(&options)
+            .map_err(error::from_core)?;
+        let mut result = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_render_session_query_source_features(
+                self.state.as_ptr(),
+                source_id.raw(),
+                native_options.as_ptr(),
+                &mut result,
+            )
+        })
+        .map_err(error::from_core)?;
+        queried_features_to_string(result)
+    }
+
     #[napi(js_name = "readPremultipliedRgba8")]
     pub fn read_premultiplied_rgba8(&self) -> Result<TextureReadback> {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
@@ -320,6 +394,85 @@ impl NativeRenderSessionHandle {
             info: TextureImageInfo::from_native(info),
             pixels: Uint8Array::from(pixels),
         })
+    }
+}
+
+impl Default for RenderedFeatureQueryOptionsInput {
+    fn default() -> Self {
+        Self {
+            layer_ids: None,
+            filter: None,
+        }
+    }
+}
+
+impl Default for SourceFeatureQueryOptionsInput {
+    fn default() -> Self {
+        Self {
+            source_layer_ids: None,
+            filter: None,
+        }
+    }
+}
+
+impl RenderedQueryGeometryInput {
+    fn into_core(self) -> Result<core::query::RenderedQueryGeometry> {
+        match self.kind.as_str() {
+            "point" => Ok(core::query::RenderedQueryGeometry::point(
+                self.point
+                    .ok_or_else(|| error::invalid_argument("point query geometry requires point"))?
+                    .into_core(),
+            )),
+            "box" => {
+                let box_ = self
+                    .box_
+                    .ok_or_else(|| error::invalid_argument("box query geometry requires box"))?;
+                Ok(core::query::RenderedQueryGeometry::box_(
+                    core::values::ScreenBox {
+                        min: box_.min.into_core(),
+                        max: box_.max.into_core(),
+                    },
+                ))
+            }
+            "lineString" => Ok(core::query::RenderedQueryGeometry::line_string(
+                self.points
+                    .ok_or_else(|| {
+                        error::invalid_argument("lineString query geometry requires points")
+                    })?
+                    .into_iter()
+                    .map(ScreenPoint::into_core)
+                    .collect(),
+            )),
+            other => Err(error::invalid_argument(format!(
+                "query geometry kind must be 'point', 'box', or 'lineString', got '{other}'"
+            ))),
+        }
+    }
+}
+
+impl RenderedFeatureQueryOptionsInput {
+    fn into_core(self) -> Result<core::query::RenderedFeatureQueryOptions> {
+        let mut options = core::query::RenderedFeatureQueryOptions::new();
+        if let Some(layer_ids) = self.layer_ids {
+            options = options.with_layer_ids(layer_ids);
+        }
+        if let Some(filter) = self.filter {
+            options = options.with_filter(parse_json_value(filter)?);
+        }
+        Ok(options)
+    }
+}
+
+impl SourceFeatureQueryOptionsInput {
+    fn into_core(self) -> Result<core::query::SourceFeatureQueryOptions> {
+        let mut options = core::query::SourceFeatureQueryOptions::new();
+        if let Some(source_layer_ids) = self.source_layer_ids {
+            options = options.with_source_layer_ids(source_layer_ids);
+        }
+        if let Some(filter) = self.filter {
+            options = options.with_filter(parse_json_value(filter)?);
+        }
+        Ok(options)
     }
 }
 
@@ -384,6 +537,106 @@ impl TextureImageInfo {
             byte_length: raw.byte_length as i64,
         }
     }
+}
+
+fn queried_features_to_string(result: *mut sys::mln_feature_query_result) -> Result<String> {
+    let result = std::ptr::NonNull::new(result)
+        .ok_or_else(|| error::invalid_argument("feature query result was null"))?;
+    let features =
+        unsafe { core::query::copy_feature_query_result(result) }.map_err(error::from_core)?;
+    let value =
+        serde_json::Value::Array(features.into_iter().map(queried_feature_to_serde).collect());
+    serde_json::to_string(&value).map_err(|serialize_error| {
+        error::invalid_argument(format!(
+            "query result could not be serialized: {serialize_error}"
+        ))
+    })
+}
+
+fn queried_feature_to_serde(feature: core::query::QueriedFeature) -> serde_json::Value {
+    serde_json::json!({
+        "feature": feature_to_serde(feature.feature),
+        "sourceId": feature.source_id,
+        "sourceLayerId": feature.source_layer_id,
+        "state": feature.state.map(json_value_to_serde),
+    })
+}
+
+fn feature_to_serde(feature: core::Feature) -> serde_json::Value {
+    let properties = feature
+        .properties
+        .into_iter()
+        .map(|member| (member.key, json_value_to_serde(member.value)))
+        .collect::<serde_json::Map<_, _>>();
+    let mut value = serde_json::json!({
+        "type": "Feature",
+        "geometry": geometry_to_serde(feature.geometry),
+        "properties": properties,
+    });
+    if !matches!(feature.identifier, core::FeatureIdentifier::Null) {
+        value["id"] = feature_identifier_to_serde(feature.identifier);
+    }
+    value
+}
+
+fn feature_identifier_to_serde(identifier: core::FeatureIdentifier) -> serde_json::Value {
+    match identifier {
+        core::FeatureIdentifier::Null => serde_json::Value::Null,
+        core::FeatureIdentifier::UInt(value) => serde_json::Value::Number(value.into()),
+        core::FeatureIdentifier::Int(value) => serde_json::Value::Number(value.into()),
+        core::FeatureIdentifier::Double(value) => serde_json::Number::from_f64(value)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        core::FeatureIdentifier::String(value) => serde_json::Value::String(value),
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn geometry_to_serde(geometry: core::Geometry) -> serde_json::Value {
+    match geometry {
+        core::Geometry::Empty => serde_json::Value::Null,
+        core::Geometry::Point(coordinate) => serde_json::json!({
+            "type": "Point",
+            "coordinates": [coordinate.longitude, coordinate.latitude]
+        }),
+        core::Geometry::LineString(coordinates) => serde_json::json!({
+            "type": "LineString",
+            "coordinates": coordinates_to_serde(coordinates)
+        }),
+        core::Geometry::Polygon(rings) => serde_json::json!({
+            "type": "Polygon",
+            "coordinates": rings.into_iter().map(coordinates_to_serde).collect::<Vec<_>>()
+        }),
+        core::Geometry::MultiPoint(coordinates) => serde_json::json!({
+            "type": "MultiPoint",
+            "coordinates": coordinates_to_serde(coordinates)
+        }),
+        core::Geometry::MultiLineString(lines) => serde_json::json!({
+            "type": "MultiLineString",
+            "coordinates": lines.into_iter().map(coordinates_to_serde).collect::<Vec<_>>()
+        }),
+        core::Geometry::MultiPolygon(polygons) => serde_json::json!({
+            "type": "MultiPolygon",
+            "coordinates": polygons
+                .into_iter()
+                .map(|rings| rings.into_iter().map(coordinates_to_serde).collect::<Vec<_>>())
+                .collect::<Vec<_>>()
+        }),
+        core::Geometry::GeometryCollection(geometries) => serde_json::json!({
+            "type": "GeometryCollection",
+            "geometries": geometries.into_iter().map(geometry_to_serde).collect::<Vec<_>>()
+        }),
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn coordinates_to_serde(coordinates: Vec<core::LatLng>) -> serde_json::Value {
+    serde_json::Value::Array(
+        coordinates
+            .into_iter()
+            .map(|coordinate| serde_json::json!([coordinate.longitude, coordinate.latitude]))
+            .collect(),
+    )
 }
 
 fn attach_render_session(
