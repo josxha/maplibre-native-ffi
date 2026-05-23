@@ -6,6 +6,12 @@ int main(string[] args) {
     MaplibreNative.network_status_get(out status);
     MaplibreNative.network_status_set(status);
 
+    MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
+    MaplibreNative.ProjectedMeters meters;
+    MaplibreNative.ProjectedMeters.for_lat_lng(coordinate, out meters);
+    MaplibreNative.LatLng round_trip;
+    MaplibreNative.LatLng.for_projected_meters(meters, out round_trip);
+
     var runtime = new MaplibreNative.RuntimeHandle();
     runtime.run_once();
     MaplibreNative.RuntimeEvent event;

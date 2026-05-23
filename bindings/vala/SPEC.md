@@ -84,6 +84,8 @@ The scaffold implements one proof slice in Rust:
   deterministic close methods and a minimal lifecycle slice.
 - Runtime event polling copies event metadata and message bytes into a boxed
   `RuntimeEvent` value.
+- Geographic value structs and projected-meter conversion helpers are visible in
+  generated Vala.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and

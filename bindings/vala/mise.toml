@@ -7,6 +7,7 @@ run = "cargo build -p maplibre-native-vala"
 depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = '''
+set -euo pipefail
 python tools/generate.py
 mkdir -p build/gir build/typelib build/vapi
 
@@ -51,6 +52,7 @@ vapigen \
 depends = [":generate"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = '''
+set -euo pipefail
 valac \
   --vapidir build/vapi \
   --pkg maplibre-native \

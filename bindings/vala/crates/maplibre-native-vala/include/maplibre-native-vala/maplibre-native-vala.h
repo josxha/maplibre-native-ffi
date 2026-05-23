@@ -18,6 +18,21 @@ typedef enum {
 
 GQuark mln_vala_error_quark(void);
 
+typedef struct {
+  double latitude;
+  double longitude;
+} MlnValaLatLng;
+
+typedef struct {
+  double northing;
+  double easting;
+} MlnValaProjectedMeters;
+
+typedef struct {
+  double x;
+  double y;
+} MlnValaScreenPoint;
+
 #define MLN_VALA_TYPE_RUNTIME_EVENT (mln_vala_runtime_event_get_type())
 typedef struct _MlnValaRuntimeEvent MlnValaRuntimeEvent;
 
@@ -80,6 +95,34 @@ gboolean mln_vala_network_status_get(uint32_t* out_status, GError** error);
  * Throws: MlnValaError
  */
 gboolean mln_vala_network_status_set(uint32_t raw_status, GError** error);
+
+/**
+ * mln_vala_projected_meters_for_lat_lng:
+ * @coordinate: (not nullable): geographic coordinate in degrees.
+ * @out_meters: (out): return location for projected meters.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_projected_meters_for_lat_lng(
+  const MlnValaLatLng* coordinate, MlnValaProjectedMeters* out_meters,
+  GError** error
+);
+
+/**
+ * mln_vala_lat_lng_for_projected_meters:
+ * @meters: (not nullable): spherical Mercator projected meters.
+ * @out_coordinate: (out): return location for geographic coordinates.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_lat_lng_for_projected_meters(
+  const MlnValaProjectedMeters* meters, MlnValaLatLng* out_coordinate,
+  GError** error
+);
 
 /**
  * mln_vala_runtime_handle_new:
