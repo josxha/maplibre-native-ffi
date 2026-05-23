@@ -1,8 +1,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use maplibre_native_core::{
-    self as maplibre_core, Error, ErrorKind, NetworkStatus, RenderMode, ResourceErrorReason,
-    ResourceResponseStatus, RuntimeEventPayload, RuntimeEventType, TileOperation,
+    self as maplibre_core, Error, ErrorKind, LogEvent, LogSeverity, NetworkStatus, RenderMode,
+    ResourceErrorReason, ResourceResponseStatus, RuntimeEventPayload, RuntimeEventType,
+    TileOperation,
 };
 use maplibre_native_sys as sys;
 use pyo3::buffer::PyBuffer;
@@ -47,6 +48,38 @@ struct PyResourceTransformState {
 #[pyclass(name = "_ResourceRequestHandle")]
 struct ResourceRequestHandle {
     state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
+}
+
+#[derive(Debug, Clone)]
+struct CopiedLogRecordRaw {
+    severity: u32,
+    event: u32,
+    code: i64,
+    message: String,
+}
+
+#[derive(Debug)]
+struct PyLogCallbackState {
+    queue: Mutex<VecDeque<CopiedLogRecordRaw>>,
+    max_queued_records: usize,
+    dropped_records: AtomicUsize,
+    consume: bool,
+}
+
+#[derive(Debug)]
+struct GlobalPyLogCallbackState {
+    current: Option<Arc<PyLogCallbackState>>,
+    retained: Vec<Arc<PyLogCallbackState>>,
+}
+
+static LOG_CALLBACK_STATE: Mutex<GlobalPyLogCallbackState> = Mutex::new(GlobalPyLogCallbackState {
+    current: None,
+    retained: Vec::new(),
+});
+
+#[pyclass(name = "_LogReceiver")]
+struct LogReceiver {
+    state: Arc<PyLogCallbackState>,
 }
 
 #[pyclass(name = "_MapHandle")]
@@ -167,6 +200,30 @@ impl RuntimeHandle {
         self.state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+impl PyLogCallbackState {
+    fn new(max_queued_records: usize, consume: bool) -> Arc<Self> {
+        Arc::new(Self {
+            queue: Mutex::new(VecDeque::new()),
+            max_queued_records,
+            dropped_records: AtomicUsize::new(0),
+            consume,
+        })
+    }
+
+    fn push(&self, record: CopiedLogRecordRaw) -> u32 {
+        let mut queue = self
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if queue.len() >= self.max_queued_records {
+            self.dropped_records.fetch_add(1, Ordering::AcqRel);
+        } else {
+            queue.push_back(record);
+        }
+        u32::from(self.consume)
     }
 }
 
@@ -529,6 +586,14 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn dump_debug_logs(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates that the pointer is a live map handle and
+        // that the call occurs on the map owner thread.
+        maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(state.as_ptr()) })
+            .map_err(map_error)
+    }
+
     fn set_style_json(&self, json: String) -> PyResult<()> {
         let state = self.state();
         let json = maplibre_core::string::c_string(&json).map_err(map_error)?;
@@ -864,6 +929,27 @@ impl DetachedRenderSessionHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .is_closed()
+    }
+}
+
+#[pymethods]
+impl LogReceiver {
+    fn poll_record(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        let mut queue = self
+            .state
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(record) = queue.pop_front() else {
+            return Ok(None);
+        };
+        drop(queue);
+        log_record_to_py(py, record).map(Some)
+    }
+
+    #[getter]
+    fn dropped_record_count(&self) -> usize {
+        self.state.dropped_records.load(Ordering::Acquire)
     }
 }
 
@@ -1295,6 +1381,49 @@ fn image_to_py(
     dict.set_item("info", texture_image_info_to_py(py, info)?)?;
     dict.set_item("data", PyBytes::new(py, data))?;
     Ok(dict.into_any().unbind())
+}
+
+fn log_record_to_py(py: Python<'_>, record: CopiedLogRecordRaw) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("severity", record.severity)?;
+    dict.set_item("event", record.event)?;
+    dict.set_item("code", record.code)?;
+    dict.set_item("message", record.message)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn log_severity_raw(severity: LogSeverity) -> u32 {
+    match severity {
+        LogSeverity::Info => sys::MLN_LOG_SEVERITY_INFO,
+        LogSeverity::Warning => sys::MLN_LOG_SEVERITY_WARNING,
+        LogSeverity::Error => sys::MLN_LOG_SEVERITY_ERROR,
+        LogSeverity::Unknown(raw) => raw,
+        _ => 0,
+    }
+}
+
+fn log_event_raw(event: LogEvent) -> u32 {
+    match event {
+        LogEvent::General => sys::MLN_LOG_EVENT_GENERAL,
+        LogEvent::Setup => sys::MLN_LOG_EVENT_SETUP,
+        LogEvent::Shader => sys::MLN_LOG_EVENT_SHADER,
+        LogEvent::ParseStyle => sys::MLN_LOG_EVENT_PARSE_STYLE,
+        LogEvent::ParseTile => sys::MLN_LOG_EVENT_PARSE_TILE,
+        LogEvent::Render => sys::MLN_LOG_EVENT_RENDER,
+        LogEvent::Style => sys::MLN_LOG_EVENT_STYLE,
+        LogEvent::Database => sys::MLN_LOG_EVENT_DATABASE,
+        LogEvent::HttpRequest => sys::MLN_LOG_EVENT_HTTP_REQUEST,
+        LogEvent::Sprite => sys::MLN_LOG_EVENT_SPRITE,
+        LogEvent::Image => sys::MLN_LOG_EVENT_IMAGE,
+        LogEvent::OpenGl => sys::MLN_LOG_EVENT_OPENGL,
+        LogEvent::Jni => sys::MLN_LOG_EVENT_JNI,
+        LogEvent::Android => sys::MLN_LOG_EVENT_ANDROID,
+        LogEvent::Crash => sys::MLN_LOG_EVENT_CRASH,
+        LogEvent::Glyph => sys::MLN_LOG_EVENT_GLYPH,
+        LogEvent::Timing => sys::MLN_LOG_EVENT_TIMING,
+        LogEvent::Unknown(raw) => raw,
+        _ => 0,
+    }
 }
 
 fn camera_options_from_parts(
@@ -1871,6 +2000,74 @@ fn network_status_raw() -> PyResult<u32> {
         .map_err(map_error)
 }
 
+#[pyfunction]
+fn set_log_callback(max_queued_records: usize, consume: bool) -> PyResult<LogReceiver> {
+    if max_queued_records == 0 {
+        return Err(invalid_argument_error(
+            "max_queued_records must be greater than zero",
+        ));
+    }
+    let replacement = PyLogCallbackState::new(max_queued_records, consume);
+    let user_data = Arc::as_ptr(&replacement).cast_mut().cast::<c_void>();
+    // SAFETY: log_callback_trampoline has the C callback ABI. user_data points
+    // to replacement, which is retained by LOG_CALLBACK_STATE after success.
+    maplibre_core::check(unsafe {
+        sys::mln_log_set_callback(Some(log_callback_trampoline), user_data)
+    })
+    .map_err(map_error)?;
+    let mut state = LOG_CALLBACK_STATE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    state.current = Some(Arc::clone(&replacement));
+    state.retained.push(Arc::clone(&replacement));
+    Ok(LogReceiver { state: replacement })
+}
+
+#[pyfunction]
+fn clear_log_callback() -> PyResult<()> {
+    // SAFETY: mln_log_clear_callback takes no arguments and clears native's
+    // process-global callback slot.
+    maplibre_core::check(unsafe { sys::mln_log_clear_callback() }).map_err(map_error)?;
+    LOG_CALLBACK_STATE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .current = None;
+    Ok(())
+}
+
+#[pyfunction]
+fn set_async_log_severity_mask(mask: u32) -> PyResult<()> {
+    // SAFETY: mask is passed by value and validated by the C API.
+    maplibre_core::check(unsafe { sys::mln_log_set_async_severity_mask(mask) }).map_err(map_error)
+}
+
+unsafe extern "C" fn log_callback_trampoline(
+    user_data: *mut c_void,
+    severity: u32,
+    event: u32,
+    code: i64,
+    message: *const c_char,
+) -> u32 {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<PyLogCallbackState>()) else {
+        return 0;
+    };
+    // SAFETY: user_data points to PyLogCallbackState retained after successful
+    // callback installation.
+    let state = unsafe { state.as_ref() };
+    // SAFETY: message follows the C logging callback contract.
+    let Ok(record) =
+        (unsafe { maplibre_core::logging::copy_log_record(severity, event, code, message) })
+    else {
+        return 0;
+    };
+    state.push(CopiedLogRecordRaw {
+        severity: log_severity_raw(record.severity),
+        event: log_event_raw(record.event),
+        code: record.code,
+        message: record.message,
+    })
+}
+
 /// Sets the process-global network status from a raw C enum value.
 #[pyfunction]
 fn set_network_status_raw(raw_status: u32) -> PyResult<()> {
@@ -2191,6 +2388,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
+    module.add_class::<LogReceiver>()?;
     module.add_class::<CustomGeometrySourceHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<DetachedRenderSessionHandle>()?;
@@ -2201,6 +2399,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(supported_render_backends_raw, module)?)?;
     module.add_function(wrap_pyfunction!(network_status_raw, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(set_log_callback, module)?)?;
+    module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;
+    module.add_function(wrap_pyfunction!(set_async_log_severity_mask, module)?)?;
     module.add_function(wrap_pyfunction!(
         set_network_status_raw_unchecked_for_test,
         module

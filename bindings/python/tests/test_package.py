@@ -4,7 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import camera, geo, json, render, resource, style
+from maplibre_native import camera, geo, json, log, render, resource, style
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -237,6 +237,44 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_process_global_logging_receiver_copies_native_records() -> None:
+    receiver = log.set_log_callback(max_queued_records=8, consume=True)
+    try:
+        log.set_async_log_severity_mask(log.LogSeverityMask.DEFAULT)
+        with mln.RuntimeHandle() as runtime:
+            with runtime.create_map() as map_handle:
+                with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
+                    map_handle.set_style_json("{")
+                map_handle.dump_debug_logs()
+
+        records = []
+        while (record := receiver.poll_record()) is not None:
+            records.append(record)
+
+        assert records
+        assert any(record.message for record in records)
+        assert all(isinstance(record.severity, log.LogSeverity) for record in records)
+        assert all(isinstance(record.event, log.LogEvent) for record in records)
+    finally:
+        log.clear_log_callback()
+        log.set_async_log_severity_mask(log.LogSeverityMask.DEFAULT)
+
+
+def test_log_receiver_reports_dropped_records() -> None:
+    receiver = log.set_log_callback(max_queued_records=1, consume=True)
+    try:
+        with mln.RuntimeHandle() as runtime:
+            with runtime.create_map() as map_handle:
+                with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
+                    map_handle.set_style_json("{")
+                map_handle.dump_debug_logs()
+
+        assert receiver.poll_record() is not None
+        assert receiver.dropped_record_count >= 0
+    finally:
+        log.clear_log_callback()
 
 
 def test_json_values_preserve_order_duplicates_and_numeric_shape() -> None:

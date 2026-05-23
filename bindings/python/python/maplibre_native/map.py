@@ -81,6 +81,10 @@ class MapHandle:
         """Request a repaint for a continuous map."""
         self._native.request_repaint()
 
+    def dump_debug_logs(self) -> None:
+        """Dump map debug logs through MapLibre Native logging."""
+        self._native.dump_debug_logs()
+
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
