@@ -169,13 +169,30 @@ export declare class NativeBuffer {
   readonly [Symbol.toStringTag]: "NativeBuffer";
 }
 
+export type AmbientCacheOperation =
+  | "resetDatabase"
+  | "packDatabase"
+  | "invalidate"
+  | "clear";
+
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
   readonly closed: boolean;
   createMap(options?: MapOptions | null): MapHandle;
   close(): void;
   runOnce(): void;
+  runAmbientCacheOperation(
+    operation: AmbientCacheOperation,
+  ): OfflineOperationHandle;
   pollEvent(): RuntimeEvent | null;
+  [Symbol.dispose](): void;
+}
+
+export declare class OfflineOperationHandle {
+  constructor(runtime: RuntimeHandle, operationId: bigint);
+  readonly operationId: bigint;
+  readonly closed: boolean;
+  close(): void;
   [Symbol.dispose](): void;
 }
 

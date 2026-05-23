@@ -15,6 +15,7 @@ const {
   MaplibreStatus,
   NativeBuffer,
   NativePointer,
+  OfflineOperationHandle,
   networkStatus,
   projectedMetersForLatLng,
   restoreDefaultAsyncLogSeverities,
@@ -168,6 +169,26 @@ test("handles stay local while workers create their own runtime", async () => {
     });
   });
   assert.deepEqual(result, { ok: true });
+});
+
+test("ambient cache operations expose discardable handles", () => {
+  const runtime = new RuntimeHandle();
+
+  try {
+    const operation = runtime.runAmbientCacheOperation("clear");
+    assert.equal(operation instanceof OfflineOperationHandle, true);
+    assert.equal(typeof operation.operationId, "bigint");
+    assert.equal(operation.closed, false);
+    operation.close();
+    assert.equal(operation.closed, true);
+    operation.close();
+    assert.throws(
+      () => runtime.runAmbientCacheOperation(/** @type {any} */ ("vacuum")),
+      InvalidArgumentError,
+    );
+  } finally {
+    runtime.close();
+  }
 });
 
 test("runtime handle supports options, explicit close, and idempotent disposal", () => {

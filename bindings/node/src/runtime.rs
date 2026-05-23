@@ -13,6 +13,11 @@ pub struct RuntimeOptions {
 }
 
 #[napi(object)]
+pub struct OfflineOperationStart {
+    pub operation_id: String,
+}
+
+#[napi(object)]
 pub struct RuntimeEvent {
     pub event_type: String,
     pub raw_event_type: u32,
@@ -61,6 +66,34 @@ impl NativeRuntimeHandle {
     pub fn run_once(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_run_once(self.state.as_ptr()) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "runAmbientCacheOperation")]
+    pub fn run_ambient_cache_operation(&self, operation: String) -> Result<OfflineOperationStart> {
+        let operation = ambient_cache_operation_from_string(&operation)?;
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_run_ambient_cache_operation_start(
+                self.state.as_ptr(),
+                operation,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(OfflineOperationStart {
+            operation_id: operation_id.to_string(),
+        })
+    }
+
+    #[napi(js_name = "discardOfflineOperation")]
+    pub fn discard_offline_operation(&self, operation_id: BigInt) -> Result<()> {
+        core::check(unsafe {
+            sys::mln_runtime_offline_operation_discard(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+            )
+        })
+        .map_err(error::from_core)
     }
 
     #[napi(js_name = "pollEvent")]
@@ -192,12 +225,28 @@ impl RuntimeOptions {
     }
 }
 
+fn ambient_cache_operation_from_string(operation: &str) -> Result<u32> {
+    match operation {
+        "resetDatabase" => Ok(sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE),
+        "packDatabase" => Ok(sys::MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE),
+        "invalidate" => Ok(sys::MLN_AMBIENT_CACHE_OPERATION_INVALIDATE),
+        "clear" => Ok(sys::MLN_AMBIENT_CACHE_OPERATION_CLEAR),
+        other => Err(error::invalid_argument(format!(
+            "ambient cache operation must be 'resetDatabase', 'packDatabase', 'invalidate', or 'clear', got '{other}'"
+        ))),
+    }
+}
+
 fn maximum_cache_size_to_u64(value: BigInt) -> Result<u64> {
+    bigint_to_u64(value, "maximumCacheSize")
+}
+
+fn bigint_to_u64(value: BigInt, field_name: &str) -> Result<u64> {
     let (signed, value, lossless) = value.get_u64();
     if signed || !lossless {
-        return Err(error::invalid_argument(
-            "maximumCacheSize must be a non-negative 64-bit bigint",
-        ));
+        return Err(error::invalid_argument(format!(
+            "{field_name} must be a non-negative 64-bit bigint"
+        )));
     }
     Ok(value)
 }

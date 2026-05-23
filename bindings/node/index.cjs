@@ -264,6 +264,41 @@ function validateByteLength(byteLength) {
   return byteLength;
 }
 
+class OfflineOperationHandle {
+  constructor(runtime, operationId) {
+    if (!(runtime instanceof RuntimeHandle)) {
+      throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
+    }
+    if (typeof operationId !== "bigint" || operationId <= 0n) {
+      throw new InvalidArgumentError(
+        null,
+        "offline operation id must be a positive bigint",
+      );
+    }
+    this.runtime = runtime;
+    this.operationId = operationId;
+    this.discarded = false;
+  }
+
+  close() {
+    if (this.discarded) {
+      return;
+    }
+    translateNativeErrors(() =>
+      this.runtime.native.discardOfflineOperation(this.operationId),
+    );
+    this.discarded = true;
+  }
+
+  get closed() {
+    return this.discarded;
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
 class RuntimeHandle {
   constructor(options) {
     this.native = translateNativeErrors(() =>
@@ -285,6 +320,13 @@ class RuntimeHandle {
 
   runOnce() {
     return translateNativeErrors(() => this.native.runOnce());
+  }
+
+  runAmbientCacheOperation(operation) {
+    const start = translateNativeErrors(() =>
+      this.native.runAmbientCacheOperation(operation),
+    );
+    return new OfflineOperationHandle(this, BigInt(start.operationId));
   }
 
   pollEvent() {
@@ -766,6 +808,7 @@ module.exports = {
   NativeError,
   MaplibreStatus,
   RuntimeHandle,
+  OfflineOperationHandle,
   MapHandle,
   MapProjectionHandle,
   NativePointer,
