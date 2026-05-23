@@ -770,6 +770,8 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     ]);
     assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
     map.addCustomGeometrySource("custom-geometry", {
+      fetchTile() {},
+      cancelTile() {},
       minZoom: 0,
       maxZoom: 14,
       tolerance: 0.375,
@@ -779,6 +781,13 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       wrap: true,
     });
     assert.equal(map.styleSourceExists("custom-geometry"), true);
+    assert.throws(
+      () =>
+        map.addCustomGeometrySource("custom-geometry-invalid", {
+          fetchTile: /** @type {any} */ ("nope"),
+        }),
+      InvalidArgumentError,
+    );
     map.setCustomGeometrySourceTileData(
       "custom-geometry",
       { z: 0, x: 0, y: 0 },

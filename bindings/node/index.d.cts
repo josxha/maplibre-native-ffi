@@ -847,7 +847,11 @@ export interface CanonicalTileId {
   y: number;
 }
 
+export type CustomGeometrySourceCallback = (tileId: CanonicalTileId) => void;
+
 export interface CustomGeometrySourceOptions {
+  fetchTile?: CustomGeometrySourceCallback | null;
+  cancelTile?: CustomGeometrySourceCallback | null;
   minZoom?: number | null;
   maxZoom?: number | null;
   tolerance?: number | null;

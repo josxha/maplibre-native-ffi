@@ -1245,8 +1245,26 @@ class MapHandle {
   }
 
   addCustomGeometrySource(sourceId, options = null) {
+    const { fetchTile, cancelTile, ...nativeOptions } = options ?? {};
+    if (fetchTile != null && typeof fetchTile !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "custom geometry fetchTile callback must be a function",
+      );
+    }
+    if (cancelTile != null && typeof cancelTile !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "custom geometry cancelTile callback must be a function",
+      );
+    }
     return translateNativeErrors(() =>
-      this.native.addCustomGeometrySource(sourceId, options),
+      this.native.addCustomGeometrySource(
+        sourceId,
+        nativeOptions,
+        fetchTile ?? null,
+        cancelTile ?? null,
+      ),
     );
   }
 

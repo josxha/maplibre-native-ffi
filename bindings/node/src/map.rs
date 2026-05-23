@@ -1,8 +1,13 @@
-use std::ffi::CString;
+use std::{
+    collections::HashMap,
+    ffi::{CString, c_void},
+    sync::{Arc, Mutex},
+};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
 use napi::bindgen_prelude::{Result, Uint8Array};
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
 use crate::{
@@ -181,6 +186,7 @@ pub struct StyleImage {
 #[napi(js_name = "NativeMapHandle")]
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
+    custom_geometry_sources: Mutex<HashMap<String, Box<CustomGeometrySourceState>>>,
 }
 
 #[napi(js_name = "createNativeMapHandle")]
@@ -196,7 +202,10 @@ pub fn create_native_map_handle(
         .map_err(error::from_core)?;
     let state =
         unsafe { NativeHandleState::from_raw_ptr(map, "MapHandle") }.map_err(error::from_core)?;
-    Ok(NativeMapHandle { state })
+    Ok(NativeMapHandle {
+        state,
+        custom_geometry_sources: Mutex::new(HashMap::new()),
+    })
 }
 
 #[napi]
@@ -725,12 +734,19 @@ impl NativeMapHandle {
 
     #[napi(js_name = "removeStyleSource")]
     pub fn remove_style_source(&self, source_id: String) -> Result<bool> {
+        let source_id_string = source_id.clone();
         let source_id = core::string::string_view(&source_id);
         let mut removed = false;
         core::check(unsafe {
             sys::mln_map_remove_style_source(self.state.as_ptr(), source_id.raw(), &mut removed)
         })
         .map_err(error::from_core)?;
+        if removed {
+            self.custom_geometry_sources
+                .lock()
+                .expect("custom geometry source mutex poisoned")
+                .remove(&source_id_string);
+        }
         Ok(removed)
     }
 
@@ -948,13 +964,30 @@ impl NativeMapHandle {
         &self,
         source_id: String,
         options: Option<CustomGeometrySourceOptions>,
+        fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+        cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
     ) -> Result<()> {
-        let source_id = core::string::string_view(&source_id);
-        let options = custom_geometry_source_options_to_native(options.unwrap_or_default());
+        let source_id_view = core::string::string_view(&source_id);
+        let mut state = CustomGeometrySourceState::new(fetch_tile, cancel_tile).map(Box::new);
+        let options = custom_geometry_source_options_to_native(
+            options.unwrap_or_default(),
+            state.as_deref_mut(),
+        );
         core::check(unsafe {
-            sys::mln_map_add_custom_geometry_source(self.state.as_ptr(), source_id.raw(), &options)
+            sys::mln_map_add_custom_geometry_source(
+                self.state.as_ptr(),
+                source_id_view.raw(),
+                &options,
+            )
         })
-        .map_err(error::from_core)
+        .map_err(error::from_core)?;
+        if let Some(state) = state {
+            self.custom_geometry_sources
+                .lock()
+                .expect("custom geometry source mutex poisoned")
+                .insert(source_id, state);
+        }
+        Ok(())
     }
 
     #[napi(js_name = "setCustomGeometrySourceTileData")]
@@ -1907,6 +1940,14 @@ impl CanonicalTileId {
             y: self.y,
         }
     }
+
+    fn from_native(raw: sys::mln_canonical_tile_id) -> Self {
+        Self {
+            z: raw.z,
+            x: raw.x,
+            y: raw.y,
+        }
+    }
 }
 
 impl FreeCameraOptions {
@@ -2096,18 +2137,76 @@ fn location_indicator_image_kind_from_string(kind: &str) -> Result<u32> {
     }
 }
 
+struct CustomGeometrySourceState {
+    fetch_tile: Arc<ThreadsafeFunction<CanonicalTileId>>,
+    cancel_tile: Option<Arc<ThreadsafeFunction<CanonicalTileId>>>,
+}
+
+impl CustomGeometrySourceState {
+    fn new(
+        fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+        cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+    ) -> Option<Self> {
+        fetch_tile.map(|fetch_tile| Self {
+            fetch_tile: Arc::new(fetch_tile),
+            cancel_tile: cancel_tile.map(Arc::new),
+        })
+    }
+}
+
 extern "C" fn custom_geometry_source_noop_tile_callback(
-    _user_data: *mut std::ffi::c_void,
+    _user_data: *mut c_void,
     _tile_id: sys::mln_canonical_tile_id,
 ) {
 }
 
+extern "C" fn custom_geometry_source_fetch_tile_callback(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    if user_data.is_null() {
+        return;
+    }
+    let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
+    state.fetch_tile.call(
+        Ok(CanonicalTileId::from_native(tile_id)),
+        ThreadsafeFunctionCallMode::NonBlocking,
+    );
+}
+
+extern "C" fn custom_geometry_source_cancel_tile_callback(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    if user_data.is_null() {
+        return;
+    }
+    let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
+    if let Some(cancel_tile) = &state.cancel_tile {
+        cancel_tile.call(
+            Ok(CanonicalTileId::from_native(tile_id)),
+            ThreadsafeFunctionCallMode::NonBlocking,
+        );
+    }
+}
+
 fn custom_geometry_source_options_to_native(
     options: CustomGeometrySourceOptions,
+    state: Option<&mut CustomGeometrySourceState>,
 ) -> sys::mln_custom_geometry_source_options {
     let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
-    raw.fetch_tile = Some(custom_geometry_source_noop_tile_callback);
-    raw.cancel_tile = Some(custom_geometry_source_noop_tile_callback);
+    if let Some(state) = state {
+        raw.fetch_tile = Some(custom_geometry_source_fetch_tile_callback);
+        raw.cancel_tile = if state.cancel_tile.is_some() {
+            Some(custom_geometry_source_cancel_tile_callback)
+        } else {
+            None
+        };
+        raw.user_data = state as *mut CustomGeometrySourceState as *mut c_void;
+    } else {
+        raw.fetch_tile = Some(custom_geometry_source_noop_tile_callback);
+        raw.cancel_tile = Some(custom_geometry_source_noop_tile_callback);
+    }
     if let Some(value) = options.min_zoom {
         raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
         raw.min_zoom = value;

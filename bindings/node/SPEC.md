@@ -154,7 +154,7 @@ index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, thread-local diagnostics, log callback bridge, async log severity controls, and root exports
 src/runtime.rs    runtime handle, runtime option materialization, event polling, resource provider/transform, ambient cache, and offline region operation start/take-result proof slices
-src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile source helpers, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility proof slices
+src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile/custom-geometry source helpers and callbacks, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility proof slices
 src/projection.rs standalone map projection handle proof slice
 src/render.rs     render session handle with JavaScript parent retention, Metal/Vulkan descriptor, feature-state, feature-query, and texture frame-scope proof slices
 src/values.rs     copied coordinate and screen point values plus projection helper proof slices
@@ -557,8 +557,9 @@ area instead of retesting all native C validation rules.
    standalone projection handle, visible-coordinate/geometry and screen
    projection helpers, geometry camera fitting,
    URL/tile/custom-geometry/GeoJSON-data/style-image/inline-image-source values,
-   style JSON/list/metadata/layer/light/location/terrain/property helpers, and
-   style probe proof slices complete.)_
+   custom-geometry callback handoff, style
+   JSON/list/metadata/layer/light/location/terrain/property helpers, and style
+   probe proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value and initial
    render session/Metal and Vulkan descriptor, feature-state, feature-query, and
