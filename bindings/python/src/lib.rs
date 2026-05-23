@@ -2645,6 +2645,23 @@ impl MapProjectionHandle {
         .map_err(map_error)
     }
 
+    fn set_visible_geometry(
+        &self,
+        geometry: &Bound<'_, PyAny>,
+        padding: (f64, f64, f64, f64),
+    ) -> PyResult<()> {
+        let state = self.state();
+        let geometry = geometry_from_wire(geometry)?;
+        let geometry =
+            maplibre_core::geometry::geometry_try_to_native(&geometry).map_err(map_error)?;
+        let padding = edge_insets_from_tuple(padding);
+        // SAFETY: The C API validates the projection pointer, geometry descriptor, and padding.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_set_visible_geometry(state.as_ptr(), geometry.as_ptr(), padding)
+        })
+        .map_err(map_error)
+    }
+
     fn pixel_for_lat_lng(
         &self,
         py: Python<'_>,

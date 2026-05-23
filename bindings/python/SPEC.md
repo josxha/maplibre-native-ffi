@@ -147,7 +147,8 @@ The current implementation includes these completed slices:
   maintenance and returns an `OfflineOperationHandle` that discards
   runtime-owned operation state on close.
 - `maplibre_native.map` provides `MapProjectionHandle` and standalone Mercator
-  projection helpers for copied camera, coordinate, and screen-point values.
+  projection helpers for copied camera, coordinate, geometry fitting, and
+  screen-point values.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish shared naming and value semantics.
 - `maplibre_native.json` provides JSON value trees that preserve numeric shape,

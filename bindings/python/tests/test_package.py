@@ -996,6 +996,10 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
                     (geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0)),
                     camera.EdgeInsets(),
                 )
+                projection.set_visible_geometry(
+                    geo.line_string((geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0))),
+                    camera.EdgeInsets(),
+                )
 
                 assert not projection.closed
                 assert isinstance(projection.get_camera(), camera.CameraOptions)

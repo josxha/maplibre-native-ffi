@@ -385,6 +385,15 @@ class MapProjectionHandle:
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
+    def set_visible_geometry(self, geometry: Geometry, padding: EdgeInsets) -> None:
+        """Update this helper's camera so geometry coordinates are visible."""
+        from .geo import _geometry_to_native_wire
+
+        self._native.set_visible_geometry(
+            _geometry_to_native_wire(geometry),
+            (padding.top, padding.left, padding.bottom, padding.right),
+        )
+
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
         """Convert a geographic coordinate to a screen-space point."""
         from .camera import ScreenPoint
