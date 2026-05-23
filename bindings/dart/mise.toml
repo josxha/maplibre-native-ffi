@@ -1,0 +1,26 @@
+[tools]
+"core:dart" = "3.10.9"
+
+[tasks.pub-get]
+run = "dart pub get"
+
+[tasks.ffigen]
+depends = [":pub-get"]
+run = "dart run ffigen --config ffigen.yaml"
+
+[tasks.format]
+run = "dart format lib test"
+
+[tasks.analyze]
+depends = [":pub-get"]
+run = "dart analyze"
+
+[tasks.build]
+depends = [":analyze"]
+
+[tasks.test]
+depends = ["//:ensure-native-library", ":pub-get"]
+run = "dart test"
+
+[tasks.ci]
+depends = [":build", ":test"]
