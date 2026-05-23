@@ -74,6 +74,38 @@ pub extern "C" fn mln_vala_source_feature_query_options_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_rendered_feature_query_options_set_layer_ids(
+    options: *mut sys::mln_rendered_feature_query_options,
+    layer_ids: *const sys::mln_string_view,
+    layer_id_count: usize,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_rendered_feature_layer_ids(options, layer_ids, layer_id_count) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_source_feature_query_options_set_source_layer_ids(
+    options: *mut sys::mln_source_feature_query_options,
+    source_layer_ids: *const sys::mln_string_view,
+    source_layer_id_count: usize,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_source_feature_layer_ids(options, source_layer_ids, source_layer_id_count) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_rendered_query_geometry_point(
     point: *const sys::mln_screen_point,
     out_geometry: *mut sys::mln_rendered_query_geometry,
@@ -251,6 +283,58 @@ fn default_source_feature_query_options(
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_source_feature_query_options_default() };
     glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn set_rendered_feature_layer_ids(
+    options: *mut sys::mln_rendered_feature_query_options,
+    layer_ids: *const sys::mln_string_view,
+    layer_id_count: usize,
+) -> error::Result<()> {
+    if options.is_null() {
+        return Err(Error::invalid_argument(
+            "rendered feature query options are null",
+        ));
+    }
+    if layer_id_count != 0 && layer_ids.is_null() {
+        return Err(Error::invalid_argument(
+            "rendered feature layer IDs are null",
+        ));
+    }
+    unsafe {
+        (*options).layer_ids = layer_ids;
+        (*options).layer_id_count = layer_id_count;
+        if layer_id_count == 0 {
+            (*options).fields &= !sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+        } else {
+            (*options).fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+        }
+    }
+    Ok(())
+}
+
+fn set_source_feature_layer_ids(
+    options: *mut sys::mln_source_feature_query_options,
+    source_layer_ids: *const sys::mln_string_view,
+    source_layer_id_count: usize,
+) -> error::Result<()> {
+    if options.is_null() {
+        return Err(Error::invalid_argument(
+            "source feature query options are null",
+        ));
+    }
+    if source_layer_id_count != 0 && source_layer_ids.is_null() {
+        return Err(Error::invalid_argument("source feature layer IDs are null"));
+    }
+    unsafe {
+        (*options).source_layer_ids = source_layer_ids;
+        (*options).source_layer_id_count = source_layer_id_count;
+        if source_layer_id_count == 0 {
+            (*options).fields &= !sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+        } else {
+            (*options).fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+        }
+    }
+    Ok(())
 }
 
 fn rendered_query_geometry_point(

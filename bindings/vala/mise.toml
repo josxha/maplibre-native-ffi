@@ -49,6 +49,10 @@ vapigen \
   --metadatadir metadata \
   --pkg gobject-2.0 \
   build/gir/MaplibreNative-0.1.vapigen.gir
+
+python tools/sanitize_gir.py \
+  build/gir/MaplibreNative-0.1.gir \
+  build/gir/MaplibreNative-0.1.vapigen.gir
 '''
 
 [tasks."compile-tests"]

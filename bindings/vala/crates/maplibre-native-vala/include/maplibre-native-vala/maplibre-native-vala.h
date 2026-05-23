@@ -1055,6 +1055,19 @@ gboolean mln_vala_map_tile_options_default(
 gboolean mln_vala_style_tile_source_options_default(
   MlnValaStyleTileSourceOptions* out_options, GError** error
 );
+gboolean mln_vala_style_tile_source_options_set_min_zoom(
+  MlnValaStyleTileSourceOptions* options, double min_zoom, GError** error
+);
+gboolean mln_vala_style_tile_source_options_set_max_zoom(
+  MlnValaStyleTileSourceOptions* options, double max_zoom, GError** error
+);
+gboolean mln_vala_style_tile_source_options_set_tile_size(
+  MlnValaStyleTileSourceOptions* options, uint32_t tile_size, GError** error
+);
+gboolean mln_vala_style_tile_source_options_set_attribution(
+  MlnValaStyleTileSourceOptions* options, const char* attribution,
+  GError** error
+);
 gboolean mln_vala_custom_geometry_source_options_default(
   MlnValaCustomGeometrySourceOptions* out_options, GError** error
 );
@@ -1068,9 +1081,9 @@ gboolean mln_vala_premultiplied_rgba8_image_default(
  * @width: physical image width.
  * @height: physical image height.
  * @stride: bytes per image row.
- * @pixels: (array length=byte_length) (nullable): borrowed premultiplied RGBA8
- * pixels.
- * @byte_length: byte length of @pixels.
+ * @pixels: (array length=pixel_byte_count) (nullable): borrowed premultiplied
+ * RGBA8 pixels.
+ * @pixel_byte_count: byte count of @pixels.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
@@ -1078,7 +1091,8 @@ gboolean mln_vala_premultiplied_rgba8_image_default(
  */
 gboolean mln_vala_premultiplied_rgba8_image_init(
   MlnValaPremultipliedRgba8Image* out_image, uint32_t width, uint32_t height,
-  uint32_t stride, const uint8_t* pixels, size_t byte_length, GError** error
+  uint32_t stride, const uint8_t* pixels, size_t pixel_byte_count,
+  GError** error
 );
 gboolean mln_vala_style_image_options_default(
   MlnValaStyleImageOptions* out_options, GError** error
@@ -1089,8 +1103,38 @@ gboolean mln_vala_style_image_info_default(
 gboolean mln_vala_rendered_feature_query_options_default(
   MlnValaRenderedFeatureQueryOptions* out_options, GError** error
 );
+/**
+ * mln_vala_rendered_feature_query_options_set_layer_ids:
+ * @options: query options.
+ * @layer_ids: (array length=n_layer_ids) (nullable): layer IDs.
+ * @n_layer_ids: number of layer IDs.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_rendered_feature_query_options_set_layer_ids(
+  MlnValaRenderedFeatureQueryOptions* options,
+  const MlnValaStringView* layer_ids, size_t n_layer_ids, GError** error
+);
 gboolean mln_vala_source_feature_query_options_default(
   MlnValaSourceFeatureQueryOptions* out_options, GError** error
+);
+/**
+ * mln_vala_source_feature_query_options_set_source_layer_ids:
+ * @options: query options.
+ * @source_layer_ids: (array length=n_source_layer_ids) (nullable): source-layer
+ * IDs.
+ * @n_source_layer_ids: number of source-layer IDs.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_source_feature_query_options_set_source_layer_ids(
+  MlnValaSourceFeatureQueryOptions* options,
+  const MlnValaStringView* source_layer_ids, size_t n_source_layer_ids,
+  GError** error
 );
 
 /**
@@ -3184,7 +3228,7 @@ gboolean mln_vala_map_handle_get_style_source_info(
  * @out_attribution: (out caller-allocates) (array length=attribution_capacity):
  * output buffer.
  * @attribution_capacity: byte length of @out_attribution.
- * @out_attribution_size: (out): return location for required byte length.
+ * @out_attribution_count: (out): return location for required byte count.
  * @out_found: (out): return location for found state.
  * @error: return location for a `GError`, or `NULL`.
  *
@@ -3193,7 +3237,7 @@ gboolean mln_vala_map_handle_get_style_source_info(
  */
 gboolean mln_vala_map_handle_copy_style_source_attribution(
   MlnValaMapHandle* self, const char* source_id, char* out_attribution,
-  size_t attribution_capacity, size_t* out_attribution_size,
+  size_t attribution_capacity, size_t* out_attribution_count,
   gboolean* out_found, GError** error
 );
 
@@ -3282,7 +3326,7 @@ gboolean mln_vala_map_handle_get_style_image_info(
  * @out_pixels: (out caller-allocates) (array length=pixel_capacity): output
  * pixel buffer.
  * @pixel_capacity: byte length of @out_pixels.
- * @out_byte_length: (out): return location for required byte length.
+ * @out_pixel_byte_count: (out): return location for required byte count.
  * @out_found: (out): return location for found state.
  * @error: return location for a `GError`, or `NULL`.
  *
@@ -3291,7 +3335,7 @@ gboolean mln_vala_map_handle_get_style_image_info(
  */
 gboolean mln_vala_map_handle_copy_style_image_premultiplied_rgba8(
   MlnValaMapHandle* self, const char* image_id, uint8_t* out_pixels,
-  size_t pixel_capacity, size_t* out_byte_length, gboolean* out_found,
+  size_t pixel_capacity, size_t* out_pixel_byte_count, gboolean* out_found,
   GError** error
 );
 

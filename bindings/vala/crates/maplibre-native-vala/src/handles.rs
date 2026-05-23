@@ -2,7 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::{CStr, c_char, c_void};
 use std::hash::{Hash, Hasher};
 use std::ptr;
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
@@ -51,6 +51,30 @@ struct CustomGeometrySourceCallbackState {
     cancel_tile: Option<CustomGeometrySourceTileDelegate>,
     cancel_user_data: *mut c_void,
     cancel_destroy_notify: GDestroyNotify,
+    lifecycle: Mutex<CustomGeometrySourceLifecycle>,
+    idle: Condvar,
+}
+
+#[derive(Debug)]
+struct CustomGeometrySourceLifecycle {
+    closing: bool,
+    active_callbacks: usize,
+}
+
+struct CustomGeometryCallbackGuard<'a> {
+    state: &'a CustomGeometrySourceCallbackState,
+}
+
+impl Drop for CustomGeometryCallbackGuard<'_> {
+    fn drop(&mut self) {
+        let Ok(mut lifecycle) = self.state.lifecycle.lock() else {
+            return;
+        };
+        lifecycle.active_callbacks = lifecycle.active_callbacks.saturating_sub(1);
+        if lifecycle.active_callbacks == 0 {
+            self.state.idle.notify_all();
+        }
+    }
 }
 
 unsafe extern "C" fn custom_geometry_fetch_trampoline(
@@ -61,9 +85,14 @@ unsafe extern "C" fn custom_geometry_fetch_trampoline(
     if state.is_null() {
         return;
     }
+    let state = unsafe { &*state };
+    let Some(_guard) = custom_geometry_enter_callback(state) else {
+        return;
+    };
     // SAFETY: state is retained by the owning MapHandle while native can invoke
-    // the source callback, and the stored delegate owns its Vala closure.
-    unsafe { ((*state).fetch_tile)(tile_id, (*state).fetch_user_data) };
+    // the source callback, and the guard prevents closure destruction until this
+    // upcall returns.
+    unsafe { (state.fetch_tile)(tile_id, state.fetch_user_data) };
 }
 
 unsafe extern "C" fn custom_geometry_cancel_trampoline(
@@ -74,11 +103,29 @@ unsafe extern "C" fn custom_geometry_cancel_trampoline(
     if state.is_null() {
         return;
     }
+    let state = unsafe { &*state };
+    let Some(_guard) = custom_geometry_enter_callback(state) else {
+        return;
+    };
     // SAFETY: state is retained by the owning MapHandle while native can invoke
-    // the source callback, and the stored delegate owns its Vala closure.
-    if let Some(cancel_tile) = unsafe { (*state).cancel_tile } {
-        unsafe { cancel_tile(tile_id, (*state).cancel_user_data) };
+    // the source callback, and the guard prevents closure destruction until this
+    // upcall returns.
+    if let Some(cancel_tile) = state.cancel_tile {
+        unsafe { cancel_tile(tile_id, state.cancel_user_data) };
     }
+}
+
+fn custom_geometry_enter_callback(
+    state: &CustomGeometrySourceCallbackState,
+) -> Option<CustomGeometryCallbackGuard<'_>> {
+    let Ok(mut lifecycle) = state.lifecycle.lock() else {
+        return None;
+    };
+    if lifecycle.closing {
+        return None;
+    }
+    lifecycle.active_callbacks += 1;
+    Some(CustomGeometryCallbackGuard { state })
 }
 
 struct ResourceTransformState {
@@ -795,6 +842,66 @@ pub extern "C" fn mln_vala_style_tile_source_options_default(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match default_style_tile_source_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_tile_source_options_set_min_zoom(
+    options: *mut sys::mln_style_tile_source_options,
+    min_zoom: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_tile_min_zoom(options, min_zoom) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_tile_source_options_set_max_zoom(
+    options: *mut sys::mln_style_tile_source_options,
+    max_zoom: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_tile_max_zoom(options, max_zoom) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_tile_source_options_set_tile_size(
+    options: *mut sys::mln_style_tile_source_options,
+    tile_size: u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_tile_tile_size(options, tile_size) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_tile_source_options_set_attribution(
+    options: *mut sys::mln_style_tile_source_options,
+    attribution: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_tile_attribution(options, attribution) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -2801,6 +2908,58 @@ fn default_style_tile_source_options(
     glib::clear_optional_out_pointer(out_options, options)
 }
 
+fn style_tile_options_mut(
+    options: *mut sys::mln_style_tile_source_options,
+) -> error::Result<&'static mut sys::mln_style_tile_source_options> {
+    if options.is_null() {
+        return Err(Error::invalid_argument(
+            "style tile source options are null",
+        ));
+    }
+    Ok(unsafe { &mut *options })
+}
+
+fn set_style_tile_min_zoom(
+    options: *mut sys::mln_style_tile_source_options,
+    min_zoom: f64,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    options.min_zoom = min_zoom;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
+    Ok(())
+}
+
+fn set_style_tile_max_zoom(
+    options: *mut sys::mln_style_tile_source_options,
+    max_zoom: f64,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    options.max_zoom = max_zoom;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
+    Ok(())
+}
+
+fn set_style_tile_tile_size(
+    options: *mut sys::mln_style_tile_source_options,
+    tile_size: u32,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    options.tile_size = tile_size;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
+    Ok(())
+}
+
+fn set_style_tile_attribution(
+    options: *mut sys::mln_style_tile_source_options,
+    attribution: *const c_char,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    let view = string_view_from_c(attribution, "style tile attribution")?;
+    options.attribution = view;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+    Ok(())
+}
+
 fn default_custom_geometry_source_options(
     out_options: *mut sys::mln_custom_geometry_source_options,
 ) -> error::Result<()> {
@@ -3550,6 +3709,11 @@ fn add_custom_geometry_source_with_callbacks(
         cancel_tile,
         cancel_user_data,
         cancel_destroy_notify,
+        lifecycle: Mutex::new(CustomGeometrySourceLifecycle {
+            closing: false,
+            active_callbacks: 0,
+        }),
+        idle: Condvar::new(),
     }));
     native_options.fetch_tile = Some(custom_geometry_fetch_trampoline);
     native_options.cancel_tile =
@@ -3581,6 +3745,15 @@ fn destroy_custom_geometry_state(state: *mut CustomGeometrySourceCallbackState) 
         return;
     }
     let state = unsafe { Box::from_raw(state) };
+    if let Ok(mut lifecycle) = state.lifecycle.lock() {
+        lifecycle.closing = true;
+        while lifecycle.active_callbacks != 0 {
+            lifecycle = state
+                .idle
+                .wait(lifecycle)
+                .expect("custom geometry lifecycle lock poisoned while waiting for callbacks");
+        }
+    }
     if let Some(destroy) = state.fetch_destroy_notify {
         unsafe { destroy(state.fetch_user_data) };
     }

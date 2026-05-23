@@ -160,7 +160,7 @@ bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, 
   uint8[] readback_pixels = new uint8[32 * 16 * 4];
   MaplibreNative.TextureImageInfo readback_info;
   session.read_premultiplied_rgba8(readback_pixels, out readback_info);
-  bool readback_matches_extent = readback_info.width == 32 && readback_info.height == 16 && readback_info.byte_length <= readback_pixels.length;
+  bool readback_matches_extent = readback_info.width == 32 && readback_info.height == 16 && readback_info.stride * readback_info.height <= readback_pixels.length;
 
   var frame = session.acquire_metal_owned_texture_frame();
   uint32 width;
@@ -305,8 +305,14 @@ void exercise_feature_state(MaplibreNative.RenderSessionHandle session, Maplibre
 void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws GLib.Error {
   MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
   rendered_options.default();
+  string rendered_layer_id = "background";
+  MaplibreNative.StringView[] rendered_layers = { { rendered_layer_id, rendered_layer_id.length } };
+  rendered_options.set_layer_ids(rendered_layers);
   MaplibreNative.SourceFeatureQueryOptions source_options = {};
   source_options.default();
+  string source_layer_id = "fixture-layer";
+  MaplibreNative.StringView[] source_layers = { { source_layer_id, source_layer_id.length } };
+  source_options.set_source_layer_ids(source_layers);
   MaplibreNative.ScreenPoint point = { 0.0, 0.0 };
   MaplibreNative.RenderedQueryGeometry geometry;
   MaplibreNative.RenderedQueryGeometry.point(point, out geometry);
@@ -329,13 +335,6 @@ void exercise_geometry_camera(MaplibreNative.MapHandle map, MaplibreNative.MapPr
   map.camera_for_geometry(geometry, fit_options, out camera);
   MaplibreNative.EdgeInsets padding = { 0.0, 0.0, 0.0, 0.0 };
   projection.set_visible_geometry(geometry, padding);
-}
-
-void exercise_feature_extensions(MaplibreNative.RenderSessionHandle session, MaplibreNative.Feature feature, MaplibreNative.JsonValue arguments) throws GLib.Error {
-  var result = session.query_feature_extensions("fixture-source", feature, "supercluster", "children", arguments);
-  MaplibreNative.FeatureExtensionResultInfo info;
-  result.get(out info);
-  result.close();
 }
 
 void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
@@ -404,8 +403,14 @@ int main(string[] args) {
     response.default();
     MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
     rendered_query_options.default();
+    string rendered_option_layer_id = "background";
+    MaplibreNative.StringView[] rendered_option_layers = { { rendered_option_layer_id, rendered_option_layer_id.length } };
+    rendered_query_options.set_layer_ids(rendered_option_layers);
     MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
     source_query_options.default();
+    string source_option_layer_id = "fixture-layer";
+    MaplibreNative.StringView[] source_option_layers = { { source_option_layer_id, source_option_layer_id.length } };
+    source_query_options.set_source_layer_ids(source_option_layers);
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ScreenPoint query_point = { 0.0, 0.0 };
@@ -681,8 +686,6 @@ int main(string[] args) {
       exercise_feature_state(bindability_session, bindability_json);
       exercise_feature_queries(bindability_session);
       exercise_geometry_camera(map, projection, bindability_geometry);
-      MaplibreNative.Feature bindability_feature = {};
-      exercise_feature_extensions(bindability_session, bindability_feature, bindability_json);
       if (bindability_metal_frame != null) {
         inspect_metal_owned_texture_frame(bindability_metal_frame);
       }
