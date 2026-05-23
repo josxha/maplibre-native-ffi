@@ -325,14 +325,6 @@ pub(crate) fn geometry_ref(value: *const Geometry) -> Option<&'static Geometry> 
     }
 }
 
-pub(crate) fn feature_ref(value: *const Feature) -> Option<&'static Feature> {
-    if value.is_null() {
-        None
-    } else {
-        Some(unsafe { &*value })
-    }
-}
-
 pub(crate) fn geojson_ref(value: *const GeoJson) -> Option<&'static GeoJson> {
     if value.is_null() {
         None

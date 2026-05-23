@@ -6143,18 +6143,16 @@ fn offline_region_create_start(
 
 fn initialize_offline_region_definition(definition: &mut sys::mln_offline_region_definition) {
     definition.size = std::mem::size_of::<sys::mln_offline_region_definition>() as u32;
-    unsafe {
-        match definition.type_ {
-            sys::MLN_OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID => {
-                definition.data.tile_pyramid.size =
-                    std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32;
-            }
-            sys::MLN_OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY => {
-                definition.data.geometry.size =
-                    std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32;
-            }
-            _ => {}
+    match definition.type_ {
+        sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => {
+            definition.data.tile_pyramid.size =
+                std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32;
         }
+        sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => {
+            definition.data.geometry.size =
+                std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32;
+        }
+        _ => {}
     }
 }
 
