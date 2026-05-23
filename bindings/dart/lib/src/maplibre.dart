@@ -42,7 +42,12 @@ final class _LogCallbackState extends RetainedCallbackState {
     ) {
       runUpcall(() {
         try {
-          callback(_copyLogRecord(record.cast<_NativeLogRecord>().ref));
+          try {
+            callback(_copyLogRecord(record.cast<_NativeLogRecord>().ref));
+          } catch (_) {
+            // Log callbacks are notification boundaries; user exceptions are
+            // contained so they never surface from native callback delivery.
+          }
         } finally {
           Maplibre._c.dartLogRecordDestroy(record);
         }

@@ -62,6 +62,7 @@ final class RuntimeHandle {
     : _state = NativeHandleState(pointer, 'RuntimeHandle');
 
   final NativeHandleState<raw.mln_runtime> _state;
+  final _maps = <int, MapHandle>{};
   _ResourceTransformState? _resourceTransformState;
   _ResourceProviderRulesState? _resourceProviderRulesState;
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
@@ -103,7 +104,9 @@ final class RuntimeHandle {
         return null;
       }
 
-      return RuntimeEvent._fromNative(event.ref);
+      final copiedEvent = RuntimeEvent._fromNative(event.ref);
+      _handleRuntimeEvent(copiedEvent);
+      return copiedEvent;
     });
   }
 
@@ -361,6 +364,29 @@ final class RuntimeHandle {
   /// Creates a map owned by this runtime.
   MapHandle createMap({MapOptions options = const MapOptions()}) =>
       MapHandle.create(this, options: options);
+
+  void _registerMap(MapHandle map) {
+    _maps[map._pointer.address] = map;
+  }
+
+  void _unregisterMapAddress(int? address) {
+    if (address != null) {
+      _maps.remove(address);
+    }
+  }
+
+  void _handleRuntimeEvent(RuntimeEvent event) {
+    if (event.sourceType !=
+        raw.mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP.value) {
+      return;
+    }
+    if (event.type !=
+        raw.mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED.value) {
+      return;
+    }
+    final map = _maps[event.sourceAddress];
+    map?._clearCustomGeometryCallbacksAfterUrlStyleLoad();
+  }
 
   /// Explicitly destroys this runtime.
   void close() {
@@ -1021,6 +1047,7 @@ final class RuntimeEvent {
   RuntimeEvent._({
     required this.type,
     required this.sourceType,
+    required this.sourceAddress,
     required this.code,
     required this.payloadType,
     required this.payloadSize,
@@ -1031,6 +1058,7 @@ final class RuntimeEvent {
     return RuntimeEvent._(
       type: event.type,
       sourceType: event.source_type,
+      sourceAddress: event.source.address,
       code: event.code,
       payloadType: event.payload_type,
       payloadSize: event.payload_size,
@@ -1043,6 +1071,9 @@ final class RuntimeEvent {
 
   /// Raw native event source type.
   final int sourceType;
+
+  /// Borrowed native source handle address copied as an opaque value.
+  final int sourceAddress;
 
   /// Native event code.
   final int code;
@@ -1161,13 +1192,16 @@ final class MapHandle {
       outMap.value = nullptr;
 
       _check(_c.mapCreate(runtime._pointer, nativeOptions, outMap));
-      return MapHandle._(runtime, outMap.value);
+      final map = MapHandle._(runtime, outMap.value);
+      runtime._registerMap(map);
+      return map;
     });
   }
 
   final RuntimeHandle _runtime;
   final NativeHandleState<raw.mln_map> _state;
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
+  var _clearCustomGeometryCallbacksWhenUrlStyleLoads = false;
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -1183,6 +1217,8 @@ final class MapHandle {
       final nativeUrl = nativeUtf8CString(url, arena);
       _check(_c.mapSetStyleUrl(_pointer, nativeUrl.pointer.cast<Char>()));
     });
+    _clearCustomGeometryCallbacksWhenUrlStyleLoads =
+        _customGeometryCallbacks.isNotEmpty;
   }
 
   /// Loads inline style JSON through MapLibre Native style APIs.
@@ -2580,7 +2616,17 @@ final class MapHandle {
 
   /// Explicitly destroys this map.
   void close() {
+    final address = _state.pointerAddress;
     _state.close(_c.mapDestroy, _c.threadLastErrorMessage);
+    _runtime._unregisterMapAddress(address);
+    _clearCustomGeometryCallbacks();
+  }
+
+  void _clearCustomGeometryCallbacksAfterUrlStyleLoad() {
+    if (!_clearCustomGeometryCallbacksWhenUrlStyleLoads) {
+      return;
+    }
+    _clearCustomGeometryCallbacksWhenUrlStyleLoads = false;
     _clearCustomGeometryCallbacks();
   }
 

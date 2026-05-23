@@ -157,7 +157,7 @@ void main() {
 
   test(
     'runtime and map handles use the native C ABI',
-    () {
+    () async {
       expect(
         () => RuntimeHandle.create(
           options: const RuntimeOptions(maximumCacheSize: -1),
@@ -280,7 +280,14 @@ void main() {
       map.setDebugOptions(MapDebugOptions.tileBorders);
       expect(map.debugOptions().contains(MapDebugOptions.tileBorders), isTrue);
       map.setDebugOptions(MapDebugOptions.none);
+      var throwingLogCalls = 0;
+      Maplibre.setLogCallback((_) {
+        throwingLogCalls += 1;
+        throw StateError('log callback failure');
+      });
       map.dumpDebugLogs();
+      await _waitUntil(() => throwingLogCalls > 0);
+      Maplibre.clearLogCallback();
       map.setStyleImage(
         'dart-image',
         PremultipliedRgba8Image(
