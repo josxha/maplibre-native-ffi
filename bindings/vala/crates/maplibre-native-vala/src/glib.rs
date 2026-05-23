@@ -46,6 +46,27 @@ pub struct GError {
     pub message: *mut c_char,
 }
 
+#[repr(C)]
+struct GObjectClassPrefix {
+    g_type: GType,
+    construct_properties: *mut c_void,
+    constructor: *mut c_void,
+    set_property: *mut c_void,
+    get_property: *mut c_void,
+    dispose: Option<unsafe extern "C" fn(*mut GObject)>,
+    finalize: Option<unsafe extern "C" fn(*mut GObject)>,
+}
+
+pub trait ObjectFinalize {
+    /// Releases native resources owned by a GObject wrapper during GLib finalization.
+    ///
+    /// # Safety
+    ///
+    /// `object` must point to a live instance of the implementing GObject subtype
+    /// whose final reference is being released by GLib.
+    unsafe extern "C" fn finalize(object: *mut GObject);
+}
+
 unsafe extern "C" {
     fn g_quark_from_static_string(string: *const c_char) -> GQuark;
     fn g_error_new_literal(domain: GQuark, code: c_int, message: *const c_char) -> *mut GError;
@@ -175,7 +196,7 @@ pub fn register_boxed_type(
     gtype
 }
 
-pub fn register_object_type<T>(type_name: &'static CStr) -> GType {
+pub fn register_object_type<T: ObjectFinalize>(type_name: &'static CStr) -> GType {
     static TYPE_REGISTRY: OnceLock<std::sync::Mutex<Vec<(&'static CStr, GType)>>> = OnceLock::new();
     let registry = TYPE_REGISTRY.get_or_init(|| std::sync::Mutex::new(Vec::new()));
     let mut registry = registry
@@ -199,14 +220,15 @@ pub fn register_object_type<T>(type_name: &'static CStr) -> GType {
     unsafe { g_type_query(parent_type, &mut parent_query) };
 
     // SAFETY: The type name is static and NUL-terminated. The instance type `T`
-    // starts with `GObject` and has a stable `repr(C)` layout. No class or
-    // instance init hooks are needed for these data-only handle wrappers.
+    // starts with `GObject` and has a stable `repr(C)` layout. The class init
+    // hook installs a finalizer that releases native resources when the last
+    // GObject reference is dropped.
     let gtype = unsafe {
         g_type_register_static_simple(
             parent_type,
             type_name.as_ptr(),
             parent_query.class_size,
-            None,
+            Some(object_class_init::<T>),
             mem::size_of::<T>() as c_uint,
             None,
             0,
@@ -214,6 +236,18 @@ pub fn register_object_type<T>(type_name: &'static CStr) -> GType {
     };
     registry.push((type_name, gtype));
     gtype
+}
+
+unsafe extern "C" fn object_class_init<T: ObjectFinalize>(
+    klass: *mut c_void,
+    _class_data: *mut c_void,
+) {
+    // SAFETY: GLib passes a writable class struct for the type being
+    // registered. The prefix layout matches GObjectClass through `finalize`.
+    unsafe {
+        let class = klass.cast::<GObjectClassPrefix>();
+        (*class).finalize = Some(T::finalize);
+    }
 }
 
 pub fn new_object<T>(gtype: GType) -> *mut T {

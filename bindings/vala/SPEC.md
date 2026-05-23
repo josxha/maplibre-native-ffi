@@ -168,13 +168,15 @@ Future tasks:
 
 The `maplibre-native-vala` crate owns the compiled ABI that GLib sees:
 
-- GObject class definitions for long-lived handles;
+- GObject class definitions and finalizers for long-lived handles;
 - boxed types for copied values, descriptors, events, render metadata, and
   `NativePointer`;
 - GLib error-domain registration and status-to-`GError` conversion;
 - C ABI calls through `maplibre-native-core` and `maplibre-native-sys`;
 - descriptor materializers, result readers, and temporary native storage;
 - callback trampolines, active-upcall accounting, and destroy-notify handling;
+- idempotent close/release paths that make repeated calls no-ops after a
+  successful release;
 - frame-scope state for session-owned texture access.
 
 The crate keeps raw C and Rust implementation details out of generated public
@@ -644,7 +646,7 @@ Use the testing pyramid below as coverage grows:
 
 | Test layer                     | Required coverage                                                                                                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Rust adapter unit tests        | Status mapping, diagnostic capture, handle state, callback accounting, frame state.                                             |
+| Rust adapter unit tests        | Status mapping, diagnostic capture, handle state, double-close no-ops, GObject finalizers, callback accounting, frame state.    |
 | Rust adapter integration tests | Small real C calls for version, network status, runtime/map lifecycle, event copying.                                           |
 | GIR/VAPI generation tests      | Scanner success, typelib generation, vapigen success, generated diff review.                                                    |
 | Vala compile tests             | Ownership transfer, nullability, `throws`, boxed value copying, callback signatures.                                            |

@@ -469,7 +469,9 @@ int main(string[] args) {
     projection.close();
 
     map.close();
+    map.close();
     runtime.clear_resource_transform();
+    runtime.close();
     runtime.close();
 
     if (backends == 0 || pointer_bits != 0x1234) {

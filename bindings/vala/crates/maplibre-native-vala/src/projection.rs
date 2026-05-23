@@ -16,6 +16,12 @@ pub struct MapProjectionHandle {
     native: *mut sys::mln_map_projection,
 }
 
+impl glib::ObjectFinalize for MapProjectionHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        let _ = close_projection_handle(object.cast::<MapProjectionHandle>());
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_projection_handle_get_type() -> GType {
     glib::register_object_type::<MapProjectionHandle>(PROJECTION_TYPE_NAME)
@@ -168,10 +174,17 @@ fn create_projection_handle(map: *mut MapHandle) -> error::Result<*mut MapProjec
 }
 
 fn close_projection_handle(handle: *mut MapProjectionHandle) -> error::Result<()> {
-    let projection = projection_native(handle)?;
-    // SAFETY: `projection_native` returns a live native projection pointer.
+    if handle.is_null() {
+        return Err(Error::invalid_argument("MapProjectionHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to MapProjectionHandle.
+    let projection = unsafe { (*handle).native };
+    if projection.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `projection` is live and owned by this handle.
     error::check(unsafe { sys::mln_map_projection_destroy(projection) })?;
-    // SAFETY: `handle` was checked by `projection_native`.
+    // SAFETY: `handle` was checked above.
     unsafe {
         (*handle).native = ptr::null_mut();
     }
@@ -390,6 +403,10 @@ mod tests {
             GTRUE
         );
 
+        assert_eq!(
+            mln_vala_map_projection_handle_close(projection, ptr::null_mut()),
+            GTRUE
+        );
         assert_eq!(
             mln_vala_map_projection_handle_close(projection, ptr::null_mut()),
             GTRUE

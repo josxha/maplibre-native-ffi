@@ -80,6 +80,42 @@ pub struct OfflineRegionListHandle {
     native: *mut sys::mln_offline_region_list,
 }
 
+impl glib::ObjectFinalize for RuntimeHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        let _ = close_runtime_handle(object.cast::<RuntimeHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for MapHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        let _ = close_map_handle(object.cast::<MapHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for StyleIdListHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        close_style_id_list(object.cast::<StyleIdListHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for JsonSnapshotHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        close_json_snapshot(object.cast::<JsonSnapshotHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for OfflineRegionSnapshotHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        close_offline_region_snapshot(object.cast::<OfflineRegionSnapshotHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for OfflineRegionListHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        close_offline_region_list(object.cast::<OfflineRegionListHandle>());
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_get_type() -> GType {
     glib::register_object_type::<RuntimeHandle>(RUNTIME_TYPE_NAME)
@@ -5003,11 +5039,18 @@ fn create_runtime_handle(
 }
 
 fn close_runtime_handle(handle: *mut RuntimeHandle) -> error::Result<()> {
-    let runtime = runtime_native(handle)?;
-    // SAFETY: `runtime_native` returns a live native runtime pointer.
+    if handle.is_null() {
+        return Err(Error::invalid_argument("RuntimeHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to `RuntimeHandle`.
+    let runtime = unsafe { (*handle).native };
+    if runtime.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `runtime` is live and owned by this handle.
     error::check(unsafe { sys::mln_runtime_destroy(runtime) })?;
-    // SAFETY: `handle` was checked by `runtime_native`. Successful runtime
-    // destruction makes resource transform callbacks unreachable.
+    // SAFETY: `handle` was checked above. Successful runtime destruction makes
+    // resource transform callbacks unreachable.
     let (resource_transform, resource_provider) = unsafe {
         (*handle).native = ptr::null_mut();
         let resource_transform = (*handle).resource_transform;
@@ -5083,10 +5126,17 @@ fn create_map_handle_with_options(
 }
 
 fn close_map_handle(handle: *mut MapHandle) -> error::Result<()> {
-    let map = map_native(handle)?;
-    // SAFETY: `map_native` returns a live native map pointer.
+    if handle.is_null() {
+        return Err(Error::invalid_argument("MapHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to `MapHandle`.
+    let map = unsafe { (*handle).native };
+    if map.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `map` is live and owned by this handle.
     error::check(unsafe { sys::mln_map_destroy(map) })?;
-    // SAFETY: `handle` was checked by `map_native`.
+    // SAFETY: `handle` was checked above.
     unsafe {
         (*handle).native = ptr::null_mut();
         glib::unref_object((*handle).runtime);
@@ -5178,7 +5228,7 @@ mod tests {
         );
         assert_eq!(
             mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
-            GFALSE
+            GTRUE
         );
 
         glib::unref_object(runtime);
@@ -5207,6 +5257,7 @@ mod tests {
         let map = mln_vala_map_handle_new_with_options(runtime, &map_options, ptr::null_mut());
         assert!(!map.is_null());
 
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(
             mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
@@ -5242,6 +5293,41 @@ mod tests {
             GTRUE
         );
         glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn gobject_finalize_releases_runtime_callback_state() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        TRANSFORM_DESTROY_COUNT.store(0, Ordering::SeqCst);
+
+        assert_eq!(
+            mln_vala_runtime_handle_set_resource_transform(
+                runtime,
+                Some(passthrough_transform),
+                ptr::null_mut(),
+                Some(transform_destroy_notify),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        glib::unref_object(runtime);
+        assert_eq!(TRANSFORM_DESTROY_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn gobject_finalize_releases_map_before_runtime_close() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 128, 128, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        glib::unref_object(map);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
         glib::unref_object(runtime);
     }
 

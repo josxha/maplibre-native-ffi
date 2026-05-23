@@ -33,6 +33,24 @@ pub struct VulkanOwnedTextureFrameHandle {
     frame: sys::mln_vulkan_owned_texture_frame,
 }
 
+impl glib::ObjectFinalize for RenderSessionHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        let _ = close_render_session(object.cast::<RenderSessionHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for MetalOwnedTextureFrameHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        let _ = release_metal_frame(object.cast::<MetalOwnedTextureFrameHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for VulkanOwnedTextureFrameHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        let _ = release_vulkan_frame(object.cast::<VulkanOwnedTextureFrameHandle>());
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_render_session_handle_get_type() -> GType {
     glib::register_object_type::<RenderSessionHandle>(RENDER_SESSION_TYPE_NAME)
@@ -974,12 +992,25 @@ fn acquire_vulkan_frame(
 }
 
 fn release_metal_frame(handle: *mut MetalOwnedTextureFrameHandle) -> error::Result<()> {
-    let (session_handle, frame) = metal_frame_state(handle)?;
-    let session = session_native(session_handle)?;
-    // SAFETY: `session` is live and `frame` is the acquired frame identity held
-    // by this wrapper.
-    error::check(unsafe { sys::mln_metal_owned_texture_release_frame(session, &frame) })?;
-    // SAFETY: `handle` was checked by `metal_frame_state`.
+    if handle.is_null() {
+        return Err(Error::invalid_argument(
+            "MetalOwnedTextureFrameHandle is null",
+        ));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let session_handle = unsafe { (*handle).session };
+    if session_handle.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `handle` is non-null and frame is a copyable C descriptor.
+    let frame = unsafe { (*handle).frame };
+    if let Ok(session) = session_native(session_handle) {
+        // SAFETY: `session` is live and `frame` is the acquired frame identity
+        // held by this wrapper.
+        error::check(unsafe { sys::mln_metal_owned_texture_release_frame(session, &frame) })?;
+    }
+    // SAFETY: `handle` was checked above. Clearing the session makes repeated
+    // release/finalize calls no-ops.
     unsafe {
         (*handle).session = ptr::null_mut();
         glib::unref_object(session_handle);
@@ -988,12 +1019,25 @@ fn release_metal_frame(handle: *mut MetalOwnedTextureFrameHandle) -> error::Resu
 }
 
 fn release_vulkan_frame(handle: *mut VulkanOwnedTextureFrameHandle) -> error::Result<()> {
-    let (session_handle, frame) = vulkan_frame_state(handle)?;
-    let session = session_native(session_handle)?;
-    // SAFETY: `session` is live and `frame` is the acquired frame identity held
-    // by this wrapper.
-    error::check(unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &frame) })?;
-    // SAFETY: `handle` was checked by `vulkan_frame_state`.
+    if handle.is_null() {
+        return Err(Error::invalid_argument(
+            "VulkanOwnedTextureFrameHandle is null",
+        ));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let session_handle = unsafe { (*handle).session };
+    if session_handle.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `handle` is non-null and frame is a copyable C descriptor.
+    let frame = unsafe { (*handle).frame };
+    if let Ok(session) = session_native(session_handle) {
+        // SAFETY: `session` is live and `frame` is the acquired frame identity
+        // held by this wrapper.
+        error::check(unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &frame) })?;
+    }
+    // SAFETY: `handle` was checked above. Clearing the session makes repeated
+    // release/finalize calls no-ops.
     unsafe {
         (*handle).session = ptr::null_mut();
         glib::unref_object(session_handle);
@@ -1159,10 +1203,17 @@ fn vulkan_frame_state(
 }
 
 fn close_render_session(handle: *mut RenderSessionHandle) -> error::Result<()> {
-    let session = session_native(handle)?;
-    // SAFETY: `session` is live.
+    if handle.is_null() {
+        return Err(Error::invalid_argument("RenderSessionHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let session = unsafe { (*handle).native };
+    if session.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `session` is live and owned by this handle.
     error::check(unsafe { sys::mln_render_session_destroy(session) })?;
-    // SAFETY: `handle` was checked by `session_native`.
+    // SAFETY: `handle` was checked above.
     unsafe {
         (*handle).native = ptr::null_mut();
         glib::unref_object((*handle).map);

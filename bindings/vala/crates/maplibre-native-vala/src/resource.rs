@@ -14,6 +14,12 @@ pub struct ResourceRequestHandle {
     native: *mut sys::mln_resource_request_handle,
 }
 
+impl glib::ObjectFinalize for ResourceRequestHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        release_request(object.cast::<ResourceRequestHandle>());
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_resource_request_handle_get_type() -> GType {
     glib::register_object_type::<ResourceRequestHandle>(RESOURCE_REQUEST_TYPE_NAME)

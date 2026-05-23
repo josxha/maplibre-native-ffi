@@ -22,6 +22,18 @@ pub struct FeatureExtensionResultHandle {
     native: *mut sys::mln_feature_extension_result,
 }
 
+impl glib::ObjectFinalize for FeatureQueryResultHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        close_feature_query_result(object.cast::<FeatureQueryResultHandle>());
+    }
+}
+
+impl glib::ObjectFinalize for FeatureExtensionResultHandle {
+    unsafe extern "C" fn finalize(object: *mut GObject) {
+        close_feature_extension_result(object.cast::<FeatureExtensionResultHandle>());
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_feature_query_result_handle_get_type() -> GType {
     glib::register_object_type::<FeatureQueryResultHandle>(FEATURE_QUERY_RESULT_TYPE_NAME)
