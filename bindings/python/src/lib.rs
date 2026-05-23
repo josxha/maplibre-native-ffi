@@ -87,6 +87,7 @@ struct LogReceiver {
 struct MapHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_map>>,
     custom_geometry_sources: Mutex<HashMap<String, Box<PyCustomGeometrySourceState>>>,
+    retired_custom_geometry_sources: Mutex<Vec<Box<PyCustomGeometrySourceState>>>,
 }
 
 #[pyclass(name = "_MapProjectionHandle")]
@@ -255,6 +256,28 @@ impl MapHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clear();
+        self.retired_custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+    }
+
+    fn retire_custom_geometry_sources(&self) {
+        let mut active = self
+            .custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if active.is_empty() {
+            return;
+        }
+        let mut retired = self
+            .retired_custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for (_, state) in active.drain() {
+            state.shared.close();
+            retired.push(state);
+        }
     }
 }
 
@@ -1066,8 +1089,9 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.as_ptr(), url.as_ptr()) })
             .map_err(map_error)?;
         // URL style replacement completes asynchronously when the new style loads.
-        // Keep custom geometry callback state alive until a synchronous teardown path
-        // can prove native no longer retains its user_data pointer.
+        // Keep custom geometry callback state alive until map teardown, while
+        // closing public queues so Python handles stop accepting events.
+        self.retire_custom_geometry_sources();
         Ok(())
     }
 
@@ -6113,6 +6137,7 @@ fn create_map(
     Ok(MapHandle {
         state: Mutex::new(state),
         custom_geometry_sources: Mutex::new(HashMap::new()),
+        retired_custom_geometry_sources: Mutex::new(Vec::new()),
     })
 }
 

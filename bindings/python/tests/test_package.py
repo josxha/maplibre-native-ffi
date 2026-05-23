@@ -1614,7 +1614,7 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
             assert source.closed
 
 
-def test_custom_geometry_source_survives_accepted_style_url_load() -> None:
+def test_set_style_url_retires_custom_geometry_callback_state() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
@@ -1625,12 +1625,9 @@ def test_custom_geometry_source_survives_accepted_style_url_load() -> None:
 
             map_handle.set_style_url("https://example.test/style.json")
 
-            assert not source.closed
+            assert source.closed
             source._native.push_fetch_for_test(1, 2, 3)
-            assert source.poll_event() == style.CustomGeometrySourceEvent(
-                style.CustomGeometrySourceEventType.FETCH_TILE,
-                style.CanonicalTileId(1, 2, 3),
-            )
+            assert source.poll_event() is None
 
 
 def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
