@@ -1,0 +1,14 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "cargo build -p maplibre-native-vala"
+
+[tasks.test]
+depends = ["//:ensure-native-library"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "cargo test -p maplibre-native-vala"
+
+[tasks.ci]
+depends = [":test"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "cargo clippy -p maplibre-native-vala --all-targets -- -D warnings"

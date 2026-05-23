@@ -1,0 +1,61 @@
+# Binding metadata seed for the generated GLib/GObject ABI.
+#
+# The future generator reads concept, ownership, and annotation records from this
+# layer and emits Rust entry stubs plus scanner-facing annotated C headers. The
+# records here cover only the proof slice.
+
+[namespace]
+c_identifier_prefix = "Mln"
+gir_namespace = "MaplibreNative"
+gir_version = "0.1"
+vala_namespace = "MaplibreNative"
+rust_crate = "maplibre-native-vala"
+
+[error_domain]
+c_name = "mln_error_quark"
+vala_name = "MaplibreNative.Error"
+variants = [
+  "INVALID_ARGUMENT",
+  "INVALID_STATE",
+  "WRONG_THREAD",
+  "UNSUPPORTED",
+  "NATIVE_ERROR",
+  "UNKNOWN_STATUS",
+]
+
+[[flags]]
+name = "RenderBackendFlags"
+c_type = "uint32_t"
+values = [
+  { name = "METAL", c_symbol = "MLN_RENDER_BACKEND_METAL" },
+  { name = "VULKAN", c_symbol = "MLN_RENDER_BACKEND_VULKAN" },
+]
+
+[[functions]]
+name = "c_version"
+c_symbol = "mln_c_version"
+gobject_symbol = "mln_vala_c_version"
+return = "uint32"
+throws = false
+
+[[functions]]
+name = "supported_render_backends"
+c_symbol = "mln_supported_render_backend_mask"
+gobject_symbol = "mln_vala_supported_render_backend_mask"
+return = "RenderBackendFlags"
+throws = false
+scaffold_return = "uint32"
+
+[[functions]]
+name = "network_status_get"
+c_symbol = "mln_network_status_get"
+gobject_symbol = "mln_vala_network_status_get"
+return = "uint32"
+throws = true
+
+[[functions]]
+name = "network_status_set"
+c_symbol = "mln_network_status_set"
+gobject_symbol = "mln_vala_network_status_set"
+return = "void"
+throws = true

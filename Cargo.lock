@@ -681,6 +681,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "maplibre-native-vala"
+version = "0.0.0"
+dependencies = [
+ "maplibre-native-core",
+ "maplibre-native-sys",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

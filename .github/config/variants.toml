@@ -41,6 +41,10 @@ requires = { platform = ["linux", "macos"] }
 task = "//bindings/rust:ci"
 requires = { platform = ["linux", "macos"] }
 
+[bindings.vala]
+task = "//bindings/vala:ci"
+requires = { platform = ["linux", "macos"] }
+
 [bindings.zig]
 task = "//bindings/zig:ci"
 requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
