@@ -149,6 +149,21 @@ def test_runtime_rejects_close_while_map_is_live() -> None:
         runtime.close()
 
 
+def test_still_image_request_uses_map_mode_validation() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map(mln.MapOptions(mode=mln.MapMode.STATIC)) as static_map:
+            static_map.request_still_image()
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map(
+            mln.MapOptions(mode=mln.MapMode.CONTINUOUS)
+        ) as map_handle:
+            with pytest.raises(mln.InvalidStateError) as raised:
+                map_handle.request_still_image()
+
+    assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
+
+
 def test_map_create_from_closed_runtime_reports_invalid_argument() -> None:
     runtime = mln.RuntimeHandle()
     runtime.close()

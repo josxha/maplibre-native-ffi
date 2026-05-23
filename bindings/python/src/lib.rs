@@ -627,6 +627,14 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn request_still_image(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates that the pointer is a live map handle and
+        // that the call occurs on the map owner thread.
+        maplibre_core::check(unsafe { sys::mln_map_request_still_image(state.as_ptr()) })
+            .map_err(map_error)
+    }
+
     fn dump_debug_logs(&self) -> PyResult<()> {
         let state = self.state();
         // SAFETY: The C API validates that the pointer is a live map handle and

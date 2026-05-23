@@ -385,6 +385,10 @@ class MapHandle:
         """Request a repaint for a continuous map."""
         self._native.request_repaint()
 
+    def request_still_image(self) -> None:
+        """Request one still image for a static or tile map."""
+        self._native.request_still_image()
+
     def set_debug_options(self, options: MapDebugOptions) -> None:
         """Apply MapLibre debug overlay mask bits."""
         self._native.set_debug_options(int(options))

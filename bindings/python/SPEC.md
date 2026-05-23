@@ -111,8 +111,8 @@ The current implementation includes these completed slices:
   for failures.
 - `RuntimeHandle` creates, runs, closes, and supports context-manager cleanup
   for a native runtime handle.
-- `MapHandle` creates and closes maps with parent runtime retention and basic
-  map options.
+- `MapHandle` creates and closes maps with parent runtime retention, basic map
+  options, repaint requests, and still-image requests.
 - `MapHandle` exposes map debug overlay options, rendering-stats view state,
   loaded-state queries, viewport options, and tile options.
 - `MapHandle` exposes GeoJSON source URL insertion plus vector, raster, and
