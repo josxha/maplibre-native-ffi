@@ -6,8 +6,11 @@ use maplibre_native_sys as sys;
 
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::handles::{self, MapHandle};
+use crate::native_pointer::NativePointer;
 
 const RENDER_SESSION_TYPE_NAME: &CStr = c"MlnValaRenderSessionHandle";
+const METAL_FRAME_TYPE_NAME: &CStr = c"MlnValaMetalOwnedTextureFrameHandle";
+const VULKAN_FRAME_TYPE_NAME: &CStr = c"MlnValaVulkanOwnedTextureFrameHandle";
 
 #[repr(C)]
 pub struct RenderSessionHandle {
@@ -16,9 +19,33 @@ pub struct RenderSessionHandle {
     map: *mut MapHandle,
 }
 
+#[repr(C)]
+pub struct MetalOwnedTextureFrameHandle {
+    parent_instance: GObject,
+    session: *mut RenderSessionHandle,
+    frame: sys::mln_metal_owned_texture_frame,
+}
+
+#[repr(C)]
+pub struct VulkanOwnedTextureFrameHandle {
+    parent_instance: GObject,
+    session: *mut RenderSessionHandle,
+    frame: sys::mln_vulkan_owned_texture_frame,
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_render_session_handle_get_type() -> GType {
     glib::register_object_type::<RenderSessionHandle>(RENDER_SESSION_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_type() -> GType {
+    glib::register_object_type::<MetalOwnedTextureFrameHandle>(METAL_FRAME_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_type() -> GType {
+    glib::register_object_type::<VulkanOwnedTextureFrameHandle>(VULKAN_FRAME_TYPE_NAME)
 }
 
 #[unsafe(no_mangle)]
@@ -320,6 +347,272 @@ pub extern "C" fn mln_vala_render_session_handle_dump_debug_logs(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_acquire_metal_owned_texture_frame(
+    handle: *mut RenderSessionHandle,
+    error_out: *mut *mut GError,
+) -> *mut MetalOwnedTextureFrameHandle {
+    match acquire_metal_frame(handle) {
+        Ok(frame) => frame,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_acquire_vulkan_owned_texture_frame(
+    handle: *mut RenderSessionHandle,
+    error_out: *mut *mut GError,
+) -> *mut VulkanOwnedTextureFrameHandle {
+    match acquire_vulkan_frame(handle) {
+        Ok(frame) => frame,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_close(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match release_metal_frame(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_close(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match release_vulkan_frame(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_read_premultiplied_rgba8(
+    handle: *mut RenderSessionHandle,
+    out_data: *mut u8,
+    out_data_capacity: usize,
+    out_info: *mut sys::mln_texture_image_info,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match read_premultiplied_rgba8(handle, out_data, out_data_capacity, out_info) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_texture(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> *mut NativePointer {
+    match metal_frame_native_pointer(handle, |frame| frame.texture, "Metal texture") {
+        Ok(pointer) => pointer,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_device(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> *mut NativePointer {
+    match metal_frame_native_pointer(handle, |frame| frame.device, "Metal device") {
+        Ok(pointer) => pointer,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_image(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> *mut NativePointer {
+    match vulkan_frame_native_pointer(handle, |frame| frame.image, "Vulkan image") {
+        Ok(pointer) => pointer,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_image_view(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> *mut NativePointer {
+    match vulkan_frame_native_pointer(handle, |frame| frame.image_view, "Vulkan image view") {
+        Ok(pointer) => pointer,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_device(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    error_out: *mut *mut GError,
+) -> *mut NativePointer {
+    match vulkan_frame_native_pointer(handle, |frame| frame.device, "Vulkan device") {
+        Ok(pointer) => pointer,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_generation(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out_generation: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    metal_frame_u64(handle, out_generation, error_out, |frame| frame.generation)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_width(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out_width: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    metal_frame_u32(handle, out_width, error_out, |frame| frame.width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_height(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out_height: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    metal_frame_u32(handle, out_height, error_out, |frame| frame.height)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_scale_factor(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out_scale_factor: *mut f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    metal_frame_f64(handle, out_scale_factor, error_out, |frame| {
+        frame.scale_factor
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_frame_id(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out_frame_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    metal_frame_u64(handle, out_frame_id, error_out, |frame| frame.frame_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_metal_owned_texture_frame_handle_get_pixel_format(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out_pixel_format: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    metal_frame_u64(handle, out_pixel_format, error_out, |frame| {
+        frame.pixel_format
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_generation(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_generation: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_u64(handle, out_generation, error_out, |frame| frame.generation)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_width(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_width: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_u32(handle, out_width, error_out, |frame| frame.width)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_height(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_height: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_u32(handle, out_height, error_out, |frame| frame.height)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_scale_factor(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_scale_factor: *mut f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_f64(handle, out_scale_factor, error_out, |frame| {
+        frame.scale_factor
+    })
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_frame_id(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_frame_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_u64(handle, out_frame_id, error_out, |frame| frame.frame_id)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_format(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_format: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_u32(handle, out_format, error_out, |frame| frame.format)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_vulkan_owned_texture_frame_handle_get_layout(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out_layout: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    vulkan_frame_u32(handle, out_layout, error_out, |frame| frame.layout)
+}
+
 fn default_metal_surface_descriptor(
     out_descriptor: *mut sys::mln_metal_surface_descriptor,
 ) -> error::Result<()> {
@@ -504,6 +797,274 @@ fn resize(
     error::check(unsafe { sys::mln_render_session_resize(session, width, height, scale_factor) })
 }
 
+fn read_premultiplied_rgba8(
+    handle: *mut RenderSessionHandle,
+    out_data: *mut u8,
+    out_data_capacity: usize,
+    out_info: *mut sys::mln_texture_image_info,
+) -> error::Result<()> {
+    let session = session_native(handle)?;
+    if out_info.is_null() {
+        return Err(Error::invalid_argument("TextureImageInfo output is null"));
+    }
+    // SAFETY: `out_info` is valid output storage by the null check above.
+    unsafe {
+        (*out_info).size = std::mem::size_of::<sys::mln_texture_image_info>() as u32;
+    }
+    // SAFETY: `session` is live. The C API validates the output buffer pointer,
+    // capacity, and info storage before writing.
+    error::check(unsafe {
+        sys::mln_texture_read_premultiplied_rgba8(session, out_data, out_data_capacity, out_info)
+    })
+}
+
+fn acquire_metal_frame(
+    handle: *mut RenderSessionHandle,
+) -> error::Result<*mut MetalOwnedTextureFrameHandle> {
+    let session = session_native(handle)?;
+    // SAFETY: Zeroed storage is immediately initialized by the C API after the
+    // public size field is set.
+    let mut frame: sys::mln_metal_owned_texture_frame = unsafe { std::mem::zeroed() };
+    frame.size = std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32;
+    // SAFETY: `session` is live and frame points to valid output storage.
+    error::check(unsafe { sys::mln_metal_owned_texture_acquire_frame(session, &mut frame) })?;
+
+    let frame_handle = glib::new_object::<MetalOwnedTextureFrameHandle>(
+        mln_vala_metal_owned_texture_frame_handle_get_type(),
+    );
+    if frame_handle.is_null() {
+        // SAFETY: `frame` was acquired from `session` and must be released if
+        // wrapper allocation fails.
+        let _ =
+            error::check(unsafe { sys::mln_metal_owned_texture_release_frame(session, &frame) });
+        return Err(Error::invalid_argument(
+            "failed to allocate MetalOwnedTextureFrameHandle",
+        ));
+    }
+    // SAFETY: `frame_handle` points to a newly allocated frame wrapper.
+    unsafe {
+        (*frame_handle).session = glib::ref_object(handle);
+        (*frame_handle).frame = frame;
+    }
+    Ok(frame_handle)
+}
+
+fn acquire_vulkan_frame(
+    handle: *mut RenderSessionHandle,
+) -> error::Result<*mut VulkanOwnedTextureFrameHandle> {
+    let session = session_native(handle)?;
+    // SAFETY: Zeroed storage is immediately initialized by the C API after the
+    // public size field is set.
+    let mut frame: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
+    frame.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32;
+    // SAFETY: `session` is live and frame points to valid output storage.
+    error::check(unsafe { sys::mln_vulkan_owned_texture_acquire_frame(session, &mut frame) })?;
+
+    let frame_handle = glib::new_object::<VulkanOwnedTextureFrameHandle>(
+        mln_vala_vulkan_owned_texture_frame_handle_get_type(),
+    );
+    if frame_handle.is_null() {
+        // SAFETY: `frame` was acquired from `session` and must be released if
+        // wrapper allocation fails.
+        let _ =
+            error::check(unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &frame) });
+        return Err(Error::invalid_argument(
+            "failed to allocate VulkanOwnedTextureFrameHandle",
+        ));
+    }
+    // SAFETY: `frame_handle` points to a newly allocated frame wrapper.
+    unsafe {
+        (*frame_handle).session = glib::ref_object(handle);
+        (*frame_handle).frame = frame;
+    }
+    Ok(frame_handle)
+}
+
+fn release_metal_frame(handle: *mut MetalOwnedTextureFrameHandle) -> error::Result<()> {
+    let (session_handle, frame) = metal_frame_state(handle)?;
+    let session = session_native(session_handle)?;
+    // SAFETY: `session` is live and `frame` is the acquired frame identity held
+    // by this wrapper.
+    error::check(unsafe { sys::mln_metal_owned_texture_release_frame(session, &frame) })?;
+    // SAFETY: `handle` was checked by `metal_frame_state`.
+    unsafe {
+        (*handle).session = ptr::null_mut();
+        glib::unref_object(session_handle);
+    }
+    Ok(())
+}
+
+fn release_vulkan_frame(handle: *mut VulkanOwnedTextureFrameHandle) -> error::Result<()> {
+    let (session_handle, frame) = vulkan_frame_state(handle)?;
+    let session = session_native(session_handle)?;
+    // SAFETY: `session` is live and `frame` is the acquired frame identity held
+    // by this wrapper.
+    error::check(unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &frame) })?;
+    // SAFETY: `handle` was checked by `vulkan_frame_state`.
+    unsafe {
+        (*handle).session = ptr::null_mut();
+        glib::unref_object(session_handle);
+    }
+    Ok(())
+}
+
+fn metal_frame_native_pointer(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    getter: impl FnOnce(sys::mln_metal_owned_texture_frame) -> *mut std::ffi::c_void,
+    name: &str,
+) -> error::Result<*mut NativePointer> {
+    let (_, frame) = metal_frame_state(handle)?;
+    let pointer = NativePointer::from_ptr(getter(frame))
+        .ok_or_else(|| Error::invalid_argument(format!("{name} pointer is null")))?;
+    Ok(Box::into_raw(Box::new(pointer)))
+}
+
+fn vulkan_frame_native_pointer(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    getter: impl FnOnce(sys::mln_vulkan_owned_texture_frame) -> *mut std::ffi::c_void,
+    name: &str,
+) -> error::Result<*mut NativePointer> {
+    let (_, frame) = vulkan_frame_state(handle)?;
+    let pointer = NativePointer::from_ptr(getter(frame))
+        .ok_or_else(|| Error::invalid_argument(format!("{name} pointer is null")))?;
+    Ok(Box::into_raw(Box::new(pointer)))
+}
+
+fn metal_frame_u32(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out: *mut u32,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_metal_owned_texture_frame) -> u32,
+) -> GBoolean {
+    metal_frame_value(handle, out, error_out, getter)
+}
+
+fn metal_frame_u64(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out: *mut u64,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_metal_owned_texture_frame) -> u64,
+) -> GBoolean {
+    metal_frame_value(handle, out, error_out, getter)
+}
+
+fn metal_frame_f64(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out: *mut f64,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_metal_owned_texture_frame) -> f64,
+) -> GBoolean {
+    metal_frame_value(handle, out, error_out, getter)
+}
+
+fn vulkan_frame_u32(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out: *mut u32,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_vulkan_owned_texture_frame) -> u32,
+) -> GBoolean {
+    vulkan_frame_value(handle, out, error_out, getter)
+}
+
+fn vulkan_frame_u64(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out: *mut u64,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_vulkan_owned_texture_frame) -> u64,
+) -> GBoolean {
+    vulkan_frame_value(handle, out, error_out, getter)
+}
+
+fn vulkan_frame_f64(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out: *mut f64,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_vulkan_owned_texture_frame) -> f64,
+) -> GBoolean {
+    vulkan_frame_value(handle, out, error_out, getter)
+}
+
+fn metal_frame_value<T>(
+    handle: *mut MetalOwnedTextureFrameHandle,
+    out: *mut T,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_metal_owned_texture_frame) -> T,
+) -> GBoolean {
+    match metal_frame_state(handle)
+        .and_then(|(_, frame)| glib::clear_optional_out_pointer(out, getter(frame)))
+    {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+fn vulkan_frame_value<T>(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+    out: *mut T,
+    error_out: *mut *mut GError,
+    getter: impl FnOnce(sys::mln_vulkan_owned_texture_frame) -> T,
+) -> GBoolean {
+    match vulkan_frame_state(handle)
+        .and_then(|(_, frame)| glib::clear_optional_out_pointer(out, getter(frame)))
+    {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+fn metal_frame_state(
+    handle: *mut MetalOwnedTextureFrameHandle,
+) -> error::Result<(*mut RenderSessionHandle, sys::mln_metal_owned_texture_frame)> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument(
+            "MetalOwnedTextureFrameHandle is null",
+        ));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let session = unsafe { (*handle).session };
+    if session.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "MetalOwnedTextureFrameHandle is closed",
+        ));
+    }
+    // SAFETY: `handle` is non-null and frame is a copyable C descriptor.
+    let frame = unsafe { (*handle).frame };
+    Ok((session, frame))
+}
+
+fn vulkan_frame_state(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+) -> error::Result<(
+    *mut RenderSessionHandle,
+    sys::mln_vulkan_owned_texture_frame,
+)> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument(
+            "VulkanOwnedTextureFrameHandle is null",
+        ));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let session = unsafe { (*handle).session };
+    if session.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "VulkanOwnedTextureFrameHandle is closed",
+        ));
+    }
+    // SAFETY: `handle` is non-null and frame is a copyable C descriptor.
+    let frame = unsafe { (*handle).frame };
+    Ok((session, frame))
+}
+
 fn close_render_session(handle: *mut RenderSessionHandle) -> error::Result<()> {
     let session = session_native(handle)?;
     // SAFETY: `session` is live.
@@ -524,12 +1085,62 @@ mod tests {
     #[test]
     fn render_descriptor_defaults_initialize_sizes() {
         // SAFETY: Zeroed storage is immediately initialized by default helpers.
-        let mut metal: sys::mln_metal_surface_descriptor = unsafe { std::mem::zeroed() };
+        let mut metal_surface: sys::mln_metal_surface_descriptor = unsafe { std::mem::zeroed() };
         assert_eq!(
-            mln_vala_metal_surface_descriptor_default(&mut metal, ptr::null_mut()),
+            mln_vala_metal_surface_descriptor_default(&mut metal_surface, ptr::null_mut()),
             GTRUE
         );
-        assert_ne!(metal.size, 0);
+        assert_ne!(metal_surface.size, 0);
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut vulkan_surface: sys::mln_vulkan_surface_descriptor = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_vulkan_surface_descriptor_default(&mut vulkan_surface, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(vulkan_surface.size, 0);
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut metal_owned: sys::mln_metal_owned_texture_descriptor =
+            unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_metal_owned_texture_descriptor_default(&mut metal_owned, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(metal_owned.size, 0);
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut metal_borrowed: sys::mln_metal_borrowed_texture_descriptor =
+            unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_metal_borrowed_texture_descriptor_default(
+                &mut metal_borrowed,
+                ptr::null_mut()
+            ),
+            GTRUE
+        );
+        assert_ne!(metal_borrowed.size, 0);
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut vulkan_owned: sys::mln_vulkan_owned_texture_descriptor =
+            unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_vulkan_owned_texture_descriptor_default(&mut vulkan_owned, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(vulkan_owned.size, 0);
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut vulkan_borrowed: sys::mln_vulkan_borrowed_texture_descriptor =
+            unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_vulkan_borrowed_texture_descriptor_default(
+                &mut vulkan_borrowed,
+                ptr::null_mut()
+            ),
+            GTRUE
+        );
+        assert_ne!(vulkan_borrowed.size, 0);
 
         // SAFETY: Zeroed storage is immediately initialized by default helpers.
         let mut texture_info: sys::mln_texture_image_info = unsafe { std::mem::zeroed() };
@@ -546,6 +1157,42 @@ mod tests {
         assert_eq!(
             mln_vala_render_session_handle_render_update(ptr::null_mut(), &mut error),
             GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        let mut info: sys::mln_texture_image_info = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_render_session_handle_read_premultiplied_rgba8(
+                ptr::null_mut(),
+                ptr::null_mut(),
+                0,
+                &mut info,
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+    }
+
+    #[test]
+    fn null_frame_handles_report_binding_errors() {
+        let mut error = ptr::null_mut();
+        let mut width = 0;
+        assert_eq!(
+            mln_vala_metal_owned_texture_frame_handle_get_width(
+                ptr::null_mut(),
+                &mut width,
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert!(
+            mln_vala_vulkan_owned_texture_frame_handle_get_image(ptr::null_mut(), &mut error,)
+                .is_null()
         );
         assert!(!error.is_null());
     }

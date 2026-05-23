@@ -696,6 +696,22 @@ G_DECLARE_FINAL_TYPE(
   RENDER_SESSION_HANDLE, GObject
 )
 
+#define MLN_VALA_TYPE_METAL_OWNED_TEXTURE_FRAME_HANDLE \
+  (mln_vala_metal_owned_texture_frame_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaMetalOwnedTextureFrameHandle,
+  mln_vala_metal_owned_texture_frame_handle, MLN_VALA,
+  METAL_OWNED_TEXTURE_FRAME_HANDLE, GObject
+)
+
+#define MLN_VALA_TYPE_VULKAN_OWNED_TEXTURE_FRAME_HANDLE \
+  (mln_vala_vulkan_owned_texture_frame_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaVulkanOwnedTextureFrameHandle,
+  mln_vala_vulkan_owned_texture_frame_handle, MLN_VALA,
+  VULKAN_OWNED_TEXTURE_FRAME_HANDLE, GObject
+)
+
 #define MLN_VALA_TYPE_RESOURCE_REQUEST_HANDLE \
   (mln_vala_resource_request_handle_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -1711,6 +1727,294 @@ gboolean mln_vala_render_session_handle_clear_data(
 );
 gboolean mln_vala_render_session_handle_dump_debug_logs(
   MlnValaRenderSessionHandle* self, GError** error
+);
+/**
+ * mln_vala_render_session_handle_read_premultiplied_rgba8:
+ * @self: a render session handle.
+ * @out_data: (out caller-allocates) (array length=out_data_capacity): output
+ * buffer.
+ * @out_data_capacity: byte length of @out_data.
+ * @out_info: (out): return location for image metadata.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_render_session_handle_read_premultiplied_rgba8(
+  MlnValaRenderSessionHandle* self, uint8_t* out_data, size_t out_data_capacity,
+  MlnValaTextureImageInfo* out_info, GError** error
+);
+/**
+ * mln_vala_render_session_handle_acquire_metal_owned_texture_frame:
+ * @self: a render session handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): an acquired frame handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaMetalOwnedTextureFrameHandle*
+mln_vala_render_session_handle_acquire_metal_owned_texture_frame(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+
+/**
+ * mln_vala_render_session_handle_acquire_vulkan_owned_texture_frame:
+ * @self: a render session handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): an acquired frame handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaVulkanOwnedTextureFrameHandle*
+mln_vala_render_session_handle_acquire_vulkan_owned_texture_frame(
+  MlnValaRenderSessionHandle* self, GError** error
+);
+gboolean mln_vala_metal_owned_texture_frame_handle_close(
+  MlnValaMetalOwnedTextureFrameHandle* self, GError** error
+);
+gboolean mln_vala_vulkan_owned_texture_frame_handle_close(
+  MlnValaVulkanOwnedTextureFrameHandle* self, GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_texture:
+ * @self: a Metal texture frame handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): borrowed native texture pointer boxed for Vala.
+ * Throws: MlnValaError
+ */
+MlnValaNativePointer* mln_vala_metal_owned_texture_frame_handle_get_texture(
+  MlnValaMetalOwnedTextureFrameHandle* self, GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_device:
+ * @self: a Metal texture frame handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): borrowed native device pointer boxed for Vala.
+ * Throws: MlnValaError
+ */
+MlnValaNativePointer* mln_vala_metal_owned_texture_frame_handle_get_device(
+  MlnValaMetalOwnedTextureFrameHandle* self, GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_generation:
+ * @self: a Metal texture frame handle.
+ * @out_generation: (out): return location for the frame generation.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_metal_owned_texture_frame_handle_get_generation(
+  MlnValaMetalOwnedTextureFrameHandle* self, uint64_t* out_generation,
+  GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_width:
+ * @self: a Metal texture frame handle.
+ * @out_width: (out): return location for physical width.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_metal_owned_texture_frame_handle_get_width(
+  MlnValaMetalOwnedTextureFrameHandle* self, uint32_t* out_width, GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_height:
+ * @self: a Metal texture frame handle.
+ * @out_height: (out): return location for physical height.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_metal_owned_texture_frame_handle_get_height(
+  MlnValaMetalOwnedTextureFrameHandle* self, uint32_t* out_height,
+  GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_scale_factor:
+ * @self: a Metal texture frame handle.
+ * @out_scale_factor: (out): return location for scale factor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_metal_owned_texture_frame_handle_get_scale_factor(
+  MlnValaMetalOwnedTextureFrameHandle* self, double* out_scale_factor,
+  GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_frame_id:
+ * @self: a Metal texture frame handle.
+ * @out_frame_id: (out): return location for opaque frame identity.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_metal_owned_texture_frame_handle_get_frame_id(
+  MlnValaMetalOwnedTextureFrameHandle* self, uint64_t* out_frame_id,
+  GError** error
+);
+
+/**
+ * mln_vala_metal_owned_texture_frame_handle_get_pixel_format:
+ * @self: a Metal texture frame handle.
+ * @out_pixel_format: (out): return location for native pixel format.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_metal_owned_texture_frame_handle_get_pixel_format(
+  MlnValaMetalOwnedTextureFrameHandle* self, uint64_t* out_pixel_format,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_image:
+ * @self: a Vulkan texture frame handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): borrowed native image pointer boxed for Vala.
+ * Throws: MlnValaError
+ */
+MlnValaNativePointer* mln_vala_vulkan_owned_texture_frame_handle_get_image(
+  MlnValaVulkanOwnedTextureFrameHandle* self, GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_image_view:
+ * @self: a Vulkan texture frame handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): borrowed native image-view pointer boxed for Vala.
+ * Throws: MlnValaError
+ */
+MlnValaNativePointer* mln_vala_vulkan_owned_texture_frame_handle_get_image_view(
+  MlnValaVulkanOwnedTextureFrameHandle* self, GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_device:
+ * @self: a Vulkan texture frame handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): borrowed native device pointer boxed for Vala.
+ * Throws: MlnValaError
+ */
+MlnValaNativePointer* mln_vala_vulkan_owned_texture_frame_handle_get_device(
+  MlnValaVulkanOwnedTextureFrameHandle* self, GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_generation:
+ * @self: a Vulkan texture frame handle.
+ * @out_generation: (out): return location for the frame generation.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_generation(
+  MlnValaVulkanOwnedTextureFrameHandle* self, uint64_t* out_generation,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_width:
+ * @self: a Vulkan texture frame handle.
+ * @out_width: (out): return location for physical width.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_width(
+  MlnValaVulkanOwnedTextureFrameHandle* self, uint32_t* out_width,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_height:
+ * @self: a Vulkan texture frame handle.
+ * @out_height: (out): return location for physical height.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_height(
+  MlnValaVulkanOwnedTextureFrameHandle* self, uint32_t* out_height,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_scale_factor:
+ * @self: a Vulkan texture frame handle.
+ * @out_scale_factor: (out): return location for scale factor.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_scale_factor(
+  MlnValaVulkanOwnedTextureFrameHandle* self, double* out_scale_factor,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_frame_id:
+ * @self: a Vulkan texture frame handle.
+ * @out_frame_id: (out): return location for opaque frame identity.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_frame_id(
+  MlnValaVulkanOwnedTextureFrameHandle* self, uint64_t* out_frame_id,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_format:
+ * @self: a Vulkan texture frame handle.
+ * @out_format: (out): return location for native image format.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_format(
+  MlnValaVulkanOwnedTextureFrameHandle* self, uint32_t* out_format,
+  GError** error
+);
+
+/**
+ * mln_vala_vulkan_owned_texture_frame_handle_get_layout:
+ * @self: a Vulkan texture frame handle.
+ * @out_layout: (out): return location for native image layout.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_vulkan_owned_texture_frame_handle_get_layout(
+  MlnValaVulkanOwnedTextureFrameHandle* self, uint32_t* out_layout,
+  GError** error
 );
 
 /**

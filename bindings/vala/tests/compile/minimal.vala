@@ -6,6 +6,53 @@ string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
   return null;
 }
 
+void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
+  uint64 generation;
+  uint32 width;
+  uint32 height;
+  double scale_factor;
+  uint64 frame_id;
+  uint64 pixel_format;
+  frame.get_generation(out generation);
+  frame.get_width(out width);
+  frame.get_height(out height);
+  frame.get_scale_factor(out scale_factor);
+  frame.get_frame_id(out frame_id);
+  frame.get_pixel_format(out pixel_format);
+  MaplibreNative.NativePointer texture = frame.get_texture();
+  MaplibreNative.NativePointer device = frame.get_device();
+  bool frame_fields_seen = texture.get_bits() != 0 && device.get_bits() != 0 && generation != frame_id && width != height && scale_factor != 0.0 && pixel_format != 0;
+  if (frame_fields_seen) {
+    GLib.stderr.printf("");
+  }
+  frame.close();
+}
+
+void inspect_vulkan_owned_texture_frame(MaplibreNative.VulkanOwnedTextureFrameHandle frame) throws GLib.Error {
+  uint64 generation;
+  uint32 width;
+  uint32 height;
+  double scale_factor;
+  uint64 frame_id;
+  uint32 format;
+  uint32 layout;
+  frame.get_generation(out generation);
+  frame.get_width(out width);
+  frame.get_height(out height);
+  frame.get_scale_factor(out scale_factor);
+  frame.get_frame_id(out frame_id);
+  frame.get_format(out format);
+  frame.get_layout(out layout);
+  MaplibreNative.NativePointer image = frame.get_image();
+  MaplibreNative.NativePointer image_view = frame.get_image_view();
+  MaplibreNative.NativePointer device = frame.get_device();
+  bool frame_fields_seen = image.get_bits() != 0 && image_view.get_bits() != 0 && device.get_bits() != 0 && generation != frame_id && width != height && scale_factor != 0.0 && format != layout;
+  if (frame_fields_seen) {
+    GLib.stderr.printf("");
+  }
+  frame.close();
+}
+
 int main(string[] args) {
   uint32 version = MaplibreNative.c_version();
   MaplibreNative.NetworkStatus status;
@@ -72,8 +119,22 @@ int main(string[] args) {
     vulkan_surface.default();
     MaplibreNative.MetalOwnedTextureDescriptor metal_owned_texture = {};
     metal_owned_texture.default();
+    MaplibreNative.MetalBorrowedTextureDescriptor metal_borrowed_texture = {};
+    metal_borrowed_texture.default();
+    MaplibreNative.VulkanOwnedTextureDescriptor vulkan_owned_texture = {};
+    vulkan_owned_texture.default();
+    MaplibreNative.VulkanBorrowedTextureDescriptor vulkan_borrowed_texture = {};
+    vulkan_borrowed_texture.default();
     MaplibreNative.TextureImageInfo texture_info = {};
     texture_info.default();
+    MaplibreNative.MetalOwnedTextureFrameHandle? metal_frame = null;
+    if (metal_frame != null) {
+      inspect_metal_owned_texture_frame(metal_frame);
+    }
+    MaplibreNative.VulkanOwnedTextureFrameHandle? vulkan_frame = null;
+    if (vulkan_frame != null) {
+      inspect_vulkan_owned_texture_frame(vulkan_frame);
+    }
     map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);
     MaplibreNative.MapDebugOptions debug_options;
     map.get_debug_options(out debug_options);

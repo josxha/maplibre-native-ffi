@@ -104,7 +104,8 @@ The scaffold implements one proof slice in Rust:
 - `MapProjectionHandle` is registered as a standalone GObject class with
   close-once lifecycle and coordinate conversion methods.
 - `RenderSessionHandle` is registered as a GObject class with descriptor
-  defaults, render-target attach methods, and basic session lifecycle methods.
+  defaults, render-target attach methods, readback helpers, texture frame
+  handles, and basic session lifecycle methods.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and
