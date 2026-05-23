@@ -4,7 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import render, resource
+from maplibre_native import render, resource, style
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -274,3 +274,41 @@ def test_resource_callback_registration_validates_bounds_and_lifecycle() -> None
         with runtime.create_map():
             with pytest.raises(mln.InvalidStateError):
                 runtime.set_resource_provider(provider, max_pending_callbacks=1)
+
+
+def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            source = map_handle.add_custom_geometry_source(
+                "custom",
+                style.CustomGeometrySourceOptions(
+                    has_cancel_tile=True,
+                    max_queued_events=1,
+                ),
+            )
+
+            source._native.push_fetch_for_test(1, 2, 3)
+            source._native.push_cancel_for_test(4, 5, 6)
+
+            event = source.poll_event()
+            assert event == style.CustomGeometrySourceEvent(
+                style.CustomGeometrySourceEventType.FETCH_TILE,
+                style.CanonicalTileId(1, 2, 3),
+            )
+            assert source.poll_event() is None
+            assert source.dropped_event_count == 1
+
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            assert source.closed
+
+
+def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.add_custom_geometry_source(
+                    "custom",
+                    style.CustomGeometrySourceOptions(max_queued_events=0),
+                )

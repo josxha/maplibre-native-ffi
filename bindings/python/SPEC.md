@@ -153,10 +153,11 @@ the native library exists before maturin invokes Cargo.
 `_native` is private. The current scaffold exposes proof-slice bridge functions,
 status-converting network status entry points, runtime/map/render-session handle
 state, copied event adapters, render target descriptor materialization, texture
-readback, texture frame guards, resource callback trampolines, and one-shot
-resource request handles needed by the Python package. As coverage grows,
-`_native` owns PyO3-specific conversion, GIL handling, Python exception
-construction, buffer guards, callback queues, and free-threaded synchronization.
+readback, texture frame guards, resource callback trampolines, one-shot resource
+request handles, and queued custom geometry source callbacks needed by the
+Python package. As coverage grows, `_native` owns PyO3-specific conversion, GIL
+handling, Python exception construction, buffer guards, callback queues, and
+free-threaded synchronization.
 
 `_native` may call `maplibre-native-sys` directly only for the initial proof
 slice or host-runtime trampoline code. Repeated C ABI adaptation moves into
@@ -417,7 +418,7 @@ Coverage targets:
 - [x] Add render session descriptors, writable-buffer readback, and texture
       frame handles.
 - [x] Add resource transform and provider callbacks with bounded queue policy.
-- [ ] Add custom geometry callback scaffolding.
+- [x] Add custom geometry callback scaffolding.
 - [ ] Add package publication metadata once artifact policy is chosen.
 - [ ] Add the Python binding to the CI binding matrix after the first native
       status-converting vertical slice passes on Linux and macOS.

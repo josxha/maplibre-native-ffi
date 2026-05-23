@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         VulkanOwnedTextureDescriptor,
         VulkanSurfaceDescriptor,
     )
+    from .style import CustomGeometrySourceHandle, CustomGeometrySourceOptions
 
 
 class MapMode(IntEnum):
@@ -82,6 +83,29 @@ class MapHandle:
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
+
+    def add_custom_geometry_source(
+        self,
+        source_id: str,
+        options: CustomGeometrySourceOptions | None = None,
+    ) -> CustomGeometrySourceHandle:
+        """Add a custom geometry source and return its queued-event handle."""
+        from .style import CustomGeometrySourceHandle, CustomGeometrySourceOptions
+
+        options = options or CustomGeometrySourceOptions()
+        native = self._native.add_custom_geometry_source(
+            source_id,
+            options.max_queued_events,
+            options.min_zoom,
+            options.max_zoom,
+            options.tolerance,
+            options.tile_size,
+            options.buffer,
+            options.clip,
+            options.wrap,
+            options.has_cancel_tile,
+        )
+        return CustomGeometrySourceHandle(native)
 
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor

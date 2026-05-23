@@ -8,11 +8,11 @@ use maplibre_native_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::{CString, c_char, c_void};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread::ThreadId;
 
 mod py_errors {
@@ -52,6 +52,58 @@ struct ResourceRequestHandle {
 #[pyclass(name = "_MapHandle")]
 struct MapHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_map>>,
+    custom_geometry_sources: Mutex<HashMap<String, Box<PyCustomGeometrySourceState>>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CustomGeometryEvent {
+    kind: u32,
+    tile_id: sys::mln_canonical_tile_id,
+}
+
+#[derive(Debug)]
+struct CustomGeometryQueue {
+    events: VecDeque<CustomGeometryEvent>,
+    dropped_events: u64,
+    active_callbacks: usize,
+    closing: bool,
+    closed: bool,
+}
+
+impl CustomGeometryQueue {
+    fn new() -> Self {
+        Self {
+            events: VecDeque::new(),
+            dropped_events: 0,
+            active_callbacks: 0,
+            closing: false,
+            closed: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PyCustomGeometrySourceShared {
+    queue: Mutex<CustomGeometryQueue>,
+    idle: Condvar,
+    max_queued_events: usize,
+}
+
+struct PyCustomGeometrySourceState {
+    shared: Arc<PyCustomGeometrySourceShared>,
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    tolerance: Option<f64>,
+    tile_size: Option<u32>,
+    buffer: Option<u32>,
+    clip: Option<bool>,
+    wrap: Option<bool>,
+    has_cancel_tile: bool,
+}
+
+#[pyclass(name = "_CustomGeometrySourceHandle")]
+struct CustomGeometrySourceHandle {
+    shared: Arc<PyCustomGeometrySourceShared>,
 }
 
 struct RenderSessionState {
@@ -124,6 +176,176 @@ impl MapHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+
+    fn clear_custom_geometry_sources(&self) {
+        self.custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+    }
+}
+
+impl PyCustomGeometrySourceShared {
+    fn new(max_queued_events: usize) -> Arc<Self> {
+        Arc::new(Self {
+            queue: Mutex::new(CustomGeometryQueue::new()),
+            idle: Condvar::new(),
+            max_queued_events,
+        })
+    }
+
+    fn enqueue(&self, kind: u32, tile_id: sys::mln_canonical_tile_id) {
+        let mut queue = self
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if queue.closing || queue.closed {
+            return;
+        }
+        if queue.events.len() >= self.max_queued_events {
+            queue.dropped_events = queue.dropped_events.saturating_add(1);
+        } else {
+            queue
+                .events
+                .push_back(CustomGeometryEvent { kind, tile_id });
+        }
+    }
+
+    fn enter_callback(&self) -> Option<CustomGeometryCallbackGuard<'_>> {
+        let mut queue = self
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if queue.closing || queue.closed {
+            return None;
+        }
+        queue.active_callbacks += 1;
+        Some(CustomGeometryCallbackGuard { shared: self })
+    }
+
+    fn exit_callback(&self) {
+        let mut queue = self
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        queue.active_callbacks -= 1;
+        if queue.active_callbacks == 0 {
+            self.idle.notify_all();
+        }
+    }
+
+    fn close(&self) {
+        let mut queue = self
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if queue.closed {
+            return;
+        }
+        queue.closing = true;
+        while queue.active_callbacks != 0 {
+            queue = self
+                .idle
+                .wait(queue)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+        queue.events.clear();
+        queue.closed = true;
+    }
+}
+
+struct CustomGeometryCallbackGuard<'a> {
+    shared: &'a PyCustomGeometrySourceShared,
+}
+
+impl Drop for CustomGeometryCallbackGuard<'_> {
+    fn drop(&mut self) {
+        self.shared.exit_callback();
+    }
+}
+
+impl PyCustomGeometrySourceState {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        max_queued_events: usize,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        tolerance: Option<f64>,
+        tile_size: Option<u32>,
+        buffer: Option<u32>,
+        clip: Option<bool>,
+        wrap: Option<bool>,
+        has_cancel_tile: bool,
+    ) -> Box<Self> {
+        Box::new(Self {
+            shared: PyCustomGeometrySourceShared::new(max_queued_events),
+            min_zoom,
+            max_zoom,
+            tolerance,
+            tile_size,
+            buffer,
+            clip,
+            wrap,
+            has_cancel_tile,
+        })
+    }
+
+    fn descriptor(&self) -> sys::mln_custom_geometry_source_options {
+        maplibre_core::style::custom_geometry_source_options_to_native(
+            maplibre_core::style::CustomGeometrySourceDescriptorFields {
+                fetch_tile: Some(custom_geometry_fetch_tile_trampoline),
+                cancel_tile: self
+                    .has_cancel_tile
+                    .then_some(custom_geometry_cancel_tile_trampoline as _),
+                user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
+                min_zoom: self.min_zoom,
+                max_zoom: self.max_zoom,
+                tolerance: self.tolerance,
+                tile_size: self.tile_size,
+                buffer: self.buffer,
+                clip: self.clip,
+                wrap: self.wrap,
+            },
+        )
+    }
+}
+
+impl Drop for PyCustomGeometrySourceState {
+    fn drop(&mut self) {
+        self.shared.close();
+    }
+}
+
+unsafe extern "C" fn custom_geometry_fetch_tile_trampoline(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
+        return;
+    };
+    // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
+    // map until source/style/map teardown waits for in-flight callbacks.
+    let state = unsafe { state.as_ref() };
+    let Some(_guard) = state.shared.enter_callback() else {
+        return;
+    };
+    state.shared.enqueue(0, tile_id);
+}
+
+unsafe extern "C" fn custom_geometry_cancel_tile_trampoline(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
+        return;
+    };
+    // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
+    // map until source/style/map teardown waits for in-flight callbacks.
+    let state = unsafe { state.as_ref() };
+    let Some(_guard) = state.shared.enter_callback() else {
+        return;
+    };
+    state.shared.enqueue(1, tile_id);
 }
 
 impl RenderSessionState {
@@ -294,7 +516,9 @@ impl MapHandle {
         let state = self.state();
         // SAFETY: state owns an mln_map pointer created by mln_map_create and
         // pairs it with the matching status-returning destroy function.
-        unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)
+        unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)?;
+        self.clear_custom_geometry_sources();
+        Ok(())
     }
 
     fn request_repaint(&self) -> PyResult<()> {
@@ -311,7 +535,63 @@ impl MapHandle {
         // SAFETY: The C API validates that the pointer is a live map handle.
         // json is a null-terminated C string whose storage lives for this call.
         maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.as_ptr(), json.as_ptr()) })
-            .map_err(map_error)
+            .map_err(map_error)?;
+        self.clear_custom_geometry_sources();
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_custom_geometry_source(
+        &self,
+        source_id: String,
+        max_queued_events: usize,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        tolerance: Option<f64>,
+        tile_size: Option<u32>,
+        buffer: Option<u32>,
+        clip: Option<bool>,
+        wrap: Option<bool>,
+        has_cancel_tile: bool,
+    ) -> PyResult<CustomGeometrySourceHandle> {
+        if max_queued_events == 0 {
+            return Err(invalid_argument_error(
+                "max_queued_events must be greater than zero",
+            ));
+        }
+        let state = PyCustomGeometrySourceState::new(
+            max_queued_events,
+            min_zoom,
+            max_zoom,
+            tolerance,
+            tile_size,
+            buffer,
+            clip,
+            wrap,
+            has_cancel_tile,
+        );
+        let descriptor = state.descriptor();
+        let source_id_view = maplibre_core::string::string_view(&source_id);
+        let map_state = self.state();
+        // SAFETY: map_state owns or has released the map pointer. The C API
+        // validates that it is live. source_id_view and descriptor are valid for
+        // this call, and state is retained by this map after successful attach.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_custom_geometry_source(
+                map_state.as_ptr(),
+                source_id_view.raw(),
+                &descriptor,
+            )
+        })
+        .map_err(map_error)?;
+        let handle = CustomGeometrySourceHandle {
+            shared: Arc::clone(&state.shared),
+        };
+        self.custom_geometry_sources
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(source_id, state);
+        Ok(handle)
     }
 
     #[getter]
@@ -542,6 +822,50 @@ impl DetachedRenderSessionHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .is_closed()
+    }
+}
+
+#[pymethods]
+impl CustomGeometrySourceHandle {
+    fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        let mut queue = self
+            .shared
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(event) = queue.events.pop_front() else {
+            return Ok(None);
+        };
+        drop(queue);
+        custom_geometry_event_to_py(py, event).map(Some)
+    }
+
+    fn push_fetch_for_test(&self, z: u32, x: u32, y: u32) {
+        self.shared
+            .enqueue(0, sys::mln_canonical_tile_id { z, x, y });
+    }
+
+    fn push_cancel_for_test(&self, z: u32, x: u32, y: u32) {
+        self.shared
+            .enqueue(1, sys::mln_canonical_tile_id { z, x, y });
+    }
+
+    #[getter]
+    fn dropped_event_count(&self) -> u64 {
+        self.shared
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .dropped_events
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        self.shared
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .closed
     }
 }
 
@@ -928,6 +1252,15 @@ fn image_to_py(
     let dict = PyDict::new(py);
     dict.set_item("info", texture_image_info_to_py(py, info)?)?;
     dict.set_item("data", PyBytes::new(py, data))?;
+    Ok(dict.into_any().unbind())
+}
+
+fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("kind", event.kind)?;
+    dict.set_item("z", event.tile_id.z)?;
+    dict.set_item("x", event.tile_id.x)?;
+    dict.set_item("y", event.tile_id.y)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1492,6 +1825,7 @@ fn create_map(
     let state = unsafe { maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_map") };
     Ok(MapHandle {
         state: Mutex::new(state),
+        custom_geometry_sources: Mutex::new(HashMap::new()),
     })
 }
 
@@ -1729,6 +2063,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
+    module.add_class::<CustomGeometrySourceHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<DetachedRenderSessionHandle>()?;
     module.add_class::<MetalOwnedTextureFrameHandle>()?;
