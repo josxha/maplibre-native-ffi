@@ -7,6 +7,7 @@ use maplibre_native_core::error::{Error, ErrorKind};
 use maplibre_native_sys as sys;
 
 pub type GBoolean = c_int;
+pub type GDestroyNotify = Option<unsafe extern "C" fn(*mut c_void)>;
 pub type GQuark = c_uint;
 pub type GType = usize;
 

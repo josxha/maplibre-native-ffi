@@ -81,6 +81,21 @@ typedef enum {
   MLN_VALA_LOG_EVENT_TIMING = 16,
 } MlnValaLogEvent;
 
+/**
+ * MlnValaLogCallback:
+ * @severity: log severity.
+ * @event: log event category.
+ * @code: native log code.
+ * @message: (nullable): borrowed log message for the callback duration.
+ *
+ * Returns: `TRUE` to consume the record, `FALSE` to let native logging handle
+ * it.
+ */
+typedef gboolean (*MlnValaLogCallback)(
+  MlnValaLogSeverity severity, MlnValaLogEvent event, int64_t code,
+  const char* message, gpointer user_data
+);
+
 typedef enum {
   MLN_VALA_MAP_DEBUG_OPTIONS_TILE_BORDERS = 1u << 1u,
   MLN_VALA_MAP_DEBUG_OPTIONS_PARSE_STATUS = 1u << 2u,
@@ -471,6 +486,22 @@ gboolean mln_vala_network_status_get(
  */
 gboolean mln_vala_network_status_set(
   MlnValaNetworkStatus status, GError** error
+);
+
+/**
+ * mln_vala_log_set_callback:
+ * @callback: (scope async) (closure user_data) (destroy destroy_notify): log
+ * callback.
+ * @user_data: closure data for @callback.
+ * @destroy_notify: destroy notify for @user_data.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_log_set_callback(
+  MlnValaLogCallback callback, gpointer user_data,
+  GDestroyNotify destroy_notify, GError** error
 );
 
 /**

@@ -1,3 +1,7 @@
+bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+  return false;
+}
+
 int main(string[] args) {
   uint32 version = MaplibreNative.c_version();
   MaplibreNative.NetworkStatus status;
@@ -7,6 +11,7 @@ int main(string[] args) {
     MaplibreNative.NetworkStatus.get(out status);
     status.set();
     MaplibreNative.log_set_async_severity_mask(MaplibreNative.LogSeverityFlags.DEFAULT);
+    MaplibreNative.log_set_callback(handle_log);
     MaplibreNative.log_clear_callback();
 
     MaplibreNative.NativePointer native_pointer;

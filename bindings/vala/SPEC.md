@@ -91,8 +91,8 @@ The scaffold implements one proof slice in Rust:
   instead of raw integer masks/statuses.
 - `NativePointer` is a public boxed value that rejects null addresses and
   exposes only opaque address bits.
-- Logging severity/event enums and async severity-mask operations are exposed in
-  generated Vala.
+- Logging severity/event enums, callback registration with destroy-notify
+  replacement, and async severity-mask operations are exposed in generated Vala.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with
