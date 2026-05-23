@@ -486,6 +486,32 @@ export interface TextureReadback {
   pixels: Uint8Array;
 }
 
+export declare class MetalOwnedTextureFrame {
+  private constructor(nativeFrame: unknown);
+  readonly generation: bigint;
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  readonly frameId: bigint;
+  readonly texture: NativePointer;
+  readonly device: NativePointer;
+  readonly pixelFormat: bigint;
+}
+
+export declare class VulkanOwnedTextureFrame {
+  private constructor(nativeFrame: unknown);
+  readonly generation: bigint;
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  readonly frameId: bigint;
+  readonly image: NativePointer;
+  readonly imageView: NativePointer;
+  readonly device: NativePointer;
+  readonly format: number;
+  readonly layout: number;
+}
+
 export interface FeatureStateSelector {
   sourceId: string;
   sourceLayerId?: string | null;
@@ -572,6 +598,12 @@ export declare class RenderSessionHandle {
     extensionField: string,
     args?: JsonValue | null,
   ): JsonValue;
+  withMetalOwnedTextureFrame<T>(
+    callback: (frame: MetalOwnedTextureFrame) => T,
+  ): T;
+  withVulkanOwnedTextureFrame<T>(
+    callback: (frame: VulkanOwnedTextureFrame) => T,
+  ): T;
   readPremultipliedRgba8(): TextureReadback;
   [Symbol.dispose](): void;
 }

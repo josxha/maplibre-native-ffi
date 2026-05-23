@@ -92,6 +92,32 @@ pub struct TextureReadback {
 }
 
 #[napi(object)]
+pub struct NativeMetalOwnedTextureFrame {
+    pub generation: BigInt,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub frame_id: BigInt,
+    pub texture_address: BigInt,
+    pub device_address: BigInt,
+    pub pixel_format: BigInt,
+}
+
+#[napi(object)]
+pub struct NativeVulkanOwnedTextureFrame {
+    pub generation: BigInt,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub frame_id: BigInt,
+    pub image_address: BigInt,
+    pub image_view_address: BigInt,
+    pub device_address: BigInt,
+    pub format: u32,
+    pub layout: u32,
+}
+
+#[napi(object)]
 pub struct FeatureStateSelectorInput {
     pub source_id: String,
     pub source_layer_id: Option<String>,
@@ -405,6 +431,72 @@ impl NativeRenderSessionHandle {
         feature_extension_result_to_string(result)
     }
 
+    #[napi(js_name = "acquireMetalOwnedTextureFrame")]
+    pub fn acquire_metal_owned_texture_frame(&self) -> Result<NativeMetalOwnedTextureFrame> {
+        let mut frame = sys::mln_metal_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
+            generation: 0,
+            width: 0,
+            height: 0,
+            scale_factor: 0.0,
+            frame_id: 0,
+            texture: std::ptr::null_mut(),
+            device: std::ptr::null_mut(),
+            pixel_format: 0,
+        };
+        core::check(unsafe {
+            sys::mln_metal_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
+        })
+        .map_err(error::from_core)?;
+        Ok(NativeMetalOwnedTextureFrame::from_native(frame))
+    }
+
+    #[napi(js_name = "releaseMetalOwnedTextureFrame")]
+    pub fn release_metal_owned_texture_frame(
+        &self,
+        frame: NativeMetalOwnedTextureFrame,
+    ) -> Result<()> {
+        let frame = frame.into_native()?;
+        core::check(unsafe {
+            sys::mln_metal_owned_texture_release_frame(self.state.as_ptr(), &frame)
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "acquireVulkanOwnedTextureFrame")]
+    pub fn acquire_vulkan_owned_texture_frame(&self) -> Result<NativeVulkanOwnedTextureFrame> {
+        let mut frame = sys::mln_vulkan_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
+            generation: 0,
+            width: 0,
+            height: 0,
+            scale_factor: 0.0,
+            frame_id: 0,
+            image: std::ptr::null_mut(),
+            image_view: std::ptr::null_mut(),
+            device: std::ptr::null_mut(),
+            format: 0,
+            layout: 0,
+        };
+        core::check(unsafe {
+            sys::mln_vulkan_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
+        })
+        .map_err(error::from_core)?;
+        Ok(NativeVulkanOwnedTextureFrame::from_native(frame))
+    }
+
+    #[napi(js_name = "releaseVulkanOwnedTextureFrame")]
+    pub fn release_vulkan_owned_texture_frame(
+        &self,
+        frame: NativeVulkanOwnedTextureFrame,
+    ) -> Result<()> {
+        let frame = frame.into_native()?;
+        core::check(unsafe {
+            sys::mln_vulkan_owned_texture_release_frame(self.state.as_ptr(), &frame)
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "readPremultipliedRgba8")]
     pub fn read_premultiplied_rgba8(&self) -> Result<TextureReadback> {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
@@ -578,6 +670,68 @@ impl TextureImageInfo {
     }
 }
 
+impl NativeMetalOwnedTextureFrame {
+    fn from_native(raw: sys::mln_metal_owned_texture_frame) -> Self {
+        Self {
+            generation: BigInt::from(raw.generation),
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: BigInt::from(raw.frame_id),
+            texture_address: ptr_to_bigint(raw.texture),
+            device_address: ptr_to_bigint(raw.device),
+            pixel_format: BigInt::from(raw.pixel_format),
+        }
+    }
+
+    fn into_native(self) -> Result<sys::mln_metal_owned_texture_frame> {
+        Ok(sys::mln_metal_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
+            generation: bigint_to_u64(&self.generation, "generation")?,
+            width: self.width,
+            height: self.height,
+            scale_factor: self.scale_factor,
+            frame_id: bigint_to_u64(&self.frame_id, "frameId")?,
+            texture: bigint_to_ptr(&self.texture_address, "textureAddress")?,
+            device: bigint_to_ptr(&self.device_address, "deviceAddress")?,
+            pixel_format: bigint_to_u64(&self.pixel_format, "pixelFormat")?,
+        })
+    }
+}
+
+impl NativeVulkanOwnedTextureFrame {
+    fn from_native(raw: sys::mln_vulkan_owned_texture_frame) -> Self {
+        Self {
+            generation: BigInt::from(raw.generation),
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: BigInt::from(raw.frame_id),
+            image_address: ptr_to_bigint(raw.image),
+            image_view_address: ptr_to_bigint(raw.image_view),
+            device_address: ptr_to_bigint(raw.device),
+            format: raw.format,
+            layout: raw.layout,
+        }
+    }
+
+    fn into_native(self) -> Result<sys::mln_vulkan_owned_texture_frame> {
+        Ok(sys::mln_vulkan_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
+            generation: bigint_to_u64(&self.generation, "generation")?,
+            width: self.width,
+            height: self.height,
+            scale_factor: self.scale_factor,
+            frame_id: bigint_to_u64(&self.frame_id, "frameId")?,
+            image: bigint_to_ptr(&self.image_address, "imageAddress")?,
+            image_view: bigint_to_ptr(&self.image_view_address, "imageViewAddress")?,
+            device: bigint_to_ptr(&self.device_address, "deviceAddress")?,
+            format: self.format,
+            layout: self.layout,
+        })
+    }
+}
+
 fn feature_from_geojson_string(value: String) -> Result<core::Feature> {
     match parse_geojson(value)? {
         core::GeoJson::Feature(feature) => Ok(feature),
@@ -723,14 +877,23 @@ fn attach_render_session(
     Ok(NativeRenderSessionHandle { state })
 }
 
+fn ptr_to_bigint(value: *mut c_void) -> BigInt {
+    BigInt::from(value as usize as u64)
+}
+
 fn bigint_to_ptr(value: &BigInt, field_name: &str) -> Result<*mut c_void> {
+    let value = bigint_to_u64(value, field_name)?;
+    Ok(value as usize as *mut c_void)
+}
+
+fn bigint_to_u64(value: &BigInt, field_name: &str) -> Result<u64> {
     let (signed, value, lossless) = value.get_u64();
     if signed || !lossless {
         return Err(error::invalid_argument(format!(
             "{field_name} must be an unsigned pointer-sized bigint"
         )));
     }
-    Ok(value as usize as *mut c_void)
+    Ok(value)
 }
 
 impl Drop for NativeRenderSessionHandle {

@@ -13,6 +13,7 @@ const {
   MapProjectionHandle,
   latLngForProjectedMeters,
   MaplibreStatus,
+  MetalOwnedTextureFrame,
   NativeBuffer,
   NativePointer,
   OfflineOperationHandle,
@@ -23,6 +24,7 @@ const {
   RenderSessionHandle,
   RuntimeHandle,
   setAsyncLogSeverities,
+  VulkanOwnedTextureFrame,
   setLogCallback,
   setNetworkStatus,
   supportedRenderBackends,
@@ -105,6 +107,60 @@ test("native pointer is a borrowed opaque address value", () => {
   assert.equal(pointer.toString(), "NativePointer[address=0x1234]");
   assert.throws(
     () => NativePointer.unsafeFromAddress(-1n),
+    InvalidArgumentError,
+  );
+});
+
+test("texture frame scopes expose borrowed pointers only while active", () => {
+  let released = false;
+  /** @type {import("..").MetalOwnedTextureFrame | undefined} */
+  let scopedFrame;
+  const result = RenderSessionHandle.prototype.withMetalOwnedTextureFrame.call(
+    {
+      native: {
+        acquireMetalOwnedTextureFrame() {
+          return {
+            generation: 1n,
+            width: 2,
+            height: 3,
+            scaleFactor: 4,
+            frameId: 5n,
+            textureAddress: 0x10n,
+            deviceAddress: 0x20n,
+            pixelFormat: 80n,
+          };
+        },
+        /** @param {any} raw */
+        releaseMetalOwnedTextureFrame(raw) {
+          assert.equal(raw.frameId, 5n);
+          released = true;
+        },
+      },
+    },
+    (frame) => {
+      scopedFrame = frame;
+      assert.equal(frame instanceof MetalOwnedTextureFrame, true);
+      assert.equal(frame.width, 2);
+      assert.equal(frame.texture.address, 0x10n);
+      assert.equal(frame.device.address, 0x20n);
+      assert.equal(frame.pixelFormat, 80n);
+      return "ok";
+    },
+  );
+
+  assert.equal(result, "ok");
+  assert.equal(released, true);
+  const frameAfterScope = scopedFrame;
+  assert.ok(frameAfterScope);
+  assert.throws(() => frameAfterScope.width, InvalidStateError);
+
+  assert.equal(typeof VulkanOwnedTextureFrame, "function");
+  assert.throws(
+    () =>
+      RenderSessionHandle.prototype.withVulkanOwnedTextureFrame.call(
+        { native: {} },
+        /** @type {any} */ (null),
+      ),
     InvalidArgumentError,
   );
 });

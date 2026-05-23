@@ -200,6 +200,9 @@ class NativePointer {
   }
 }
 
+const TEXTURE_FRAME_RAW = Symbol("textureFrameRaw");
+const TEXTURE_FRAME_DEACTIVATE = Symbol("textureFrameDeactivate");
+
 class NativeBuffer {
   static allocate(byteLength) {
     return new NativeBuffer(new ArrayBuffer(validateByteLength(byteLength)));
@@ -255,6 +258,128 @@ class NativeBuffer {
 
   get [Symbol.toStringTag]() {
     return "NativeBuffer";
+  }
+}
+
+class MetalOwnedTextureFrame {
+  #active = true;
+  #raw;
+
+  constructor(raw) {
+    this.#raw = raw;
+    Object.freeze(this);
+  }
+
+  get generation() {
+    return this.#read("generation");
+  }
+
+  get width() {
+    return this.#read("width");
+  }
+
+  get height() {
+    return this.#read("height");
+  }
+
+  get scaleFactor() {
+    return this.#read("scaleFactor");
+  }
+
+  get frameId() {
+    return this.#read("frameId");
+  }
+
+  get texture() {
+    return NativePointer.unsafeFromAddress(this.#read("textureAddress"));
+  }
+
+  get device() {
+    return NativePointer.unsafeFromAddress(this.#read("deviceAddress"));
+  }
+
+  get pixelFormat() {
+    return this.#read("pixelFormat");
+  }
+
+  #read(field) {
+    if (!this.#active) {
+      throw new InvalidStateError(null, "texture frame scope is closed");
+    }
+    return this.#raw[field];
+  }
+
+  [TEXTURE_FRAME_RAW]() {
+    return this.#raw;
+  }
+
+  [TEXTURE_FRAME_DEACTIVATE]() {
+    this.#active = false;
+  }
+}
+
+class VulkanOwnedTextureFrame {
+  #active = true;
+  #raw;
+
+  constructor(raw) {
+    this.#raw = raw;
+    Object.freeze(this);
+  }
+
+  get generation() {
+    return this.#read("generation");
+  }
+
+  get width() {
+    return this.#read("width");
+  }
+
+  get height() {
+    return this.#read("height");
+  }
+
+  get scaleFactor() {
+    return this.#read("scaleFactor");
+  }
+
+  get frameId() {
+    return this.#read("frameId");
+  }
+
+  get image() {
+    return NativePointer.unsafeFromAddress(this.#read("imageAddress"));
+  }
+
+  get imageView() {
+    return NativePointer.unsafeFromAddress(this.#read("imageViewAddress"));
+  }
+
+  get device() {
+    return NativePointer.unsafeFromAddress(this.#read("deviceAddress"));
+  }
+
+  get format() {
+    return this.#read("format");
+  }
+
+  get layout() {
+    return this.#read("layout");
+  }
+
+  #read(field) {
+    if (!this.#active) {
+      throw new InvalidStateError(null, "texture frame scope is closed");
+    }
+    return this.#raw[field];
+  }
+
+  [TEXTURE_FRAME_RAW]() {
+    return this.#raw;
+  }
+
+  [TEXTURE_FRAME_DEACTIVATE]() {
+    this.#active = false;
   }
 }
 
@@ -724,6 +849,54 @@ class RenderSessionHandle {
         ),
       ),
     );
+  }
+
+  withMetalOwnedTextureFrame(callback) {
+    if (typeof callback !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "metal texture frame callback must be a function",
+      );
+    }
+    const frame = new MetalOwnedTextureFrame(
+      translateNativeErrors(() => this.native.acquireMetalOwnedTextureFrame()),
+    );
+    try {
+      return callback(frame);
+    } finally {
+      try {
+        translateNativeErrors(() =>
+          this.native.releaseMetalOwnedTextureFrame(frame[TEXTURE_FRAME_RAW]()),
+        );
+      } finally {
+        frame[TEXTURE_FRAME_DEACTIVATE]();
+      }
+    }
+  }
+
+  withVulkanOwnedTextureFrame(callback) {
+    if (typeof callback !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "vulkan texture frame callback must be a function",
+      );
+    }
+    const frame = new VulkanOwnedTextureFrame(
+      translateNativeErrors(() => this.native.acquireVulkanOwnedTextureFrame()),
+    );
+    try {
+      return callback(frame);
+    } finally {
+      try {
+        translateNativeErrors(() =>
+          this.native.releaseVulkanOwnedTextureFrame(
+            frame[TEXTURE_FRAME_RAW](),
+          ),
+        );
+      } finally {
+        frame[TEXTURE_FRAME_DEACTIVATE]();
+      }
+    }
   }
 
   readPremultipliedRgba8() {
@@ -1418,6 +1591,8 @@ module.exports = {
   MapHandle,
   MapProjectionHandle,
   RenderSessionHandle,
+  MetalOwnedTextureFrame,
+  VulkanOwnedTextureFrame,
   NativePointer,
   NativeBuffer,
   cVersion,
