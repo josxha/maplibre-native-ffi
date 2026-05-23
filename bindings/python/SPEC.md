@@ -115,6 +115,8 @@ The current implementation includes these completed slices:
   map options.
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
+- `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes
+  camera snapshot, jump, pan, and transition-cancel operations.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish shared naming and value semantics.
 - `maplibre_native.json` provides JSON value trees that preserve numeric shape,

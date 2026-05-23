@@ -11,6 +11,7 @@ from . import _native
 from .runtime import RuntimeHandle
 
 if TYPE_CHECKING:
+    from .camera import CameraOptions
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -83,6 +84,49 @@ class MapHandle:
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
+
+    def get_camera(self) -> CameraOptions:
+        """Return the current camera snapshot."""
+        from .camera import CameraOptions
+
+        return CameraOptions.from_native(self._native.get_camera())
+
+    def jump_to(self, camera: CameraOptions) -> None:
+        """Apply a camera jump command."""
+        center = (
+            (camera.center.latitude, camera.center.longitude)
+            if camera.center is not None
+            else None
+        )
+        padding = (
+            (
+                camera.padding.top,
+                camera.padding.left,
+                camera.padding.bottom,
+                camera.padding.right,
+            )
+            if camera.padding is not None
+            else None
+        )
+        anchor = (
+            (camera.anchor.x, camera.anchor.y) if camera.anchor is not None else None
+        )
+        self._native.jump_to(
+            center,
+            camera.zoom,
+            camera.bearing,
+            camera.pitch,
+            padding,
+            anchor,
+        )
+
+    def move_by(self, delta_x: float, delta_y: float) -> None:
+        """Apply a screen-space pan command."""
+        self._native.move_by(delta_x, delta_y)
+
+    def cancel_transitions(self) -> None:
+        """Cancel active camera transitions."""
+        self._native.cancel_transitions()
 
     def add_custom_geometry_source(
         self,

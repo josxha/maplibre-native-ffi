@@ -540,6 +540,48 @@ impl MapHandle {
         Ok(())
     }
 
+    fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: The C API validates that the pointer is a live map handle and
+        // camera points to initialized writable storage.
+        maplibre_core::check(unsafe { sys::mln_map_get_camera(state.as_ptr(), &mut camera) })
+            .map_err(map_error)?;
+        camera_options_to_py(py, &camera)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn jump_to(
+        &self,
+        center: Option<(f64, f64)>,
+        zoom: Option<f64>,
+        bearing: Option<f64>,
+        pitch: Option<f64>,
+        padding: Option<(f64, f64, f64, f64)>,
+        anchor: Option<(f64, f64)>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        // SAFETY: The C API validates the map pointer and camera fields.
+        maplibre_core::check(unsafe { sys::mln_map_jump_to(state.as_ptr(), &camera) })
+            .map_err(map_error)
+    }
+
+    fn move_by(&self, delta_x: f64, delta_y: f64) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and delta values.
+        maplibre_core::check(unsafe { sys::mln_map_move_by(state.as_ptr(), delta_x, delta_y) })
+            .map_err(map_error)
+    }
+
+    fn cancel_transitions(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer.
+        maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(state.as_ptr()) })
+            .map_err(map_error)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn add_custom_geometry_source(
         &self,
@@ -1252,6 +1294,92 @@ fn image_to_py(
     let dict = PyDict::new(py);
     dict.set_item("info", texture_image_info_to_py(py, info)?)?;
     dict.set_item("data", PyBytes::new(py, data))?;
+    Ok(dict.into_any().unbind())
+}
+
+fn camera_options_from_parts(
+    center: Option<(f64, f64)>,
+    zoom: Option<f64>,
+    bearing: Option<f64>,
+    pitch: Option<f64>,
+    padding: Option<(f64, f64, f64, f64)>,
+    anchor: Option<(f64, f64)>,
+) -> sys::mln_camera_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_camera_options_default() };
+    if let Some((latitude, longitude)) = center {
+        raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
+        raw.latitude = latitude;
+        raw.longitude = longitude;
+    }
+    if let Some(zoom) = zoom {
+        raw.fields |= sys::MLN_CAMERA_OPTION_ZOOM;
+        raw.zoom = zoom;
+    }
+    if let Some(bearing) = bearing {
+        raw.fields |= sys::MLN_CAMERA_OPTION_BEARING;
+        raw.bearing = bearing;
+    }
+    if let Some(pitch) = pitch {
+        raw.fields |= sys::MLN_CAMERA_OPTION_PITCH;
+        raw.pitch = pitch;
+    }
+    if let Some((top, left, bottom, right)) = padding {
+        raw.fields |= sys::MLN_CAMERA_OPTION_PADDING;
+        raw.padding = sys::mln_edge_insets {
+            top,
+            left,
+            bottom,
+            right,
+        };
+    }
+    if let Some((x, y)) = anchor {
+        raw.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
+        raw.anchor = sys::mln_screen_point { x, y };
+    }
+    raw
+}
+
+fn camera_options_to_py(py: Python<'_>, camera: &sys::mln_camera_options) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    if camera.fields & sys::MLN_CAMERA_OPTION_CENTER != 0 {
+        let center = PyDict::new(py);
+        center.set_item("latitude", camera.latitude)?;
+        center.set_item("longitude", camera.longitude)?;
+        dict.set_item("center", center)?;
+    } else {
+        dict.set_item("center", py.None())?;
+    }
+    dict.set_item(
+        "zoom",
+        (camera.fields & sys::MLN_CAMERA_OPTION_ZOOM != 0).then_some(camera.zoom),
+    )?;
+    dict.set_item(
+        "bearing",
+        (camera.fields & sys::MLN_CAMERA_OPTION_BEARING != 0).then_some(camera.bearing),
+    )?;
+    dict.set_item(
+        "pitch",
+        (camera.fields & sys::MLN_CAMERA_OPTION_PITCH != 0).then_some(camera.pitch),
+    )?;
+    if camera.fields & sys::MLN_CAMERA_OPTION_PADDING != 0 {
+        let padding = PyDict::new(py);
+        padding.set_item("top", camera.padding.top)?;
+        padding.set_item("left", camera.padding.left)?;
+        padding.set_item("bottom", camera.padding.bottom)?;
+        padding.set_item("right", camera.padding.right)?;
+        dict.set_item("padding", padding)?;
+    } else {
+        dict.set_item("padding", py.None())?;
+    }
+    if camera.fields & sys::MLN_CAMERA_OPTION_ANCHOR != 0 {
+        let anchor = PyDict::new(py);
+        anchor.set_item("x", camera.anchor.x)?;
+        anchor.set_item("y", camera.anchor.y)?;
+        dict.set_item("anchor", anchor)?;
+    } else {
+        dict.set_item("anchor", py.None())?;
+    }
     Ok(dict.into_any().unbind())
 }
 

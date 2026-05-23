@@ -4,7 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import geo, json, render, resource, style
+from maplibre_native import camera, geo, json, render, resource, style
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -142,6 +142,31 @@ def test_map_create_from_closed_runtime_reports_invalid_argument() -> None:
 
     with pytest.raises(mln.InvalidArgumentError):
         runtime.create_map()
+
+
+def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            target = camera.CameraOptions(
+                center=geo.LatLng(10.0, 20.0),
+                zoom=2.0,
+                bearing=15.0,
+                pitch=10.0,
+                padding=camera.EdgeInsets(top=1.0, left=2.0, bottom=3.0, right=4.0),
+                anchor=camera.ScreenPoint(x=16.0, y=8.0),
+            )
+            map_handle.jump_to(target)
+            snapshot = map_handle.get_camera()
+            map_handle.move_by(1.0, 1.0)
+            map_handle.cancel_transitions()
+
+            assert snapshot.center is not None
+            assert snapshot.center.latitude == pytest.approx(10.0)
+            assert snapshot.center.longitude == pytest.approx(20.0)
+            assert snapshot.zoom == pytest.approx(2.0)
+            assert snapshot.bearing == pytest.approx(15.0)
+            assert snapshot.pitch == pytest.approx(10.0)
+            assert snapshot.padding == target.padding
 
 
 def test_poll_event_returns_none_when_queue_is_empty() -> None:
