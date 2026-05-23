@@ -111,6 +111,12 @@ state/validation audit after Round 1 commits.
   - Coverage: added a subprocess regression test that closes runtime, map, and
     custom-geometry handles, exits the interpreter, and asserts stderr does not
     contain shutdown finalizer noise.
+- Cover explicit custom-geometry source removal.
+  - Evidence: reviewers noted the Round 1 record claimed successful
+    `remove_style_source()` releases retained custom geometry state, but there
+    was no focused test for the handle behavior.
+  - Resolution: added a test that removes a custom geometry source, verifies the
+    returned handle is closed, and verifies test callback events are ignored.
 
 ### Rejected or deferred findings
 
@@ -125,8 +131,13 @@ state/validation audit after Round 1 commits.
 
 ### Validation
 
-- Focused regression:
+- Focused finalizer regression:
   `mise run //bindings/python:test --
   tests/test_package.py::test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown`
-- Full Python binding CI: `mise run //bindings/python:ci` (57 Python tests,
-  wheel build, and metadata/`_native` import check)
+- Focused custom-source removal regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_remove_style_source_releases_custom_geometry_handle`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
+  (57 Python tests, wheel build, and metadata/`_native` import check) passed.
