@@ -772,12 +772,42 @@ impl NativeMapHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "addGeoJsonSourceData")]
+    pub fn add_geo_json_source_data(&self, source_id: String, data: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let data = parse_geojson(data)?;
+        let native_data = core::geojson::geojson_try_to_native(&data).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_add_geojson_source_data(
+                self.state.as_ptr(),
+                source_id.raw(),
+                native_data.as_ptr(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "setGeoJsonSourceUrl")]
     pub fn set_geo_json_source_url(&self, source_id: String, url: String) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
         core::check(unsafe {
             sys::mln_map_set_geojson_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setGeoJsonSourceData")]
+    pub fn set_geo_json_source_data(&self, source_id: String, data: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let data = parse_geojson(data)?;
+        let native_data = core::geojson::geojson_try_to_native(&data).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_set_geojson_source_data(
+                self.state.as_ptr(),
+                source_id.raw(),
+                native_data.as_ptr(),
+            )
         })
         .map_err(error::from_core)
     }
@@ -2047,6 +2077,193 @@ fn parse_json_value(value: String) -> Result<core::JsonValue> {
         error::invalid_argument(format!("JSON input is invalid: {parse_error}"))
     })?;
     json_value_from_serde(value)
+}
+
+fn parse_geojson(value: String) -> Result<core::GeoJson> {
+    let value: serde_json::Value = serde_json::from_str(&value).map_err(|parse_error| {
+        error::invalid_argument(format!("GeoJSON input is invalid: {parse_error}"))
+    })?;
+    geojson_from_serde(&value)
+}
+
+fn geojson_from_serde(value: &serde_json::Value) -> Result<core::GeoJson> {
+    match object_type(value)? {
+        "Feature" => Ok(core::GeoJson::Feature(feature_from_serde(value)?)),
+        "FeatureCollection" => {
+            let features = value
+                .get("features")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| {
+                    error::invalid_argument("GeoJSON FeatureCollection.features must be an array")
+                })?
+                .iter()
+                .map(feature_from_serde)
+                .collect::<Result<Vec<_>>>()?;
+            Ok(core::GeoJson::FeatureCollection(features))
+        }
+        _ => Ok(core::GeoJson::Geometry(geometry_from_serde(value)?)),
+    }
+}
+
+fn feature_from_serde(value: &serde_json::Value) -> Result<core::Feature> {
+    if object_type(value)? != "Feature" {
+        return Err(error::invalid_argument(
+            "GeoJSON feature type must be 'Feature'",
+        ));
+    }
+    let geometry = match value.get("geometry") {
+        Some(serde_json::Value::Null) | None => core::Geometry::Empty,
+        Some(geometry) => geometry_from_serde(geometry)?,
+    };
+    let properties = match value.get("properties") {
+        Some(serde_json::Value::Object(properties)) => properties
+            .iter()
+            .map(|(key, value)| {
+                Ok(core::JsonMember::new(
+                    key.clone(),
+                    json_value_from_serde(value.clone())?,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?,
+        Some(serde_json::Value::Null) | None => Vec::new(),
+        _ => {
+            return Err(error::invalid_argument(
+                "GeoJSON feature properties must be an object or null",
+            ));
+        }
+    };
+    let mut feature = core::Feature::new(geometry, properties);
+    if let Some(identifier) = value.get("id") {
+        feature = feature.with_identifier(feature_identifier_from_serde(identifier)?);
+    }
+    Ok(feature)
+}
+
+fn feature_identifier_from_serde(value: &serde_json::Value) -> Result<core::FeatureIdentifier> {
+    match value {
+        serde_json::Value::Null => Ok(core::FeatureIdentifier::Null),
+        serde_json::Value::String(value) => Ok(core::FeatureIdentifier::String(value.clone())),
+        serde_json::Value::Number(value) => {
+            if let Some(value) = value.as_u64() {
+                Ok(core::FeatureIdentifier::UInt(value))
+            } else if let Some(value) = value.as_i64() {
+                Ok(core::FeatureIdentifier::Int(value))
+            } else if let Some(value) = value.as_f64() {
+                Ok(core::FeatureIdentifier::Double(value))
+            } else {
+                Err(error::invalid_argument(
+                    "GeoJSON feature id number is not representable",
+                ))
+            }
+        }
+        _ => Err(error::invalid_argument(
+            "GeoJSON feature id must be a string, number, or null",
+        )),
+    }
+}
+
+fn geometry_from_serde(value: &serde_json::Value) -> Result<core::Geometry> {
+    match object_type(value)? {
+        "Point" => Ok(core::Geometry::Point(position_from_serde(
+            required_member(value, "coordinates")?,
+        )?)),
+        "LineString" => Ok(core::Geometry::LineString(positions_from_serde(
+            required_member(value, "coordinates")?,
+        )?)),
+        "Polygon" => Ok(core::Geometry::Polygon(linear_rings_from_serde(
+            required_member(value, "coordinates")?,
+        )?)),
+        "MultiPoint" => Ok(core::Geometry::MultiPoint(positions_from_serde(
+            required_member(value, "coordinates")?,
+        )?)),
+        "MultiLineString" => Ok(core::Geometry::MultiLineString(lines_from_serde(
+            required_member(value, "coordinates")?,
+        )?)),
+        "MultiPolygon" => Ok(core::Geometry::MultiPolygon(polygons_from_serde(
+            required_member(value, "coordinates")?,
+        )?)),
+        "GeometryCollection" => {
+            let geometries = value
+                .get("geometries")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| {
+                    error::invalid_argument(
+                        "GeoJSON GeometryCollection.geometries must be an array",
+                    )
+                })?
+                .iter()
+                .map(geometry_from_serde)
+                .collect::<Result<Vec<_>>>()?;
+            Ok(core::Geometry::GeometryCollection(geometries))
+        }
+        other => Err(error::invalid_argument(format!(
+            "unsupported GeoJSON geometry type '{other}'"
+        ))),
+    }
+}
+
+fn object_type(value: &serde_json::Value) -> Result<&str> {
+    value
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| error::invalid_argument("GeoJSON object must have a string type"))
+}
+
+fn required_member<'a>(value: &'a serde_json::Value, name: &str) -> Result<&'a serde_json::Value> {
+    value
+        .get(name)
+        .ok_or_else(|| error::invalid_argument(format!("GeoJSON object missing {name}")))
+}
+
+fn position_from_serde(value: &serde_json::Value) -> Result<core::LatLng> {
+    let values = value
+        .as_array()
+        .ok_or_else(|| error::invalid_argument("GeoJSON position must be an array"))?;
+    if values.len() < 2 {
+        return Err(error::invalid_argument(
+            "GeoJSON position must contain longitude and latitude",
+        ));
+    }
+    let longitude = values[0]
+        .as_f64()
+        .ok_or_else(|| error::invalid_argument("GeoJSON longitude must be a number"))?;
+    let latitude = values[1]
+        .as_f64()
+        .ok_or_else(|| error::invalid_argument("GeoJSON latitude must be a number"))?;
+    Ok(core::LatLng::new(latitude, longitude))
+}
+
+fn positions_from_serde(value: &serde_json::Value) -> Result<Vec<core::LatLng>> {
+    value
+        .as_array()
+        .ok_or_else(|| error::invalid_argument("GeoJSON coordinate list must be an array"))?
+        .iter()
+        .map(position_from_serde)
+        .collect()
+}
+
+fn linear_rings_from_serde(value: &serde_json::Value) -> Result<Vec<Vec<core::LatLng>>> {
+    value
+        .as_array()
+        .ok_or_else(|| error::invalid_argument("GeoJSON polygon coordinates must be an array"))?
+        .iter()
+        .map(positions_from_serde)
+        .collect()
+}
+
+fn lines_from_serde(value: &serde_json::Value) -> Result<Vec<Vec<core::LatLng>>> {
+    linear_rings_from_serde(value)
+}
+
+fn polygons_from_serde(value: &serde_json::Value) -> Result<Vec<Vec<Vec<core::LatLng>>>> {
+    value
+        .as_array()
+        .ok_or_else(|| {
+            error::invalid_argument("GeoJSON multi-polygon coordinates must be an array")
+        })?
+        .iter()
+        .map(linear_rings_from_serde)
+        .collect()
 }
 
 fn json_value_to_string(value: core::JsonValue) -> Result<String> {

@@ -315,7 +315,9 @@ export declare class MapHandle {
   getStyleSourceType(sourceId: string): StyleSourceType | null;
   getStyleSourceInfo(sourceId: string): StyleSourceInfo | null;
   addGeoJsonSourceUrl(sourceId: string, url: string): void;
+  addGeoJsonSourceData(sourceId: string, data: JsonValue): void;
   setGeoJsonSourceUrl(sourceId: string, url: string): void;
+  setGeoJsonSourceData(sourceId: string, data: JsonValue): void;
   addVectorSourceUrl(sourceId: string, url: string): void;
   addRasterSourceUrl(sourceId: string, url: string): void;
   addRasterDemSourceUrl(sourceId: string, url: string): void;

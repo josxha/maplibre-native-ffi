@@ -627,9 +627,21 @@ class MapHandle {
     );
   }
 
+  addGeoJsonSourceData(sourceId, data) {
+    return translateNativeErrors(() =>
+      this.native.addGeoJsonSourceData(sourceId, stringifyJson(data)),
+    );
+  }
+
   setGeoJsonSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
       this.native.setGeoJsonSourceUrl(sourceId, url),
+    );
+  }
+
+  setGeoJsonSourceData(sourceId, data) {
+    return translateNativeErrors(() =>
+      this.native.setGeoJsonSourceData(sourceId, stringifyJson(data)),
     );
   }
 
