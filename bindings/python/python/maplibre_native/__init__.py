@@ -1,6 +1,12 @@
 """Low-level Python bindings for MapLibre Native FFI."""
 
-from ._global import EXPECTED_C_ABI_VERSION, c_version, supported_render_backends
+from ._global import (
+    EXPECTED_C_ABI_VERSION,
+    c_version,
+    network_status,
+    set_network_status,
+    supported_render_backends,
+)
 from .errors import (
     InvalidArgumentError,
     InvalidStateError,
@@ -28,5 +34,7 @@ __all__ = [
     "UnsupportedFeatureError",
     "WrongThreadError",
     "c_version",
+    "network_status",
+    "set_network_status",
     "supported_render_backends",
 ]

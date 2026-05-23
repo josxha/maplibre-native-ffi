@@ -2,6 +2,7 @@
 
 from . import _native
 from .render import RenderBackend
+from .runtime import NetworkStatus
 
 EXPECTED_C_ABI_VERSION: int = int(_native.expected_c_abi_version())
 
@@ -14,3 +15,16 @@ def c_version() -> int:
 def supported_render_backends() -> RenderBackend:
     """Return render backends compiled into the linked native library."""
     return RenderBackend(_native.supported_render_backends_raw())
+
+
+def network_status() -> NetworkStatus:
+    """Return MapLibre Native's process-global network status."""
+    return NetworkStatus(_native.network_status_raw())
+
+
+def set_network_status(status: NetworkStatus) -> None:
+    """Set MapLibre Native's process-global network status."""
+    network_status_value = (
+        status if isinstance(status, NetworkStatus) else NetworkStatus(status)
+    )
+    _native.set_network_status_raw(network_status_value.native_code)

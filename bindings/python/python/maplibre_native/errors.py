@@ -47,7 +47,9 @@ class MaplibreError(Exception):
 class InvalidArgumentError(MaplibreError):
     """Error for invalid C ABI arguments or invalid Python-owned inputs."""
 
-    def __init__(self, native_status_code: int = -1, diagnostic: str = "") -> None:
+    def __init__(
+        self, native_status_code: int | None = -1, diagnostic: str = ""
+    ) -> None:
         super().__init__(
             MaplibreStatus.INVALID_ARGUMENT, native_status_code, diagnostic
         )
@@ -56,28 +58,36 @@ class InvalidArgumentError(MaplibreError):
 class InvalidStateError(MaplibreError):
     """Error for otherwise valid objects in the wrong lifecycle state."""
 
-    def __init__(self, native_status_code: int = -2, diagnostic: str = "") -> None:
+    def __init__(
+        self, native_status_code: int | None = -2, diagnostic: str = ""
+    ) -> None:
         super().__init__(MaplibreStatus.INVALID_STATE, native_status_code, diagnostic)
 
 
 class WrongThreadError(MaplibreError):
     """Error for thread-affine native handles called from the wrong thread."""
 
-    def __init__(self, native_status_code: int = -3, diagnostic: str = "") -> None:
+    def __init__(
+        self, native_status_code: int | None = -3, diagnostic: str = ""
+    ) -> None:
         super().__init__(MaplibreStatus.WRONG_THREAD, native_status_code, diagnostic)
 
 
 class UnsupportedFeatureError(MaplibreError):
     """Error for entry points or requested behavior unavailable in this build."""
 
-    def __init__(self, native_status_code: int = -4, diagnostic: str = "") -> None:
+    def __init__(
+        self, native_status_code: int | None = -4, diagnostic: str = ""
+    ) -> None:
         super().__init__(MaplibreStatus.UNSUPPORTED, native_status_code, diagnostic)
 
 
 class NativeError(MaplibreError):
     """Error for native MapLibre failures converted to C status."""
 
-    def __init__(self, native_status_code: int = -5, diagnostic: str = "") -> None:
+    def __init__(
+        self, native_status_code: int | None = -5, diagnostic: str = ""
+    ) -> None:
         super().__init__(MaplibreStatus.NATIVE_ERROR, native_status_code, diagnostic)
 
 

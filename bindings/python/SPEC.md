@@ -106,6 +106,9 @@ This scaffold implements one proof slice:
 - `maplibre_native.c_version()` calls `mln_c_version()` through `_native`.
 - `maplibre_native.supported_render_backends()` calls
   `mln_supported_render_backend_mask()` and returns a Python `IntFlag` value.
+- `maplibre_native.network_status()` and `maplibre_native.set_network_status()`
+  cross native status-returning APIs and raise Python `MaplibreError` subclasses
+  for failures.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish naming and value semantics for later concept
   implementations.
@@ -113,13 +116,13 @@ This scaffold implements one proof slice:
 
 ## Build artifacts and tasks
 
-| Artifact                 | Path                         | Contents                                                                                                                      |
-| ------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Python project           | `bindings/python`            | Public Python package, PyO3 crate, tests, maturin metadata.                                                                   |
-| PyO3 extension crate     | `bindings/python/Cargo.toml` | `maplibre-native-python` cdylib compiled as `maplibre_native._native`.                                                        |
-| Public Python package    | `python/maplibre_native`     | Typed public facade, exceptions, values, handles, and concept modules.                                                        |
-| Private extension module | `maplibre_native._native`    | Current proof-slice bridge functions; later status conversion, handle state, callback trampolines, and copied result helpers. |
-| Test suite               | `tests`                      | Python tests against the real native C library.                                                                               |
+| Artifact                 | Path                         | Contents                                                                                                                         |
+| ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Python project           | `bindings/python`            | Public Python package, PyO3 crate, tests, maturin metadata.                                                                      |
+| PyO3 extension crate     | `bindings/python/Cargo.toml` | `maplibre-native-python` cdylib compiled as `maplibre_native._native`.                                                           |
+| Public Python package    | `python/maplibre_native`     | Typed public facade, exceptions, values, handles, and concept modules.                                                           |
+| Private extension module | `maplibre_native._native`    | Proof-slice bridge functions, native status conversion, and later handle state, callback trampolines, and copied result helpers. |
+| Test suite               | `tests`                      | Python tests against the real native C library.                                                                                  |
 
 Implemented tasks:
 
@@ -141,10 +144,11 @@ the native library exists before maturin invokes Cargo.
 
 ### `maplibre_native._native`
 
-`_native` is private. The current scaffold exposes only the proof-slice bridge
-functions needed by the Python package. As coverage grows, `_native` owns
-PyO3-specific conversion, GIL handling, Python exception construction, buffer
-guards, callback queues, and free-threaded synchronization.
+`_native` is private. The current scaffold exposes proof-slice bridge functions
+and status-converting network status entry points needed by the Python package.
+As coverage grows, `_native` owns PyO3-specific conversion, GIL handling, Python
+exception construction, buffer guards, callback queues, and free-threaded
+synchronization.
 
 `_native` may call `maplibre-native-sys` directly only for the initial proof
 slice or host-runtime trampoline code. Repeated C ABI adaptation moves into
@@ -156,6 +160,8 @@ The package root exports stable public names:
 
 ```python
 c_version()
+network_status()
+set_network_status()
 supported_render_backends()
 EXPECTED_C_ABI_VERSION
 InvalidArgumentError
@@ -201,20 +207,20 @@ callback trampolines, and handle internals stay out of public modules.
 
 ## Public API map
 
-| C concept                            | Python module                                  | Public shape                                                                                                  |
-| ------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Process-global ABI and library state | `maplibre_native`                              | Functions such as `c_version()` and `supported_render_backends()`; planned network status helpers.            |
-| Status and diagnostics               | `maplibre_native.errors`                       | `MaplibreError` subclasses carrying `MaplibreStatus`, raw status code, and diagnostic.                        |
-| Runtime and events                   | `maplibre_native.runtime`                      | `RuntimeHandle`, `RuntimeOptions`, event values, offline operation handles, and resource callback owners.     |
-| Map and style                        | `maplibre_native.map`, `maplibre_native.style` | `MapHandle`, map options, style source/layer/image values, and custom geometry source state.                  |
-| Projection                           | `maplibre_native.map`                          | `MapProjectionHandle` and standalone projection helpers.                                                      |
-| Render targets                       | `maplibre_native.render`                       | `RenderSessionHandle`, render target descriptors, `NativePointer`, backend masks, buffers, and frame handles. |
-| Resources                            | `maplibre_native.resource`                     | Resource requests, responses, provider decisions, transform requests, and one-shot request handles.           |
-| Camera                               | `maplibre_native.camera`                       | Camera, bounds, fit, animation, and free-camera descriptors.                                                  |
-| Geometry and JSON                    | `maplibre_native.geo`, `maplibre_native.json`  | Copied value trees that preserve numeric shape, order, and duplicate JSON object members.                     |
-| Queries                              | `maplibre_native.query`                        | Rendered/source query descriptors and copied result values.                                                   |
-| Logging                              | `maplibre_native.log`                          | Process-global logging callback configuration and copied log records.                                         |
-| Offline                              | `maplibre_native.offline`                      | Offline operation values and event payloads not owned by `runtime`.                                           |
+| C concept                            | Python module                                  | Public shape                                                                                                    |
+| ------------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Process-global ABI and library state | `maplibre_native`                              | Functions such as `c_version()`, `supported_render_backends()`, `network_status()`, and `set_network_status()`. |
+| Status and diagnostics               | `maplibre_native.errors`                       | `MaplibreError` subclasses carrying `MaplibreStatus`, raw status code, and diagnostic.                          |
+| Runtime and events                   | `maplibre_native.runtime`                      | `RuntimeHandle`, `RuntimeOptions`, event values, offline operation handles, and resource callback owners.       |
+| Map and style                        | `maplibre_native.map`, `maplibre_native.style` | `MapHandle`, map options, style source/layer/image values, and custom geometry source state.                    |
+| Projection                           | `maplibre_native.map`                          | `MapProjectionHandle` and standalone projection helpers.                                                        |
+| Render targets                       | `maplibre_native.render`                       | `RenderSessionHandle`, render target descriptors, `NativePointer`, backend masks, buffers, and frame handles.   |
+| Resources                            | `maplibre_native.resource`                     | Resource requests, responses, provider decisions, transform requests, and one-shot request handles.             |
+| Camera                               | `maplibre_native.camera`                       | Camera, bounds, fit, animation, and free-camera descriptors.                                                    |
+| Geometry and JSON                    | `maplibre_native.geo`, `maplibre_native.json`  | Copied value trees that preserve numeric shape, order, and duplicate JSON object members.                       |
+| Queries                              | `maplibre_native.query`                        | Rendered/source query descriptors and copied result values.                                                     |
+| Logging                              | `maplibre_native.log`                          | Process-global logging callback configuration and copied log records.                                           |
+| Offline                              | `maplibre_native.offline`                      | Offline operation values and event payloads not owned by `runtime`.                                             |
 
 ## Naming rules
 
@@ -382,10 +388,10 @@ Coverage targets:
 - [x] Add private PyO3 extension scaffold using the shared Rust crates.
 - [x] Add public package modules, error classes, `NativePointer`, and first
       process-global proof slice.
-- [ ] Move repeated direct `sys` sequences from `_native` into
-      `maplibre-native-core` as bridge-neutral adapters.
-- [ ] Implement native status-to-Python exception conversion in `_native`.
-- [ ] Add `network_status()` and `set_network_status()` over native status
+- [x] Move repeated direct `sys` sequences from `_native` into
+      `maplibre-native-core` as bridge-neutral adapters for network status.
+- [x] Implement native status-to-Python exception conversion in `_native`.
+- [x] Add `network_status()` and `set_network_status()` over native status
       conversion.
 - [ ] Add `RuntimeHandle` with context-manager close and owner-thread error
       propagation.
