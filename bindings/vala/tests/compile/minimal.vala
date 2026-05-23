@@ -270,8 +270,12 @@ void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue 
 void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Geometry geometry) throws GLib.Error {
   string source_id = "fixture-source";
   var data = new MaplibreNative.GeoJson.geometry(geometry);
+  var feature_data = new MaplibreNative.GeoJson.feature(geometry);
+  MaplibreNative.Geometry[] collection_geometries = { geometry };
+  var collection_data = new MaplibreNative.GeoJson.feature_collection(collection_geometries);
   map.add_geojson_source_data(source_id, data);
-  map.set_geojson_source_data(source_id, data);
+  map.set_geojson_source_data(source_id, feature_data);
+  map.set_geojson_source_data(source_id, collection_data);
 
   MaplibreNative.CustomGeometrySourceOptions options = {};
   options.default();
