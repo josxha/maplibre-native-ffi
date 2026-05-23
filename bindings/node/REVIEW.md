@@ -316,3 +316,32 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Post-redesign review round 4
+
+Review evidence:
+
+- Ran three independent review agents after the provider callback handoff shape
+  fix:
+  - FFI/threading/ThreadsafeFunction convention review.
+  - JavaScript/TypeScript API, declaration, export, and test review.
+  - SPEC/REVIEW record-conformance review.
+- The FFI and SPEC/REVIEW reviewers reported no remaining actionable findings.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `mise run fix`, and `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. ESM smoke coverage did not exercise the resource or runtime subpaths central
+   to the redesigned resource API.
+   - Action: `test/esm-smoke.mjs` now imports `ResourceRequestHandle` from the
+     resource subpath and `RuntimeHandle` from the runtime subpath.
+2. Typecheck coverage did not exercise the corrected provider callback API.
+   - Action: `test/subpath-types.test.cts` now imports
+     `ResourceProviderCallback`, defines a callback that receives
+     `request.handle`, and type-checks a
+     `RuntimeHandle.setResourceProviderRoutes()` call.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.

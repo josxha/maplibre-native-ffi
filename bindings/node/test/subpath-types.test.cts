@@ -17,6 +17,7 @@ import {
 } from "@maplibre/native-ffi-node/render";
 import {
   ResourceRequestHandle,
+  type ResourceProviderCallback,
   type ResourceResponseInput,
   type ResourceRoute,
   type ResourceTransformRule,
@@ -51,6 +52,14 @@ const geometry: RenderedQueryGeometry = {
 };
 const response: ResourceResponseInput = { status: "ok" };
 const route: ResourceRoute = { urlPrefix: "custom://", kind: "source" };
+const providerCallback: ResourceProviderCallback = (request) => {
+  request.handle.complete(response);
+};
+RuntimeHandle.prototype.setResourceProviderRoutes.call(
+  {} as RuntimeHandle,
+  [route],
+  providerCallback,
+);
 const transformRule: ResourceTransformRule = {
   urlPrefix: "http://example.test/",
   replacementUrlPrefix: "https://example.test/",
@@ -76,6 +85,7 @@ void descriptor;
 void geometry;
 void response;
 void route;
+void providerCallback;
 void transformRule;
 void invalidTransformRuleMissingPrefix;
 void invalidTransformRuleBothReplacements;
