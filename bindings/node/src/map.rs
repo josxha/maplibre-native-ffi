@@ -518,6 +518,52 @@ impl NativeMapHandle {
         json_snapshot_to_string(snapshot)
     }
 
+    #[napi(js_name = "setStyleLightJson")]
+    pub fn set_style_light_json(&self, light_json: String) -> Result<()> {
+        let light = parse_json_value(light_json)?;
+        let native_light =
+            core::json::json_value_try_to_native(&light).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_set_style_light_json(self.state.as_ptr(), native_light.as_ptr())
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setStyleLightPropertyJson")]
+    pub fn set_style_light_property_json(
+        &self,
+        property_name: String,
+        value_json: String,
+    ) -> Result<()> {
+        let property_name = core::string::string_view(&property_name);
+        let value = parse_json_value(value_json)?;
+        let native_value =
+            core::json::json_value_try_to_native(&value).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_set_style_light_property(
+                self.state.as_ptr(),
+                property_name.raw(),
+                native_value.as_ptr(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getStyleLightPropertyJson")]
+    pub fn get_style_light_property_json(&self, property_name: String) -> Result<Option<String>> {
+        let property_name = core::string::string_view(&property_name);
+        let mut snapshot = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_map_get_style_light_property(
+                self.state.as_ptr(),
+                property_name.raw(),
+                &mut snapshot,
+            )
+        })
+        .map_err(error::from_core)?;
+        json_snapshot_to_string(snapshot)
+    }
+
     #[napi(js_name = "setStyleJson")]
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;

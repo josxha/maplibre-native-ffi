@@ -320,6 +320,17 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
     });
+    map.setStyleLight({ anchor: "viewport", color: "#ffffff", intensity: 0.5 });
+    map.setStyleLightProperty("intensity", 0.75);
+    assert.equal(map.getStyleLightProperty("intensity"), 0.75);
+    assert.deepEqual(map.getStyleLightProperty("color"), [
+      "rgba",
+      255,
+      255,
+      255,
+      1,
+    ]);
+
     assert.equal(map.styleSourceExists("empty-geojson"), true);
     assert.equal(map.listStyleSourceIds().includes("empty-geojson"), true);
     assert.equal(map.getStyleSourceType("empty-geojson"), "geojson");

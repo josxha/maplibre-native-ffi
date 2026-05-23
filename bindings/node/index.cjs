@@ -533,6 +533,25 @@ class MapHandle {
     return json === null ? null : JSON.parse(json);
   }
 
+  setStyleLight(light) {
+    return translateNativeErrors(() =>
+      this.native.setStyleLightJson(stringifyJson(light)),
+    );
+  }
+
+  setStyleLightProperty(propertyName, value) {
+    return translateNativeErrors(() =>
+      this.native.setStyleLightPropertyJson(propertyName, stringifyJson(value)),
+    );
+  }
+
+  getStyleLightProperty(propertyName) {
+    const json = translateNativeErrors(() =>
+      this.native.getStyleLightPropertyJson(propertyName),
+    );
+    return json === null ? null : JSON.parse(json);
+  }
+
   setStyleJson(json) {
     return translateNativeErrors(() => this.native.setStyleJson(json));
   }

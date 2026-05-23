@@ -197,6 +197,9 @@ export declare class MapHandle {
   getLayerProperty(layerId: string, propertyName: string): JsonValue | null;
   setLayerFilter(layerId: string, filter: JsonValue | null): void;
   getLayerFilter(layerId: string): JsonValue | null;
+  setStyleLight(light: JsonValue): void;
+  setStyleLightProperty(propertyName: string, value: JsonValue): void;
+  getStyleLightProperty(propertyName: string): JsonValue | null;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;
