@@ -612,3 +612,43 @@ review-record audit.
   `uv run pytest bindings/python/tests/test_package.py` (60 tests),
   `mise run //bindings/python:ci`, `uv run ty check --error-on-warning .mise`,
   and `cargo check -p maplibre-native-python`; all passed.
+
+## Round 13
+
+Review fanout: post-decision implementation check for offline-operation
+lifecycle, runtime annotation-cycle removal, public root exports, deduplication
+scope, validation, and decision-log accuracy.
+
+### Applied findings
+
+- None. Reviewers found no actionable in-scope findings worth fixing now.
+- Decision-log cleanup: updated `DECISIONS.md` so the offline-operation
+  lifecycle section reflects the implemented `RuntimeHandle.close()`
+  coordination rather than describing it as remaining work.
+
+### Rejected or deferred findings
+
+- Deeper deduplication below the Python public binding layer remains deferred.
+  Within the Python binding stack, the branch is expected to stay polished and
+  mechanically regular.
+- Broad private callback simulators, backend-specific render readback/frame
+  hardening, packaging/distribution/CI-matrix expansion, broad enum
+  deduplication, and broader root export expansion remain deferred.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Reviewers found no actionable lifecycle, typing/API, validation, root-export,
+  or decision-log findings.
+- Focused validation run before this review round:
+  `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `uv run ty check --error-on-warning .mise`,
+  `cargo check -p maplibre-native-python`,
+  `mise run //bindings/python:test -- tests/test_package.py::test_runtime_close_marks_live_offline_operations_closed tests/test_package.py::test_offline_operation_take_rejects_closed_handles tests/test_package.py::test_offline_operation_take_results_convert_public_values`,
+  `mise run //bindings/python:test -- tests/test_package.py::test_public_type_hints_are_resolvable tests/test_package.py::test_public_modules_avoid_runtime_annotation_fallbacks`,
+  and `mise run //bindings/python:ci` (62 Python tests, wheel build, and
+  metadata/`_native` import check) passed.

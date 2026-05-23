@@ -47,14 +47,12 @@ and an operation whose runtime is already closed becomes closed when discard
 sees the closed runtime. Python should provide comparable Python-side lifecycle
 safety.
 
-The immediate Python fix already landed for closed or double-taken operation
-handles: `OfflineOperationHandle.take_*()` methods validate closed state before
-calling native code. The remaining lifecycle polish is coordination between
-`RuntimeHandle.close()` and still-live `OfflineOperationHandle` wrappers. The
-preferred behavior is that a successful runtime close marks outstanding offline
-operation wrappers closed, so later `take_*()` or `close()` calls fail/no-op
-from Python-owned state rather than reaching native with stale runtime state.
+The Python binding now follows that policy. `OfflineOperationHandle.take_*()`
+methods validate closed state before calling native code, and a successful
+`RuntimeHandle.close()` marks outstanding offline operation wrappers closed so
+later `take_*()` or `close()` calls fail/no-op from Python-owned state rather
+than reaching native with stale runtime state.
 
-Keep failed native operations retryable: if a native take or discard fails, the
-offline operation wrapper should remain live unless the failure proves the
-runtime is already closed and the wrapper can no longer be used.
+Failed native operations stay retryable: if a native take or discard fails, the
+offline operation wrapper remains live unless the failure proves the runtime is
+already closed and the wrapper can no longer be used.
