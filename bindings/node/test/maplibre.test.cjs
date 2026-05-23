@@ -544,6 +544,12 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       "https://example.test/dem/{z}/{x}/{y}.png",
     ]);
     assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
+    map.addHillshadeLayer("hillshade", "raster-dem-url");
+    map.addColorReliefLayer("color-relief", "raster-dem-tiles", "hillshade");
+    assert.equal(map.getStyleLayerType("hillshade"), "hillshade");
+    assert.equal(map.getStyleLayerType("color-relief"), "color-relief");
+    assert.equal(map.removeStyleLayer("color-relief"), true);
+    assert.equal(map.removeStyleLayer("hillshade"), true);
 
     map.addImageSourceUrl(
       "image-source",

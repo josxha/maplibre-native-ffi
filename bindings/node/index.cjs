@@ -669,6 +669,18 @@ class MapHandle {
     );
   }
 
+  addHillshadeLayer(layerId, sourceId, beforeLayerId = null) {
+    return translateNativeErrors(() =>
+      this.native.addHillshadeLayer(layerId, sourceId, beforeLayerId),
+    );
+  }
+
+  addColorReliefLayer(layerId, sourceId, beforeLayerId = null) {
+    return translateNativeErrors(() =>
+      this.native.addColorReliefLayer(layerId, sourceId, beforeLayerId),
+    );
+  }
+
   addLocationIndicatorLayer(layerId, beforeLayerId = null) {
     return translateNativeErrors(() =>
       this.native.addLocationIndicatorLayer(layerId, beforeLayerId),

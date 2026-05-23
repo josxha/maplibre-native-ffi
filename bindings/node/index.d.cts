@@ -273,6 +273,16 @@ export declare class MapHandle {
   setImageSourceUrl(sourceId: string, url: string): void;
   setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;
   getImageSourceCoordinates(sourceId: string): LatLng[] | null;
+  addHillshadeLayer(
+    layerId: string,
+    sourceId: string,
+    beforeLayerId?: string | null,
+  ): void;
+  addColorReliefLayer(
+    layerId: string,
+    sourceId: string,
+    beforeLayerId?: string | null,
+  ): void;
   addLocationIndicatorLayer(
     layerId: string,
     beforeLayerId?: string | null,

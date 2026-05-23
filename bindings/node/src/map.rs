@@ -902,6 +902,50 @@ impl NativeMapHandle {
         ))
     }
 
+    #[napi(js_name = "addHillshadeLayer")]
+    pub fn add_hillshade_layer(
+        &self,
+        layer_id: String,
+        source_id: String,
+        before_layer_id: Option<String>,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let source_id = core::string::string_view(&source_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = core::string::string_view(&before_layer_id);
+        core::check(unsafe {
+            sys::mln_map_add_hillshade_layer(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                source_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addColorReliefLayer")]
+    pub fn add_color_relief_layer(
+        &self,
+        layer_id: String,
+        source_id: String,
+        before_layer_id: Option<String>,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let source_id = core::string::string_view(&source_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = core::string::string_view(&before_layer_id);
+        core::check(unsafe {
+            sys::mln_map_add_color_relief_layer(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                source_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "addLocationIndicatorLayer")]
     pub fn add_location_indicator_layer(
         &self,
