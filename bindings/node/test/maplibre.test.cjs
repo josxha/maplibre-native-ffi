@@ -174,7 +174,7 @@ test("handles stay local while workers create their own runtime", async () => {
   assert.deepEqual(result, { ok: true });
 });
 
-test("ambient cache operations expose discardable handles", () => {
+test("offline operations expose discardable handles", () => {
   const runtime = new RuntimeHandle();
 
   try {
@@ -185,6 +185,34 @@ test("ambient cache operations expose discardable handles", () => {
     operation.close();
     assert.equal(operation.closed, true);
     operation.close();
+    const list = runtime.offlineRegionsList();
+    assert.equal(list instanceof OfflineOperationHandle, true);
+    list.close();
+    const get = runtime.offlineRegionGet(1n);
+    get.close();
+    const create = runtime.offlineRegionCreate(
+      {
+        kind: "tilePyramid",
+        styleUrl: "https://example.test/style.json",
+        bounds: {
+          southwest: { latitude: -1, longitude: -2 },
+          northeast: { latitude: 1, longitude: 2 },
+        },
+        minZoom: 0,
+        maxZoom: 1,
+        pixelRatio: 1,
+      },
+      new Uint8Array([1, 2, 3]),
+    );
+    create.close();
+    assert.throws(
+      () =>
+        runtime.offlineRegionSetDownloadState(
+          1n,
+          /** @type {any} */ ("paused"),
+        ),
+      InvalidArgumentError,
+    );
     assert.throws(
       () => runtime.runAmbientCacheOperation(/** @type {any} */ ("vacuum")),
       InvalidArgumentError,

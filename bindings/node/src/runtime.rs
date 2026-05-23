@@ -25,6 +25,18 @@ pub struct OfflineOperationStart {
 }
 
 #[napi(object)]
+pub struct OfflineRegionDefinitionInput {
+    pub kind: String,
+    pub style_url: String,
+    pub bounds: Option<crate::values::LatLngBounds>,
+    pub geometry: Option<String>,
+    pub min_zoom: f64,
+    pub max_zoom: f64,
+    pub pixel_ratio: f64,
+    pub include_ideographs: Option<bool>,
+}
+
+#[napi(object)]
 pub struct RuntimeEvent {
     pub event_type: String,
     pub raw_event_type: u32,
@@ -261,9 +273,124 @@ impl NativeRuntimeHandle {
             )
         })
         .map_err(error::from_core)?;
-        Ok(OfflineOperationStart {
-            operation_id: operation_id.to_string(),
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionsList")]
+    pub fn offline_regions_list(&self) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_regions_list_start(self.state.as_ptr(), &mut operation_id)
         })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionGet")]
+    pub fn offline_region_get(&self, region_id: BigInt) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_get_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionSetObserved")]
+    pub fn offline_region_set_observed(
+        &self,
+        region_id: BigInt,
+        observed: bool,
+    ) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_set_observed_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                observed,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionSetDownloadState")]
+    pub fn offline_region_set_download_state(
+        &self,
+        region_id: BigInt,
+        state: String,
+    ) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_set_download_state_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                offline_region_download_state_from_string(&state)?,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionInvalidate")]
+    pub fn offline_region_invalidate(&self, region_id: BigInt) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_invalidate_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionDelete")]
+    pub fn offline_region_delete(&self, region_id: BigInt) -> Result<OfflineOperationStart> {
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_delete_start(
+                self.state.as_ptr(),
+                bigint_to_i64(region_id, "regionId")?,
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
+    }
+
+    #[napi(js_name = "offlineRegionCreate")]
+    pub fn offline_region_create(
+        &self,
+        definition: OfflineRegionDefinitionInput,
+        metadata: Option<Uint8Array>,
+    ) -> Result<OfflineOperationStart> {
+        let definition = offline_region_definition_from_input(definition)?;
+        let native_definition = core::runtime::offline_region_definition_to_native(&definition)
+            .map_err(error::from_core)?;
+        let raw_definition = native_definition.to_raw();
+        let metadata = metadata
+            .map(|metadata| metadata.to_vec())
+            .unwrap_or_default();
+        let mut operation_id = 0;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_create_start(
+                self.state.as_ptr(),
+                &raw_definition,
+                core::runtime::metadata_ptr(&metadata),
+                metadata.len(),
+                &mut operation_id,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_operation_start(operation_id))
     }
 
     #[napi(js_name = "discardOfflineOperation")]
@@ -666,6 +793,60 @@ impl RuntimeOptions {
     }
 }
 
+fn offline_operation_start(operation_id: u64) -> OfflineOperationStart {
+    OfflineOperationStart {
+        operation_id: operation_id.to_string(),
+    }
+}
+
+fn offline_region_definition_from_input(
+    input: OfflineRegionDefinitionInput,
+) -> Result<core::OfflineRegionDefinition> {
+    let include_ideographs = input.include_ideographs.unwrap_or(true);
+    match input.kind.as_str() {
+        "tilePyramid" => Ok(core::OfflineRegionDefinition::TilePyramid {
+            style_url: input.style_url,
+            bounds: input
+                .bounds
+                .ok_or_else(|| {
+                    error::invalid_argument("tile pyramid offline region requires bounds")
+                })?
+                .into_core(),
+            min_zoom: input.min_zoom,
+            max_zoom: input.max_zoom,
+            pixel_ratio: input.pixel_ratio as f32,
+            include_ideographs,
+        }),
+        "geometry" => Ok(core::OfflineRegionDefinition::GeometryRegion {
+            style_url: input.style_url,
+            geometry: crate::map::parse_geometry(input.geometry.ok_or_else(|| {
+                error::invalid_argument("geometry offline region requires geometry")
+            })?)?,
+            min_zoom: input.min_zoom,
+            max_zoom: input.max_zoom,
+            pixel_ratio: input.pixel_ratio as f32,
+            include_ideographs,
+        }),
+        other => Err(error::invalid_argument(format!(
+            "offline region kind must be 'tilePyramid' or 'geometry', got '{other}'"
+        ))),
+    }
+}
+
+fn offline_region_download_state_from_string(state: &str) -> Result<u32> {
+    match state {
+        "inactive" => core::OfflineRegionDownloadState::Inactive
+            .raw_for_set()
+            .map_err(error::from_core),
+        "active" => core::OfflineRegionDownloadState::Active
+            .raw_for_set()
+            .map_err(error::from_core),
+        other => Err(error::invalid_argument(format!(
+            "offline region download state must be 'inactive' or 'active', got '{other}'"
+        ))),
+    }
+}
+
 fn ambient_cache_operation_from_string(operation: &str) -> Result<u32> {
     match operation {
         "resetDatabase" => Ok(sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE),
@@ -680,6 +861,16 @@ fn ambient_cache_operation_from_string(operation: &str) -> Result<u32> {
 
 fn maximum_cache_size_to_u64(value: BigInt) -> Result<u64> {
     bigint_to_u64(value, "maximumCacheSize")
+}
+
+fn bigint_to_i64(value: BigInt, field_name: &str) -> Result<i64> {
+    let (value, lossless) = value.get_i64();
+    if !lossless {
+        return Err(error::invalid_argument(format!(
+            "{field_name} must be a signed 64-bit bigint"
+        )));
+    }
+    Ok(value)
 }
 
 fn bigint_to_u64(value: BigInt, field_name: &str) -> Result<u64> {

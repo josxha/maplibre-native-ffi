@@ -311,9 +311,51 @@ export declare class RuntimeHandle {
   runAmbientCacheOperation(
     operation: AmbientCacheOperation,
   ): OfflineOperationHandle;
+  offlineRegionsList(): OfflineOperationHandle;
+  offlineRegionGet(regionId: bigint): OfflineOperationHandle;
+  offlineRegionSetObserved(
+    regionId: bigint,
+    observed: boolean,
+  ): OfflineOperationHandle;
+  offlineRegionSetDownloadState(
+    regionId: bigint,
+    state: OfflineRegionDownloadState,
+  ): OfflineOperationHandle;
+  offlineRegionInvalidate(regionId: bigint): OfflineOperationHandle;
+  offlineRegionDelete(regionId: bigint): OfflineOperationHandle;
+  offlineRegionCreate(
+    definition: OfflineRegionDefinition,
+    metadata?: Uint8Array | null,
+  ): OfflineOperationHandle;
   pollEvent(): RuntimeEvent | null;
   [Symbol.dispose](): void;
 }
+
+export interface OfflineTilePyramidRegionDefinition {
+  kind: "tilePyramid";
+  styleUrl: string;
+  bounds: LatLngBounds;
+  minZoom: number;
+  maxZoom: number;
+  pixelRatio: number;
+  includeIdeographs?: boolean | null;
+}
+
+export interface OfflineGeometryRegionDefinition {
+  kind: "geometry";
+  styleUrl: string;
+  geometry: JsonValue;
+  minZoom: number;
+  maxZoom: number;
+  pixelRatio: number;
+  includeIdeographs?: boolean | null;
+}
+
+export type OfflineRegionDefinition =
+  | OfflineTilePyramidRegionDefinition
+  | OfflineGeometryRegionDefinition;
+
+export type OfflineRegionDownloadState = "inactive" | "active";
 
 export declare class OfflineOperationHandle {
   constructor(runtime: RuntimeHandle, operationId: bigint);

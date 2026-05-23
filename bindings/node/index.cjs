@@ -405,6 +405,55 @@ class RuntimeHandle {
     return new OfflineOperationHandle(this, BigInt(start.operationId));
   }
 
+  offlineRegionsList() {
+    return this.#offlineOperation(() => this.native.offlineRegionsList());
+  }
+
+  offlineRegionGet(regionId) {
+    return this.#offlineOperation(() => this.native.offlineRegionGet(regionId));
+  }
+
+  offlineRegionSetObserved(regionId, observed) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionSetObserved(regionId, observed),
+    );
+  }
+
+  offlineRegionSetDownloadState(regionId, state) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionSetDownloadState(regionId, state),
+    );
+  }
+
+  offlineRegionInvalidate(regionId) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionInvalidate(regionId),
+    );
+  }
+
+  offlineRegionDelete(regionId) {
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionDelete(regionId),
+    );
+  }
+
+  offlineRegionCreate(definition, metadata = null) {
+    const nativeDefinition = { ...definition };
+    if (definition?.geometry == null) {
+      delete nativeDefinition.geometry;
+    } else {
+      nativeDefinition.geometry = stringifyJson(definition.geometry);
+    }
+    return this.#offlineOperation(() =>
+      this.native.offlineRegionCreate(nativeDefinition, metadata),
+    );
+  }
+
+  #offlineOperation(startOperation) {
+    const start = translateNativeErrors(startOperation);
+    return new OfflineOperationHandle(this, BigInt(start.operationId));
+  }
+
   pollEvent() {
     return translateNativeErrors(() => this.native.pollEvent());
   }
