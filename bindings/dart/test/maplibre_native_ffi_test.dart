@@ -16,7 +16,7 @@ void main() {
       nativeLibraryPath != null && File(nativeLibraryPath).existsSync();
 
   test(
-    'process-global proof slice crosses the native C ABI',
+    'process-global APIs cross the native C ABI',
     () {
       expect(Maplibre.cVersion(), greaterThanOrEqualTo(0));
       expect(Maplibre.supportedRenderBackends().bits, greaterThanOrEqualTo(0));
