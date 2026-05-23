@@ -19,12 +19,20 @@ int main(string[] args) {
     MaplibreNative.LatLng round_trip;
     MaplibreNative.LatLng.for_projected_meters(meters, out round_trip);
 
-    var runtime = new MaplibreNative.RuntimeHandle();
+    MaplibreNative.RuntimeOptions runtime_options = {};
+    runtime_options.default();
+    var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
     runtime.run_once();
     MaplibreNative.RuntimeEvent event;
     runtime.poll_event(out event);
 
-    var map = new MaplibreNative.MapHandle(runtime, 512, 512, 1.0);
+    MaplibreNative.MapOptions map_options = {};
+    map_options.default();
+    map_options.width = 512;
+    map_options.height = 512;
+    map_options.scale_factor = 1.0;
+    map_options.map_mode = MaplibreNative.MapMode.CONTINUOUS;
+    var map = new MaplibreNative.MapHandle.with_options(runtime, map_options);
     map.set_style_url("asset://missing-style.json");
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
     map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);

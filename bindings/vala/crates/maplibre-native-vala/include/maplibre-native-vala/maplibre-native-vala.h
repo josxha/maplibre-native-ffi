@@ -28,6 +28,23 @@ typedef enum {
 } MlnValaNetworkStatus;
 
 typedef enum {
+  MLN_VALA_RUNTIME_OPTION_FLAGS_MAXIMUM_CACHE_SIZE = 1u << 0u,
+} MlnValaRuntimeOptionFlags;
+
+typedef enum {
+  MLN_VALA_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1,
+  MLN_VALA_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2,
+  MLN_VALA_AMBIENT_CACHE_OPERATION_INVALIDATE = 3,
+  MLN_VALA_AMBIENT_CACHE_OPERATION_CLEAR = 4,
+} MlnValaAmbientCacheOperation;
+
+typedef enum {
+  MLN_VALA_MAP_MODE_CONTINUOUS = 0,
+  MLN_VALA_MAP_MODE_STATIC = 1,
+  MLN_VALA_MAP_MODE_TILE = 2,
+} MlnValaMapMode;
+
+typedef enum {
   MLN_VALA_LOG_SEVERITY_INFO = 1,
   MLN_VALA_LOG_SEVERITY_WARNING = 2,
   MLN_VALA_LOG_SEVERITY_ERROR = 3,
@@ -168,6 +185,46 @@ typedef struct {
   double x;
   double y;
 } MlnValaScreenPoint;
+
+typedef struct {
+  uint32_t size;
+  MlnValaRuntimeOptionFlags flags;
+  const char* asset_path;
+  const char* cache_path;
+  uint64_t maximum_cache_size;
+} MlnValaRuntimeOptions;
+
+typedef struct {
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  double scale_factor;
+  MlnValaMapMode map_mode;
+} MlnValaMapOptions;
+
+/**
+ * mln_vala_runtime_options_default:
+ * @out_options: (out): return location for initialized runtime options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_options_default(
+  MlnValaRuntimeOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_map_options_default:
+ * @out_options: (out): return location for initialized map options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_options_default(
+  MlnValaMapOptions* out_options, GError** error
+);
 
 typedef struct {
   double top;
@@ -475,6 +532,18 @@ gboolean mln_vala_lat_lng_for_projected_meters(
 MlnValaRuntimeHandle* mln_vala_runtime_handle_new(GError** error);
 
 /**
+ * mln_vala_runtime_handle_new_with_options:
+ * @options: (not nullable): runtime options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a new runtime handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaRuntimeHandle* mln_vala_runtime_handle_new_with_options(
+  const MlnValaRuntimeOptions* options, GError** error
+);
+
+/**
  * mln_vala_runtime_handle_close:
  * @self: a runtime handle.
  * @error: return location for a `GError`, or `NULL`.
@@ -513,6 +582,34 @@ gboolean mln_vala_runtime_handle_poll_event(
 );
 
 /**
+ * mln_vala_runtime_handle_run_ambient_cache_operation_start:
+ * @self: a runtime handle.
+ * @operation: ambient cache operation.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_run_ambient_cache_operation_start(
+  MlnValaRuntimeHandle* self, MlnValaAmbientCacheOperation operation,
+  uint64_t* out_operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_operation_discard:
+ * @self: a runtime handle.
+ * @operation_id: offline operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_operation_discard(
+  MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
+);
+
+/**
  * mln_vala_map_handle_new:
  * @runtime: a runtime handle.
  * @width: map width in logical pixels.
@@ -526,6 +623,20 @@ gboolean mln_vala_runtime_handle_poll_event(
 MlnValaMapHandle* mln_vala_map_handle_new(
   MlnValaRuntimeHandle* runtime, uint32_t width, uint32_t height,
   double scale_factor, GError** error
+);
+
+/**
+ * mln_vala_map_handle_new_with_options:
+ * @runtime: a runtime handle.
+ * @options: (not nullable): map options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a new map handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaMapHandle* mln_vala_map_handle_new_with_options(
+  MlnValaRuntimeHandle* runtime, const MlnValaMapOptions* options,
+  GError** error
 );
 
 /**

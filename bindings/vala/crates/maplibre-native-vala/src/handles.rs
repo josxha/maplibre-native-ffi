@@ -34,8 +34,50 @@ pub extern "C" fn mln_vala_map_handle_get_type() -> GType {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_options_default(
+    out_options: *mut sys::mln_runtime_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_runtime_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_options_default(
+    out_options: *mut sys::mln_map_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_map_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_new(error_out: *mut *mut GError) -> *mut RuntimeHandle {
-    match create_runtime_handle() {
+    match create_runtime_handle(ptr::null()) {
+        Ok(handle) => handle,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_new_with_options(
+    options: *const sys::mln_runtime_options,
+    error_out: *mut *mut GError,
+) -> *mut RuntimeHandle {
+    match create_runtime_handle(options) {
         Ok(handle) => handle,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -82,6 +124,37 @@ pub extern "C" fn mln_vala_runtime_handle_poll_event(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match poll_runtime_event(handle, out_event) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_run_ambient_cache_operation_start(
+    handle: *mut RuntimeHandle,
+    operation: u32,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match run_ambient_cache_operation_start(handle, operation, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_operation_discard(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_operation_discard(handle, operation_id) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -197,6 +270,21 @@ pub extern "C" fn mln_vala_map_handle_new(
     error_out: *mut *mut GError,
 ) -> *mut MapHandle {
     match create_map_handle(runtime, width, height, scale_factor) {
+        Ok(handle) => handle,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_new_with_options(
+    runtime: *mut RuntimeHandle,
+    options: *const sys::mln_map_options,
+    error_out: *mut *mut GError,
+) -> *mut MapHandle {
+    match create_map_handle_with_options(runtime, options) {
         Ok(handle) => handle,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -722,6 +810,18 @@ pub extern "C" fn mln_vala_map_handle_set_style_json(
     }
 }
 
+fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_runtime_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_map_options(out_options: *mut sys::mln_map_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_map_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
 fn request_repaint(handle: *mut MapHandle) -> error::Result<()> {
     let map = map_native(handle)?;
     // SAFETY: `map_native` returns a live native map pointer.
@@ -1138,6 +1238,30 @@ fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> erro
     error::check(unsafe { sys::mln_map_set_style_json(map, json) })
 }
 
+fn run_ambient_cache_operation_start(
+    handle: *mut RuntimeHandle,
+    operation: u32,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live, and `out_operation_id` points to writable
+    // operation ID storage. The C API validates operation values.
+    error::check(unsafe {
+        sys::mln_runtime_run_ambient_cache_operation_start(runtime, operation, out_operation_id)
+    })
+}
+
+fn offline_operation_discard(handle: *mut RuntimeHandle, operation_id: u64) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    // SAFETY: `runtime` is live. The C API validates operation IDs.
+    error::check(unsafe { sys::mln_runtime_offline_operation_discard(runtime, operation_id) })
+}
+
 fn poll_runtime_event(
     handle: *mut RuntimeHandle,
     out_event: *mut *mut RuntimeEvent,
@@ -1167,12 +1291,22 @@ fn poll_runtime_event(
     Ok(())
 }
 
-fn create_runtime_handle() -> error::Result<*mut RuntimeHandle> {
+fn create_runtime_handle(
+    options: *const sys::mln_runtime_options,
+) -> error::Result<*mut RuntimeHandle> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
-    let options = unsafe { sys::mln_runtime_options_default() };
+    let default_options;
+    let options = if options.is_null() {
+        default_options = unsafe { sys::mln_runtime_options_default() };
+        &default_options
+    } else {
+        // SAFETY: The caller supplied a non-null pointer to borrowed runtime
+        // options for the duration of this call.
+        unsafe { &*options }
+    };
     let mut native = ptr::null_mut();
     // SAFETY: `options` and `native` out pointer are valid for this call.
-    error::check(unsafe { sys::mln_runtime_create(&options, &mut native) })?;
+    error::check(unsafe { sys::mln_runtime_create(options, &mut native) })?;
 
     let handle = glib::new_object::<RuntimeHandle>(mln_vala_runtime_handle_get_type());
     if handle.is_null() {
@@ -1223,17 +1357,27 @@ fn create_map_handle(
     height: u32,
     scale_factor: f64,
 ) -> error::Result<*mut MapHandle> {
-    let native_runtime = runtime_native(runtime)?;
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let mut options = unsafe { sys::mln_map_options_default() };
     options.width = width;
     options.height = height;
     options.scale_factor = scale_factor;
+    create_map_handle_with_options(runtime, &options)
+}
+
+fn create_map_handle_with_options(
+    runtime: *mut RuntimeHandle,
+    options: *const sys::mln_map_options,
+) -> error::Result<*mut MapHandle> {
+    let native_runtime = runtime_native(runtime)?;
+    if options.is_null() {
+        return Err(Error::invalid_argument("map options are null"));
+    }
 
     let mut native = ptr::null_mut();
     // SAFETY: `native_runtime`, `options`, and out pointer are valid for this
-    // call. The C API validates option values.
-    error::check(unsafe { sys::mln_map_create(native_runtime, &options, &mut native) })?;
+    // call. The C API validates option values and copies needed inputs.
+    error::check(unsafe { sys::mln_map_create(native_runtime, options, &mut native) })?;
 
     let handle = glib::new_object::<MapHandle>(mln_vala_map_handle_get_type());
     if handle.is_null() {
@@ -1303,6 +1447,71 @@ mod tests {
             GFALSE
         );
 
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn runtime_and_map_options_create_handles() {
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut runtime_options: sys::mln_runtime_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_runtime_options_default(&mut runtime_options, ptr::null_mut()),
+            GTRUE
+        );
+        let runtime = mln_vala_runtime_handle_new_with_options(&runtime_options, ptr::null_mut());
+        assert!(!runtime.is_null());
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut map_options: sys::mln_map_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_map_options_default(&mut map_options, ptr::null_mut()),
+            GTRUE
+        );
+        map_options.width = 128;
+        map_options.height = 128;
+        map_options.scale_factor = 1.0;
+        let map = mln_vala_map_handle_new_with_options(runtime, &map_options, ptr::null_mut());
+        assert!(!map.is_null());
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn offline_operation_wrappers_report_invalid_inputs() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+
+        let mut operation_id = 0;
+        let mut error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_runtime_handle_run_ambient_cache_operation_start(
+                runtime,
+                0,
+                &mut operation_id,
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_runtime_handle_offline_operation_discard(runtime, 0, &mut error),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
         glib::unref_object(runtime);
     }
 
