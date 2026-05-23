@@ -91,12 +91,30 @@ export interface RuntimeEvent {
   payloadKind: string;
 }
 
+export interface MapOptions {
+  width?: number | null;
+  height?: number | null;
+  scaleFactor?: number | null;
+  mapMode?: "continuous" | "static" | "tile" | null;
+}
+
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
   readonly closed: boolean;
+  createMap(options?: MapOptions | null): MapHandle;
   close(): void;
   runOnce(): void;
   pollEvent(): RuntimeEvent | null;
+  [Symbol.dispose](): void;
+}
+
+export declare class MapHandle {
+  constructor(runtime: RuntimeHandle, options?: MapOptions | null);
+  readonly closed: boolean;
+  close(): void;
+  requestRepaint(): void;
+  setStyleJson(json: string): void;
+  setStyleUrl(url: string): void;
   [Symbol.dispose](): void;
 }
 

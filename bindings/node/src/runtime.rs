@@ -153,6 +153,12 @@ fn runtime_event_type_name(event_type: core::RuntimeEventType) -> &'static str {
     }
 }
 
+impl NativeRuntimeHandle {
+    pub(crate) fn as_ptr(&self) -> *mut sys::mln_runtime {
+        self.state.as_ptr()
+    }
+}
+
 impl Drop for NativeRuntimeHandle {
     fn drop(&mut self) {
         let _ = self.state.leak_for_report();

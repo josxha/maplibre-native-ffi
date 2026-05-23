@@ -4,7 +4,9 @@ const test = require("node:test");
 const {
   cVersion,
   InvalidArgumentError,
+  InvalidStateError,
   MaplibreError,
+  MapHandle,
   MaplibreStatus,
   networkStatus,
   RuntimeHandle,
@@ -44,6 +46,28 @@ test("runtime handle supports options, explicit close, and idempotent disposal",
   assert.equal(runtime.closed, true);
   runtime.close();
   runtime[Symbol.dispose]();
+});
+
+test("map handle retains runtime parent and closes before runtime", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 32, height: 32, scaleFactor: 1 });
+
+  assert.equal(map instanceof MapHandle, true);
+  assert.equal(map.closed, false);
+  assert.throws(() => runtime.close(), InvalidStateError);
+  map.close();
+  assert.equal(map.closed, true);
+  map.close();
+  runtime.close();
+});
+
+test("map options reject unknown map modes", () => {
+  const runtime = new RuntimeHandle();
+  assert.throws(
+    () => runtime.createMap({ mapMode: /** @type {any} */ ("globe") }),
+    InvalidArgumentError,
+  );
+  runtime.close();
 });
 
 test("runtime options reject invalid bigint values", () => {

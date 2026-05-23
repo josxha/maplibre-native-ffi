@@ -154,12 +154,12 @@ index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice and root exports
 src/runtime.rs    runtime handle, runtime option materialization, and event polling proof slice
+src/map.rs        map handle, map option materialization, style-loading, and repaint proof slice
 ```
 
 Planned internal Rust modules own implementation roles:
 
 ```text
-src/map.rs        map handles, camera, style loading, and map-owned callbacks
 src/render.rs     render sessions, targets, readback, and frame scopes
 src/resource.rs   resource request/response conversion and one-shot handles
 src/style.rs      style source, layer, image, and custom geometry conversion
@@ -536,7 +536,8 @@ area instead of retesting all native C validation rules.
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
    polling. _(Initial event envelope polling proof slice complete.)_
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent
-   retention.
+   retention. _(Initial lifecycle, options, style-loading, and parent-retention
+   proof slice complete.)_
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,
    and TypeScript concept modules.
 7. Add logging, resource transforms, resource providers, and one-shot resource

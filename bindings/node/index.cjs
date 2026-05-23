@@ -100,6 +100,10 @@ class RuntimeHandle {
     );
   }
 
+  createMap(options) {
+    return new MapHandle(this, options);
+  }
+
   close() {
     return translateNativeErrors(() => this.native.close());
   }
@@ -114,6 +118,42 @@ class RuntimeHandle {
 
   pollEvent() {
     return translateNativeErrors(() => this.native.pollEvent());
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
+class MapHandle {
+  constructor(runtime, options) {
+    if (!(runtime instanceof RuntimeHandle)) {
+      throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
+    }
+    this.runtime = runtime;
+    this.native = translateNativeErrors(() =>
+      native.createNativeMapHandle(runtime.native, options ?? {}),
+    );
+  }
+
+  close() {
+    return translateNativeErrors(() => this.native.close());
+  }
+
+  get closed() {
+    return this.native.closed;
+  }
+
+  requestRepaint() {
+    return translateNativeErrors(() => this.native.requestRepaint());
+  }
+
+  setStyleJson(json) {
+    return translateNativeErrors(() => this.native.setStyleJson(json));
+  }
+
+  setStyleUrl(url) {
+    return translateNativeErrors(() => this.native.setStyleUrl(url));
   }
 
   [Symbol.dispose]() {
@@ -223,6 +263,7 @@ module.exports = {
   NativeError,
   MaplibreStatus,
   RuntimeHandle,
+  MapHandle,
   cVersion,
   supportedRenderBackends,
   networkStatus,

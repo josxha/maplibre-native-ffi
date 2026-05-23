@@ -7,8 +7,10 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod error;
+mod map;
 mod maplibre;
 mod runtime;
 
+pub use map::*;
 pub use maplibre::*;
 pub use runtime::*;
