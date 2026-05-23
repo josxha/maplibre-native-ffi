@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
@@ -219,7 +220,22 @@ void main() {
     expect(ResourceLoadingMethod.all.rawValue, 0);
     expect(ResourceStoragePolicy.permanent.rawValue, 0);
     expect(ResourceResponseStatus.error.rawValue, 1);
+    expect(ResourceErrorReason.rateLimit.rawValue, 4);
     expect(SourceType.customVector.rawValue, 8);
     expect(TileScheme.tms.rawValue, 1);
+  });
+
+  test('resource responses preserve public semantic fields', () {
+    final response = ResourceResponse(
+      status: ResourceResponseStatus.ok,
+      bytes: Uint8List.fromList([1, 2, 3]),
+      etag: 'abc',
+      modifiedUnixMs: 42,
+    );
+
+    expect(response.status, ResourceResponseStatus.ok);
+    expect(response.bytes, [1, 2, 3]);
+    expect(response.etag, 'abc');
+    expect(response.modifiedUnixMs, 42);
   });
 }

@@ -1,6 +1,8 @@
 /// Resource requests, responses, transforms, providers, and request handles.
 library;
 
+import 'dart:typed_data';
+
 /// Resource kind requested by MapLibre Native.
 final class ResourceKind {
   const ResourceKind._(this.rawValue, this.name);
@@ -143,6 +145,46 @@ final class ResourceResponseStatus {
   final String name;
 }
 
+/// Resource error reason.
+final class ResourceErrorReason {
+  const ResourceErrorReason._(this.rawValue, this.name);
+
+  /// No error.
+  static const none = ResourceErrorReason._(0, 'none');
+
+  /// Resource was not found.
+  static const notFound = ResourceErrorReason._(1, 'notFound');
+
+  /// Server returned an error.
+  static const server = ResourceErrorReason._(2, 'server');
+
+  /// Connection failed.
+  static const connection = ResourceErrorReason._(3, 'connection');
+
+  /// Request was rate-limited.
+  static const rateLimit = ResourceErrorReason._(4, 'rateLimit');
+
+  /// Other resource error.
+  static const other = ResourceErrorReason._(5, 'other');
+
+  /// Creates an error reason from a raw native value.
+  factory ResourceErrorReason.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => none,
+    1 => notFound,
+    2 => server,
+    3 => connection,
+    4 => rateLimit,
+    5 => other,
+    _ => ResourceErrorReason._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+}
+
 /// Decision returned by a resource provider callback.
 final class ResourceProviderDecision {
   const ResourceProviderDecision._(this.rawValue, this.name);
@@ -158,4 +200,47 @@ final class ResourceProviderDecision {
 
   /// Human-readable name.
   final String name;
+}
+
+/// Resource response returned by a Dart resource provider.
+final class ResourceResponse {
+  /// Creates a resource response.
+  const ResourceResponse({
+    required this.status,
+    this.errorReason = ResourceErrorReason.none,
+    this.bytes,
+    this.errorMessage,
+    this.mustRevalidate = false,
+    this.modifiedUnixMs,
+    this.expiresUnixMs,
+    this.etag,
+    this.retryAfterUnixMs,
+  });
+
+  /// Response status.
+  final ResourceResponseStatus status;
+
+  /// Error reason for error responses.
+  final ResourceErrorReason errorReason;
+
+  /// Optional response bytes.
+  final Uint8List? bytes;
+
+  /// Optional error message.
+  final String? errorMessage;
+
+  /// Whether cached data must be revalidated.
+  final bool mustRevalidate;
+
+  /// Optional modified timestamp in Unix milliseconds.
+  final int? modifiedUnixMs;
+
+  /// Optional expiration timestamp in Unix milliseconds.
+  final int? expiresUnixMs;
+
+  /// Optional entity tag.
+  final String? etag;
+
+  /// Optional retry-after timestamp in Unix milliseconds.
+  final int? retryAfterUnixMs;
 }

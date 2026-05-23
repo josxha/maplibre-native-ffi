@@ -423,6 +423,23 @@ final class MaplibreNativeCApi {
     _raw.mln_json_snapshot_destroy(snapshot);
   }
 
+  /// Completes a C API resource provider request.
+  int resourceRequestComplete(
+    Pointer<raw.mln_resource_request_handle> handle,
+    Pointer<raw.mln_resource_response> response,
+  ) => _raw.mln_resource_request_complete(handle, response).value;
+
+  /// Reports whether a resource provider request was cancelled.
+  int resourceRequestCancelled(
+    Pointer<raw.mln_resource_request_handle> handle,
+    Pointer<Bool> outCancelled,
+  ) => _raw.mln_resource_request_cancelled(handle, outCancelled).value;
+
+  /// Releases the provider's reference to a resource request handle.
+  void resourceRequestRelease(Pointer<raw.mln_resource_request_handle> handle) {
+    _raw.mln_resource_request_release(handle);
+  }
+
   /// Adds one style source from a style-spec source JSON object.
   int mapAddStyleSourceJson(
     Pointer<raw.mln_map> map,

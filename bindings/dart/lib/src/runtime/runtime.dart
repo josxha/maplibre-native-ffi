@@ -17,6 +17,7 @@ import '../json/json.dart';
 import '../query/query.dart';
 import '../render/native_pointer.dart';
 import '../render/targets.dart';
+import '../resource/resource.dart';
 import '../style/style.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
@@ -981,6 +982,52 @@ final class RenderSessionHandle {
   }
 }
 
+/// Releasable handle for a resource request owned by a Dart provider.
+final class ResourceRequestHandle {
+  ResourceRequestHandle._(this._pointer);
+
+  Pointer<raw.mln_resource_request_handle> _pointer;
+  var _released = false;
+
+  /// Whether this provider reference has been released by Dart.
+  bool get isReleased => _released;
+
+  /// Reports whether MapLibre has cancelled this provider request.
+  bool cancelled() {
+    return withNativeArena((arena) {
+      final outCancelled = arena<Bool>();
+      _check(_c.resourceRequestCancelled(_livePointer, outCancelled));
+      return outCancelled.value;
+    });
+  }
+
+  /// Completes this request with [response]. Completion is one-shot.
+  void complete(ResourceResponse response) {
+    withNativeArena((arena) {
+      final nativeResponse = arena<raw.mln_resource_response>();
+      nativeResponse.ref = _resourceResponseToNative(response, arena);
+      _check(_c.resourceRequestComplete(_livePointer, nativeResponse));
+    });
+  }
+
+  /// Releases the provider reference. The handle must not be used afterwards.
+  void close() {
+    if (_released) {
+      return;
+    }
+    _c.resourceRequestRelease(_pointer);
+    _pointer = nullptr;
+    _released = true;
+  }
+
+  Pointer<raw.mln_resource_request_handle> get _livePointer {
+    if (_released || _pointer == nullptr) {
+      throwInvalidArgument('resource request handle has been released');
+    }
+    return _pointer;
+  }
+}
+
 /// CPU image readback metadata for a texture session frame.
 final class TextureImageInfo {
   const TextureImageInfo._({
@@ -1132,6 +1179,53 @@ final class VulkanOwnedTextureFrame {
     final _ = _session._pointer;
     return NativePointer(pointer.address);
   }
+}
+
+raw.mln_resource_response _resourceResponseToNative(
+  ResourceResponse response,
+  Allocator allocator,
+) {
+  final result = Struct.create<raw.mln_resource_response>();
+  result.size = sizeOf<raw.mln_resource_response>();
+  result.status = response.status.rawValue;
+  result.error_reason = response.errorReason.rawValue;
+  final bytes = response.bytes;
+  if (bytes != null && bytes.isNotEmpty) {
+    final nativeBytes = allocator<Uint8>(bytes.length);
+    for (var index = 0; index < bytes.length; index += 1) {
+      nativeBytes[index] = bytes[index];
+    }
+    result.bytes = nativeBytes;
+    result.byte_count = bytes.length;
+  }
+  final errorMessage = response.errorMessage;
+  if (errorMessage != null) {
+    result.error_message = nativeUtf8CString(
+      errorMessage,
+      allocator,
+    ).pointer.cast<Char>();
+  }
+  result.must_revalidate = response.mustRevalidate;
+  final modifiedUnixMs = response.modifiedUnixMs;
+  if (modifiedUnixMs != null) {
+    result.has_modified = true;
+    result.modified_unix_ms = modifiedUnixMs;
+  }
+  final expiresUnixMs = response.expiresUnixMs;
+  if (expiresUnixMs != null) {
+    result.has_expires = true;
+    result.expires_unix_ms = expiresUnixMs;
+  }
+  final etag = response.etag;
+  if (etag != null) {
+    result.etag = nativeUtf8CString(etag, allocator).pointer.cast<Char>();
+  }
+  final retryAfterUnixMs = response.retryAfterUnixMs;
+  if (retryAfterUnixMs != null) {
+    result.has_retry_after = true;
+    result.retry_after_unix_ms = retryAfterUnixMs;
+  }
+  return result;
 }
 
 raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(
