@@ -82,7 +82,8 @@ The scaffold implements one proof slice in Rust:
 - `mln_vala_network_status_get()` and `mln_vala_network_status_set()` cross the
   real C ABI and expose failure through GLib `GError`.
 - `RuntimeHandle` and `MapHandle` are registered as GObject classes with
-  deterministic close methods and map lifecycle/style/debug methods.
+  deterministic close methods, map lifecycle/style methods, debug option flags,
+  and rendering-stats controls.
 - Runtime event polling copies event metadata and message bytes into a boxed
   `RuntimeEvent` value.
 - `RenderBackendFlags` and `NetworkStatus` expose typed Vala enum surfaces

@@ -63,6 +63,16 @@ typedef enum {
   MLN_VALA_LOG_EVENT_TIMING = 16,
 } MlnValaLogEvent;
 
+typedef enum {
+  MLN_VALA_MAP_DEBUG_OPTIONS_TILE_BORDERS = 1u << 1u,
+  MLN_VALA_MAP_DEBUG_OPTIONS_PARSE_STATUS = 1u << 2u,
+  MLN_VALA_MAP_DEBUG_OPTIONS_TIMESTAMPS = 1u << 3u,
+  MLN_VALA_MAP_DEBUG_OPTIONS_COLLISION = 1u << 4u,
+  MLN_VALA_MAP_DEBUG_OPTIONS_OVERDRAW = 1u << 5u,
+  MLN_VALA_MAP_DEBUG_OPTIONS_STENCIL_CLIP = 1u << 6u,
+  MLN_VALA_MAP_DEBUG_OPTIONS_DEPTH_BUFFER = 1u << 7u,
+} MlnValaMapDebugOptions;
+
 GQuark mln_vala_error_quark(void);
 
 typedef struct {
@@ -330,6 +340,58 @@ gboolean mln_vala_map_handle_request_repaint(
  */
 gboolean mln_vala_map_handle_request_still_image(
   MlnValaMapHandle* self, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_debug_options:
+ * @self: a map handle.
+ * @options: debug option flags.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_debug_options(
+  MlnValaMapHandle* self, MlnValaMapDebugOptions options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_debug_options:
+ * @self: a map handle.
+ * @out_options: (out): return location for debug option flags.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_debug_options(
+  MlnValaMapHandle* self, MlnValaMapDebugOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_rendering_stats_view_enabled:
+ * @self: a map handle.
+ * @enabled: whether to show the rendering stats overlay.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_rendering_stats_view_enabled(
+  MlnValaMapHandle* self, gboolean enabled, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_rendering_stats_view_enabled:
+ * @self: a map handle.
+ * @out_enabled: (out): return location for overlay state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_rendering_stats_view_enabled(
+  MlnValaMapHandle* self, gboolean* out_enabled, GError** error
 );
 
 /**

@@ -150,6 +150,66 @@ pub extern "C" fn mln_vala_map_handle_request_still_image(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_debug_options(
+    handle: *mut MapHandle,
+    options: u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_debug_options(handle, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_debug_options(
+    handle: *mut MapHandle,
+    out_options: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_debug_options(handle, out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_rendering_stats_view_enabled(
+    handle: *mut MapHandle,
+    enabled: GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_rendering_stats_view_enabled(handle, enabled != GFALSE) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_rendering_stats_view_enabled(
+    handle: *mut MapHandle,
+    out_enabled: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_rendering_stats_view_enabled(handle, out_enabled) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_is_fully_loaded(
     handle: *mut MapHandle,
     out_loaded: *mut GBoolean,
@@ -218,6 +278,41 @@ fn request_still_image(handle: *mut MapHandle) -> error::Result<()> {
     let map = map_native(handle)?;
     // SAFETY: `map_native` returns a live native map pointer.
     error::check(unsafe { sys::mln_map_request_still_image(map) })
+}
+
+fn set_debug_options(handle: *mut MapHandle, options: u32) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map_native` returns a live native map pointer. The C API
+    // validates debug-option bits.
+    error::check(unsafe { sys::mln_map_set_debug_options(map, options) })
+}
+
+fn get_debug_options(handle: *mut MapHandle, out_options: *mut u32) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_options.is_null() {
+        return Err(Error::invalid_argument(
+            "debug options output pointer is null",
+        ));
+    }
+    // SAFETY: `map` is live and `out_options` points to writable storage.
+    error::check(unsafe { sys::mln_map_get_debug_options(map, out_options) })
+}
+
+fn set_rendering_stats_view_enabled(handle: *mut MapHandle, enabled: bool) -> error::Result<()> {
+    let map = map_native(handle)?;
+    // SAFETY: `map_native` returns a live native map pointer.
+    error::check(unsafe { sys::mln_map_set_rendering_stats_view_enabled(map, enabled) })
+}
+
+fn get_rendering_stats_view_enabled(
+    handle: *mut MapHandle,
+    out_enabled: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let mut enabled = false;
+    // SAFETY: `map` is live and `enabled` is valid output storage.
+    error::check(unsafe { sys::mln_map_get_rendering_stats_view_enabled(map, &mut enabled) })?;
+    glib::clear_optional_out_pointer(out_enabled, if enabled { GTRUE } else { GFALSE })
 }
 
 fn is_fully_loaded(handle: *mut MapHandle, out_loaded: *mut GBoolean) -> error::Result<()> {
@@ -428,6 +523,53 @@ mod tests {
         assert!(!runtime.is_null());
         let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
         assert!(!map.is_null());
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn map_debug_and_rendering_stats_options_round_trip() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        assert_eq!(
+            mln_vala_map_handle_set_debug_options(
+                map,
+                sys::MLN_MAP_DEBUG_TILE_BORDERS,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut debug_options = 0;
+        assert_eq!(
+            mln_vala_map_handle_get_debug_options(map, &mut debug_options, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(debug_options, sys::MLN_MAP_DEBUG_TILE_BORDERS);
+
+        assert_eq!(
+            mln_vala_map_handle_set_rendering_stats_view_enabled(map, GTRUE, ptr::null_mut()),
+            GTRUE
+        );
+        let mut rendering_stats_enabled = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_get_rendering_stats_view_enabled(
+                map,
+                &mut rendering_stats_enabled,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(rendering_stats_enabled, GTRUE);
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

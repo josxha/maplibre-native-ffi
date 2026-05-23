@@ -27,6 +27,12 @@ int main(string[] args) {
     var map = new MaplibreNative.MapHandle(runtime, 512, 512, 1.0);
     map.set_style_url("asset://missing-style.json");
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);
+    MaplibreNative.MapDebugOptions debug_options;
+    map.get_debug_options(out debug_options);
+    map.set_rendering_stats_view_enabled(true);
+    bool rendering_stats_enabled = false;
+    map.get_rendering_stats_view_enabled(out rendering_stats_enabled);
     bool loaded = false;
     map.is_fully_loaded(out loaded);
     map.dump_debug_logs();
