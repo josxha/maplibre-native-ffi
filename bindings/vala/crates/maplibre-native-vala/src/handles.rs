@@ -3865,6 +3865,10 @@ fn feature_state_selector_storage()
     STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+fn initialize_feature_state_selector(selector: &mut sys::mln_feature_state_selector) {
+    selector.size = std::mem::size_of::<sys::mln_feature_state_selector>() as u32;
+}
+
 fn owned_string_view(
     value: *const c_char,
     label: &str,
@@ -3888,6 +3892,7 @@ fn set_feature_state_source_id(
 ) -> error::Result<()> {
     let (owned, view) = owned_string_view(source_id, "feature-state source ID")?;
     let selector_ref = mut_struct(selector, "feature-state selector")?;
+    initialize_feature_state_selector(selector_ref);
     feature_state_selector_storage()
         .lock()
         .expect("feature-state selector storage lock poisoned")
@@ -3904,6 +3909,7 @@ fn set_feature_state_source_layer_id(
 ) -> error::Result<()> {
     let (owned, view) = owned_string_view(source_layer_id, "feature-state source layer ID")?;
     let selector_ref = mut_struct(selector, "feature-state selector")?;
+    initialize_feature_state_selector(selector_ref);
     feature_state_selector_storage()
         .lock()
         .expect("feature-state selector storage lock poisoned")
@@ -3921,6 +3927,7 @@ fn set_feature_state_feature_id(
 ) -> error::Result<()> {
     let (owned, view) = owned_string_view(feature_id, "feature-state feature ID")?;
     let selector_ref = mut_struct(selector, "feature-state selector")?;
+    initialize_feature_state_selector(selector_ref);
     feature_state_selector_storage()
         .lock()
         .expect("feature-state selector storage lock poisoned")
@@ -3938,6 +3945,7 @@ fn set_feature_state_state_key(
 ) -> error::Result<()> {
     let (owned, view) = owned_string_view(state_key, "feature-state state key")?;
     let selector_ref = mut_struct(selector, "feature-state selector")?;
+    initialize_feature_state_selector(selector_ref);
     feature_state_selector_storage()
         .lock()
         .expect("feature-state selector storage lock poisoned")
@@ -6118,17 +6126,36 @@ fn offline_region_create_start(
             "offline operation ID output pointer is null",
         ));
     }
+    let mut definition = unsafe { *definition };
+    initialize_offline_region_definition(&mut definition);
     // SAFETY: `runtime` is live, definition and metadata are borrowed for this
     // call, and output storage is writable.
     error::check(unsafe {
         sys::mln_runtime_offline_region_create_start(
             runtime,
-            definition,
+            &definition,
             metadata,
             metadata_size,
             out_operation_id,
         )
     })
+}
+
+fn initialize_offline_region_definition(definition: &mut sys::mln_offline_region_definition) {
+    definition.size = std::mem::size_of::<sys::mln_offline_region_definition>() as u32;
+    unsafe {
+        match definition.type_ {
+            sys::MLN_OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID => {
+                definition.data.tile_pyramid.size =
+                    std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32;
+            }
+            sys::MLN_OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY => {
+                definition.data.geometry.size =
+                    std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn offline_region_get_start(
@@ -6684,6 +6711,19 @@ mod tests {
     ) {
     }
 
+    unsafe extern "C" fn counted_custom_geometry_tile_delegate(
+        _tile_id: sys::mln_canonical_tile_id,
+        _user_data: *mut c_void,
+    ) {
+    }
+
+    unsafe extern "C" fn counted_custom_geometry_destroy_notify(user_data: *mut c_void) {
+        assert!(!user_data.is_null());
+        // SAFETY: Tests pass a live `AtomicUsize` pointer as user_data and
+        // trigger destroy-notify before the counter leaves scope.
+        unsafe { &*(user_data as *const AtomicUsize) }.fetch_add(1, Ordering::SeqCst);
+    }
+
     #[test]
     fn runtime_handle_create_run_and_close() {
         let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
@@ -7052,6 +7092,108 @@ mod tests {
             GTRUE
         );
 
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn custom_geometry_callbacks_release_on_source_removal() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let destroy_count = AtomicUsize::new(0);
+        assert_eq!(
+            mln_vala_map_handle_add_custom_geometry_source_with_callbacks(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                Some(counted_custom_geometry_tile_delegate),
+                &destroy_count as *const AtomicUsize as *mut c_void,
+                Some(counted_custom_geometry_destroy_notify),
+                None,
+                ptr::null_mut(),
+                None,
+                ptr::null(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut removed = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn custom_geometry_callbacks_release_on_inline_style_replacement() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let destroy_count = AtomicUsize::new(0);
+        assert_eq!(
+            mln_vala_map_handle_add_custom_geometry_source_with_callbacks(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                Some(counted_custom_geometry_tile_delegate),
+                &destroy_count as *const AtomicUsize as *mut c_void,
+                Some(counted_custom_geometry_destroy_notify),
+                None,
+                ptr::null_mut(),
+                None,
+                ptr::null(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
         glib::unref_object(map);
         glib::unref_object(runtime);
     }

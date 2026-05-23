@@ -13,7 +13,6 @@ use crate::glib::{self, GError, GType};
 
 const JSON_VALUE_TYPE_NAME: &CStr = c"MlnValaJsonValue";
 const GEOMETRY_TYPE_NAME: &CStr = c"MlnValaGeometry";
-const FEATURE_TYPE_NAME: &CStr = c"MlnValaFeature";
 const GEOJSON_TYPE_NAME: &CStr = c"MlnValaGeoJson";
 
 #[repr(C)]
@@ -73,11 +72,6 @@ pub extern "C" fn mln_vala_geometry_get_type() -> GType {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_feature_get_type() -> GType {
-    glib::register_boxed_type(FEATURE_TYPE_NAME, feature_copy_erased, feature_free_erased)
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_geo_json_get_type() -> GType {
     glib::register_boxed_type(GEOJSON_TYPE_NAME, geojson_copy_erased, geojson_free_erased)
 }
@@ -107,22 +101,6 @@ pub extern "C" fn mln_vala_geometry_copy(value: *const Geometry) -> *mut Geometr
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_geometry_free(value: *mut Geometry) {
-    if !value.is_null() {
-        unsafe {
-            drop(Box::from_raw(value));
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_feature_copy(value: *const Feature) -> *mut Feature {
-    feature_ref(value).map_or(ptr::null_mut(), |value| {
-        Box::into_raw(Box::new(value.clone()))
-    })
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_feature_free(value: *mut Feature) {
     if !value.is_null() {
         unsafe {
             drop(Box::from_raw(value));
@@ -280,23 +258,6 @@ pub extern "C" fn mln_vala_geometry_new_line_string(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_feature_new(
-    geometry: *const Geometry,
-    error_out: *mut *mut GError,
-) -> *mut Feature {
-    let Some(geometry) = geometry_ref(geometry) else {
-        glib::set_error(
-            error_out,
-            Error::invalid_argument("feature geometry is null"),
-        );
-        return ptr::null_mut();
-    };
-    Box::into_raw(Box::new(Feature {
-        value: core::Feature::new(geometry.value.clone(), Vec::new()),
-    }))
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_geo_json_new_geometry(
     geometry: *const Geometry,
     error_out: *mut *mut GError,
@@ -391,12 +352,6 @@ unsafe extern "C" fn geometry_copy_erased(value: *mut c_void) -> *mut c_void {
 }
 unsafe extern "C" fn geometry_free_erased(value: *mut c_void) {
     mln_vala_geometry_free(value.cast());
-}
-unsafe extern "C" fn feature_copy_erased(value: *mut c_void) -> *mut c_void {
-    mln_vala_feature_copy(value.cast()).cast()
-}
-unsafe extern "C" fn feature_free_erased(value: *mut c_void) {
-    mln_vala_feature_free(value.cast());
 }
 unsafe extern "C" fn geojson_copy_erased(value: *mut c_void) -> *mut c_void {
     mln_vala_geo_json_copy(value.cast()).cast()

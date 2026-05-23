@@ -6,7 +6,7 @@ use std::ptr;
 use maplibre_native_core::error::Error;
 use maplibre_native_sys as sys;
 
-use crate::glib::{self, GBoolean, GError, GFALSE, GTRUE, GType};
+use crate::glib::{self, GError, GType};
 
 const STRING_LIST_TYPE_NAME: &CStr = c"MlnValaStringList";
 
@@ -142,12 +142,4 @@ pub(crate) fn string_list_ref(list: *const StringList) -> Option<&'static String
 
 pub(crate) fn copy_optional_list(list: *const StringList) -> Option<StringList> {
     string_list_ref(list).cloned()
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_string_list_is_empty(list: *const StringList) -> GBoolean {
-    match string_list_ref(list) {
-        Some(list) if !list.views.is_empty() => GFALSE,
-        _ => GTRUE,
-    }
 }

@@ -447,3 +447,43 @@ Review artifacts:
 - `mise run //bindings/vala:generate`
 - `mise run //bindings/vala:ci`
 - `mise run test`
+
+## Round 12
+
+Review artifacts:
+
+- `review-loop/round12-api-surface.md`
+- `review-loop/round12-lifecycle.md`
+- `review-loop/round12-validation-docs.md`
+
+### Applied findings
+
+- Added focused Rust adapter tests proving captured custom-geometry delegate
+  destroy-notify state is released after successful matching source removal and
+  after successful inline style JSON replacement.
+
+### Rejected or deferred findings
+
+- `NativePointer` remains a public opaque pointer-address value by design for
+  backend-native handles; this is documented in the SPEC and Vala conventions.
+- `set_style_url()` custom-geometry teardown remains deferred because URL style
+  replacement completes asynchronously after the new style loads and needs
+  load-state/event coordination or a maintainer-approved policy.
+- Remaining descriptor-owned string retention for low-level value records is
+  recorded as user-input-needed rather than guessed in this review loop.
+
+### User-input-needed findings
+
+- Decide whether public result/list/snapshot handles such as
+  `FeatureQueryResultHandle`, `JsonSnapshotHandle`, `OfflineRegionListHandle`,
+  and `StyleIdListHandle` are accepted low-level Vala exceptions or should be
+  replaced with copied GLib-owned values/arrays to match the stronger convention
+  wording.
+- Decide whether direct weak string fields such as `RuntimeOptions.asset_path`,
+  `RuntimeOptions.cache_path`, `ResourceResponse.error_message`, and
+  `ResourceResponse.etag` should remain low-level fields or move behind owned
+  validated setters.
+
+### Validation
+
+- `mise run //bindings/vala:ci`
