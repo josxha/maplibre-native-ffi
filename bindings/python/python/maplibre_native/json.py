@@ -77,6 +77,7 @@ JsonLike: TypeAlias = (
     | tuple["JsonLike", ...]
     | dict[object, "JsonLike"]
 )
+JsonObjectLike: TypeAlias = JsonObject | dict[object, JsonLike]
 
 
 def json_uint(value: int) -> JsonUInt:
@@ -224,6 +225,7 @@ __all__ = [
     "JsonLike",
     "JsonMember",
     "JsonObject",
+    "JsonObjectLike",
     "JsonScalar",
     "JsonUInt",
     "JsonValue",

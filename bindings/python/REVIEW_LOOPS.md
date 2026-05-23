@@ -220,47 +220,48 @@ Review fanout: final completion review after Round 3 JsonLike annotation fixes.
 
 ## Round 5
 
-Review fanout: terminal independent review after Round 4 style JSON annotation
-fixes were committed and pushed at `e98fb10`.
+Review fanout: final API correctness, tests/validation accuracy, and public
+type-surface polish after Round 4.
 
 ### Applied findings
 
-- None. The independent final review fanout reported no remaining sensible,
-  safe, in-scope actionable findings.
+- Restrict top-level JSON object parameters to object-shaped inputs in public
+  annotations.
+  - Evidence: final review found source JSON, layer JSON, light JSON, and
+    feature-extension argument APIs used broad `JsonLike` annotations even
+    though their C contracts require a top-level JSON object.
+  - Resolution: added public `JsonObjectLike` and used it for top-level
+    source/layer/light JSON and feature-extension argument inputs, while keeping
+    property/filter/state inputs as `JsonLike`.
+- Tighten remaining public typed-surface annotations.
+  - Evidence: final review found several `py.typed` public methods still
+    returned or accepted `object` where concrete public types were known.
+  - Resolution: narrowed runtime offline/map/resource callback annotations,
+    `MapHandle.set_style_image()` image input, and added explicit `__all__`
+    lists to `errors`, `map`, `render`, and `runtime` modules.
 
 ### Rejected or deferred findings
 
-- No new rejected or deferred findings in this round. Previously deferred items
-  remain unchanged: broad private callback simulators, backend-specific render
-  readback/frame hardening, packaging/distribution/CI-matrix expansion, and
-  broad enum deduplication.
+- `RenderSessionHandle.read_premultiplied_rgba8_into(buffer: object)` remains
+  intentionally broad because Python typing cannot precisely express arbitrary
+  writable contiguous buffer-protocol objects without over-promising.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, and broad enum deduplication.
 
 ### Findings requiring user input
 
 - None in this round.
 
-### Final review evidence
-
-- Review run: `95c13e25`, three independent reviewer agents.
-- General completion reviewer: no remaining sensible, safe, in-scope actionable
-  findings; review record complete; style JSON annotation fix present; focused
-  validation and diff hygiene passed; working tree clean and pushed.
-- Typed public API reviewer: no actionable findings remain; `JsonLike` and
-  `JsonValue` annotations match runtime behavior across map/query/render JSON
-  APIs; tests cover plain JSON-like values; review record documents rounds 3-4.
-- Lifecycle/callback reviewer: no blockers remain; finalizers are quiet,
-  custom-geometry lifecycle is guarded, GIL waits and callback unwind
-  containment are present, and resource request one-shot semantics are enforced.
-
 ### Validation
 
-- Final focused review validation reported by reviewers:
-  - `mise run //bindings/python:test -- ...` for JsonLike/JsonValue regression
-    tests passed.
-  - `mise run //bindings/python:test -- ...` for lifecycle/callback tests
-    passed.
-  - `git diff --check origin/main...HEAD` passed.
-- Final branch state before recording this terminal review:
-  `git status
-  --short --branch` showed only `## python...origin/python` at
-  `e98fb10`.
+- Focused JSON object/type-surface regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_style_source_url_metadata_and_removal_public_api
+  tests/test_package.py::test_style_json_light_layer_property_and_filter_public_api
+  tests/test_package.py::test_render_session_query_public_api_uses_query_and_geojson_wire_values
+  tests/test_package.py::test_render_session_feature_state_public_api_uses_json_wire_values`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
+  (58 Python tests, wheel build, and metadata/`_native` import check) passed.

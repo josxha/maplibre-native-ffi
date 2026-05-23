@@ -1,12 +1,24 @@
 """Runtime values and handles for the Python binding."""
 
+from __future__ import annotations
+
 from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any
 
 from . import _native
+
+if TYPE_CHECKING:
+    from .map import MapHandle, MapOptions
+    from .offline import (
+        AmbientCacheOperation,
+        OfflineOperationHandle,
+        OfflineRegionDefinition,
+        OfflineRegionDownloadState,
+    )
+    from .resource import ResourceProviderCallback, ResourceTransformCallback
 
 
 class NetworkStatus(IntEnum):
@@ -329,7 +341,9 @@ class RuntimeHandle:
         """Run one pending owner-thread task for this runtime."""
         self._native.run_once()
 
-    def run_ambient_cache_operation(self, operation: object) -> object:
+    def run_ambient_cache_operation(
+        self, operation: AmbientCacheOperation
+    ) -> OfflineOperationHandle:
         """Start an ambient cache maintenance operation."""
         from .offline import AmbientCacheOperation, OfflineOperationHandle
 
@@ -339,8 +353,8 @@ class RuntimeHandle:
         return OfflineOperationHandle(self, operation_id)
 
     def create_offline_region(
-        self, definition: object, metadata: bytes = b""
-    ) -> object:
+        self, definition: OfflineRegionDefinition, metadata: bytes = b""
+    ) -> OfflineOperationHandle:
         """Start creating an offline region."""
         from .offline import OfflineOperationHandle, _definition_to_native_wire
 
@@ -350,7 +364,7 @@ class RuntimeHandle:
         )
         return OfflineOperationHandle(self, operation_id)
 
-    def get_offline_region(self, region_id: int) -> object:
+    def get_offline_region(self, region_id: int) -> OfflineOperationHandle:
         """Start getting an offline region snapshot by ID."""
         from .offline import OfflineOperationHandle
 
@@ -359,13 +373,15 @@ class RuntimeHandle:
             self._native.offline_region_get_start(region_id),
         )
 
-    def list_offline_regions(self) -> object:
+    def list_offline_regions(self) -> OfflineOperationHandle:
         """Start listing offline region snapshots."""
         from .offline import OfflineOperationHandle
 
         return OfflineOperationHandle(self, self._native.offline_regions_list_start())
 
-    def merge_offline_regions_database(self, side_database_path: str) -> object:
+    def merge_offline_regions_database(
+        self, side_database_path: str
+    ) -> OfflineOperationHandle:
         """Start merging offline regions from another database path."""
         from .offline import OfflineOperationHandle
 
@@ -378,7 +394,7 @@ class RuntimeHandle:
         self,
         region_id: int,
         metadata: bytes,
-    ) -> object:
+    ) -> OfflineOperationHandle:
         """Start updating opaque binary metadata for an offline region."""
         from .offline import OfflineOperationHandle
 
@@ -387,7 +403,7 @@ class RuntimeHandle:
             self._native.offline_region_update_metadata_start(region_id, metadata),
         )
 
-    def get_offline_region_status(self, region_id: int) -> object:
+    def get_offline_region_status(self, region_id: int) -> OfflineOperationHandle:
         """Start getting completed/download status for an offline region."""
         from .offline import OfflineOperationHandle
 
@@ -396,7 +412,9 @@ class RuntimeHandle:
             self._native.offline_region_get_status_start(region_id),
         )
 
-    def set_offline_region_observed(self, region_id: int, observed: bool) -> object:
+    def set_offline_region_observed(
+        self, region_id: int, observed: bool
+    ) -> OfflineOperationHandle:
         """Start enabling or disabling runtime events for an offline region."""
         from .offline import OfflineOperationHandle
 
@@ -408,8 +426,8 @@ class RuntimeHandle:
     def set_offline_region_download_state(
         self,
         region_id: int,
-        state: object,
-    ) -> object:
+        state: OfflineRegionDownloadState,
+    ) -> OfflineOperationHandle:
         """Start setting an offline region's native download state."""
         from .offline import OfflineOperationHandle, OfflineRegionDownloadState
 
@@ -421,7 +439,7 @@ class RuntimeHandle:
             ),
         )
 
-    def invalidate_offline_region(self, region_id: int) -> object:
+    def invalidate_offline_region(self, region_id: int) -> OfflineOperationHandle:
         """Start invalidating cached resources for an offline region."""
         from .offline import OfflineOperationHandle
 
@@ -430,7 +448,7 @@ class RuntimeHandle:
             self._native.offline_region_invalidate_start(region_id),
         )
 
-    def delete_offline_region(self, region_id: int) -> object:
+    def delete_offline_region(self, region_id: int) -> OfflineOperationHandle:
         """Start deleting an offline region."""
         from .offline import OfflineOperationHandle
 
@@ -441,7 +459,7 @@ class RuntimeHandle:
 
     def set_resource_transform(
         self,
-        callback: object,
+        callback: ResourceTransformCallback,
         *,
         max_pending_callbacks: int = 64,
     ) -> None:
@@ -459,7 +477,7 @@ class RuntimeHandle:
 
     def set_resource_provider(
         self,
-        callback: object,
+        callback: ResourceProviderCallback,
         *,
         max_pending_callbacks: int = 64,
     ) -> None:
@@ -478,11 +496,11 @@ class RuntimeHandle:
             return None
         return RuntimeEvent.from_native(event)
 
-    def create_map(self, options: object | None = None) -> object:
+    def create_map(self, options: MapOptions | None = None) -> MapHandle:
         """Create a map owned by this runtime."""
-        from .map import MapHandle, MapOptions
+        from .map import MapHandle
 
-        return MapHandle(self, cast("MapOptions | None", options))
+        return MapHandle(self, options)
 
     def __enter__(self) -> "RuntimeHandle":
         return self
@@ -494,3 +512,22 @@ class RuntimeHandle:
         traceback: TracebackType | None,
     ) -> None:
         self.close()
+
+
+__all__ = [
+    "NetworkStatus",
+    "RenderFramePayload",
+    "RenderMapPayload",
+    "RenderMode",
+    "RenderingStats",
+    "RuntimeEvent",
+    "RuntimeEventSource",
+    "RuntimeEventSourceType",
+    "RuntimeEventType",
+    "RuntimeHandle",
+    "RuntimeOptions",
+    "StyleImageMissingPayload",
+    "TileActionPayload",
+    "TileId",
+    "TileOperation",
+]

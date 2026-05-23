@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .geo import Feature
-    from .json import JsonLike, JsonValue
+    from .json import JsonLike, JsonObjectLike, JsonValue
     from .map import MapHandle
     from .query import (
         FeatureExtensionResult,
@@ -370,7 +370,7 @@ class RenderSessionHandle:
         feature: Feature,
         extension: str,
         extension_field: str,
-        arguments: JsonLike | None = None,
+        arguments: JsonObjectLike | None = None,
     ) -> FeatureExtensionResult:
         """Query a feature extension from the latest render session state."""
         from .geo import _feature_to_native_wire
@@ -539,3 +539,26 @@ class VulkanOwnedTextureFrameHandle:
         traceback: TracebackType | None,
     ) -> None:
         self.close()
+
+
+__all__ = [
+    "DetachedRenderSessionHandle",
+    "MetalBorrowedTextureDescriptor",
+    "MetalContextDescriptor",
+    "MetalOwnedTextureDescriptor",
+    "MetalOwnedTextureFrame",
+    "MetalOwnedTextureFrameHandle",
+    "MetalSurfaceDescriptor",
+    "NativePointer",
+    "PremultipliedRgba8Image",
+    "RenderBackend",
+    "RenderSessionHandle",
+    "RenderTargetExtent",
+    "TextureImageInfo",
+    "VulkanBorrowedTextureDescriptor",
+    "VulkanContextDescriptor",
+    "VulkanOwnedTextureDescriptor",
+    "VulkanOwnedTextureFrame",
+    "VulkanOwnedTextureFrameHandle",
+    "VulkanSurfaceDescriptor",
+]

@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         ScreenPoint,
     )
     from .geo import GeoJson, Geometry, LatLng, LatLngBounds
-    from .json import JsonLike, JsonValue
+    from .json import JsonLike, JsonObjectLike, JsonValue
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -546,7 +546,9 @@ class MapHandle:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
 
-    def add_style_source_json(self, source_id: str, source_json: JsonLike) -> None:
+    def add_style_source_json(
+        self, source_id: str, source_json: JsonObjectLike
+    ) -> None:
         """Add one style source from a style-spec source JSON object."""
         from .json import _to_native_wire as _json_to_native_wire
 
@@ -757,7 +759,7 @@ class MapHandle:
 
     def add_style_layer_json(
         self,
-        layer_json: JsonLike,
+        layer_json: JsonObjectLike,
         before_layer_id: str | None = None,
     ) -> None:
         """Add one style layer from a full style-spec layer JSON object."""
@@ -772,7 +774,7 @@ class MapHandle:
         raw = self._native.get_style_layer_json(layer_id)
         return _from_native_wire(raw) if raw is not None else None
 
-    def set_style_light_json(self, light_json: JsonLike) -> None:
+    def set_style_light_json(self, light_json: JsonObjectLike) -> None:
         """Set the style light from a style-spec light JSON object."""
         from .json import _to_native_wire
 
@@ -828,7 +830,7 @@ class MapHandle:
     def set_style_image(
         self,
         image_id: str,
-        image: object,
+        image: PremultipliedRgba8Image,
         options: StyleImageOptions | None = None,
     ) -> None:
         """Add or replace one runtime style image."""
@@ -1348,3 +1350,21 @@ class MapHandle:
         traceback: TracebackType | None,
     ) -> None:
         self.close()
+
+
+__all__ = [
+    "ConstrainMode",
+    "MapDebugOptions",
+    "MapHandle",
+    "MapMode",
+    "MapOptions",
+    "MapProjectionHandle",
+    "MapTileOptions",
+    "MapViewportOptions",
+    "NorthOrientation",
+    "ProjectedMeters",
+    "TileLodMode",
+    "ViewportMode",
+    "lat_lng_for_projected_meters",
+    "projected_meters_for_lat_lng",
+]
