@@ -23,6 +23,8 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   runtime.offline_region_get_status_start(1, out operation_id);
   runtime.offline_region_set_observed_start(1, true, out operation_id);
   runtime.offline_region_set_download_state_start(1, MaplibreNative.OfflineRegionDownloadState.INACTIVE, out operation_id);
+  MaplibreNative.OfflineRegionStatus status;
+  runtime.offline_region_get_status_take_result(operation_id, out status);
   runtime.offline_region_invalidate_start(1, out operation_id);
   runtime.offline_region_delete_start(1, out operation_id);
   runtime.offline_operation_discard(operation_id);

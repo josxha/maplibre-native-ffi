@@ -392,6 +392,22 @@ pub extern "C" fn mln_vala_runtime_handle_offline_region_delete_start(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_get_status_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    out_status: *mut sys::mln_offline_region_status,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_get_status_take_result(handle, operation_id, out_status) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_offline_operation_discard(
     handle: *mut RuntimeHandle,
     operation_id: u64,
@@ -3740,6 +3756,24 @@ fn offline_region_delete_start(
     })
 }
 
+fn offline_region_get_status_take_result(
+    handle: *mut RuntimeHandle,
+    operation_id: u64,
+    out_status: *mut sys::mln_offline_region_status,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_status.is_null() {
+        return Err(Error::invalid_argument(
+            "offline region status output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable. The C API
+    // validates operation ID state and writes only on success.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_get_status_take_result(runtime, operation_id, out_status)
+    })
+}
+
 fn offline_operation_discard(handle: *mut RuntimeHandle, operation_id: u64) -> error::Result<()> {
     let runtime = runtime_native(handle)?;
     // SAFETY: `runtime` is live. The C API validates operation IDs.
@@ -4122,6 +4156,18 @@ mod tests {
                 ptr::null(),
                 1,
                 &mut operation_id,
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_runtime_handle_offline_region_get_status_take_result(
+                runtime,
+                0,
+                ptr::null_mut(),
                 &mut error,
             ),
             GFALSE

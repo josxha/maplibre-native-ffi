@@ -199,6 +199,19 @@ typedef char* (*MlnValaResourceTransformCallback)(
   MlnValaResourceKind kind, const char* url, gpointer user_data
 );
 
+typedef struct {
+  uint32_t size;
+  MlnValaOfflineRegionDownloadState download_state;
+  uint64_t completed_resource_count;
+  uint64_t completed_resource_size;
+  uint64_t completed_tile_count;
+  uint64_t required_tile_count;
+  uint64_t completed_tile_size;
+  uint64_t required_resource_count;
+  bool required_resource_count_is_precise;
+  bool complete;
+} MlnValaOfflineRegionStatus;
+
 typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
 
 typedef struct {
@@ -1347,6 +1360,21 @@ gboolean mln_vala_runtime_handle_offline_region_invalidate_start(
 gboolean mln_vala_runtime_handle_offline_region_delete_start(
   MlnValaRuntimeHandle* self, int64_t region_id, uint64_t* out_operation_id,
   GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_get_status_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed get-status operation ID.
+ * @out_status: (out): return location for the copied status snapshot.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_get_status_take_result(
+  MlnValaRuntimeHandle* self, uint64_t operation_id,
+  MlnValaOfflineRegionStatus* out_status, GError** error
 );
 
 /**
