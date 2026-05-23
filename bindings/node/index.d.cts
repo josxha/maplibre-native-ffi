@@ -426,7 +426,7 @@ export interface RenderTargetExtent {
 }
 
 export interface MetalContextDescriptor {
-  deviceAddress?: bigint | null;
+  device?: NativePointer | null;
 }
 
 export interface MetalOwnedTextureDescriptor {
@@ -436,20 +436,20 @@ export interface MetalOwnedTextureDescriptor {
 
 export interface MetalBorrowedTextureDescriptor {
   extent: RenderTargetExtent;
-  textureAddress: bigint;
+  texture: NativePointer;
 }
 
 export interface MetalSurfaceDescriptor {
   extent: RenderTargetExtent;
   context: MetalContextDescriptor;
-  layerAddress: bigint;
+  layer: NativePointer;
 }
 
 export interface VulkanContextDescriptor {
-  instanceAddress: bigint;
-  physicalDeviceAddress: bigint;
-  deviceAddress: bigint;
-  graphicsQueueAddress: bigint;
+  instance: NativePointer;
+  physicalDevice: NativePointer;
+  device: NativePointer;
+  graphicsQueue: NativePointer;
   graphicsQueueFamilyIndex: number;
 }
 
@@ -461,8 +461,8 @@ export interface VulkanOwnedTextureDescriptor {
 export interface VulkanBorrowedTextureDescriptor {
   extent: RenderTargetExtent;
   context: VulkanContextDescriptor;
-  imageAddress: bigint;
-  imageViewAddress: bigint;
+  image: NativePointer;
+  imageView: NativePointer;
   format: number;
   initialLayout: number;
   finalLayout: number;
@@ -471,7 +471,7 @@ export interface VulkanBorrowedTextureDescriptor {
 export interface VulkanSurfaceDescriptor {
   extent: RenderTargetExtent;
   context: VulkanContextDescriptor;
-  surfaceAddress: bigint;
+  surface: NativePointer;
 }
 
 export interface TextureImageInfo {
@@ -546,6 +546,8 @@ export interface QueriedFeature {
   state?: JsonValue | null;
 }
 
+type TextureFrameCallbackResult<T> = T extends PromiseLike<unknown> ? never : T;
+
 export declare class RenderSessionHandle {
   private constructor(nativeHandle: unknown, map: MapHandle);
   readonly map: MapHandle;
@@ -600,11 +602,11 @@ export declare class RenderSessionHandle {
     args?: JsonValue | null,
   ): JsonValue;
   withMetalOwnedTextureFrame<T>(
-    callback: (frame: MetalOwnedTextureFrame) => T,
-  ): T;
+    callback: (frame: MetalOwnedTextureFrame) => TextureFrameCallbackResult<T>,
+  ): TextureFrameCallbackResult<T>;
   withVulkanOwnedTextureFrame<T>(
-    callback: (frame: VulkanOwnedTextureFrame) => T,
-  ): T;
+    callback: (frame: VulkanOwnedTextureFrame) => TextureFrameCallbackResult<T>,
+  ): TextureFrameCallbackResult<T>;
   readPremultipliedRgba8(): TextureReadback;
   [Symbol.dispose](): void;
 }

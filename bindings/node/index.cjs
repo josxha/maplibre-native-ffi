@@ -163,14 +163,22 @@ function mapDebugOptionMaskBit(option) {
   );
 }
 
+const CONSTRUCTION_TOKEN = Symbol("constructionToken");
+
 class NativePointer {
-  static null = new NativePointer(0n);
+  static null = new NativePointer(CONSTRUCTION_TOKEN, 0n);
 
   static unsafeFromAddress(address) {
-    return new NativePointer(address);
+    return new NativePointer(CONSTRUCTION_TOKEN, address);
   }
 
-  constructor(address) {
+  constructor(token, address) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "use NativePointer.unsafeFromAddress() to construct native pointers",
+      );
+    }
     if (typeof address !== "bigint") {
       throw new InvalidArgumentError(
         null,
@@ -243,9 +251,7 @@ class NativeBuffer {
       return new NativeBuffer(data.slice(0));
     }
     if (ArrayBuffer.isView(data)) {
-      return new NativeBuffer(
-        new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-      );
+      return new NativeBuffer(data);
     }
     throw new InvalidArgumentError(
       null,
@@ -259,10 +265,9 @@ class NativeBuffer {
     } else if (data instanceof ArrayBuffer) {
       this.buffer = data;
     } else if (ArrayBuffer.isView(data)) {
-      this.buffer = data.buffer.slice(
-        data.byteOffset,
-        data.byteOffset + data.byteLength,
-      );
+      const copy = new Uint8Array(data.byteLength);
+      copy.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+      this.buffer = copy.buffer;
     } else {
       throw new InvalidArgumentError(
         null,
@@ -292,7 +297,13 @@ class MetalOwnedTextureFrame {
   #active = true;
   #raw;
 
-  constructor(raw) {
+  constructor(token, raw) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "texture frames are only available inside render-session frame scopes",
+      );
+    }
     this.#raw = raw;
     Object.freeze(this);
   }
@@ -349,7 +360,13 @@ class VulkanOwnedTextureFrame {
   #active = true;
   #raw;
 
-  constructor(raw) {
+  constructor(token, raw) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "texture frames are only available inside render-session frame scopes",
+      );
+    }
     this.#raw = raw;
     Object.freeze(this);
   }
@@ -434,7 +451,13 @@ function validateByteLength(byteLength) {
 }
 
 class ResourceRequestHandle {
-  constructor(handleId) {
+  constructor(token, handleId) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "resource request handles are created by resource provider callbacks",
+      );
+    }
     recordHandleEnvironment(this);
     this.handleId = handleId;
     this.closed = false;
@@ -562,7 +585,10 @@ class RuntimeHandle {
       this.native.setResourceProvider((request) => {
         const wrapped = {
           ...request,
-          handle: new ResourceRequestHandle(request.handleId),
+          handle: new ResourceRequestHandle(
+            CONSTRUCTION_TOKEN,
+            request.handleId,
+          ),
         };
         delete wrapped.handleId;
         return callback(wrapped);
@@ -752,8 +778,99 @@ class MapProjectionHandle {
   }
 }
 
+function nativePointerAddress(value, fieldName) {
+  if (!(value instanceof NativePointer)) {
+    throw new InvalidArgumentError(
+      null,
+      `${fieldName} must be a NativePointer`,
+    );
+  }
+  return value.address;
+}
+
+function nullableNativePointerAddress(value, fieldName) {
+  return value == null ? null : nativePointerAddress(value, fieldName);
+}
+
+function normalizeMetalContext(context = {}) {
+  return {
+    deviceAddress: nullableNativePointerAddress(context.device, "device"),
+  };
+}
+
+function normalizeVulkanContext(context) {
+  return {
+    instanceAddress: nativePointerAddress(context?.instance, "instance"),
+    physicalDeviceAddress: nativePointerAddress(
+      context?.physicalDevice,
+      "physicalDevice",
+    ),
+    deviceAddress: nativePointerAddress(context?.device, "device"),
+    graphicsQueueAddress: nativePointerAddress(
+      context?.graphicsQueue,
+      "graphicsQueue",
+    ),
+    graphicsQueueFamilyIndex: context?.graphicsQueueFamilyIndex,
+  };
+}
+
+function normalizeMetalOwnedTextureDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeMetalContext(descriptor?.context),
+  };
+}
+
+function normalizeMetalBorrowedTextureDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    textureAddress: nativePointerAddress(descriptor?.texture, "texture"),
+  };
+}
+
+function normalizeMetalSurfaceDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeMetalContext(descriptor?.context),
+    layerAddress: nativePointerAddress(descriptor?.layer, "layer"),
+  };
+}
+
+function normalizeVulkanOwnedTextureDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeVulkanContext(descriptor?.context),
+  };
+}
+
+function normalizeVulkanBorrowedTextureDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeVulkanContext(descriptor?.context),
+    imageAddress: nativePointerAddress(descriptor?.image, "image"),
+    imageViewAddress: nativePointerAddress(descriptor?.imageView, "imageView"),
+    format: descriptor?.format,
+    initialLayout: descriptor?.initialLayout,
+    finalLayout: descriptor?.finalLayout,
+  };
+}
+
+function normalizeVulkanSurfaceDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeVulkanContext(descriptor?.context),
+    surfaceAddress: nativePointerAddress(descriptor?.surface, "surface"),
+  };
+}
+
 class RenderSessionHandle {
-  constructor(nativeHandle, map) {
+  constructor(token, nativeHandle, map) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "render sessions are created by MapHandle attach methods",
+      );
+    }
     recordHandleEnvironment(this);
     defineCheckedNative(this, nativeHandle);
     this.map = map;
@@ -761,37 +878,55 @@ class RenderSessionHandle {
 
   static attachMetalOwnedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
-      native.createMetalOwnedTextureRenderSession(map.native, descriptor),
+      native.createMetalOwnedTextureRenderSession(
+        map.native,
+        normalizeMetalOwnedTextureDescriptor(descriptor),
+      ),
     );
   }
 
   static attachMetalBorrowedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
-      native.createMetalBorrowedTextureRenderSession(map.native, descriptor),
+      native.createMetalBorrowedTextureRenderSession(
+        map.native,
+        normalizeMetalBorrowedTextureDescriptor(descriptor),
+      ),
     );
   }
 
   static attachMetalSurface(map, descriptor) {
     return attachRenderSession(map, () =>
-      native.createMetalSurfaceRenderSession(map.native, descriptor),
+      native.createMetalSurfaceRenderSession(
+        map.native,
+        normalizeMetalSurfaceDescriptor(descriptor),
+      ),
     );
   }
 
   static attachVulkanOwnedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
-      native.createVulkanOwnedTextureRenderSession(map.native, descriptor),
+      native.createVulkanOwnedTextureRenderSession(
+        map.native,
+        normalizeVulkanOwnedTextureDescriptor(descriptor),
+      ),
     );
   }
 
   static attachVulkanBorrowedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
-      native.createVulkanBorrowedTextureRenderSession(map.native, descriptor),
+      native.createVulkanBorrowedTextureRenderSession(
+        map.native,
+        normalizeVulkanBorrowedTextureDescriptor(descriptor),
+      ),
     );
   }
 
   static attachVulkanSurface(map, descriptor) {
     return attachRenderSession(map, () =>
-      native.createVulkanSurfaceRenderSession(map.native, descriptor),
+      native.createVulkanSurfaceRenderSession(
+        map.native,
+        normalizeVulkanSurfaceDescriptor(descriptor),
+      ),
     );
   }
 
@@ -903,6 +1038,7 @@ class RenderSessionHandle {
       );
     }
     const frame = new MetalOwnedTextureFrame(
+      CONSTRUCTION_TOKEN,
       translateNativeErrors(() => this.native.acquireMetalOwnedTextureFrame()),
     );
     try {
@@ -926,6 +1062,7 @@ class RenderSessionHandle {
       );
     }
     const frame = new VulkanOwnedTextureFrame(
+      CONSTRUCTION_TOKEN,
       translateNativeErrors(() => this.native.acquireVulkanOwnedTextureFrame()),
     );
     try {
@@ -956,7 +1093,11 @@ function attachRenderSession(map, attach) {
   if (!(map instanceof MapHandle)) {
     throw new InvalidArgumentError(null, "map must be a MapHandle");
   }
-  return new RenderSessionHandle(translateNativeErrors(attach), map);
+  return new RenderSessionHandle(
+    CONSTRUCTION_TOKEN,
+    translateNativeErrors(attach),
+    map,
+  );
 }
 
 class MapHandle {

@@ -66,7 +66,7 @@ convention-defined behavior.
 | ---- | --------------------------------------------- | ------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
 | None | No in-scope Node-only omissions are recorded. | Current coverage matches this implementation map. | Consumers use the root package or concept subpaths. | Focused Node-layer tests cover the wrapper surface. |
 
-## Current scaffold
+## Current files
 
 ```text
 bindings/node/
@@ -80,10 +80,17 @@ bindings/node/
   tsconfig.json
   index.cjs
   index.d.cts
+  {camera,error,geo,json,log,map,offline,query,render,resource,runtime,style}.cjs
+  {camera,error,geo,json,log,map,offline,query,render,resource,runtime,style}.d.cts
   src/
     lib.rs
     error.rs
     maplibre.rs
+    map.rs
+    projection.rs
+    render.rs
+    runtime.rs
+    values.rs
   test/
     maplibre.test.cjs
 ```
@@ -517,6 +524,11 @@ surface against the real native add-on. It should focus on Node-owned behavior:
 
 Tests cover focused Node-layer adaptation behavior. Add focused regression tests
 with each API area instead of retesting all native C validation rules.
+Resource-provider tests cover registration and JavaScript handle guard behavior;
+the native request lifecycle remains enforced by the one-shot registry in
+`src/runtime.rs` and covered at the C ABI layer because the Node suite does not
+have a deterministic network-request trigger that avoids broader integration
+policy.
 
 ## Implementation milestones
 

@@ -29,6 +29,14 @@ pub(crate) fn invalid_argument(message: impl Into<String>) -> NapiError {
     from_core(maplibre_native_core::Error::invalid_argument(message))
 }
 
+pub(crate) fn invalid_state(message: impl Into<String>) -> NapiError {
+    from_core(maplibre_native_core::Error::new(
+        maplibre_native_core::ErrorKind::InvalidState,
+        None,
+        message,
+    ))
+}
+
 fn json_string(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');

@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use std::{cell::Cell, ffi::c_void};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
@@ -154,6 +154,7 @@ pub struct SourceFeatureQueryOptionsInput {
 #[napi(js_name = "NativeRenderSessionHandle")]
 pub struct NativeRenderSessionHandle {
     state: NativeHandleState<sys::mln_render_session>,
+    frame_acquired: Cell<bool>,
 }
 
 #[napi(js_name = "createMetalOwnedTextureRenderSession")]
@@ -245,6 +246,7 @@ pub fn create_vulkan_surface_render_session(
 impl NativeRenderSessionHandle {
     #[napi]
     pub fn close(&self) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         unsafe { self.state.close_status(sys::mln_render_session_destroy) }
             .map_err(error::from_core)
     }
@@ -256,6 +258,7 @@ impl NativeRenderSessionHandle {
 
     #[napi]
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         core::check(unsafe {
             sys::mln_render_session_resize(self.state.as_ptr(), width, height, scale_factor)
         })
@@ -264,30 +267,35 @@ impl NativeRenderSessionHandle {
 
     #[napi(js_name = "renderUpdate")]
     pub fn render_update(&self) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         core::check(unsafe { sys::mln_render_session_render_update(self.state.as_ptr()) })
             .map_err(error::from_core)
     }
 
     #[napi]
     pub fn detach(&self) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         core::check(unsafe { sys::mln_render_session_detach(self.state.as_ptr()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "reduceMemoryUse")]
     pub fn reduce_memory_use(&self) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         core::check(unsafe { sys::mln_render_session_reduce_memory_use(self.state.as_ptr()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "clearData")]
     pub fn clear_data(&self) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         core::check(unsafe { sys::mln_render_session_clear_data(self.state.as_ptr()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "dumpDebugLogs")]
     pub fn dump_debug_logs(&self) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         core::check(unsafe { sys::mln_render_session_dump_debug_logs(self.state.as_ptr()) })
             .map_err(error::from_core)
     }
@@ -298,6 +306,7 @@ impl NativeRenderSessionHandle {
         selector: FeatureStateSelectorInput,
         state: String,
     ) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         let selector = selector.into_core()?;
         let native_selector = core::query::feature_state_selector_to_native(&selector);
         let state = parse_json_value(state)?;
@@ -315,6 +324,7 @@ impl NativeRenderSessionHandle {
 
     #[napi(js_name = "getFeatureState")]
     pub fn get_feature_state(&self, selector: FeatureStateSelectorInput) -> Result<String> {
+        self.ensure_no_frame_acquired()?;
         let selector = selector.into_core()?;
         let native_selector = core::query::feature_state_selector_to_native(&selector);
         let mut snapshot = std::ptr::null_mut();
@@ -336,6 +346,7 @@ impl NativeRenderSessionHandle {
 
     #[napi(js_name = "removeFeatureState")]
     pub fn remove_feature_state(&self, selector: FeatureStateSelectorInput) -> Result<()> {
+        self.ensure_no_frame_acquired()?;
         let selector = selector.into_core()?;
         let native_selector = core::query::feature_state_selector_to_native(&selector);
         core::check(unsafe {
@@ -353,6 +364,7 @@ impl NativeRenderSessionHandle {
         geometry: RenderedQueryGeometryInput,
         options: Option<RenderedFeatureQueryOptionsInput>,
     ) -> Result<String> {
+        self.ensure_no_frame_acquired()?;
         let geometry = geometry.into_core()?;
         let native_geometry = core::query::rendered_query_geometry_to_native(&geometry);
         let options = options.unwrap_or_default().into_core()?;
@@ -377,6 +389,7 @@ impl NativeRenderSessionHandle {
         source_id: String,
         options: Option<SourceFeatureQueryOptionsInput>,
     ) -> Result<String> {
+        self.ensure_no_frame_acquired()?;
         let source_id = core::string::string_view(&source_id);
         let options = options.unwrap_or_default().into_core()?;
         let native_options = core::query::source_feature_query_options_to_native(&options)
@@ -403,6 +416,7 @@ impl NativeRenderSessionHandle {
         extension_field: String,
         arguments: Option<String>,
     ) -> Result<String> {
+        self.ensure_no_frame_acquired()?;
         let source_id = core::string::string_view(&source_id);
         let extension = core::string::string_view(&extension);
         let extension_field = core::string::string_view(&extension_field);
@@ -433,6 +447,7 @@ impl NativeRenderSessionHandle {
 
     #[napi(js_name = "acquireMetalOwnedTextureFrame")]
     pub fn acquire_metal_owned_texture_frame(&self) -> Result<NativeMetalOwnedTextureFrame> {
+        self.ensure_no_frame_acquired()?;
         let mut frame = sys::mln_metal_owned_texture_frame {
             size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
             generation: 0,
@@ -448,6 +463,7 @@ impl NativeRenderSessionHandle {
             sys::mln_metal_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
         })
         .map_err(error::from_core)?;
+        self.frame_acquired.set(true);
         Ok(NativeMetalOwnedTextureFrame::from_native(frame))
     }
 
@@ -460,11 +476,14 @@ impl NativeRenderSessionHandle {
         core::check(unsafe {
             sys::mln_metal_owned_texture_release_frame(self.state.as_ptr(), &frame)
         })
-        .map_err(error::from_core)
+        .map_err(error::from_core)?;
+        self.frame_acquired.set(false);
+        Ok(())
     }
 
     #[napi(js_name = "acquireVulkanOwnedTextureFrame")]
     pub fn acquire_vulkan_owned_texture_frame(&self) -> Result<NativeVulkanOwnedTextureFrame> {
+        self.ensure_no_frame_acquired()?;
         let mut frame = sys::mln_vulkan_owned_texture_frame {
             size: std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
             generation: 0,
@@ -482,6 +501,7 @@ impl NativeRenderSessionHandle {
             sys::mln_vulkan_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
         })
         .map_err(error::from_core)?;
+        self.frame_acquired.set(true);
         Ok(NativeVulkanOwnedTextureFrame::from_native(frame))
     }
 
@@ -494,11 +514,14 @@ impl NativeRenderSessionHandle {
         core::check(unsafe {
             sys::mln_vulkan_owned_texture_release_frame(self.state.as_ptr(), &frame)
         })
-        .map_err(error::from_core)
+        .map_err(error::from_core)?;
+        self.frame_acquired.set(false);
+        Ok(())
     }
 
     #[napi(js_name = "readPremultipliedRgba8")]
     pub fn read_premultiplied_rgba8(&self) -> Result<TextureReadback> {
+        self.ensure_no_frame_acquired()?;
         let mut info = unsafe { sys::mln_texture_image_info_default() };
         let first_status = unsafe {
             sys::mln_texture_read_premultiplied_rgba8(
@@ -525,6 +548,17 @@ impl NativeRenderSessionHandle {
             info: TextureImageInfo::from_native(info),
             pixels: Uint8Array::from(pixels),
         })
+    }
+}
+
+impl NativeRenderSessionHandle {
+    fn ensure_no_frame_acquired(&self) -> Result<()> {
+        if self.frame_acquired.get() {
+            return Err(error::invalid_state(
+                "texture frame scope is active for this render session",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -874,7 +908,10 @@ fn attach_render_session(
     let state = unsafe { NativeHandleState::from_raw_ptr(session, "RenderSessionHandle") }
         .map_err(error::from_core)?;
     let _ = map;
-    Ok(NativeRenderSessionHandle { state })
+    Ok(NativeRenderSessionHandle {
+        state,
+        frame_acquired: Cell::new(false),
+    })
 }
 
 fn ptr_to_bigint(value: *mut c_void) -> BigInt {

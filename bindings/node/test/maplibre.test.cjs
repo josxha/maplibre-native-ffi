@@ -31,10 +31,29 @@ const {
   threadLastErrorMessage,
 } = require("..");
 
+if (false) {
+  const session = /** @type {import("..").RenderSessionHandle} */ (
+    /** @type {unknown} */ (null)
+  );
+  // @ts-expect-error texture frame callbacks release native frames synchronously.
+  session.withMetalOwnedTextureFrame(async (frame) => frame.width);
+  // @ts-expect-error texture frame callbacks release native frames synchronously.
+  session.withVulkanOwnedTextureFrame(async (frame) => frame.width);
+}
+
 test("concept subpath modules expose curated public API groups", () => {
-  const runtimeModule = require("../runtime.cjs");
-  const renderModule = require("../render.cjs");
-  const errorModule = require("../error.cjs");
+  const packageJson = require("../package.json");
+  for (const subpath of Object.keys(packageJson.exports)) {
+    require(
+      subpath === "."
+        ? "@maplibre/native-ffi-node"
+        : `@maplibre/native-ffi-node${subpath.slice(1)}`,
+    );
+  }
+
+  const runtimeModule = require("@maplibre/native-ffi-node/runtime");
+  const renderModule = require("@maplibre/native-ffi-node/render");
+  const errorModule = require("@maplibre/native-ffi-node/error");
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
   assert.equal(runtimeModule.networkStatus, networkStatus);
@@ -121,6 +140,10 @@ test("native pointer is a borrowed opaque address value", () => {
     () => NativePointer.unsafeFromAddress(-1n),
     InvalidArgumentError,
   );
+  assert.throws(
+    () => new /** @type {any} */ (NativePointer)(1n),
+    InvalidArgumentError,
+  );
 });
 
 test("texture frame scopes expose borrowed pointers only while active", () => {
@@ -192,6 +215,11 @@ test("native buffer owns byte storage for render interop", () => {
   const copied = NativeBuffer.from(allocated.asUint8Array());
   allocated.asUint8Array()[0] = 9;
   assert.deepEqual([...copied.asUint8Array()], [1, 2, 3, 4]);
+  const sharedCopy = NativeBuffer.from(
+    new Uint8Array(new SharedArrayBuffer(4)),
+  );
+  assert.equal(sharedCopy.asArrayBuffer() instanceof ArrayBuffer, true);
+  assert.equal(sharedCopy.asArrayBuffer() instanceof SharedArrayBuffer, false);
   assert.throws(() => NativeBuffer.allocate(-1), InvalidArgumentError);
   assert.throws(
     () => NativeBuffer.from(/** @type {any} */ ("bytes")),
@@ -360,11 +388,18 @@ test("map handle retains runtime parent and closes before runtime", () => {
   assert.equal(map.closed, false);
   const projection = map.createProjection();
   projection.close();
-  const retainedSession = Reflect.construct(
-    /** @type {any} */ (RenderSessionHandle),
-    [{ closed: false }, map],
+  assert.throws(
+    () =>
+      Reflect.construct(/** @type {any} */ (RenderSessionHandle), [
+        { closed: false },
+        map,
+      ]),
+    InvalidArgumentError,
   );
-  assert.equal(retainedSession.map, map);
+  assert.throws(
+    () => new /** @type {any} */ (ResourceRequestHandle)("detached"),
+    InvalidArgumentError,
+  );
   assert.throws(() => runtime.close(), InvalidStateError);
   map.close();
   assert.equal(map.closed, true);
@@ -381,9 +416,17 @@ test("render session attach descriptors translate native failures", () => {
       () =>
         map.attachMetalOwnedTexture({
           extent: { width: 16, height: 16, scaleFactor: 1 },
-          context: { deviceAddress: 0n },
+          context: { device: NativePointer.null },
         }),
       MaplibreError,
+    );
+    assert.throws(
+      () =>
+        map.attachMetalBorrowedTexture({
+          extent: { width: 16, height: 16, scaleFactor: 1 },
+          texture: /** @type {any} */ (0n),
+        }),
+      InvalidArgumentError,
     );
     assert.equal(
       typeof RenderSessionHandle.attachMetalOwnedTexture,

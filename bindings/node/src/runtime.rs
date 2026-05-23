@@ -953,7 +953,18 @@ impl NativeRuntimeHandle {
 
 impl Drop for NativeRuntimeHandle {
     fn drop(&mut self) {
-        let _ = self.state.leak_for_report();
+        if self.state.leak_for_report().is_some() {
+            if let Ok(mut transform) = self.resource_transform.lock() {
+                if let Some(transform) = transform.take() {
+                    std::mem::forget(transform);
+                }
+            }
+            if let Ok(mut provider) = self.resource_provider.lock() {
+                if let Some(provider) = provider.take() {
+                    std::mem::forget(provider);
+                }
+            }
+        }
     }
 }
 

@@ -1666,7 +1666,13 @@ impl NativeMapHandle {
 
 impl Drop for NativeMapHandle {
     fn drop(&mut self) {
-        let _ = self.state.leak_for_report();
+        if self.state.leak_for_report().is_some()
+            && let Ok(mut sources) = self.custom_geometry_sources.lock()
+        {
+            for (_, source) in sources.drain() {
+                Box::leak(source);
+            }
+        }
     }
 }
 
