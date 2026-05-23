@@ -20,7 +20,7 @@ if TYPE_CHECKING:
         ProjectionMode,
         ScreenPoint,
     )
-    from .geo import GeoJson, LatLng
+    from .geo import GeoJson, LatLng, LatLngBounds
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         VulkanSurfaceDescriptor,
     )
     from .style import (
+        CanonicalTileId,
         CustomGeometrySourceHandle,
         CustomGeometrySourceOptions,
         StyleImage,
@@ -1023,6 +1024,48 @@ class MapHandle:
             options.has_cancel_tile,
         )
         return CustomGeometrySourceHandle(native)
+
+    def set_custom_geometry_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        data: GeoJson,
+    ) -> None:
+        """Set custom geometry source data for one canonical tile."""
+        from .geo import _to_native_wire as _geojson_to_native_wire
+
+        self._native.set_custom_geometry_source_tile_data(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
+            _geojson_to_native_wire(data),
+        )
+
+    def invalidate_custom_geometry_source_tile(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+    ) -> None:
+        """Invalidate custom geometry source data for one canonical tile."""
+        self._native.invalidate_custom_geometry_source_tile(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
+        )
+
+    def invalidate_custom_geometry_source_region(
+        self,
+        source_id: str,
+        bounds: LatLngBounds,
+    ) -> None:
+        """Invalidate custom geometry source data inside one geographic region."""
+        self._native.invalidate_custom_geometry_source_region(
+            source_id,
+            (bounds.southwest.latitude, bounds.southwest.longitude),
+            (bounds.northeast.latitude, bounds.northeast.longitude),
+        )
 
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor

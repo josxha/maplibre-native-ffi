@@ -2283,6 +2283,70 @@ impl MapHandle {
         Ok(handle)
     }
 
+    fn set_custom_geometry_source_tile_data(
+        &self,
+        source_id: String,
+        z: u32,
+        x: u32,
+        y: u32,
+        data: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let data = geojson_from_wire(data)?;
+        let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, source ID, tile ID, and GeoJSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_custom_geometry_source_tile_data(
+                state.as_ptr(),
+                source_id.raw(),
+                sys::mln_canonical_tile_id { z, x, y },
+                data.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn invalidate_custom_geometry_source_tile(
+        &self,
+        source_id: String,
+        z: u32,
+        x: u32,
+        y: u32,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        // SAFETY: The C API validates the map pointer, source ID, and tile ID.
+        maplibre_core::check(unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_tile(
+                state.as_ptr(),
+                source_id.raw(),
+                sys::mln_canonical_tile_id { z, x, y },
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn invalidate_custom_geometry_source_region(
+        &self,
+        source_id: String,
+        southwest: (f64, f64),
+        northeast: (f64, f64),
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let bounds = lat_lng_bounds_from_tuple((southwest, northeast));
+        // SAFETY: The C API validates the map pointer, source ID, and bounds.
+        maplibre_core::check(unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_region(
+                state.as_ptr(),
+                source_id.raw(),
+                bounds,
+            )
+        })
+        .map_err(map_error)
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
@@ -3382,6 +3446,21 @@ fn lat_lngs_from_tuples(coordinates: Vec<(f64, f64)>) -> Vec<sys::mln_lat_lng> {
             longitude,
         })
         .collect()
+}
+
+fn lat_lng_bounds_from_tuple(
+    (southwest, northeast): ((f64, f64), (f64, f64)),
+) -> sys::mln_lat_lng_bounds {
+    sys::mln_lat_lng_bounds {
+        southwest: sys::mln_lat_lng {
+            latitude: southwest.0,
+            longitude: southwest.1,
+        },
+        northeast: sys::mln_lat_lng {
+            latitude: northeast.0,
+            longitude: northeast.1,
+        },
+    }
 }
 
 fn lat_lng_to_py(py: Python<'_>, coordinate: sys::mln_lat_lng) -> PyResult<Py<PyAny>> {

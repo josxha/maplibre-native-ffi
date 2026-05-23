@@ -1200,6 +1200,16 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
             assert source.poll_event() is None
             assert source.dropped_event_count == 1
 
+            tile = style.CanonicalTileId(0, 0, 0)
+            data = geo.FeatureCollection((geo.Feature(geometry=geo.point(0.0, 0.0)),))
+            bounds = geo.LatLngBounds(
+                southwest=geo.LatLng(-1.0, -1.0),
+                northeast=geo.LatLng(1.0, 1.0),
+            )
+            map_handle.set_custom_geometry_source_tile_data("custom", tile, data)
+            map_handle.invalidate_custom_geometry_source_tile("custom", tile)
+            map_handle.invalidate_custom_geometry_source_region("custom", bounds)
+
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
             assert source.closed
 

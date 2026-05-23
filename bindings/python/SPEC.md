@@ -119,6 +119,8 @@ The current implementation includes these completed slices:
   raster, and raster DEM style source URL/inline-tile insertion, source removal,
   existence checks, type/info lookup, attribution copying, and source ID
   listing.
+- `MapHandle` exposes custom geometry source callback queues, tile data updates,
+  and tile/region invalidation.
 - `MapHandle` exposes built-in hillshade, color-relief, and location-indicator
   layer insertion, JSON style layer insertion/copying, style light JSON/property
   APIs, layer property/filter APIs, location-indicator property setters, style
