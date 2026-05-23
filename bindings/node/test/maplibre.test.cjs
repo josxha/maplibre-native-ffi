@@ -31,6 +31,33 @@ const {
   threadLastErrorMessage,
 } = require("..");
 
+/**
+ * @param {string} handleId
+ * @param {string} url
+ * @returns {any}
+ */
+function fakeResourceProviderRequest(handleId, url) {
+  return {
+    url,
+    kind: "source",
+    rawKind: 2,
+    loadingMethod: "all",
+    rawLoadingMethod: 0,
+    priority: "regular",
+    rawPriority: 0,
+    usage: "online",
+    rawUsage: 0,
+    storagePolicy: "volatile",
+    rawStoragePolicy: 1,
+    range: null,
+    priorModifiedUnixMs: null,
+    priorExpiresUnixMs: null,
+    priorEtag: null,
+    priorData: new Uint8Array(),
+    handleId,
+  };
+}
+
 if (false) {
   const session = /** @type {import("..").RenderSessionHandle} */ (
     /** @type {unknown} */ (null)
@@ -360,7 +387,7 @@ test("offline operations expose discardable handles", () => {
   }
 });
 
-test("resource provider routes validate Node handoff shape", () => {
+test("resource provider routes validate Node handoff shape", async () => {
   const runtime = new RuntimeHandle();
 
   try {
@@ -384,6 +411,71 @@ test("resource provider routes validate Node handoff shape", () => {
   } finally {
     runtime.close();
   }
+
+  /** @type {any} */
+  let received;
+  RuntimeHandle.prototype.setResourceProviderRoutes.call(
+    {
+      native: {
+        /** @param {any} routes @param {(request: any) => void} callback */
+        setResourceProviderRoutes(routes, callback) {
+          assert.deepEqual(routes, [{ urlPrefix: "custom://" }]);
+          callback(fakeResourceProviderRequest("1", "custom://tile"));
+        },
+      },
+    },
+    [{ urlPrefix: "custom://" }],
+    (request) => {
+      received = request;
+      return /** @type {any} */ ("ignored");
+    },
+  );
+  assert.ok(received);
+  assert.equal(received.handleId, undefined);
+  assert.equal(received.handle instanceof ResourceRequestHandle, true);
+  assert.equal(received.handle.closed, false);
+  received.handle.close();
+
+  /** @type {any} */
+  let thrownHandle;
+  RuntimeHandle.prototype.setResourceProviderRoutes.call(
+    {
+      native: {
+        /** @param {any} _routes @param {(request: any) => void} callback */
+        setResourceProviderRoutes(_routes, callback) {
+          callback(fakeResourceProviderRequest("2", "custom://throw"));
+        },
+      },
+    },
+    [{ urlPrefix: "custom://" }],
+    (request) => {
+      thrownHandle = request.handle;
+      throw new Error("provider boom");
+    },
+  );
+  assert.ok(thrownHandle);
+  assert.equal(thrownHandle.closed, true);
+
+  /** @type {any} */
+  let rejectedHandle;
+  RuntimeHandle.prototype.setResourceProviderRoutes.call(
+    {
+      native: {
+        /** @param {any} _routes @param {(request: any) => void} callback */
+        setResourceProviderRoutes(_routes, callback) {
+          callback(fakeResourceProviderRequest("3", "custom://reject"));
+        },
+      },
+    },
+    [{ urlPrefix: "custom://" }],
+    (request) => {
+      rejectedHandle = request.handle;
+      return Promise.reject(new Error("provider rejected"));
+    },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(rejectedHandle);
+  assert.equal(rejectedHandle.closed, true);
 });
 
 test("runtime handle supports options, resource transform, explicit close, and idempotent disposal", () => {
@@ -410,10 +502,12 @@ test("runtime handle supports options, resource transform, explicit close, and i
   );
   assert.throws(
     () =>
-      runtime.setResourceTransformRules([
-        { urlPrefix: "http://", replacementUrlPrefix: "https://" },
-        { replacementUrl: "https://a", replacementUrlPrefix: "https://b" },
-      ]),
+      runtime.setResourceTransformRules(
+        /** @type {any} */ ([
+          { urlPrefix: "http://", replacementUrlPrefix: "https://" },
+          { replacementUrl: "https://a", replacementUrlPrefix: "https://b" },
+        ]),
+      ),
     InvalidArgumentError,
   );
   runtime.close();

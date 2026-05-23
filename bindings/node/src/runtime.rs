@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
 use std::ptr::NonNull;
@@ -138,9 +138,14 @@ pub struct ResourceResponseInput {
 }
 
 static RESOURCE_REQUEST_HANDLE_IDS: AtomicU64 = AtomicU64::new(1);
-static RESOURCE_REQUEST_HANDLES: OnceLock<
-    Mutex<HashMap<u64, Arc<core::resource::ResourceRequestHandleState>>>,
-> = OnceLock::new();
+static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<u64, ResourceRequestRegistration>>> =
+    OnceLock::new();
+
+#[derive(Clone)]
+struct ResourceRequestRegistration {
+    handle: Arc<core::resource::ResourceRequestHandleState>,
+    provider: usize,
+}
 
 struct ResourceMatcher {
     kind: Option<u32>,
@@ -162,13 +167,16 @@ struct ResourceTransformState {
 struct ResourceProviderState {
     routes: Vec<ResourceMatcher>,
     callback: ThreadsafeFunction<ResourceProviderRequest>,
+    pending_handle_ids: Mutex<HashSet<u64>>,
 }
 
 #[napi(js_name = "NativeRuntimeHandle")]
 pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
+    retired_resource_transforms: Mutex<Vec<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
+    retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -187,7 +195,9 @@ pub fn create_native_runtime_handle(
     Ok(NativeRuntimeHandle {
         state,
         resource_transform: Mutex::new(None),
+        retired_resource_transforms: Mutex::new(Vec::new()),
         resource_provider: Mutex::new(None),
+        retired_resource_providers: Mutex::new(Vec::new()),
     })
 }
 
@@ -198,41 +208,37 @@ pub fn native_resource_request_complete(
 ) -> Result<()> {
     let handle_id = parse_resource_request_handle_id(&handle_id)?;
     let response = resource_response_from_input(response)?;
-    let handle = resource_request_handles()
+    let registration = resource_request_handles()
         .lock()
         .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
         .get(&handle_id)
         .cloned()
         .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
-    handle.complete(&response).map_err(error::from_core)?;
-    resource_request_handles()
-        .lock()
-        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
-        .remove(&handle_id);
+    registration
+        .handle
+        .complete(&response)
+        .map_err(error::from_core)?;
+    unregister_resource_request_handle(handle_id);
     Ok(())
 }
 
 #[napi(js_name = "nativeResourceRequestCancelled")]
 pub fn native_resource_request_cancelled(handle_id: String) -> Result<bool> {
     let handle_id = parse_resource_request_handle_id(&handle_id)?;
-    let handle = resource_request_handles()
+    let registration = resource_request_handles()
         .lock()
         .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
         .get(&handle_id)
         .cloned()
         .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
-    handle.is_cancelled().map_err(error::from_core)
+    registration.handle.is_cancelled().map_err(error::from_core)
 }
 
 #[napi(js_name = "nativeResourceRequestClose")]
 pub fn native_resource_request_close(handle_id: String) -> Result<()> {
     let handle_id = parse_resource_request_handle_id(&handle_id)?;
-    if let Some(handle) = resource_request_handles()
-        .lock()
-        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
-        .remove(&handle_id)
-    {
-        handle.close();
+    if let Some(registration) = unregister_resource_request_handle(handle_id) {
+        registration.handle.close();
     }
     Ok(())
 }
@@ -242,12 +248,7 @@ impl NativeRuntimeHandle {
     #[napi]
     pub fn close(&self) -> Result<()> {
         unsafe { self.state.close_status(sys::mln_runtime_destroy) }.map_err(error::from_core)?;
-        if let Ok(mut transform) = self.resource_transform.lock() {
-            *transform = None;
-        }
-        if let Ok(mut provider) = self.resource_provider.lock() {
-            *provider = None;
-        }
+        self.release_resource_callback_state();
         Ok(())
     }
 
@@ -274,6 +275,7 @@ impl NativeRuntimeHandle {
                 .map(resource_matcher_from_input)
                 .collect::<Result<Vec<_>>>()?,
             callback,
+            pending_handle_ids: Mutex::new(HashSet::new()),
         });
         let descriptor = core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
@@ -283,11 +285,14 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_set_resource_provider(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        *self
+        let replaced = self
             .resource_provider
             .lock()
-            .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))? =
-            Some(provider);
+            .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?
+            .replace(provider);
+        if let Some(replaced) = replaced {
+            self.retire_resource_provider(replaced);
+        }
         Ok(())
     }
 
@@ -311,11 +316,14 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        *self
+        let replaced = self
             .resource_transform
             .lock()
-            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))? =
-            Some(transform);
+            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
+            .replace(transform);
+        if let Some(replaced) = replaced {
+            self.retire_resource_transform(replaced);
+        }
         Ok(())
     }
 
@@ -323,11 +331,14 @@ impl NativeRuntimeHandle {
     pub fn clear_resource_transform(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.as_ptr()) })
             .map_err(error::from_core)?;
-        *self
+        let replaced = self
             .resource_transform
             .lock()
-            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))? =
-            None;
+            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
+            .take();
+        if let Some(replaced) = replaced {
+            self.retire_resource_transform(replaced);
+        }
         Ok(())
     }
 
@@ -680,7 +691,7 @@ unsafe extern "C" fn resource_provider_trampoline(
         Ok(handle_state) => handle_state,
         Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
     };
-    let handle_id = register_resource_request_handle(handle_state.clone());
+    let handle_id = register_resource_request_handle(handle_state.clone(), provider);
     let provider_request = resource_provider_request_from_core(request, handle_id);
     let status = provider.callback.call(
         Ok(provider_request),
@@ -763,25 +774,45 @@ impl RuntimeEvent {
     }
 }
 
-fn resource_request_handles()
--> &'static Mutex<HashMap<u64, Arc<core::resource::ResourceRequestHandleState>>> {
+fn resource_request_handles() -> &'static Mutex<HashMap<u64, ResourceRequestRegistration>> {
     RESOURCE_REQUEST_HANDLES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn register_resource_request_handle(
     handle: Arc<core::resource::ResourceRequestHandleState>,
+    provider: &ResourceProviderState,
 ) -> u64 {
     let handle_id = RESOURCE_REQUEST_HANDLE_IDS.fetch_add(1, Ordering::Relaxed);
     if let Ok(mut handles) = resource_request_handles().lock() {
-        handles.insert(handle_id, handle);
+        handles.insert(
+            handle_id,
+            ResourceRequestRegistration {
+                handle,
+                provider: provider as *const ResourceProviderState as usize,
+            },
+        );
+    }
+    if let Ok(mut pending) = provider.pending_handle_ids.lock() {
+        pending.insert(handle_id);
     }
     handle_id
 }
 
-fn unregister_resource_request_handle(handle_id: u64) {
-    if let Ok(mut handles) = resource_request_handles().lock() {
-        handles.remove(&handle_id);
+fn unregister_resource_request_handle(handle_id: u64) -> Option<ResourceRequestRegistration> {
+    let registration = resource_request_handles()
+        .lock()
+        .ok()
+        .and_then(|mut handles| handles.remove(&handle_id));
+    if let Some(registration) = &registration {
+        // SAFETY: a registration can only remain in the global registry while
+        // its provider state is active or retained in the runtime's retired
+        // provider list. Provider drop drains and removes all its registrations.
+        let provider = unsafe { &*(registration.provider as *const ResourceProviderState) };
+        if let Ok(mut pending) = provider.pending_handle_ids.lock() {
+            pending.remove(&handle_id);
+        }
     }
+    registration
 }
 
 fn resource_matcher_from_input(input: ResourceRouteInput) -> Result<ResourceMatcher> {
@@ -1060,6 +1091,56 @@ impl NativeRuntimeHandle {
     pub(crate) fn as_ptr(&self) -> *mut sys::mln_runtime {
         self.state.as_ptr()
     }
+
+    fn retire_resource_transform(&self, transform: Arc<ResourceTransformState>) {
+        if let Ok(mut retired) = self.retired_resource_transforms.lock() {
+            retired.push(transform);
+        } else {
+            std::mem::forget(transform);
+        }
+    }
+
+    fn retire_resource_provider(&self, provider: Arc<ResourceProviderState>) {
+        if let Ok(mut retired) = self.retired_resource_providers.lock() {
+            retired.push(provider);
+        } else {
+            std::mem::forget(provider);
+        }
+    }
+
+    fn release_resource_callback_state(&self) {
+        if let Ok(mut transform) = self.resource_transform.lock() {
+            *transform = None;
+        }
+        if let Ok(mut retired_transforms) = self.retired_resource_transforms.lock() {
+            retired_transforms.clear();
+        }
+        if let Ok(mut provider) = self.resource_provider.lock() {
+            *provider = None;
+        }
+        if let Ok(mut retired_providers) = self.retired_resource_providers.lock() {
+            retired_providers.clear();
+        }
+    }
+}
+
+impl Drop for ResourceProviderState {
+    fn drop(&mut self) {
+        let pending = self
+            .pending_handle_ids
+            .lock()
+            .map(|mut pending| pending.drain().collect::<Vec<_>>())
+            .unwrap_or_default();
+        for handle_id in pending {
+            if let Some(registration) = resource_request_handles()
+                .lock()
+                .ok()
+                .and_then(|mut handles| handles.remove(&handle_id))
+            {
+                registration.handle.close();
+            }
+        }
+    }
 }
 
 impl Drop for NativeRuntimeHandle {
@@ -1070,8 +1151,18 @@ impl Drop for NativeRuntimeHandle {
                     std::mem::forget(transform);
                 }
             }
+            if let Ok(mut retired_transforms) = self.retired_resource_transforms.lock() {
+                for transform in retired_transforms.drain(..) {
+                    std::mem::forget(transform);
+                }
+            }
             if let Ok(mut provider) = self.resource_provider.lock() {
                 if let Some(provider) = provider.take() {
+                    std::mem::forget(provider);
+                }
+            }
+            if let Ok(mut retired_providers) = self.retired_resource_providers.lock() {
+                for provider in retired_providers.drain(..) {
                     std::mem::forget(provider);
                 }
             }

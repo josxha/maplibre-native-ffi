@@ -484,6 +484,44 @@ function validateByteLength(byteLength) {
   return byteLength;
 }
 
+const resourceRequestFinalizer =
+  typeof FinalizationRegistry === "function"
+    ? new FinalizationRegistry((handleId) => {
+        try {
+          native.nativeResourceRequestClose(handleId);
+        } catch {
+          // Finalizers are best-effort cleanup only.
+        }
+      })
+    : null;
+
+function resourceProviderErrorResponse(error) {
+  const message =
+    error && typeof error.message === "string"
+      ? error.message
+      : "resource provider callback failed";
+  return {
+    status: "error",
+    errorReason: "other",
+    errorMessage: message,
+  };
+}
+
+function completeResourceRequestWithProviderError(handle, error) {
+  if (handle.closed) {
+    return;
+  }
+  try {
+    handle.complete(resourceProviderErrorResponse(error));
+  } catch {
+    try {
+      handle.close();
+    } catch {
+      // The request may have been cancelled or completed already.
+    }
+  }
+}
+
 class ResourceRequestHandle {
   constructor(token, handleId) {
     if (token !== CONSTRUCTION_TOKEN) {
@@ -495,6 +533,7 @@ class ResourceRequestHandle {
     recordHandleEnvironment(this);
     this.handleId = handleId;
     this.closed = false;
+    resourceRequestFinalizer?.register(this, handleId, this);
   }
 
   complete(response = {}) {
@@ -506,6 +545,7 @@ class ResourceRequestHandle {
       native.nativeResourceRequestComplete(this.handleId, response),
     );
     this.closed = true;
+    resourceRequestFinalizer?.unregister(this);
   }
 
   cancelled() {
@@ -524,6 +564,7 @@ class ResourceRequestHandle {
       native.nativeResourceRequestClose(this.handleId),
     );
     this.closed = true;
+    resourceRequestFinalizer?.unregister(this);
   }
 
   [Symbol.dispose]() {
@@ -633,10 +674,14 @@ class RuntimeHandle {
         };
         delete wrapped.handleId;
         try {
-          callback(wrapped);
+          const result = callback(wrapped);
+          if (result && typeof result.then === "function") {
+            result.catch((error) => {
+              completeResourceRequestWithProviderError(handle, error);
+            });
+          }
         } catch (error) {
-          handle.close();
-          throw error;
+          completeResourceRequestWithProviderError(handle, error);
         }
       }),
     );

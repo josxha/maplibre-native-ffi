@@ -207,3 +207,46 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Post-redesign review round 1
+
+Review evidence:
+
+- Ran three independent review agents after the resource callback design
+  correction:
+  - FFI/threading/handle-lifetime review.
+  - JavaScript/TypeScript API and test review.
+  - SPEC/REVIEW conformance review.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `cargo check -p maplibre-native-node`, `mise run fix`, and
+  `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. Provider callback throws or rejected thenables could close/release a handled
+   request without completing it with an error response.
+   - Action: provider callback handoff now completes the request with an error
+     response on synchronous throws or rejected thenables, falling back to close
+     only when completion is already invalid.
+2. `ResourceRequestHandle` cleanup depended only on explicit user calls.
+   - Action: the wrapper registers resource request handles with a best-effort
+     `FinalizationRegistry`, and the native runtime tracks pending provider
+     request IDs so runtime/provider teardown releases outstanding handles.
+3. Replaced/cleared resource provider and transform state could drop while
+   native callbacks still held raw `user_data` pointers.
+   - Action: replaced providers/transforms are retained in retired state until
+     runtime close/destruction, and leaked runtimes intentionally forget active
+     and retired callback state.
+4. `ResourceTransformRule` declarations allowed invalid rule shapes.
+   - Action: declarations now encode exactly one replacement form and require
+     `urlPrefix` for prefix replacement, with `@ts-expect-error` coverage for
+     rejected shapes.
+5. Provider-route tests did not execute the JavaScript handoff wrapper.
+   - Action: Node tests now invoke the wrapper through a fake native provider
+     hook to verify `handleId` stripping, `ResourceRequestHandle` wrapping,
+     ignored return values, synchronous throw handling, and rejected thenable
+     handling.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.

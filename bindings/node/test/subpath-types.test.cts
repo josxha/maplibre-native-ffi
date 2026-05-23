@@ -55,6 +55,16 @@ const transformRule: ResourceTransformRule = {
   urlPrefix: "http://example.test/",
   replacementUrlPrefix: "https://example.test/",
 };
+// @ts-expect-error prefix replacements require a matched URL prefix.
+const invalidTransformRuleMissingPrefix: ResourceTransformRule = {
+  replacementUrlPrefix: "https://example.test/",
+};
+// @ts-expect-error transform rules set exactly one replacement form.
+const invalidTransformRuleBothReplacements: ResourceTransformRule = {
+  urlPrefix: "http://example.test/",
+  replacementUrl: "https://example.test/a",
+  replacementUrlPrefix: "https://example.test/",
+};
 const image: StyleImageInput = {
   width: 1,
   height: 1,
@@ -67,5 +77,7 @@ void geometry;
 void response;
 void route;
 void transformRule;
+void invalidTransformRuleMissingPrefix;
+void invalidTransformRuleBothReplacements;
 void image;
 void json;

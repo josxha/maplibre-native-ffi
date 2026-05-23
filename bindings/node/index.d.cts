@@ -237,10 +237,16 @@ export interface ResourceRoute {
   urlPrefix?: string | null;
 }
 
-export interface ResourceTransformRule extends ResourceRoute {
-  replacementUrl?: string | null;
-  replacementUrlPrefix?: string | null;
-}
+export type ResourceTransformRule =
+  | (ResourceRoute & {
+      replacementUrl: string;
+      replacementUrlPrefix?: null;
+    })
+  | (Omit<ResourceRoute, "urlPrefix"> & {
+      urlPrefix: string;
+      replacementUrl?: null;
+      replacementUrlPrefix: string;
+    });
 
 export interface ResourceByteRange {
   start: string;
