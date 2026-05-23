@@ -1,11 +1,25 @@
 """Map handles, options, and map lifecycle entry points."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
+from typing import TYPE_CHECKING
 
 from . import _native
 from .runtime import RuntimeHandle
+
+if TYPE_CHECKING:
+    from .render import (
+        MetalBorrowedTextureDescriptor,
+        MetalOwnedTextureDescriptor,
+        MetalSurfaceDescriptor,
+        RenderSessionHandle,
+        VulkanBorrowedTextureDescriptor,
+        VulkanOwnedTextureDescriptor,
+        VulkanSurfaceDescriptor,
+    )
 
 
 class MapMode(IntEnum):
@@ -68,6 +82,121 @@ class MapHandle:
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
+
+    def attach_metal_surface(
+        self, descriptor: MetalSurfaceDescriptor
+    ) -> RenderSessionHandle:
+        """Attach a Metal native surface render target to this map."""
+        from . import _native
+        from .render import RenderSessionHandle
+
+        native = _native.attach_metal_surface(
+            self._native,
+            descriptor.extent.width,
+            descriptor.extent.height,
+            descriptor.extent.scale_factor,
+            descriptor.context.device.address,
+            descriptor.layer.address,
+        )
+        return RenderSessionHandle(native, self)
+
+    def attach_vulkan_surface(
+        self, descriptor: VulkanSurfaceDescriptor
+    ) -> RenderSessionHandle:
+        """Attach a Vulkan native surface render target to this map."""
+        from . import _native
+        from .render import RenderSessionHandle
+
+        native = _native.attach_vulkan_surface(
+            self._native,
+            descriptor.extent.width,
+            descriptor.extent.height,
+            descriptor.extent.scale_factor,
+            descriptor.context.instance.address,
+            descriptor.context.physical_device.address,
+            descriptor.context.device.address,
+            descriptor.context.graphics_queue.address,
+            descriptor.context.graphics_queue_family_index,
+            descriptor.surface.address,
+        )
+        return RenderSessionHandle(native, self)
+
+    def attach_metal_owned_texture(
+        self, descriptor: MetalOwnedTextureDescriptor
+    ) -> RenderSessionHandle:
+        """Attach a Metal session-owned texture render target to this map."""
+        from . import _native
+        from .render import RenderSessionHandle
+
+        native = _native.attach_metal_owned_texture(
+            self._native,
+            descriptor.extent.width,
+            descriptor.extent.height,
+            descriptor.extent.scale_factor,
+            descriptor.context.device.address,
+        )
+        return RenderSessionHandle(native, self)
+
+    def attach_metal_borrowed_texture(
+        self, descriptor: MetalBorrowedTextureDescriptor
+    ) -> RenderSessionHandle:
+        """Attach a Metal caller-owned texture render target to this map."""
+        from . import _native
+        from .render import RenderSessionHandle
+
+        native = _native.attach_metal_borrowed_texture(
+            self._native,
+            descriptor.extent.width,
+            descriptor.extent.height,
+            descriptor.extent.scale_factor,
+            descriptor.texture.address,
+        )
+        return RenderSessionHandle(native, self)
+
+    def attach_vulkan_owned_texture(
+        self, descriptor: VulkanOwnedTextureDescriptor
+    ) -> RenderSessionHandle:
+        """Attach a Vulkan session-owned texture render target to this map."""
+        from . import _native
+        from .render import RenderSessionHandle
+
+        native = _native.attach_vulkan_owned_texture(
+            self._native,
+            descriptor.extent.width,
+            descriptor.extent.height,
+            descriptor.extent.scale_factor,
+            descriptor.context.instance.address,
+            descriptor.context.physical_device.address,
+            descriptor.context.device.address,
+            descriptor.context.graphics_queue.address,
+            descriptor.context.graphics_queue_family_index,
+        )
+        return RenderSessionHandle(native, self)
+
+    def attach_vulkan_borrowed_texture(
+        self, descriptor: VulkanBorrowedTextureDescriptor
+    ) -> RenderSessionHandle:
+        """Attach a Vulkan caller-owned texture render target to this map."""
+        from . import _native
+        from .render import RenderSessionHandle
+
+        native = _native.attach_vulkan_borrowed_texture(
+            self._native,
+            descriptor.extent.width,
+            descriptor.extent.height,
+            descriptor.extent.scale_factor,
+            descriptor.context.instance.address,
+            descriptor.context.physical_device.address,
+            descriptor.context.device.address,
+            descriptor.context.graphics_queue.address,
+            descriptor.context.graphics_queue_family_index,
+            descriptor.image.address,
+            descriptor.image_view.address,
+            descriptor.format,
+            descriptor.initial_layout,
+            descriptor.final_layout,
+        )
+        return RenderSessionHandle(native, self)
 
     def __enter__(self) -> "MapHandle":
         return self

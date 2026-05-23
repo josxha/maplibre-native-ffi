@@ -4,6 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
+from maplibre_native import render
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -171,3 +172,43 @@ def test_poll_event_returns_copied_map_event() -> None:
             assert loading_failed.source.source_type == mln.RuntimeEventSourceType.MAP
             assert copied_message == loading_failed.message
             assert loading_failed.message
+
+
+def test_render_descriptors_are_public_python_values() -> None:
+    extent = render.RenderTargetExtent(width=320, height=240, scale_factor=2.0)
+    pointer = render.NativePointer(0x1234)
+    metal = render.MetalOwnedTextureDescriptor(
+        extent=extent,
+        context=render.MetalContextDescriptor(device=pointer),
+    )
+    vulkan = render.VulkanBorrowedTextureDescriptor(
+        extent=extent,
+        context=render.VulkanContextDescriptor(graphics_queue_family_index=7),
+        image=pointer,
+        image_view=render.NativePointer(0x5678),
+        format=44,
+        initial_layout=1,
+        final_layout=2,
+    )
+
+    assert metal.extent == extent
+    assert metal.context.device.address == 0x1234
+    assert vulkan.context.graphics_queue_family_index == 7
+    assert vulkan.image_view.address == 0x5678
+    assert vulkan.format == 44
+
+
+def test_invalid_render_target_attach_reports_native_status() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(
+                (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+            ) as raised:
+                map_handle.attach_metal_owned_texture(
+                    render.MetalOwnedTextureDescriptor()
+                )
+
+            assert raised.value.status in {
+                mln.MaplibreStatus.INVALID_ARGUMENT,
+                mln.MaplibreStatus.UNSUPPORTED,
+            }

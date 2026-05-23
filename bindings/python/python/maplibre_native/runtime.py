@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
-from typing import Any
+from typing import Any, cast
 
 from . import _native
 
@@ -174,9 +174,9 @@ class RuntimeHandle:
 
     def create_map(self, options: object | None = None) -> object:
         """Create a map owned by this runtime."""
-        from .map import MapHandle
+        from .map import MapHandle, MapOptions
 
-        return MapHandle(self, options)
+        return MapHandle(self, cast("MapOptions | None", options))
 
     def __enter__(self) -> "RuntimeHandle":
         return self
