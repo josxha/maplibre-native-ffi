@@ -257,6 +257,9 @@ export declare class MapHandle {
   addVectorSourceUrl(sourceId: string, url: string): void;
   addRasterSourceUrl(sourceId: string, url: string): void;
   addRasterDemSourceUrl(sourceId: string, url: string): void;
+  addVectorSourceTiles(sourceId: string, tiles: Iterable<string>): void;
+  addRasterSourceTiles(sourceId: string, tiles: Iterable<string>): void;
+  addRasterDemSourceTiles(sourceId: string, tiles: Iterable<string>): void;
   addImageSourceUrl(sourceId: string, coordinates: LatLng[], url: string): void;
   setImageSourceUrl(sourceId: string, url: string): void;
   setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;

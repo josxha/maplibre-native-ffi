@@ -579,6 +579,24 @@ class MapHandle {
     );
   }
 
+  addVectorSourceTiles(sourceId, tiles) {
+    return translateNativeErrors(() =>
+      this.native.addVectorSourceTiles(sourceId, Array.from(tiles)),
+    );
+  }
+
+  addRasterSourceTiles(sourceId, tiles) {
+    return translateNativeErrors(() =>
+      this.native.addRasterSourceTiles(sourceId, Array.from(tiles)),
+    );
+  }
+
+  addRasterDemSourceTiles(sourceId, tiles) {
+    return translateNativeErrors(() =>
+      this.native.addRasterDemSourceTiles(sourceId, Array.from(tiles)),
+    );
+  }
+
   addImageSourceUrl(sourceId, coordinates, url) {
     return translateNativeErrors(() =>
       this.native.addImageSourceUrl(sourceId, coordinates, url),

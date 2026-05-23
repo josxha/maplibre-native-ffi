@@ -538,6 +538,54 @@ impl NativeMapHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "addVectorSourceTiles")]
+    pub fn add_vector_source_tiles(&self, source_id: String, tiles: Vec<String>) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let tiles = StringViews::new(tiles);
+        core::check(unsafe {
+            sys::mln_map_add_vector_source_tiles(
+                self.state.as_ptr(),
+                source_id.raw(),
+                tiles.as_ptr(),
+                tiles.len(),
+                std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addRasterSourceTiles")]
+    pub fn add_raster_source_tiles(&self, source_id: String, tiles: Vec<String>) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let tiles = StringViews::new(tiles);
+        core::check(unsafe {
+            sys::mln_map_add_raster_source_tiles(
+                self.state.as_ptr(),
+                source_id.raw(),
+                tiles.as_ptr(),
+                tiles.len(),
+                std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addRasterDemSourceTiles")]
+    pub fn add_raster_dem_source_tiles(&self, source_id: String, tiles: Vec<String>) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let tiles = StringViews::new(tiles);
+        core::check(unsafe {
+            sys::mln_map_add_raster_dem_source_tiles(
+                self.state.as_ptr(),
+                source_id.raw(),
+                tiles.as_ptr(),
+                tiles.len(),
+                std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "addImageSourceUrl")]
     pub fn add_image_source_url(
         &self,
@@ -1182,6 +1230,32 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
         other => Err(error::invalid_argument(format!(
             "debug option must be a known MapDebugOption, got '{other}'"
         ))),
+    }
+}
+
+struct StringViews {
+    _strings: Vec<String>,
+    views: Vec<sys::mln_string_view>,
+}
+
+impl StringViews {
+    fn new(strings: Vec<String>) -> Self {
+        let views = strings
+            .iter()
+            .map(|value| core::string::string_view(value).raw())
+            .collect();
+        Self {
+            _strings: strings,
+            views,
+        }
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_string_view {
+        self.views.as_ptr()
+    }
+
+    fn len(&self) -> usize {
+        self.views.len()
     }
 }
 

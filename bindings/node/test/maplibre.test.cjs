@@ -482,6 +482,18 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       "https://example.test/dem.json",
     );
     assert.equal(map.getStyleSourceType("raster-dem-url"), "raster-dem");
+    map.addVectorSourceTiles("vector-tiles", [
+      "https://example.test/vector/{z}/{x}/{y}.pbf",
+    ]);
+    assert.equal(map.getStyleSourceType("vector-tiles"), "vector");
+    map.addRasterSourceTiles("raster-tiles", [
+      "https://example.test/raster/{z}/{x}/{y}.png",
+    ]);
+    assert.equal(map.getStyleSourceType("raster-tiles"), "raster");
+    map.addRasterDemSourceTiles("raster-dem-tiles", [
+      "https://example.test/dem/{z}/{x}/{y}.png",
+    ]);
+    assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
 
     map.addImageSourceUrl(
       "image-source",
@@ -497,6 +509,9 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     );
     assert.equal(map.getImageSourceCoordinates("missing-source"), null);
     assert.equal(map.removeStyleSource("image-source"), true);
+    assert.equal(map.removeStyleSource("raster-dem-tiles"), true);
+    assert.equal(map.removeStyleSource("raster-tiles"), true);
+    assert.equal(map.removeStyleSource("vector-tiles"), true);
     assert.equal(map.removeStyleSource("raster-dem-url"), true);
     assert.equal(map.removeStyleSource("raster-url"), true);
     assert.equal(map.removeStyleSource("vector-url"), true);
