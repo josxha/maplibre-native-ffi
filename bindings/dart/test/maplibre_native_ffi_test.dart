@@ -40,6 +40,20 @@ void main() {
       map.setStyleJson(_emptyStyleJson);
       runtime.runOnce();
       runtime.drainEvents();
+      map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 1));
+      final camera = map.camera();
+      expect(camera.center, const LatLng(0, 0));
+      expect(camera.zoom, closeTo(1, 0.0001));
+      map.moveBy(1, 1);
+      map.scaleBy(1.01, anchor: const ScreenPoint(128, 128));
+      map.rotateBy(const ScreenPoint(0, 0), const ScreenPoint(1, 1));
+      map.pitchBy(0);
+      map.cancelTransitions();
+      expect(() => map.scaleBy(-1), throwsA(isA<InvalidArgumentException>()));
+      final centerPixel = map.pixelForLatLng(const LatLng(0, 0));
+      expect(centerPixel.x.isFinite, isTrue);
+      expect(map.latLngForPixel(centerPixel).latitude.isFinite, isTrue);
+
       final sourceIds = map.listStyleSourceIds();
       expect(sourceIds, contains('org.maplibre.annotations'));
       expect(

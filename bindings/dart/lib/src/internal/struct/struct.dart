@@ -23,6 +23,13 @@ raw.mln_lat_lng_bounds latLngBoundsToNative(LatLngBounds value) {
   return result;
 }
 
+/// Converts a native bounds value to Dart.
+LatLngBounds latLngBoundsFromNative(raw.mln_lat_lng_bounds value) =>
+    LatLngBounds(
+      latLngFromNative(value.southwest),
+      latLngFromNative(value.northeast),
+    );
+
 /// Converts Dart screen point to the native C value shape.
 raw.mln_screen_point screenPointToNative(ScreenPoint value) {
   final result = Struct.create<raw.mln_screen_point>();
@@ -30,6 +37,10 @@ raw.mln_screen_point screenPointToNative(ScreenPoint value) {
   result.y = value.y;
   return result;
 }
+
+/// Converts a native screen point to Dart.
+ScreenPoint screenPointFromNative(raw.mln_screen_point value) =>
+    ScreenPoint(value.x, value.y);
 
 /// Converts Dart edge insets to the native C value shape.
 raw.mln_edge_insets edgeInsetsToNative(EdgeInsets value) {
@@ -40,6 +51,14 @@ raw.mln_edge_insets edgeInsetsToNative(EdgeInsets value) {
   result.right = value.right;
   return result;
 }
+
+/// Converts native edge insets to Dart.
+EdgeInsets edgeInsetsFromNative(raw.mln_edge_insets value) => EdgeInsets(
+  top: value.top,
+  left: value.left,
+  bottom: value.bottom,
+  right: value.right,
+);
 
 /// Converts Dart vector to the native C value shape.
 raw.mln_vec3 vec3ToNative(Vec3 value) {
@@ -124,6 +143,61 @@ raw.mln_camera_options cameraOptionsToNative(CameraOptions value) {
     result.field_of_view = fieldOfView;
   }
   return result;
+}
+
+/// Copies native camera options into a Dart value.
+CameraOptions cameraOptionsFromNative(raw.mln_camera_options value) {
+  final fields = value.fields;
+  return CameraOptions(
+    center:
+        (fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_CENTER.value) ==
+            0
+        ? null
+        : LatLng(value.latitude, value.longitude),
+    zoom:
+        (fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_ZOOM.value) == 0
+        ? null
+        : value.zoom,
+    bearing:
+        (fields &
+                raw.mln_camera_option_field.MLN_CAMERA_OPTION_BEARING.value) ==
+            0
+        ? null
+        : value.bearing,
+    pitch:
+        (fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_PITCH.value) ==
+            0
+        ? null
+        : value.pitch,
+    centerAltitude:
+        (fields &
+                raw
+                    .mln_camera_option_field
+                    .MLN_CAMERA_OPTION_CENTER_ALTITUDE
+                    .value) ==
+            0
+        ? null
+        : value.center_altitude,
+    padding:
+        (fields &
+                raw.mln_camera_option_field.MLN_CAMERA_OPTION_PADDING.value) ==
+            0
+        ? null
+        : edgeInsetsFromNative(value.padding),
+    anchor:
+        (fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_ANCHOR.value) ==
+            0
+        ? null
+        : screenPointFromNative(value.anchor),
+    roll:
+        (fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_ROLL.value) == 0
+        ? null
+        : value.roll,
+    fieldOfView:
+        (fields & raw.mln_camera_option_field.MLN_CAMERA_OPTION_FOV.value) == 0
+        ? null
+        : value.field_of_view,
+  );
 }
 
 /// Materializes Dart animation options into a native C struct.

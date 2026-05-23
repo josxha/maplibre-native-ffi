@@ -88,6 +88,103 @@ final class MaplibreNativeCApi {
   int mapSetStyleJson(Pointer<raw.mln_map> map, Pointer<Char> json) =>
       _raw.mln_map_set_style_json(map, json).value;
 
+  /// Copies the current camera snapshot.
+  int mapGetCamera(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_camera_options> outCamera,
+  ) => _raw.mln_map_get_camera(map, outCamera).value;
+
+  /// Applies a camera jump command.
+  int mapJumpTo(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_camera_options> camera,
+  ) => _raw.mln_map_jump_to(map, camera).value;
+
+  /// Applies a camera ease transition command.
+  int mapEaseTo(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_camera_options> camera,
+    Pointer<raw.mln_animation_options> animation,
+  ) => _raw.mln_map_ease_to(map, camera, animation).value;
+
+  /// Applies a camera fly transition command.
+  int mapFlyTo(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_camera_options> camera,
+    Pointer<raw.mln_animation_options> animation,
+  ) => _raw.mln_map_fly_to(map, camera, animation).value;
+
+  /// Applies a screen-space pan command.
+  int mapMoveBy(Pointer<raw.mln_map> map, double deltaX, double deltaY) =>
+      _raw.mln_map_move_by(map, deltaX, deltaY).value;
+
+  /// Applies an animated screen-space pan command.
+  int mapMoveByAnimated(
+    Pointer<raw.mln_map> map,
+    double deltaX,
+    double deltaY,
+    Pointer<raw.mln_animation_options> animation,
+  ) => _raw.mln_map_move_by_animated(map, deltaX, deltaY, animation).value;
+
+  /// Applies a screen-space zoom command.
+  int mapScaleBy(
+    Pointer<raw.mln_map> map,
+    double scale,
+    Pointer<raw.mln_screen_point> anchor,
+  ) => _raw.mln_map_scale_by(map, scale, anchor).value;
+
+  /// Applies an animated screen-space zoom command.
+  int mapScaleByAnimated(
+    Pointer<raw.mln_map> map,
+    double scale,
+    Pointer<raw.mln_screen_point> anchor,
+    Pointer<raw.mln_animation_options> animation,
+  ) => _raw.mln_map_scale_by_animated(map, scale, anchor, animation).value;
+
+  /// Applies a screen-space rotate command.
+  int mapRotateBy(
+    Pointer<raw.mln_map> map,
+    raw.mln_screen_point first,
+    raw.mln_screen_point second,
+  ) => _raw.mln_map_rotate_by(map, first, second).value;
+
+  /// Applies an animated screen-space rotate command.
+  int mapRotateByAnimated(
+    Pointer<raw.mln_map> map,
+    raw.mln_screen_point first,
+    raw.mln_screen_point second,
+    Pointer<raw.mln_animation_options> animation,
+  ) => _raw.mln_map_rotate_by_animated(map, first, second, animation).value;
+
+  /// Applies a pitch delta command.
+  int mapPitchBy(Pointer<raw.mln_map> map, double pitch) =>
+      _raw.mln_map_pitch_by(map, pitch).value;
+
+  /// Applies an animated pitch delta command.
+  int mapPitchByAnimated(
+    Pointer<raw.mln_map> map,
+    double pitch,
+    Pointer<raw.mln_animation_options> animation,
+  ) => _raw.mln_map_pitch_by_animated(map, pitch, animation).value;
+
+  /// Cancels active camera transitions.
+  int mapCancelTransitions(Pointer<raw.mln_map> map) =>
+      _raw.mln_map_cancel_transitions(map).value;
+
+  /// Converts a geographic coordinate to a screen point.
+  int mapPixelForLatLng(
+    Pointer<raw.mln_map> map,
+    raw.mln_lat_lng coordinate,
+    Pointer<raw.mln_screen_point> outPoint,
+  ) => _raw.mln_map_pixel_for_lat_lng(map, coordinate, outPoint).value;
+
+  /// Converts a screen point to a geographic coordinate.
+  int mapLatLngForPixel(
+    Pointer<raw.mln_map> map,
+    raw.mln_screen_point point,
+    Pointer<raw.mln_lat_lng> outCoordinate,
+  ) => _raw.mln_map_lat_lng_for_pixel(map, point, outCoordinate).value;
+
   /// Counts IDs in a style ID list.
   int styleIdListCount(
     Pointer<raw.mln_style_id_list> list,

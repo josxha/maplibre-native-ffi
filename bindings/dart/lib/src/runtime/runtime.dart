@@ -2,6 +2,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import '../camera/camera.dart';
 import '../geo/geo.dart';
 import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
@@ -10,6 +11,7 @@ import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
 import '../internal/struct/geometry.dart' as native_geometry;
 import '../internal/struct/json.dart' as native_json;
+import '../internal/struct/struct.dart' as native_struct;
 import '../json/json.dart';
 import '../style/style.dart';
 
@@ -211,6 +213,146 @@ final class MapHandle {
     withNativeArena((arena) {
       final nativeJson = nativeUtf8CString(json, arena);
       _check(_c.mapSetStyleJson(_pointer, nativeJson.pointer.cast<Char>()));
+    });
+  }
+
+  /// Copies the current camera snapshot.
+  CameraOptions camera() {
+    return withNativeArena((arena) {
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      _check(_c.mapGetCamera(_pointer, outCamera));
+      return native_struct.cameraOptionsFromNative(outCamera.ref);
+    });
+  }
+
+  /// Applies a camera jump command.
+  void jumpTo(CameraOptions camera) {
+    withNativeArena((arena) {
+      final nativeCamera = _nativeCamera(camera, arena);
+      _check(_c.mapJumpTo(_pointer, nativeCamera));
+    });
+  }
+
+  /// Applies a camera ease transition command.
+  void easeTo(CameraOptions camera, {AnimationOptions? animation}) {
+    withNativeArena((arena) {
+      final nativeCamera = _nativeCamera(camera, arena);
+      final nativeAnimation = _nativeAnimation(animation, arena);
+      _check(_c.mapEaseTo(_pointer, nativeCamera, nativeAnimation));
+    });
+  }
+
+  /// Applies a camera fly transition command.
+  void flyTo(CameraOptions camera, {AnimationOptions? animation}) {
+    withNativeArena((arena) {
+      final nativeCamera = _nativeCamera(camera, arena);
+      final nativeAnimation = _nativeAnimation(animation, arena);
+      _check(_c.mapFlyTo(_pointer, nativeCamera, nativeAnimation));
+    });
+  }
+
+  /// Applies a screen-space pan command.
+  void moveBy(double deltaX, double deltaY, {AnimationOptions? animation}) {
+    withNativeArena((arena) {
+      final nativeAnimation = _nativeAnimation(animation, arena);
+      _check(
+        animation == null
+            ? _c.mapMoveBy(_pointer, deltaX, deltaY)
+            : _c.mapMoveByAnimated(_pointer, deltaX, deltaY, nativeAnimation),
+      );
+    });
+  }
+
+  /// Applies a screen-space zoom command.
+  void scaleBy(
+    double scale, {
+    ScreenPoint? anchor,
+    AnimationOptions? animation,
+  }) {
+    withNativeArena((arena) {
+      final nativeAnchor = _nativeScreenPoint(anchor, arena);
+      final nativeAnimation = _nativeAnimation(animation, arena);
+      _check(
+        animation == null
+            ? _c.mapScaleBy(_pointer, scale, nativeAnchor)
+            : _c.mapScaleByAnimated(
+                _pointer,
+                scale,
+                nativeAnchor,
+                nativeAnimation,
+              ),
+      );
+    });
+  }
+
+  /// Applies a screen-space rotate command.
+  void rotateBy(
+    ScreenPoint first,
+    ScreenPoint second, {
+    AnimationOptions? animation,
+  }) {
+    withNativeArena((arena) {
+      final nativeFirst = native_struct.screenPointToNative(first);
+      final nativeSecond = native_struct.screenPointToNative(second);
+      final nativeAnimation = _nativeAnimation(animation, arena);
+      _check(
+        animation == null
+            ? _c.mapRotateBy(_pointer, nativeFirst, nativeSecond)
+            : _c.mapRotateByAnimated(
+                _pointer,
+                nativeFirst,
+                nativeSecond,
+                nativeAnimation,
+              ),
+      );
+    });
+  }
+
+  /// Applies a pitch delta command.
+  void pitchBy(double pitch, {AnimationOptions? animation}) {
+    withNativeArena((arena) {
+      final nativeAnimation = _nativeAnimation(animation, arena);
+      _check(
+        animation == null
+            ? _c.mapPitchBy(_pointer, pitch)
+            : _c.mapPitchByAnimated(_pointer, pitch, nativeAnimation),
+      );
+    });
+  }
+
+  /// Cancels active camera transitions.
+  void cancelTransitions() {
+    _check(_c.mapCancelTransitions(_pointer));
+  }
+
+  /// Converts a geographic world coordinate to a screen point.
+  ScreenPoint pixelForLatLng(LatLng coordinate) {
+    return withNativeArena((arena) {
+      final outPoint = arena<raw.mln_screen_point>();
+      _check(
+        _c.mapPixelForLatLng(
+          _pointer,
+          native_struct.latLngToNative(coordinate),
+          outPoint,
+        ),
+      );
+      return native_struct.screenPointFromNative(outPoint.ref);
+    });
+  }
+
+  /// Converts a screen point to a geographic world coordinate.
+  LatLng latLngForPixel(ScreenPoint point) {
+    return withNativeArena((arena) {
+      final outCoordinate = arena<raw.mln_lat_lng>();
+      _check(
+        _c.mapLatLngForPixel(
+          _pointer,
+          native_struct.screenPointToNative(point),
+          outCoordinate,
+        ),
+      );
+      return native_struct.latLngFromNative(outCoordinate.ref);
     });
   }
 
@@ -503,6 +645,39 @@ final class MapHandle {
   void close() {
     _state.close(_c.mapDestroy, _c.threadLastErrorMessage);
   }
+}
+
+Pointer<raw.mln_camera_options> _nativeCamera(
+  CameraOptions camera,
+  Allocator allocator,
+) {
+  final nativeCamera = allocator<raw.mln_camera_options>();
+  nativeCamera.ref = native_struct.cameraOptionsToNative(camera);
+  return nativeCamera;
+}
+
+Pointer<raw.mln_animation_options> _nativeAnimation(
+  AnimationOptions? animation,
+  Allocator allocator,
+) {
+  if (animation == null) {
+    return nullptr.cast<raw.mln_animation_options>();
+  }
+  final nativeAnimation = allocator<raw.mln_animation_options>();
+  nativeAnimation.ref = native_struct.animationOptionsToNative(animation);
+  return nativeAnimation;
+}
+
+Pointer<raw.mln_screen_point> _nativeScreenPoint(
+  ScreenPoint? point,
+  Allocator allocator,
+) {
+  if (point == null) {
+    return nullptr.cast<raw.mln_screen_point>();
+  }
+  final nativePoint = allocator<raw.mln_screen_point>();
+  nativePoint.ref = native_struct.screenPointToNative(point);
+  return nativePoint;
 }
 
 String? _copyStyleSourceAttribution(
