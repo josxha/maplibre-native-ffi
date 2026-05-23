@@ -274,6 +274,30 @@ pub extern "C" fn mln_vala_runtime_handle_run_ambient_cache_operation_start(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_create_start(
+    handle: *mut RuntimeHandle,
+    definition: *const sys::mln_offline_region_definition,
+    metadata: *const u8,
+    metadata_size: usize,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_create_start(
+        handle,
+        definition,
+        metadata,
+        metadata_size,
+        out_operation_id,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_offline_region_get_start(
     handle: *mut RuntimeHandle,
     region_id: i64,
@@ -4308,6 +4332,40 @@ fn run_ambient_cache_operation_start(
     // operation ID storage. The C API validates operation values.
     error::check(unsafe {
         sys::mln_runtime_run_ambient_cache_operation_start(runtime, operation, out_operation_id)
+    })
+}
+
+fn offline_region_create_start(
+    handle: *mut RuntimeHandle,
+    definition: *const sys::mln_offline_region_definition,
+    metadata: *const u8,
+    metadata_size: usize,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if definition.is_null() {
+        return Err(Error::invalid_argument("offline region definition is null"));
+    }
+    if metadata.is_null() && metadata_size != 0 {
+        return Err(Error::invalid_argument(
+            "offline region metadata is null with non-zero size",
+        ));
+    }
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live, definition and metadata are borrowed for this
+    // call, and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_create_start(
+            runtime,
+            definition,
+            metadata,
+            metadata_size,
+            out_operation_id,
+        )
     })
 }
 

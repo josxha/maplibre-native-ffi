@@ -1474,6 +1474,24 @@ gboolean mln_vala_runtime_handle_run_ambient_cache_operation_start(
 );
 
 /**
+ * mln_vala_runtime_handle_offline_region_create_start:
+ * @self: a runtime handle.
+ * @definition: (not nullable): offline region definition.
+ * @metadata: (array length=metadata_size) (nullable): metadata bytes.
+ * @metadata_size: metadata byte length.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_create_start(
+  MlnValaRuntimeHandle* self, const MlnValaOfflineRegionDefinition* definition,
+  const uint8_t* metadata, size_t metadata_size, uint64_t* out_operation_id,
+  GError** error
+);
+
+/**
  * mln_vala_runtime_handle_offline_region_get_start:
  * @self: a runtime handle.
  * @region_id: offline region ID.
