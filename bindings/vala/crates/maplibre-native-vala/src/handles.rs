@@ -5704,14 +5704,15 @@ fn copy_style_id_list(native: *mut sys::mln_style_id_list) -> error::Result<Stri
             // SAFETY: style_id_list_get returns a GLib-allocated NUL-terminated string.
             let bytes = unsafe { CStr::from_ptr(id) }.to_bytes();
             let string = CString::new(bytes)
-                .map_err(|_| Error::invalid_argument("style ID contains embedded NUL"))?;
-            // SAFETY: transfer the temporary GLib string copy back to GLib.
+                .map_err(|_| Error::invalid_argument("style ID contains embedded NUL"));
+            // SAFETY: transfer the temporary GLib string copy back to GLib on every exit path.
             unsafe { glib::free(id.cast()) };
-            strings.push(string);
+            strings.push(string?);
         }
         Ok(StringList::from_strings(strings))
     })();
     close_style_id_list(handle);
+    glib::unref_object(handle);
     copy_result
 }
 

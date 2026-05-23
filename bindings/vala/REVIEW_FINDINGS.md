@@ -910,3 +910,28 @@ Review artifacts:
   typelib-derived GIR.
 - Reviewers verified branch `vala` was clean and pushed at `a2d77a9` with
   `HEAD...@{upstream}` at `0 0`.
+
+## Round 24
+
+Review artifacts:
+
+- Independent completion auditor for goal `mpiwuf4w-ayx14h`.
+
+### Applied findings
+
+- Fixed the owned style ID list copy path so temporary GLib string copies are
+  freed before propagating conversion errors.
+- Unreffed the temporary internal `StyleIdListHandle` wrapper after copying and
+  closing the native style ID list.
+
+### Rejected or deferred findings
+
+- The auditor noted that some Vala fixture coverage is compile/bindability-only
+  because several C ABI operations require live native query/offline operation
+  results. Runtime coverage for those native behaviors stays in the C/Rust
+  layers; the Vala fixture proves generated ownership/nullability/error shapes
+  for those APIs where practical.
+
+### User-input-needed findings
+
+- None new.
