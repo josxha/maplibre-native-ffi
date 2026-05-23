@@ -370,9 +370,8 @@ Applied findings:
      the error completion.
 2. `ResourceProviderCallback` returned contextual `void`, which TypeScript still
    permits callbacks to return arbitrary ignored values.
-   - Action: the provider callback type now returns
-     `undefined | PromiseLike<void>` and the type fixture rejects a callback
-     that returns a resource response.
+   - Action: the provider callback type now returns `void | PromiseLike<void>`
+     and the type fixture rejects a callback that returns a resource response.
 3. The SPEC task map understated `pnpm test` by omitting the ESM smoke test.
    - Action: the `pnpm test` row now records both `node --test test/*.test.cjs`
      and `node test/esm-smoke.mjs`.
