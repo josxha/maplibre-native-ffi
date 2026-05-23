@@ -51,6 +51,9 @@ final class NativeHandleState<T extends NativeType> implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _pointer == null;
 
+  /// Address of the live pointer without owner-isolate validation.
+  int? get pointerAddress => _pointer?.address;
+
   /// Returns the live pointer, or throws when the handle is closed.
   Pointer<T> get pointer {
     _checkOwnerIsolate();
