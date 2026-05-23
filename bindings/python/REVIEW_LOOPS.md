@@ -217,3 +217,50 @@ Review fanout: final completion review after Round 3 JsonLike annotation fixes.
   tests/test_package.py::test_style_json_light_layer_property_and_filter_public_api`
 - Repository fix/check task: `mise run fix`
 - Full Python binding CI: `mise run //bindings/python:ci`
+
+## Round 5
+
+Review fanout: terminal independent review after Round 4 style JSON annotation
+fixes were committed and pushed at `e98fb10`.
+
+### Applied findings
+
+- None. The independent final review fanout reported no remaining sensible,
+  safe, in-scope actionable findings.
+
+### Rejected or deferred findings
+
+- No new rejected or deferred findings in this round. Previously deferred items
+  remain unchanged: broad private callback simulators, backend-specific render
+  readback/frame hardening, packaging/distribution/CI-matrix expansion, and
+  broad enum deduplication.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Final review evidence
+
+- Review run: `95c13e25`, three independent reviewer agents.
+- General completion reviewer: no remaining sensible, safe, in-scope actionable
+  findings; review record complete; style JSON annotation fix present; focused
+  validation and diff hygiene passed; working tree clean and pushed.
+- Typed public API reviewer: no actionable findings remain; `JsonLike` and
+  `JsonValue` annotations match runtime behavior across map/query/render JSON
+  APIs; tests cover plain JSON-like values; review record documents rounds 3-4.
+- Lifecycle/callback reviewer: no blockers remain; finalizers are quiet,
+  custom-geometry lifecycle is guarded, GIL waits and callback unwind
+  containment are present, and resource request one-shot semantics are enforced.
+
+### Validation
+
+- Final focused review validation reported by reviewers:
+  - `mise run //bindings/python:test -- ...` for JsonLike/JsonValue regression
+    tests passed.
+  - `mise run //bindings/python:test -- ...` for lifecycle/callback tests
+    passed.
+  - `git diff --check origin/main...HEAD` passed.
+- Final branch state before recording this terminal review:
+  `git status
+  --short --branch` showed only `## python...origin/python` at
+  `e98fb10`.
