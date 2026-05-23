@@ -671,17 +671,26 @@ unsafe extern "C" fn resource_provider_trampoline(
         return core::resource::UNKNOWN_PROVIDER_DECISION;
     }
     let provider = unsafe { &*(user_data as *const ResourceProviderState) };
-    let request = match unsafe { core::resource::copy_resource_request(&*request) } {
-        Ok(request) => request,
-        Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
+    let raw_request = unsafe { &*request };
+    let url = if provider.routes.iter().any(|route| route.needs_url()) {
+        if raw_request.url.is_null() {
+            return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+        }
+        Some(unsafe { CStr::from_ptr(raw_request.url) }.to_string_lossy())
+    } else {
+        None
     };
     if !provider
         .routes
         .iter()
-        .any(|route| resource_matcher_matches(route, request.raw_kind, &request.url))
+        .any(|route| resource_matcher_matches_borrowed(route, raw_request.kind, url.as_deref()))
     {
         return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
     }
+    let request = match unsafe { core::resource::copy_resource_request(raw_request) } {
+        Ok(request) => request,
+        Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
+    };
     let handle_state = match unsafe {
         core::resource::ResourceRequestHandleState::new(
             handle,
@@ -865,24 +874,34 @@ fn resource_transform_rule_from_input(
 }
 
 fn resource_matcher_matches(matcher: &ResourceMatcher, raw_kind: u32, url: &str) -> bool {
+    resource_matcher_matches_borrowed(matcher, raw_kind, Some(url))
+}
+
+fn resource_matcher_matches_borrowed(
+    matcher: &ResourceMatcher,
+    raw_kind: u32,
+    url: Option<&str>,
+) -> bool {
     if matcher.kind.is_some_and(|kind| kind != raw_kind) {
         return false;
     }
-    if matcher
-        .url
-        .as_deref()
-        .is_some_and(|expected| expected != url)
-    {
+    if matcher.url.is_some() && matcher.url.as_deref() != url {
         return false;
     }
     if matcher
         .url_prefix
         .as_deref()
-        .is_some_and(|prefix| !url.starts_with(prefix))
+        .is_some_and(|prefix| !url.is_some_and(|url| url.starts_with(prefix)))
     {
         return false;
     }
     true
+}
+
+impl ResourceMatcher {
+    fn needs_url(&self) -> bool {
+        self.url.is_some() || self.url_prefix.is_some()
+    }
 }
 
 fn parse_resource_request_handle_id(handle_id: &str) -> Result<u64> {

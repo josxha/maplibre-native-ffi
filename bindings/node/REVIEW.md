@@ -250,3 +250,41 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Post-redesign review round 2
+
+Review evidence:
+
+- Ran three independent review agents after the resource request handoff
+  hardening:
+  - FFI/threading/pending-request lifetime review.
+  - JavaScript/TypeScript API, declaration, export, and test review.
+  - SPEC/REVIEW record-conformance review.
+- The JavaScript/TypeScript reviewer reported no remaining actionable findings.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `cargo check -p maplibre-native-node`, `mise run fix`, and
+  `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. Non-matching provider requests copied the full borrowed C request before
+   native route matching.
+   - Action: the provider trampoline now inspects only borrowed `kind` and `url`
+     for route matching, returns pass-through before copying non-matching
+     requests, and copies the full request only after a route matches.
+2. Rejected thenable handling used `.catch()` directly and missed valid
+   thenables without a `catch` method.
+   - Action: provider callback results now use `Promise.resolve(result).catch`,
+     preserving thrown-then-getter handling through the outer try/catch.
+3. Provider error-completion tests proved fallback close behavior rather than
+   the submitted error response.
+   - Action: wrapper tests now patch the native completion/close functions and
+     assert the error response for synchronous throw, rejected Promise, and
+     rejected custom thenable cases.
+4. The review log did not record the post-hardening review loop.
+   - Action: this round records the review evidence, applied findings, and
+     validation commands.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.

@@ -30,6 +30,7 @@ const {
   supportedRenderBackends,
   threadLastErrorMessage,
 } = require("..");
+const nativeAddon = require("../index.js");
 
 /**
  * @param {string} handleId
@@ -412,70 +413,145 @@ test("resource provider routes validate Node handoff shape", async () => {
     runtime.close();
   }
 
-  /** @type {any} */
-  let received;
-  RuntimeHandle.prototype.setResourceProviderRoutes.call(
-    {
-      native: {
-        /** @param {any} routes @param {(request: any) => void} callback */
-        setResourceProviderRoutes(routes, callback) {
-          assert.deepEqual(routes, [{ urlPrefix: "custom://" }]);
-          callback(fakeResourceProviderRequest("1", "custom://tile"));
+  const originalComplete = nativeAddon.nativeResourceRequestComplete;
+  const originalClose = nativeAddon.nativeResourceRequestClose;
+  /** @type {Array<{ handleId: string, response: any }>} */
+  const completions = [];
+  /** @type {string[]} */
+  const closes = [];
+  nativeAddon.nativeResourceRequestComplete =
+    /** @type {(handleId: string, response: any) => void} */ (
+      (handleId, response) => {
+        completions.push({ handleId, response });
+      }
+    );
+  nativeAddon.nativeResourceRequestClose =
+    /** @type {(handleId: string) => void} */ (
+      (handleId) => {
+        closes.push(handleId);
+      }
+    );
+  try {
+    /** @type {any} */
+    let received;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} routes @param {(request: any) => void} callback */
+          setResourceProviderRoutes(routes, callback) {
+            assert.deepEqual(routes, [{ urlPrefix: "custom://" }]);
+            callback(fakeResourceProviderRequest("1", "custom://tile"));
+          },
         },
       },
-    },
-    [{ urlPrefix: "custom://" }],
-    (request) => {
-      received = request;
-      return /** @type {any} */ ("ignored");
-    },
-  );
-  assert.ok(received);
-  assert.equal(received.handleId, undefined);
-  assert.equal(received.handle instanceof ResourceRequestHandle, true);
-  assert.equal(received.handle.closed, false);
-  received.handle.close();
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        received = request;
+        return /** @type {any} */ ("ignored");
+      },
+    );
+    assert.ok(received);
+    assert.equal(received.handleId, undefined);
+    assert.equal(received.handle instanceof ResourceRequestHandle, true);
+    assert.equal(received.handle.closed, false);
+    received.handle.close();
+    assert.deepEqual(closes, ["1"]);
 
-  /** @type {any} */
-  let thrownHandle;
-  RuntimeHandle.prototype.setResourceProviderRoutes.call(
-    {
-      native: {
-        /** @param {any} _routes @param {(request: any) => void} callback */
-        setResourceProviderRoutes(_routes, callback) {
-          callback(fakeResourceProviderRequest("2", "custom://throw"));
+    /** @type {any} */
+    let thrownHandle;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(fakeResourceProviderRequest("2", "custom://throw"));
+          },
         },
       },
-    },
-    [{ urlPrefix: "custom://" }],
-    (request) => {
-      thrownHandle = request.handle;
-      throw new Error("provider boom");
-    },
-  );
-  assert.ok(thrownHandle);
-  assert.equal(thrownHandle.closed, true);
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        thrownHandle = request.handle;
+        throw new Error("provider boom");
+      },
+    );
+    assert.ok(thrownHandle);
+    assert.equal(thrownHandle.closed, true);
+    assert.deepEqual(completions[0], {
+      handleId: "2",
+      response: {
+        status: "error",
+        errorReason: "other",
+        errorMessage: "provider boom",
+      },
+    });
 
-  /** @type {any} */
-  let rejectedHandle;
-  RuntimeHandle.prototype.setResourceProviderRoutes.call(
-    {
-      native: {
-        /** @param {any} _routes @param {(request: any) => void} callback */
-        setResourceProviderRoutes(_routes, callback) {
-          callback(fakeResourceProviderRequest("3", "custom://reject"));
+    /** @type {any} */
+    let rejectedHandle;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(fakeResourceProviderRequest("3", "custom://reject"));
+          },
         },
       },
-    },
-    [{ urlPrefix: "custom://" }],
-    (request) => {
-      rejectedHandle = request.handle;
-      return Promise.reject(new Error("provider rejected"));
-    },
-  );
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.ok(rejectedHandle);
-  assert.equal(rejectedHandle.closed, true);
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        rejectedHandle = request.handle;
+        return Promise.reject(new Error("provider rejected"));
+      },
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(rejectedHandle);
+    assert.equal(rejectedHandle.closed, true);
+    assert.deepEqual(completions[1], {
+      handleId: "3",
+      response: {
+        status: "error",
+        errorReason: "other",
+        errorMessage: "provider rejected",
+      },
+    });
+
+    /** @type {any} */
+    let thenableHandle;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(fakeResourceProviderRequest("4", "custom://thenable"));
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        thenableHandle = request.handle;
+        return {
+          /** @param {(value?: unknown) => void} _resolve @param {(reason?: unknown) => void} reject */
+          then(_resolve, reject) {
+            setImmediate(() => reject(new Error("thenable rejected")));
+          },
+        };
+      },
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(thenableHandle);
+    assert.equal(thenableHandle.closed, true);
+    assert.deepEqual(completions[2], {
+      handleId: "4",
+      response: {
+        status: "error",
+        errorReason: "other",
+        errorMessage: "thenable rejected",
+      },
+    });
+  } finally {
+    nativeAddon.nativeResourceRequestComplete = originalComplete;
+    nativeAddon.nativeResourceRequestClose = originalClose;
+  }
 });
 
 test("runtime handle supports options, resource transform, explicit close, and idempotent disposal", () => {

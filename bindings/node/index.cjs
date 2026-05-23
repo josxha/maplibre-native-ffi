@@ -676,7 +676,7 @@ class RuntimeHandle {
         try {
           const result = callback(wrapped);
           if (result && typeof result.then === "function") {
-            result.catch((error) => {
+            Promise.resolve(result).catch((error) => {
               completeResourceRequestWithProviderError(handle, error);
             });
           }
