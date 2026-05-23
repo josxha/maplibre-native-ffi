@@ -27,6 +27,17 @@ pub struct CameraOptions {
     pub pitch: Option<f64>,
 }
 
+#[napi(object)]
+pub struct StyleSourceInfo {
+    pub source_type: String,
+    pub raw_type: u32,
+    pub id_size: i64,
+    pub is_volatile: bool,
+    pub has_attribution: bool,
+    pub attribution_size: i64,
+    pub attribution: Option<String>,
+}
+
 #[napi(js_name = "NativeMapHandle")]
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
@@ -256,6 +267,64 @@ impl NativeMapHandle {
         copy_style_id_list(list).map_err(error::from_core)
     }
 
+    #[napi(js_name = "getStyleSourceType")]
+    pub fn get_style_source_type(&self, source_id: String) -> Result<Option<String>> {
+        let source_id = core::string::string_view(&source_id);
+        let mut raw_type = 0;
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_get_style_source_type(
+                self.state.as_ptr(),
+                source_id.raw(),
+                &mut raw_type,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(found.then(|| style_source_type_name(raw_type).to_owned()))
+    }
+
+    #[napi(js_name = "getStyleSourceInfo")]
+    pub fn get_style_source_info(&self, source_id: String) -> Result<Option<StyleSourceInfo>> {
+        let source_id_view = core::string::string_view(&source_id);
+        let mut raw_info = sys::mln_style_source_info {
+            size: std::mem::size_of::<sys::mln_style_source_info>() as u32,
+            type_: 0,
+            id_size: 0,
+            is_volatile: false,
+            has_attribution: false,
+            attribution_size: 0,
+        };
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_get_style_source_info(
+                self.state.as_ptr(),
+                source_id_view.raw(),
+                &mut raw_info,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if !found {
+            return Ok(None);
+        }
+        let attribution = copy_style_source_attribution(
+            self.state.as_ptr(),
+            source_id_view.raw(),
+            raw_info.attribution_size,
+        )
+        .map_err(error::from_core)?;
+        Ok(Some(StyleSourceInfo {
+            source_type: style_source_type_name(raw_info.type_).to_owned(),
+            raw_type: raw_info.type_,
+            id_size: raw_info.id_size as i64,
+            is_volatile: raw_info.is_volatile,
+            has_attribution: raw_info.has_attribution,
+            attribution_size: raw_info.attribution_size as i64,
+            attribution,
+        }))
+    }
+
     #[napi(js_name = "addStyleLayerJson")]
     pub fn add_style_layer_json(
         &self,
@@ -305,6 +374,32 @@ impl NativeMapHandle {
         core::check(unsafe { sys::mln_map_list_style_layer_ids(self.state.as_ptr(), &mut list) })
             .map_err(error::from_core)?;
         copy_style_id_list(list).map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getStyleLayerType")]
+    pub fn get_style_layer_type(&self, layer_id: String) -> Result<Option<String>> {
+        let layer_id = core::string::string_view(&layer_id);
+        let mut raw_type = sys::mln_string_view {
+            data: std::ptr::null(),
+            size: 0,
+        };
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_get_style_layer_type(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                &mut raw_type,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if found {
+            Ok(Some(
+                unsafe { core::string::copy_string_view(raw_type) }.map_err(error::from_core)?,
+            ))
+        } else {
+            Ok(None)
+        }
     }
 
     #[napi(js_name = "setStyleJson")]
@@ -409,6 +504,36 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
     }
 }
 
+fn copy_style_source_attribution(
+    map: *mut sys::mln_map,
+    source_id: sys::mln_string_view,
+    attribution_size: usize,
+) -> core::Result<Option<String>> {
+    if attribution_size == 0 {
+        return Ok(None);
+    }
+    let mut buffer = vec![0; attribution_size];
+    let mut copied_size = 0;
+    let mut found = false;
+    core::check(unsafe {
+        sys::mln_map_copy_style_source_attribution(
+            map,
+            source_id,
+            buffer.as_mut_ptr().cast(),
+            buffer.len(),
+            &mut copied_size,
+            &mut found,
+        )
+    })?;
+    if !found || copied_size == 0 {
+        return Ok(None);
+    }
+    buffer.truncate(copied_size);
+    String::from_utf8(buffer).map(Some).map_err(|error| {
+        core::Error::invalid_argument(format!("style source attribution was not UTF-8: {error}"))
+    })
+}
+
 fn copy_style_id_list(list: *mut sys::mln_style_id_list) -> core::Result<Vec<String>> {
     struct StyleIdListGuard(*mut sys::mln_style_id_list);
 
@@ -431,6 +556,20 @@ fn copy_style_id_list(list: *mut sys::mln_style_id_list) -> core::Result<Vec<Str
         ids.push(unsafe { core::string::copy_string_view(raw_id) }?);
     }
     Ok(ids)
+}
+
+fn style_source_type_name(raw_type: u32) -> &'static str {
+    match raw_type {
+        sys::MLN_STYLE_SOURCE_TYPE_VECTOR => "vector",
+        sys::MLN_STYLE_SOURCE_TYPE_RASTER => "raster",
+        sys::MLN_STYLE_SOURCE_TYPE_RASTER_DEM => "raster-dem",
+        sys::MLN_STYLE_SOURCE_TYPE_GEOJSON => "geojson",
+        sys::MLN_STYLE_SOURCE_TYPE_IMAGE => "image",
+        sys::MLN_STYLE_SOURCE_TYPE_VIDEO => "video",
+        sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => "annotations",
+        sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => "custom-vector",
+        _ => "unknown",
+    }
 }
 
 fn parse_json_value(value: String) -> Result<core::JsonValue> {

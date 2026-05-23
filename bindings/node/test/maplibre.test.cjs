@@ -322,6 +322,12 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     });
     assert.equal(map.styleSourceExists("empty-geojson"), true);
     assert.equal(map.listStyleSourceIds().includes("empty-geojson"), true);
+    assert.equal(map.getStyleSourceType("empty-geojson"), "geojson");
+    assert.equal(
+      map.getStyleSourceInfo("empty-geojson")?.sourceType,
+      "geojson",
+    );
+    assert.equal(map.getStyleSourceInfo("missing-source"), null);
     assert.equal(map.removeStyleSource("empty-geojson"), true);
 
     map.addStyleLayerJson({
@@ -331,6 +337,8 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     });
     assert.equal(map.styleLayerExists("background"), true);
     assert.equal(map.listStyleLayerIds().includes("background"), true);
+    assert.equal(map.getStyleLayerType("background"), "background");
+    assert.equal(map.getStyleLayerType("missing-layer"), null);
     assert.equal(map.removeStyleLayer("background"), true);
     assert.throws(
       () => map.addStyleLayerJson(/** @type {any} */ (undefined)),

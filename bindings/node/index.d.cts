@@ -180,10 +180,13 @@ export declare class MapHandle {
   styleSourceExists(sourceId: string): boolean;
   removeStyleSource(sourceId: string): boolean;
   listStyleSourceIds(): string[];
+  getStyleSourceType(sourceId: string): StyleSourceType | null;
+  getStyleSourceInfo(sourceId: string): StyleSourceInfo | null;
   addStyleLayerJson(layer: JsonValue, beforeLayerId?: string | null): void;
   styleLayerExists(layerId: string): boolean;
   removeStyleLayer(layerId: string): boolean;
   listStyleLayerIds(): string[];
+  getStyleLayerType(layerId: string): string | null;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;
@@ -211,6 +214,27 @@ export type JsonValue =
   | string
   | JsonValue[]
   | { [key: string]: JsonValue };
+
+export type StyleSourceType =
+  | "unknown"
+  | "vector"
+  | "raster"
+  | "raster-dem"
+  | "geojson"
+  | "image"
+  | "video"
+  | "annotations"
+  | "custom-vector";
+
+export interface StyleSourceInfo {
+  sourceType: StyleSourceType;
+  rawType: number;
+  idSize: number;
+  isVolatile: boolean;
+  hasAttribution: boolean;
+  attributionSize: number;
+  attribution?: string | null;
+}
 
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;

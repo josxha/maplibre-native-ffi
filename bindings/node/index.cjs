@@ -453,6 +453,18 @@ class MapHandle {
     return translateNativeErrors(() => this.native.listStyleSourceIds());
   }
 
+  getStyleSourceType(sourceId) {
+    return translateNativeErrors(() =>
+      this.native.getStyleSourceType(sourceId),
+    );
+  }
+
+  getStyleSourceInfo(sourceId) {
+    return translateNativeErrors(() =>
+      this.native.getStyleSourceInfo(sourceId),
+    );
+  }
+
   addStyleLayerJson(layer, beforeLayerId = null) {
     return translateNativeErrors(() =>
       this.native.addStyleLayerJson(stringifyJson(layer), beforeLayerId),
@@ -469,6 +481,10 @@ class MapHandle {
 
   listStyleLayerIds() {
     return translateNativeErrors(() => this.native.listStyleLayerIds());
+  }
+
+  getStyleLayerType(layerId) {
+    return translateNativeErrors(() => this.native.getStyleLayerType(layerId));
   }
 
   setStyleJson(json) {
