@@ -117,6 +117,16 @@ export declare class NativePointer {
   toString(): string;
 }
 
+export declare class NativeBuffer {
+  static allocate(byteLength: number): NativeBuffer;
+  static from(data: NativeBuffer | ArrayBuffer | ArrayBufferView): NativeBuffer;
+  constructor(data: number | ArrayBuffer | ArrayBufferView);
+  readonly byteLength: number;
+  asArrayBuffer(): ArrayBuffer;
+  asUint8Array(): Uint8Array;
+  readonly [Symbol.toStringTag]: "NativeBuffer";
+}
+
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
   readonly closed: boolean;

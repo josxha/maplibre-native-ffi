@@ -178,6 +178,74 @@ class NativePointer {
   }
 }
 
+class NativeBuffer {
+  static allocate(byteLength) {
+    return new NativeBuffer(new ArrayBuffer(validateByteLength(byteLength)));
+  }
+
+  static from(data) {
+    if (data instanceof NativeBuffer) {
+      return new NativeBuffer(data.asUint8Array());
+    }
+    if (data instanceof ArrayBuffer) {
+      return new NativeBuffer(data.slice(0));
+    }
+    if (ArrayBuffer.isView(data)) {
+      return new NativeBuffer(
+        new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+      );
+    }
+    throw new InvalidArgumentError(
+      null,
+      "native buffer data must be an ArrayBuffer or typed array view",
+    );
+  }
+
+  constructor(data) {
+    if (typeof data === "number") {
+      this.buffer = new ArrayBuffer(validateByteLength(data));
+    } else if (data instanceof ArrayBuffer) {
+      this.buffer = data;
+    } else if (ArrayBuffer.isView(data)) {
+      this.buffer = data.buffer.slice(
+        data.byteOffset,
+        data.byteOffset + data.byteLength,
+      );
+    } else {
+      throw new InvalidArgumentError(
+        null,
+        "native buffer constructor requires a byte length, ArrayBuffer, or typed array view",
+      );
+    }
+  }
+
+  get byteLength() {
+    return this.buffer.byteLength;
+  }
+
+  asArrayBuffer() {
+    return this.buffer;
+  }
+
+  asUint8Array() {
+    return new Uint8Array(this.buffer);
+  }
+
+  get [Symbol.toStringTag]() {
+    return "NativeBuffer";
+  }
+}
+
+function validateByteLength(byteLength) {
+  if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
+    throw new InvalidArgumentError(
+      null,
+      "native buffer byteLength must be a non-negative safe integer",
+    );
+  }
+  return byteLength;
+}
+
 class RuntimeHandle {
   constructor(options) {
     this.native = translateNativeErrors(() =>
@@ -387,6 +455,7 @@ module.exports = {
   RuntimeHandle,
   MapHandle,
   NativePointer,
+  NativeBuffer,
   cVersion,
   supportedRenderBackends,
   networkStatus,

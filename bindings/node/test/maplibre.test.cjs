@@ -9,6 +9,7 @@ const {
   MapHandle,
   latLngForProjectedMeters,
   MaplibreStatus,
+  NativeBuffer,
   NativePointer,
   networkStatus,
   projectedMetersForLatLng,
@@ -74,6 +75,28 @@ test("native pointer is a borrowed opaque address value", () => {
   assert.equal(pointer.toString(), "NativePointer[address=0x1234]");
   assert.throws(
     () => NativePointer.unsafeFromAddress(-1n),
+    InvalidArgumentError,
+  );
+});
+
+test("native buffer owns byte storage for render interop", () => {
+  const allocated = NativeBuffer.allocate(4);
+  allocated.asUint8Array().set([1, 2, 3, 4]);
+
+  assert.equal(allocated.byteLength, 4);
+  assert.deepEqual([...allocated.asUint8Array()], [1, 2, 3, 4]);
+  assert.equal(allocated.asArrayBuffer() instanceof ArrayBuffer, true);
+  assert.equal(
+    Object.prototype.toString.call(allocated),
+    "[object NativeBuffer]",
+  );
+
+  const copied = NativeBuffer.from(allocated.asUint8Array());
+  allocated.asUint8Array()[0] = 9;
+  assert.deepEqual([...copied.asUint8Array()], [1, 2, 3, 4]);
+  assert.throws(() => NativeBuffer.allocate(-1), InvalidArgumentError);
+  assert.throws(
+    () => NativeBuffer.from(/** @type {any} */ ("bytes")),
     InvalidArgumentError,
   );
 });

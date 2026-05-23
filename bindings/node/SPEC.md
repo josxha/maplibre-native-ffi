@@ -149,7 +149,7 @@ modules. Planned public TypeScript modules group C API concepts:
 Current internal Rust modules:
 
 ```text
-index.cjs          public JavaScript wrapper, error classes, and NativePointer value
+index.cjs          public JavaScript wrapper, error classes, NativePointer, and NativeBuffer values
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, async log severity controls, and root exports
@@ -547,7 +547,7 @@ area instead of retesting all native C validation rules.
    control proof slice complete; callback handoff remains.)_
 8. Add camera, projection, query, style, and offline APIs.
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
-   `NativeBuffer`, and texture frame scopes.
+   `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result
     adaptation into `maplibre-native-core` as broad coverage replaces the proof
     slice.
