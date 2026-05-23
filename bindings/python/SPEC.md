@@ -145,8 +145,9 @@ The current implementation includes these completed slices:
   region status, and runtime event payload value shapes.
 - `RuntimeHandle` starts native ambient cache and offline region
   create/get/list, merge, metadata, status, observation, download-state,
-  invalidation, and delete operations, returning `OfflineOperationHandle` values
-  that discard runtime-owned operation state on close.
+  invalidation, and delete operations; `OfflineOperationHandle` values take
+  completed region/list/status results or discard runtime-owned operation state
+  on close.
 - `maplibre_native.map` provides `MapProjectionHandle` and standalone Mercator
   projection helpers for copied camera, coordinate, geometry fitting, and
   screen-point values.

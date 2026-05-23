@@ -134,6 +134,53 @@ class OfflineOperationHandle:
         self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
         self._closed = True
 
+    def take_region(self) -> "OfflineRegionInfo":
+        """Take a completed region snapshot result."""
+        raw = self._runtime._native.offline_region_create_take_result(
+            self._operation_id
+        )  # noqa: SLF001
+        self._closed = True
+        return OfflineRegionInfo.from_native(raw)
+
+    def take_optional_region(self) -> "OfflineRegionInfo | None":
+        """Take a completed optional region snapshot result."""
+        raw = self._runtime._native.offline_region_get_take_result(self._operation_id)  # noqa: SLF001
+        self._closed = True
+        return OfflineRegionInfo.from_native(raw) if raw is not None else None
+
+    def take_region_list(
+        self,
+        *,
+        merge_result: bool = False,
+    ) -> tuple["OfflineRegionInfo", ...]:
+        """Take a completed region-list result."""
+        if merge_result:
+            raw = self._runtime._native.offline_regions_merge_database_take_result(
+                self._operation_id
+            )  # noqa: SLF001
+        else:
+            raw = self._runtime._native.offline_regions_list_take_result(
+                self._operation_id
+            )  # noqa: SLF001
+        self._closed = True
+        return tuple(OfflineRegionInfo.from_native(region) for region in raw)
+
+    def take_updated_region(self) -> "OfflineRegionInfo":
+        """Take a completed updated region snapshot result."""
+        raw = self._runtime._native.offline_region_update_metadata_take_result(
+            self._operation_id
+        )  # noqa: SLF001
+        self._closed = True
+        return OfflineRegionInfo.from_native(raw)
+
+    def take_status(self) -> "OfflineRegionStatus":
+        """Take a completed offline region status result."""
+        raw = self._runtime._native.offline_region_get_status_take_result(
+            self._operation_id
+        )  # noqa: SLF001
+        self._closed = True
+        return OfflineRegionStatus.from_native(raw)
+
     def __enter__(self) -> "OfflineOperationHandle":
         return self
 
@@ -159,6 +206,23 @@ class OfflineRegionStatus:
     required_resource_count: int
     required_resource_count_is_precise: bool
     complete: bool
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "OfflineRegionStatus":
+        """Build a status snapshot from private native bridge values."""
+        return cls(
+            download_state=OfflineRegionDownloadState(raw["download_state"]),
+            completed_resource_count=raw["completed_resource_count"],
+            completed_resource_size=raw["completed_resource_size"],
+            completed_tile_count=raw["completed_tile_count"],
+            required_tile_count=raw["required_tile_count"],
+            completed_tile_size=raw["completed_tile_size"],
+            required_resource_count=raw["required_resource_count"],
+            required_resource_count_is_precise=raw[
+                "required_resource_count_is_precise"
+            ],
+            complete=raw["complete"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +272,15 @@ class OfflineRegionInfo:
     definition: OfflineRegionDefinition
     metadata: bytes
 
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "OfflineRegionInfo":
+        """Build region metadata from private native bridge values."""
+        return cls(
+            id=raw["id"],
+            definition=_definition_from_native_wire(raw["definition"]),
+            metadata=raw["metadata"],
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class OfflineOperationCompleted:
@@ -235,6 +308,42 @@ class OfflineOperationCompleted:
             result_status=_payload_int(payload, "result_status"),
             found=_payload_bool(payload, "found"),
         )
+
+
+def _definition_from_native_wire(raw: dict[str, object]) -> OfflineRegionDefinition:
+    kind = raw["type"]
+    if kind == "tile_pyramid":
+        bounds = raw["bounds"]
+        return OfflineTilePyramidRegionDefinition(
+            style_url=raw["style_url"],
+            bounds=LatLngBounds(
+                southwest=_lat_lng_from_native_wire(bounds["southwest"]),
+                northeast=_lat_lng_from_native_wire(bounds["northeast"]),
+            ),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            pixel_ratio=raw["pixel_ratio"],
+            include_ideographs=raw["include_ideographs"],
+        )
+    if kind == "geometry":
+        from .geo import _geometry_from_native_wire
+
+        return OfflineGeometryRegionDefinition(
+            style_url=raw["style_url"],
+            geometry=_geometry_from_native_wire(raw["geometry"]),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            pixel_ratio=raw["pixel_ratio"],
+            include_ideographs=raw["include_ideographs"],
+        )
+    msg = f"unsupported native offline region definition kind: {kind}"
+    raise TypeError(msg)
+
+
+def _lat_lng_from_native_wire(raw: dict[str, object]):
+    from .geo import LatLng
+
+    return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
 
 def _definition_to_native_wire(

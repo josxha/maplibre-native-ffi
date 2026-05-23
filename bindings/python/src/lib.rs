@@ -595,6 +595,155 @@ impl RuntimeHandle {
         })
     }
 
+    fn offline_region_create_take_result(
+        &self,
+        py: Python<'_>,
+        operation_id: u64,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_region_create_take_result(
+                state.as_ptr(),
+                operation_id,
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_offline_region_snapshot")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned offline-region snapshot returned by the C API.
+        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(ptr) }
+            .map_err(map_error)?;
+        offline_region_info_to_py(py, &info)
+    }
+
+    fn offline_region_get_take_result(
+        &self,
+        py: Python<'_>,
+        operation_id: u64,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut found = false;
+        // SAFETY: The C API validates the runtime handle, operation ID, output pointer, and found pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_region_get_take_result(
+                state.as_ptr(),
+                operation_id,
+                out.as_mut_ptr(),
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+        let ptr = out
+            .into_non_null("mln_offline_region_snapshot")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned offline-region snapshot returned by the C API.
+        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(ptr) }
+            .map_err(map_error)?;
+        offline_region_info_to_py(py, &info).map(Some)
+    }
+
+    fn offline_regions_list_take_result(
+        &self,
+        py: Python<'_>,
+        operation_id: u64,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_regions_list_take_result(
+                state.as_ptr(),
+                operation_id,
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_offline_region_list")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned offline-region list returned by the C API.
+        let regions =
+            unsafe { maplibre_core::runtime::copy_offline_region_list(ptr) }.map_err(map_error)?;
+        offline_region_list_to_py(py, &regions)
+    }
+
+    fn offline_regions_merge_database_take_result(
+        &self,
+        py: Python<'_>,
+        operation_id: u64,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_regions_merge_database_take_result(
+                state.as_ptr(),
+                operation_id,
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_offline_region_list")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned offline-region list returned by the C API.
+        let regions =
+            unsafe { maplibre_core::runtime::copy_offline_region_list(ptr) }.map_err(map_error)?;
+        offline_region_list_to_py(py, &regions)
+    }
+
+    fn offline_region_update_metadata_take_result(
+        &self,
+        py: Python<'_>,
+        operation_id: u64,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_region_update_metadata_take_result(
+                state.as_ptr(),
+                operation_id,
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_offline_region_snapshot")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned offline-region snapshot returned by the C API.
+        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(ptr) }
+            .map_err(map_error)?;
+        offline_region_info_to_py(py, &info)
+    }
+
+    fn offline_region_get_status_take_result(
+        &self,
+        py: Python<'_>,
+        operation_id: u64,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut status = empty_offline_region_status();
+        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_region_get_status_take_result(
+                state.as_ptr(),
+                operation_id,
+                &mut status,
+            )
+        })
+        .map_err(map_error)?;
+        offline_region_status_to_py(py, &status)
+    }
+
     fn offline_operation_discard(&self, operation_id: u64) -> PyResult<()> {
         let state = self.state();
         // SAFETY: The C API validates the runtime handle, owner-thread affinity,
@@ -4391,6 +4540,113 @@ fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> Py
     Ok(dict.into_any().unbind())
 }
 
+fn empty_offline_region_status() -> sys::mln_offline_region_status {
+    sys::mln_offline_region_status {
+        size: std::mem::size_of::<sys::mln_offline_region_status>() as u32,
+        download_state: 0,
+        completed_resource_count: 0,
+        completed_resource_size: 0,
+        completed_tile_count: 0,
+        required_tile_count: 0,
+        completed_tile_size: 0,
+        required_resource_count: 0,
+        required_resource_count_is_precise: false,
+        complete: false,
+    }
+}
+
+fn offline_region_status_to_py(
+    py: Python<'_>,
+    status: &sys::mln_offline_region_status,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("download_state", status.download_state)?;
+    dict.set_item("completed_resource_count", status.completed_resource_count)?;
+    dict.set_item("completed_resource_size", status.completed_resource_size)?;
+    dict.set_item("completed_tile_count", status.completed_tile_count)?;
+    dict.set_item("required_tile_count", status.required_tile_count)?;
+    dict.set_item("completed_tile_size", status.completed_tile_size)?;
+    dict.set_item("required_resource_count", status.required_resource_count)?;
+    dict.set_item(
+        "required_resource_count_is_precise",
+        status.required_resource_count_is_precise,
+    )?;
+    dict.set_item("complete", status.complete)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn offline_region_list_to_py(
+    py: Python<'_>,
+    regions: &[maplibre_core::OfflineRegionInfo],
+) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for region in regions {
+        list.append(offline_region_info_to_py(py, region)?)?;
+    }
+    Ok(list.into_any().unbind())
+}
+
+fn offline_region_info_to_py(
+    py: Python<'_>,
+    info: &maplibre_core::OfflineRegionInfo,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("id", info.id)?;
+    dict.set_item(
+        "definition",
+        offline_region_definition_to_py(py, &info.definition)?,
+    )?;
+    dict.set_item("metadata", PyBytes::new(py, &info.metadata))?;
+    Ok(dict.into_any().unbind())
+}
+
+fn offline_region_definition_to_py(
+    py: Python<'_>,
+    definition: &maplibre_core::OfflineRegionDefinition,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    match definition {
+        maplibre_core::OfflineRegionDefinition::TilePyramid {
+            style_url,
+            bounds,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        } => {
+            dict.set_item("type", "tile_pyramid")?;
+            dict.set_item("style_url", style_url)?;
+            dict.set_item("bounds", lat_lng_bounds_core_to_py(py, bounds)?)?;
+            dict.set_item("min_zoom", *min_zoom)?;
+            dict.set_item("max_zoom", *max_zoom)?;
+            dict.set_item("pixel_ratio", *pixel_ratio)?;
+            dict.set_item("include_ideographs", *include_ideographs)?;
+        }
+        maplibre_core::OfflineRegionDefinition::GeometryRegion {
+            style_url,
+            geometry,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        } => {
+            dict.set_item("type", "geometry")?;
+            dict.set_item("style_url", style_url)?;
+            dict.set_item("geometry", geometry_to_py(py, geometry)?)?;
+            dict.set_item("min_zoom", *min_zoom)?;
+            dict.set_item("max_zoom", *max_zoom)?;
+            dict.set_item("pixel_ratio", *pixel_ratio)?;
+            dict.set_item("include_ideographs", *include_ideographs)?;
+        }
+        _ => {
+            return Err(invalid_argument_error(
+                "unsupported offline region definition",
+            ));
+        }
+    }
+    Ok(dict.into_any().unbind())
+}
+
 fn offline_region_definition_from_wire(
     raw: &Bound<'_, PyAny>,
 ) -> PyResult<maplibre_core::OfflineRegionDefinition> {
@@ -4888,6 +5144,16 @@ fn lat_lng_core_to_py(py: Python<'_>, coordinate: &maplibre_core::LatLng) -> PyR
     let dict = PyDict::new(py);
     dict.set_item("latitude", coordinate.latitude)?;
     dict.set_item("longitude", coordinate.longitude)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn lat_lng_bounds_core_to_py(
+    py: Python<'_>,
+    bounds: &maplibre_core::LatLngBounds,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("southwest", lat_lng_core_to_py(py, &bounds.southwest)?)?;
+    dict.set_item("northeast", lat_lng_core_to_py(py, &bounds.northeast)?)?;
     Ok(dict.into_any().unbind())
 }
 

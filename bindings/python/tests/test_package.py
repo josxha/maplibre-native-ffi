@@ -1046,6 +1046,107 @@ def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -
             assert operation.closed
 
 
+def test_offline_operation_take_results_convert_public_values() -> None:
+    class FakeNativeRuntime:
+        def __init__(self) -> None:
+            self.discarded = []
+
+        def offline_region_create_take_result(
+            self, operation_id: int
+        ) -> dict[str, object]:
+            assert operation_id == 1
+            return region_wire(b"created")
+
+        def offline_region_get_take_result(
+            self, operation_id: int
+        ) -> dict[str, object] | None:
+            assert operation_id == 2
+            return region_wire(b"found")
+
+        def offline_regions_list_take_result(
+            self, operation_id: int
+        ) -> list[dict[str, object]]:
+            assert operation_id == 3
+            return [region_wire(b"listed")]
+
+        def offline_regions_merge_database_take_result(
+            self,
+            operation_id: int,
+        ) -> list[dict[str, object]]:
+            assert operation_id == 4
+            return [region_wire(b"merged")]
+
+        def offline_region_update_metadata_take_result(
+            self,
+            operation_id: int,
+        ) -> dict[str, object]:
+            assert operation_id == 5
+            return region_wire(b"updated")
+
+        def offline_region_get_status_take_result(
+            self, operation_id: int
+        ) -> dict[str, object]:
+            assert operation_id == 6
+            return {
+                "download_state": 1,
+                "completed_resource_count": 2,
+                "completed_resource_size": 3,
+                "completed_tile_count": 4,
+                "required_tile_count": 5,
+                "completed_tile_size": 6,
+                "required_resource_count": 7,
+                "required_resource_count_is_precise": True,
+                "complete": False,
+            }
+
+        def offline_operation_discard(self, operation_id: int) -> None:
+            self.discarded.append(operation_id)
+
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self._native = FakeNativeRuntime()
+
+    def region_wire(metadata: bytes) -> dict[str, object]:
+        return {
+            "id": 42,
+            "definition": {
+                "type": "tile_pyramid",
+                "style_url": "https://example.test/style.json",
+                "bounds": {
+                    "southwest": {"latitude": -1.0, "longitude": -2.0},
+                    "northeast": {"latitude": 1.0, "longitude": 2.0},
+                },
+                "min_zoom": 0.0,
+                "max_zoom": 10.0,
+                "pixel_ratio": 1.0,
+                "include_ideographs": True,
+            },
+            "metadata": metadata,
+        }
+
+    runtime = FakeRuntime()
+
+    region = offline.OfflineOperationHandle(runtime, 1).take_region()
+    optional = offline.OfflineOperationHandle(runtime, 2).take_optional_region()
+    listed = offline.OfflineOperationHandle(runtime, 3).take_region_list()
+    merged = offline.OfflineOperationHandle(runtime, 4).take_region_list(
+        merge_result=True,
+    )
+    updated = offline.OfflineOperationHandle(runtime, 5).take_updated_region()
+    status = offline.OfflineOperationHandle(runtime, 6).take_status()
+
+    assert region.id == 42
+    assert isinstance(region.definition, offline.OfflineTilePyramidRegionDefinition)
+    assert region.definition.bounds.southwest == geo.LatLng(-1.0, -2.0)
+    assert optional is not None
+    assert optional.metadata == b"found"
+    assert listed[0].metadata == b"listed"
+    assert merged[0].metadata == b"merged"
+    assert updated.metadata == b"updated"
+    assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
+    assert status.completed_resource_count == 2
+
+
 def test_ambient_cache_operation_starts_and_discards_through_public_api(
     tmp_path: Path,
 ) -> None:
