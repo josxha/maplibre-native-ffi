@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
-use napi::bindgen_prelude::Result;
+use napi::bindgen_prelude::{Result, Uint8Array};
 use napi_derive::napi;
 
 use crate::{
@@ -78,6 +78,36 @@ pub struct StyleSourceInfo {
     pub has_attribution: bool,
     pub attribution_size: i64,
     pub attribution: Option<String>,
+}
+
+#[napi(object)]
+pub struct StyleImageInput {
+    pub width: u32,
+    pub height: u32,
+    pub stride: Option<u32>,
+    pub pixels: Uint8Array,
+    pub pixel_ratio: Option<f64>,
+    pub sdf: Option<bool>,
+}
+
+#[napi(object)]
+pub struct StyleImageInfo {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub byte_length: i64,
+    pub pixel_ratio: f64,
+    pub sdf: bool,
+}
+
+#[napi(object)]
+pub struct StyleImage {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub pixel_ratio: f64,
+    pub sdf: bool,
+    pub pixels: Uint8Array,
 }
 
 #[napi(js_name = "NativeMapHandle")]
@@ -672,6 +702,121 @@ impl NativeMapHandle {
             )
         })
         .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setStyleImage")]
+    pub fn set_style_image(&self, image_id: String, image: StyleImageInput) -> Result<()> {
+        let image_id = core::string::string_view(&image_id);
+        let stride = image.stride.unwrap_or(image.width.saturating_mul(4));
+        let raw_image = sys::mln_premultiplied_rgba8_image {
+            size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+            width: image.width,
+            height: image.height,
+            stride,
+            pixels: image.pixels.as_ptr(),
+            byte_length: image.pixels.len(),
+        };
+        let mut options = unsafe { sys::mln_style_image_options_default() };
+        if let Some(pixel_ratio) = image.pixel_ratio {
+            options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            options.pixel_ratio = pixel_ratio as f32;
+        }
+        if let Some(sdf) = image.sdf {
+            options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+            options.sdf = sdf;
+        }
+        core::check(unsafe {
+            sys::mln_map_set_style_image(self.state.as_ptr(), image_id.raw(), &raw_image, &options)
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "styleImageExists")]
+    pub fn style_image_exists(&self, image_id: String) -> Result<bool> {
+        let image_id = core::string::string_view(&image_id);
+        let mut exists = false;
+        core::check(unsafe {
+            sys::mln_map_style_image_exists(self.state.as_ptr(), image_id.raw(), &mut exists)
+        })
+        .map_err(error::from_core)?;
+        Ok(exists)
+    }
+
+    #[napi(js_name = "removeStyleImage")]
+    pub fn remove_style_image(&self, image_id: String) -> Result<bool> {
+        let image_id = core::string::string_view(&image_id);
+        let mut removed = false;
+        core::check(unsafe {
+            sys::mln_map_remove_style_image(self.state.as_ptr(), image_id.raw(), &mut removed)
+        })
+        .map_err(error::from_core)?;
+        Ok(removed)
+    }
+
+    #[napi(js_name = "getStyleImageInfo")]
+    pub fn get_style_image_info(&self, image_id: String) -> Result<Option<StyleImageInfo>> {
+        let image_id = core::string::string_view(&image_id);
+        let mut raw_info = unsafe { sys::mln_style_image_info_default() };
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_get_style_image_info(
+                self.state.as_ptr(),
+                image_id.raw(),
+                &mut raw_info,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(found.then(|| style_image_info_from_native(raw_info)))
+    }
+
+    #[napi(js_name = "copyStyleImagePremultipliedRgba8")]
+    pub fn copy_style_image_premultiplied_rgba8(
+        &self,
+        image_id: String,
+    ) -> Result<Option<StyleImage>> {
+        let image_id = core::string::string_view(&image_id);
+        let mut raw_info = unsafe { sys::mln_style_image_info_default() };
+        let mut info_found = false;
+        core::check(unsafe {
+            sys::mln_map_get_style_image_info(
+                self.state.as_ptr(),
+                image_id.raw(),
+                &mut raw_info,
+                &mut info_found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if !info_found {
+            return Ok(None);
+        }
+        let info = style_image_info_from_native(raw_info);
+        let mut pixels = vec![0; info.byte_length as usize];
+        let mut byte_length = 0;
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_copy_style_image_premultiplied_rgba8(
+                self.state.as_ptr(),
+                image_id.raw(),
+                pixels.as_mut_ptr(),
+                pixels.len(),
+                &mut byte_length,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if !found {
+            return Ok(None);
+        }
+        pixels.truncate(byte_length);
+        Ok(Some(StyleImage {
+            width: info.width,
+            height: info.height,
+            stride: info.stride,
+            pixel_ratio: info.pixel_ratio,
+            sdf: info.sdf,
+            pixels: Uint8Array::from(pixels),
+        }))
     }
 
     #[napi(js_name = "addImageSourceUrl")]
@@ -1344,6 +1489,17 @@ impl StringViews {
 
     fn len(&self) -> usize {
         self.views.len()
+    }
+}
+
+fn style_image_info_from_native(raw: sys::mln_style_image_info) -> StyleImageInfo {
+    StyleImageInfo {
+        width: raw.width,
+        height: raw.height,
+        stride: raw.stride,
+        byte_length: raw.byte_length as i64,
+        pixel_ratio: raw.pixel_ratio as f64,
+        sdf: raw.sdf,
     }
 }
 

@@ -264,6 +264,11 @@ export declare class MapHandle {
   addVectorSourceTiles(sourceId: string, tiles: Iterable<string>): void;
   addRasterSourceTiles(sourceId: string, tiles: Iterable<string>): void;
   addRasterDemSourceTiles(sourceId: string, tiles: Iterable<string>): void;
+  setStyleImage(imageId: string, image: StyleImageInput): void;
+  styleImageExists(imageId: string): boolean;
+  removeStyleImage(imageId: string): boolean;
+  getStyleImageInfo(imageId: string): StyleImageInfo | null;
+  copyStyleImagePremultipliedRgba8(imageId: string): StyleImage | null;
   addImageSourceUrl(sourceId: string, coordinates: LatLng[], url: string): void;
   setImageSourceUrl(sourceId: string, url: string): void;
   setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;
@@ -338,6 +343,28 @@ export interface StyleSourceInfo {
   hasAttribution: boolean;
   attributionSize: number;
   attribution?: string | null;
+}
+
+export interface StyleImageInput {
+  width: number;
+  height: number;
+  stride?: number | null;
+  pixels: Uint8Array;
+  pixelRatio?: number | null;
+  sdf?: boolean | null;
+}
+
+export interface StyleImageInfo {
+  width: number;
+  height: number;
+  stride: number;
+  byteLength: number;
+  pixelRatio: number;
+  sdf: boolean;
+}
+
+export interface StyleImage extends StyleImageInfo {
+  pixels: Uint8Array;
 }
 
 export declare function cVersion(): number;

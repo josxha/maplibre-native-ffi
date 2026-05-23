@@ -479,6 +479,29 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       1,
     ]);
 
+    map.setStyleImage("red-pixel", {
+      width: 1,
+      height: 1,
+      pixels: new Uint8Array([255, 0, 0, 255]),
+      pixelRatio: 2,
+      sdf: true,
+    });
+    assert.equal(map.styleImageExists("red-pixel"), true);
+    assert.deepEqual(map.getStyleImageInfo("red-pixel"), {
+      width: 1,
+      height: 1,
+      stride: 4,
+      byteLength: 4,
+      pixelRatio: 2,
+      sdf: true,
+    });
+    const copiedImage = map.copyStyleImagePremultipliedRgba8("red-pixel");
+    assert.ok(copiedImage);
+    assert.deepEqual([...copiedImage.pixels], [255, 0, 0, 255]);
+    assert.equal(map.copyStyleImagePremultipliedRgba8("missing-image"), null);
+    assert.equal(map.removeStyleImage("red-pixel"), true);
+    assert.equal(map.styleImageExists("red-pixel"), false);
+
     assert.equal(map.styleSourceExists("empty-geojson"), true);
     assert.equal(map.listStyleSourceIds().includes("empty-geojson"), true);
     assert.equal(map.getStyleSourceType("empty-geojson"), "geojson");

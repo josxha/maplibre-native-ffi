@@ -621,6 +621,30 @@ class MapHandle {
     );
   }
 
+  setStyleImage(imageId, image) {
+    return translateNativeErrors(() =>
+      this.native.setStyleImage(imageId, image),
+    );
+  }
+
+  styleImageExists(imageId) {
+    return translateNativeErrors(() => this.native.styleImageExists(imageId));
+  }
+
+  removeStyleImage(imageId) {
+    return translateNativeErrors(() => this.native.removeStyleImage(imageId));
+  }
+
+  getStyleImageInfo(imageId) {
+    return translateNativeErrors(() => this.native.getStyleImageInfo(imageId));
+  }
+
+  copyStyleImagePremultipliedRgba8(imageId) {
+    return translateNativeErrors(() =>
+      this.native.copyStyleImagePremultipliedRgba8(imageId),
+    );
+  }
+
   addImageSourceUrl(sourceId, coordinates, url) {
     return translateNativeErrors(() =>
       this.native.addImageSourceUrl(sourceId, coordinates, url),
