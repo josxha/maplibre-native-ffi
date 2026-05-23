@@ -695,3 +695,34 @@ Review artifacts:
 - `mise run test`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`
+
+## Round 18
+
+Review artifacts:
+
+- `review-loop/round18-api-surface.md`
+- `review-loop/round18-lifecycle.md`
+- `review-loop/round18-validation-docs.md`
+
+### Applied findings
+
+- Removed public raw runtime-event getter functions from the scanner header,
+  Rust adapter exports, and metadata inventory.
+- Extended `check_generated_surfaces.py` to reject those raw runtime-event
+  getter methods in generated VAPI/GIR surfaces.
+
+### Rejected or deferred findings
+
+- None.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- `mise run fix`
+- `mise run //bindings/vala:ci`
+- `mise run test`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`

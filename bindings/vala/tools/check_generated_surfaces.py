@@ -22,6 +22,7 @@ VAPI_FORBIDDEN_PATTERNS = {
     r"\b(?:FeatureExtensionResultHandle|FeatureQueryResultHandle|JsonSnapshotHandle|OfflineRegionListHandle|OfflineRegionSnapshotHandle|StyleIdListHandle)(?:Class)?\b": "native result/list/snapshot handle",
     r"\bpublic\s+weak\s+string\b": "public weak string field",
     r"\bset_(?:source_id|source_layer_id|feature_id|state_key|layer_ids|source_layer_ids|attribution)\b": "sidecar-backed descriptor setter",
+    r"\bget_raw_(?:type|source_type|payload_type)\b": "raw runtime event getter",
 }
 
 VAPI_DESCRIPTOR_RECORDS = {
@@ -90,6 +91,7 @@ GIR_FORBIDDEN_METHODS = {
     "RenderedFeatureQueryOptions": {"set_layer_ids"},
     "SourceFeatureQueryOptions": {"set_source_layer_ids"},
     "StyleTileSourceOptions": {"set_attribution"},
+    "RuntimeEvent": {"get_raw_type", "get_raw_source_type", "get_raw_payload_type"},
 }
 
 GIR_FORBIDDEN_FIELDS = {

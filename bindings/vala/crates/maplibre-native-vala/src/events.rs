@@ -290,22 +290,12 @@ pub extern "C" fn mln_vala_runtime_event_get_event_type(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_runtime_event_get_raw_type(event: *const RuntimeEvent) -> u32 {
-    event_ref(event).map_or(0, |event| event.raw_type)
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_event_get_source_type(
     event: *const RuntimeEvent,
 ) -> ValaRuntimeEventSourceType {
     event_ref(event).map_or(ValaRuntimeEventSourceType::Unknown, |event| {
         source_type_from_raw(event.source_type)
     })
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_runtime_event_get_raw_source_type(event: *const RuntimeEvent) -> u32 {
-    event_ref(event).map_or(0, |event| event.source_type)
 }
 
 #[unsafe(no_mangle)]
@@ -329,11 +319,6 @@ pub extern "C" fn mln_vala_runtime_event_get_payload_type(
     event_ref(event).map_or(ValaRuntimeEventPayloadType::Unknown, |event| {
         payload_type_from_raw(event.payload_type)
     })
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_runtime_event_get_raw_payload_type(event: *const RuntimeEvent) -> u32 {
-    event_ref(event).map_or(0, |event| event.payload_type)
 }
 
 #[unsafe(no_mangle)]

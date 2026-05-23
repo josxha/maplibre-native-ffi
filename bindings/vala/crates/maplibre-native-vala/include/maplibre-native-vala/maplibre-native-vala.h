@@ -1778,11 +1778,7 @@ void mln_vala_runtime_event_free(MlnValaRuntimeEvent* event);
 MlnValaRuntimeEventType mln_vala_runtime_event_get_event_type(
   const MlnValaRuntimeEvent* event
 );
-uint32_t mln_vala_runtime_event_get_raw_type(const MlnValaRuntimeEvent* event);
 MlnValaRuntimeEventSourceType mln_vala_runtime_event_get_source_type(
-  const MlnValaRuntimeEvent* event
-);
-uint32_t mln_vala_runtime_event_get_raw_source_type(
   const MlnValaRuntimeEvent* event
 );
 /**
@@ -1796,9 +1792,6 @@ MlnValaNativePointer* mln_vala_runtime_event_get_source_pointer(
 );
 int32_t mln_vala_runtime_event_get_code(const MlnValaRuntimeEvent* event);
 MlnValaRuntimeEventPayloadType mln_vala_runtime_event_get_payload_type(
-  const MlnValaRuntimeEvent* event
-);
-uint32_t mln_vala_runtime_event_get_raw_payload_type(
   const MlnValaRuntimeEvent* event
 );
 /**
