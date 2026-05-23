@@ -52,6 +52,27 @@ int main(string[] args) {
     map.pitch_by_animated(0.0, animation);
     map.cancel_transitions();
 
+    MaplibreNative.BoundOptions bounds = {};
+    bounds.default();
+    map.get_bounds(out bounds);
+    map.set_bounds(bounds);
+    MaplibreNative.FreeCameraOptions free_camera = {};
+    free_camera.default();
+    map.get_free_camera_options(out free_camera);
+    map.set_free_camera_options(free_camera);
+    MaplibreNative.ProjectionMode projection_mode = {};
+    projection_mode.default();
+    map.get_projection_mode(out projection_mode);
+    map.set_projection_mode(projection_mode);
+    MaplibreNative.MapViewportOptions viewport_options = {};
+    viewport_options.default();
+    map.get_viewport_options(out viewport_options);
+    map.set_viewport_options(viewport_options);
+    MaplibreNative.MapTileOptions tile_options = {};
+    tile_options.default();
+    map.get_tile_options(out tile_options);
+    map.set_tile_options(tile_options);
+
     bool loaded = false;
     map.is_fully_loaded(out loaded);
     map.dump_debug_logs();

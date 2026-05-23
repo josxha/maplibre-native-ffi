@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glib-object.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 G_BEGIN_DECLS
@@ -92,6 +93,65 @@ typedef enum {
   MLN_VALA_ANIMATION_OPTION_FIELDS_EASING = 1u << 3u,
 } MlnValaAnimationOptionFields;
 
+typedef enum {
+  MLN_VALA_BOUND_OPTION_FIELDS_BOUNDS = 1u << 0u,
+  MLN_VALA_BOUND_OPTION_FIELDS_MIN_ZOOM = 1u << 1u,
+  MLN_VALA_BOUND_OPTION_FIELDS_MAX_ZOOM = 1u << 2u,
+  MLN_VALA_BOUND_OPTION_FIELDS_MIN_PITCH = 1u << 3u,
+  MLN_VALA_BOUND_OPTION_FIELDS_MAX_PITCH = 1u << 4u,
+} MlnValaBoundOptionFields;
+
+typedef enum {
+  MLN_VALA_FREE_CAMERA_OPTION_FIELDS_POSITION = 1u << 0u,
+  MLN_VALA_FREE_CAMERA_OPTION_FIELDS_ORIENTATION = 1u << 1u,
+} MlnValaFreeCameraOptionFields;
+
+typedef enum {
+  MLN_VALA_PROJECTION_MODE_FIELDS_AXONOMETRIC = 1u << 0u,
+  MLN_VALA_PROJECTION_MODE_FIELDS_X_SKEW = 1u << 1u,
+  MLN_VALA_PROJECTION_MODE_FIELDS_Y_SKEW = 1u << 2u,
+} MlnValaProjectionModeFields;
+
+typedef enum {
+  MLN_VALA_MAP_VIEWPORT_OPTION_FIELDS_NORTH_ORIENTATION = 1u << 0u,
+  MLN_VALA_MAP_VIEWPORT_OPTION_FIELDS_CONSTRAIN_MODE = 1u << 1u,
+  MLN_VALA_MAP_VIEWPORT_OPTION_FIELDS_VIEWPORT_MODE = 1u << 2u,
+  MLN_VALA_MAP_VIEWPORT_OPTION_FIELDS_FRUSTUM_OFFSET = 1u << 3u,
+} MlnValaMapViewportOptionFields;
+
+typedef enum {
+  MLN_VALA_MAP_TILE_OPTION_FIELDS_PREFETCH_ZOOM_DELTA = 1u << 0u,
+  MLN_VALA_MAP_TILE_OPTION_FIELDS_LOD_MIN_RADIUS = 1u << 1u,
+  MLN_VALA_MAP_TILE_OPTION_FIELDS_LOD_SCALE = 1u << 2u,
+  MLN_VALA_MAP_TILE_OPTION_FIELDS_LOD_PITCH_THRESHOLD = 1u << 3u,
+  MLN_VALA_MAP_TILE_OPTION_FIELDS_LOD_ZOOM_SHIFT = 1u << 4u,
+  MLN_VALA_MAP_TILE_OPTION_FIELDS_LOD_MODE = 1u << 5u,
+} MlnValaMapTileOptionFields;
+
+typedef enum {
+  MLN_VALA_NORTH_ORIENTATION_UP = 0,
+  MLN_VALA_NORTH_ORIENTATION_RIGHT = 1,
+  MLN_VALA_NORTH_ORIENTATION_DOWN = 2,
+  MLN_VALA_NORTH_ORIENTATION_LEFT = 3,
+} MlnValaNorthOrientation;
+
+typedef enum {
+  MLN_VALA_CONSTRAIN_MODE_NONE = 0,
+  MLN_VALA_CONSTRAIN_MODE_HEIGHT_ONLY = 1,
+  MLN_VALA_CONSTRAIN_MODE_WIDTH_AND_HEIGHT = 2,
+  MLN_VALA_CONSTRAIN_MODE_SCREEN = 3,
+} MlnValaConstrainMode;
+
+typedef enum {
+  MLN_VALA_VIEWPORT_MODE_DEFAULT = 0,
+  MLN_VALA_VIEWPORT_MODE_FLIPPED_Y = 1,
+} MlnValaViewportMode;
+
+typedef enum {
+  MLN_VALA_TILE_LOD_MODE_DEFAULT = 0,
+  MLN_VALA_TILE_LOD_MODE_DISTANCE = 1,
+} MlnValaTileLodMode;
+
 GQuark mln_vala_error_quark(void);
 
 typedef struct {
@@ -147,6 +207,69 @@ typedef struct {
   MlnValaUnitBezier easing;
 } MlnValaAnimationOptions;
 
+typedef struct {
+  MlnValaLatLng southwest;
+  MlnValaLatLng northeast;
+} MlnValaLatLngBounds;
+
+typedef struct {
+  uint32_t size;
+  MlnValaBoundOptionFields fields;
+  MlnValaLatLngBounds bounds;
+  double min_zoom;
+  double max_zoom;
+  double min_pitch;
+  double max_pitch;
+} MlnValaBoundOptions;
+
+typedef struct {
+  double x;
+  double y;
+  double z;
+} MlnValaVec3;
+
+typedef struct {
+  double x;
+  double y;
+  double z;
+  double w;
+} MlnValaQuaternion;
+
+typedef struct {
+  uint32_t size;
+  MlnValaFreeCameraOptionFields fields;
+  MlnValaVec3 position;
+  MlnValaQuaternion orientation;
+} MlnValaFreeCameraOptions;
+
+typedef struct {
+  uint32_t size;
+  MlnValaProjectionModeFields fields;
+  bool axonometric;
+  double x_skew;
+  double y_skew;
+} MlnValaProjectionMode;
+
+typedef struct {
+  uint32_t size;
+  MlnValaMapViewportOptionFields fields;
+  MlnValaNorthOrientation north_orientation;
+  MlnValaConstrainMode constrain_mode;
+  MlnValaViewportMode viewport_mode;
+  MlnValaEdgeInsets frustum_offset;
+} MlnValaMapViewportOptions;
+
+typedef struct {
+  uint32_t size;
+  MlnValaMapTileOptionFields fields;
+  uint32_t prefetch_zoom_delta;
+  double lod_min_radius;
+  double lod_scale;
+  double lod_pitch_threshold;
+  double lod_zoom_shift;
+  MlnValaTileLodMode lod_mode;
+} MlnValaMapTileOptions;
+
 /**
  * mln_vala_camera_options_default:
  * @out_options: (out): return location for initialized camera options.
@@ -169,6 +292,22 @@ gboolean mln_vala_camera_options_default(
  */
 gboolean mln_vala_animation_options_default(
   MlnValaAnimationOptions* out_options, GError** error
+);
+
+gboolean mln_vala_bound_options_default(
+  MlnValaBoundOptions* out_options, GError** error
+);
+gboolean mln_vala_free_camera_options_default(
+  MlnValaFreeCameraOptions* out_options, GError** error
+);
+gboolean mln_vala_projection_mode_default(
+  MlnValaProjectionMode* out_mode, GError** error
+);
+gboolean mln_vala_map_viewport_options_default(
+  MlnValaMapViewportOptions* out_options, GError** error
+);
+gboolean mln_vala_map_tile_options_default(
+  MlnValaMapTileOptions* out_options, GError** error
 );
 
 #define MLN_VALA_TYPE_NATIVE_POINTER (mln_vala_native_pointer_get_type())
@@ -486,6 +625,138 @@ gboolean mln_vala_map_handle_get_rendering_stats_view_enabled(
  */
 gboolean mln_vala_map_handle_get_camera(
   MlnValaMapHandle* self, MlnValaCameraOptions* out_camera, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_viewport_options:
+ * @self: a map handle.
+ * @out_options: (out): return location for viewport options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_viewport_options(
+  MlnValaMapHandle* self, MlnValaMapViewportOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_viewport_options:
+ * @self: a map handle.
+ * @options: (not nullable): viewport options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_viewport_options(
+  MlnValaMapHandle* self, const MlnValaMapViewportOptions* options,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_tile_options:
+ * @self: a map handle.
+ * @out_options: (out): return location for tile options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_tile_options(
+  MlnValaMapHandle* self, MlnValaMapTileOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_tile_options:
+ * @self: a map handle.
+ * @options: (not nullable): tile options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_tile_options(
+  MlnValaMapHandle* self, const MlnValaMapTileOptions* options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_bounds:
+ * @self: a map handle.
+ * @out_options: (out): return location for bound options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_bounds(
+  MlnValaMapHandle* self, MlnValaBoundOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_bounds:
+ * @self: a map handle.
+ * @options: (not nullable): bound options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_bounds(
+  MlnValaMapHandle* self, const MlnValaBoundOptions* options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_free_camera_options:
+ * @self: a map handle.
+ * @out_options: (out): return location for free camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_free_camera_options(
+  MlnValaMapHandle* self, MlnValaFreeCameraOptions* out_options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_free_camera_options:
+ * @self: a map handle.
+ * @options: (not nullable): free camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_free_camera_options(
+  MlnValaMapHandle* self, const MlnValaFreeCameraOptions* options,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_projection_mode:
+ * @self: a map handle.
+ * @out_mode: (out): return location for projection mode.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_projection_mode(
+  MlnValaMapHandle* self, MlnValaProjectionMode* out_mode, GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_projection_mode:
+ * @self: a map handle.
+ * @mode: (not nullable): projection mode.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_projection_mode(
+  MlnValaMapHandle* self, const MlnValaProjectionMode* mode, GError** error
 );
 
 /**

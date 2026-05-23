@@ -119,6 +119,76 @@ pub extern "C" fn mln_vala_animation_options_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_bound_options_default(
+    out_options: *mut sys::mln_bound_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_bound_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_free_camera_options_default(
+    out_options: *mut sys::mln_free_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_free_camera_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_projection_mode_default(
+    out_mode: *mut sys::mln_projection_mode,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_projection_mode(out_mode) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_viewport_options_default(
+    out_options: *mut sys::mln_map_viewport_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_map_viewport_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_tile_options_default(
+    out_options: *mut sys::mln_map_tile_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_map_tile_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_new(
     runtime: *mut RuntimeHandle,
     width: u32,
@@ -273,6 +343,156 @@ pub extern "C" fn mln_vala_map_handle_get_camera(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match get_camera(handle, out_camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_viewport_options(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_map_viewport_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_viewport_options(handle, out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_viewport_options(
+    handle: *mut MapHandle,
+    options: *const sys::mln_map_viewport_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_viewport_options(handle, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_tile_options(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_map_tile_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_tile_options(handle, out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_tile_options(
+    handle: *mut MapHandle,
+    options: *const sys::mln_map_tile_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_tile_options(handle, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_bounds(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_bound_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_bounds(handle, out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_bounds(
+    handle: *mut MapHandle,
+    options: *const sys::mln_bound_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_bounds(handle, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_free_camera_options(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_free_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_free_camera_options(handle, out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_free_camera_options(
+    handle: *mut MapHandle,
+    options: *const sys::mln_free_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_free_camera_options(handle, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_projection_mode(
+    handle: *mut MapHandle,
+    out_mode: *mut sys::mln_projection_mode,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_projection_mode(handle, out_mode) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_projection_mode(
+    handle: *mut MapHandle,
+    mode: *const sys::mln_projection_mode,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_projection_mode(handle, mode) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -561,6 +781,40 @@ fn default_animation_options(out_options: *mut sys::mln_animation_options) -> er
     glib::clear_optional_out_pointer(out_options, options)
 }
 
+fn default_bound_options(out_options: *mut sys::mln_bound_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_bound_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_free_camera_options(
+    out_options: *mut sys::mln_free_camera_options,
+) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_free_camera_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_projection_mode(out_mode: *mut sys::mln_projection_mode) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mode = unsafe { sys::mln_projection_mode_default() };
+    glib::clear_optional_out_pointer(out_mode, mode)
+}
+
+fn default_map_viewport_options(
+    out_options: *mut sys::mln_map_viewport_options,
+) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_map_viewport_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_map_tile_options(out_options: *mut sys::mln_map_tile_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_map_tile_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
 fn get_camera(
     handle: *mut MapHandle,
     out_camera: *mut sys::mln_camera_options,
@@ -575,6 +829,153 @@ fn get_camera(
     // with the current ABI size.
     error::check(unsafe { sys::mln_map_get_camera(map, &mut camera) })?;
     glib::clear_optional_out_pointer(out_camera, camera)
+}
+
+fn get_viewport_options(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_map_viewport_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_options.is_null() {
+        return Err(Error::invalid_argument(
+            "viewport options output pointer is null",
+        ));
+    }
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut options = unsafe { sys::mln_map_viewport_options_default() };
+    // SAFETY: `map` is live and `options` is valid output storage initialized
+    // with the current ABI size.
+    error::check(unsafe { sys::mln_map_get_viewport_options(map, &mut options) })?;
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn set_viewport_options(
+    handle: *mut MapHandle,
+    options: *const sys::mln_map_viewport_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if options.is_null() {
+        return Err(Error::invalid_argument("viewport options are null"));
+    }
+    // SAFETY: `map` is live and `options` points to caller-owned options.
+    error::check(unsafe { sys::mln_map_set_viewport_options(map, options) })
+}
+
+fn get_tile_options(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_map_tile_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_options.is_null() {
+        return Err(Error::invalid_argument(
+            "tile options output pointer is null",
+        ));
+    }
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut options = unsafe { sys::mln_map_tile_options_default() };
+    // SAFETY: `map` is live and `options` is valid output storage initialized
+    // with the current ABI size.
+    error::check(unsafe { sys::mln_map_get_tile_options(map, &mut options) })?;
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn set_tile_options(
+    handle: *mut MapHandle,
+    options: *const sys::mln_map_tile_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if options.is_null() {
+        return Err(Error::invalid_argument("tile options are null"));
+    }
+    // SAFETY: `map` is live and `options` points to caller-owned options.
+    error::check(unsafe { sys::mln_map_set_tile_options(map, options) })
+}
+
+fn get_bounds(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_bound_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_options.is_null() {
+        return Err(Error::invalid_argument(
+            "bound options output pointer is null",
+        ));
+    }
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut options = unsafe { sys::mln_bound_options_default() };
+    // SAFETY: `map` is live and `options` is valid output storage initialized
+    // with the current ABI size.
+    error::check(unsafe { sys::mln_map_get_bounds(map, &mut options) })?;
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn set_bounds(handle: *mut MapHandle, options: *const sys::mln_bound_options) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if options.is_null() {
+        return Err(Error::invalid_argument("bound options are null"));
+    }
+    // SAFETY: `map` is live and `options` points to caller-owned options.
+    error::check(unsafe { sys::mln_map_set_bounds(map, options) })
+}
+
+fn get_free_camera_options(
+    handle: *mut MapHandle,
+    out_options: *mut sys::mln_free_camera_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_options.is_null() {
+        return Err(Error::invalid_argument(
+            "free camera options output pointer is null",
+        ));
+    }
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut options = unsafe { sys::mln_free_camera_options_default() };
+    // SAFETY: `map` is live and `options` is valid output storage initialized
+    // with the current ABI size.
+    error::check(unsafe { sys::mln_map_get_free_camera_options(map, &mut options) })?;
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn set_free_camera_options(
+    handle: *mut MapHandle,
+    options: *const sys::mln_free_camera_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if options.is_null() {
+        return Err(Error::invalid_argument("free camera options are null"));
+    }
+    // SAFETY: `map` is live and `options` points to caller-owned options.
+    error::check(unsafe { sys::mln_map_set_free_camera_options(map, options) })
+}
+
+fn get_projection_mode(
+    handle: *mut MapHandle,
+    out_mode: *mut sys::mln_projection_mode,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_mode.is_null() {
+        return Err(Error::invalid_argument(
+            "projection mode output pointer is null",
+        ));
+    }
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut mode = unsafe { sys::mln_projection_mode_default() };
+    // SAFETY: `map` is live and `mode` is valid output storage initialized with
+    // the current ABI size.
+    error::check(unsafe { sys::mln_map_get_projection_mode(map, &mut mode) })?;
+    glib::clear_optional_out_pointer(out_mode, mode)
+}
+
+fn set_projection_mode(
+    handle: *mut MapHandle,
+    mode: *const sys::mln_projection_mode,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if mode.is_null() {
+        return Err(Error::invalid_argument("projection mode is null"));
+    }
+    // SAFETY: `map` is live and `mode` points to caller-owned options.
+    error::check(unsafe { sys::mln_map_set_projection_mode(map, mode) })
 }
 
 fn jump_to(handle: *mut MapHandle, camera: *const sys::mln_camera_options) -> error::Result<()> {
@@ -1020,6 +1421,98 @@ mod tests {
         );
         assert_eq!(
             mln_vala_map_handle_cancel_transitions(map, ptr::null_mut()),
+            GTRUE
+        );
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn map_state_option_descriptors_round_trip() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut viewport: sys::mln_map_viewport_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_map_viewport_options_default(&mut viewport, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_get_viewport_options(map, &mut viewport, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_viewport_options(map, &viewport, ptr::null_mut()),
+            GTRUE
+        );
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut tile: sys::mln_map_tile_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_map_tile_options_default(&mut tile, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_get_tile_options(map, &mut tile, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_tile_options(map, &tile, ptr::null_mut()),
+            GTRUE
+        );
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut bounds: sys::mln_bound_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_bound_options_default(&mut bounds, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_get_bounds(map, &mut bounds, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_bounds(map, &bounds, ptr::null_mut()),
+            GTRUE
+        );
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut free_camera: sys::mln_free_camera_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_free_camera_options_default(&mut free_camera, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_get_free_camera_options(map, &mut free_camera, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_free_camera_options(map, &free_camera, ptr::null_mut()),
+            GTRUE
+        );
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut projection_mode: sys::mln_projection_mode = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_projection_mode_default(&mut projection_mode, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_get_projection_mode(map, &mut projection_mode, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_projection_mode(map, &projection_mode, ptr::null_mut()),
             GTRUE
         );
 

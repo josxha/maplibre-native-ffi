@@ -83,7 +83,7 @@ The scaffold implements one proof slice in Rust:
   real C ABI and expose failure through GLib `GError`.
 - `RuntimeHandle` and `MapHandle` are registered as GObject classes with
   deterministic close methods, map lifecycle/style methods, debug option flags,
-  rendering-stats controls, and basic camera command descriptors.
+  rendering-stats controls, camera commands, and map state option descriptors.
 - Runtime event polling copies event metadata and message bytes into a boxed
   `RuntimeEvent` value.
 - `RenderBackendFlags` and `NetworkStatus` expose typed Vala enum surfaces
