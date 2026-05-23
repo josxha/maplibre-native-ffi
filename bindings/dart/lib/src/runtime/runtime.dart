@@ -39,6 +39,21 @@ final class ResourceProvider {
   final ResourceProviderCallback callback;
 }
 
+/// Runtime creation options.
+final class RuntimeOptions {
+  /// Creates runtime options.
+  const RuntimeOptions({this.assetPath, this.cachePath, this.maximumCacheSize});
+
+  /// Filesystem root for `asset://` URLs.
+  final String? assetPath;
+
+  /// Cache database path.
+  final String? cachePath;
+
+  /// Maximum ambient cache size in bytes.
+  final int? maximumCacheSize;
+}
+
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
 final class RuntimeHandle {
   RuntimeHandle._(Pointer<raw.mln_runtime> pointer)
@@ -49,12 +64,16 @@ final class RuntimeHandle {
   _ResourceProviderRulesState? _resourceProviderRulesState;
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
 
-  /// Creates a runtime on the current native thread using native defaults.
-  factory RuntimeHandle.create() {
+  /// Creates a runtime on the current native thread.
+  factory RuntimeHandle.create({
+    RuntimeOptions options = const RuntimeOptions(),
+  }) {
     return withNativeArena((arena) {
+      final nativeOptions = arena<raw.mln_runtime_options>();
+      nativeOptions.ref = _runtimeOptionsToNative(options, arena);
       final outRuntime = arena<Pointer<raw.mln_runtime>>();
       outRuntime.value = nullptr;
-      _check(_c.runtimeCreate(nullptr, outRuntime));
+      _check(_c.runtimeCreate(nativeOptions, outRuntime));
       return RuntimeHandle._(outRuntime.value);
     });
   }
@@ -742,6 +761,37 @@ final class OfflineOperationHandle {
     _check(_c.runtimeOfflineOperationDiscard(_runtime._pointer, id));
     _discarded = true;
   }
+}
+
+raw.mln_runtime_options _runtimeOptionsToNative(
+  RuntimeOptions options,
+  Allocator allocator,
+) {
+  final result = _c.runtimeOptionsDefault();
+  final assetPath = options.assetPath;
+  if (assetPath != null) {
+    result.asset_path = nativeUtf8CString(
+      assetPath,
+      allocator,
+    ).pointer.cast<Char>();
+  }
+  final cachePath = options.cachePath;
+  if (cachePath != null) {
+    result.cache_path = nativeUtf8CString(
+      cachePath,
+      allocator,
+    ).pointer.cast<Char>();
+  }
+  final maximumCacheSize = options.maximumCacheSize;
+  if (maximumCacheSize != null) {
+    if (maximumCacheSize < 0) {
+      throwInvalidArgument('maximum cache size must be non-negative');
+    }
+    result.flags |=
+        raw.mln_runtime_option_flag.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE.value;
+    result.maximum_cache_size = maximumCacheSize;
+  }
+  return result;
 }
 
 raw.mln_offline_region_definition _offlineRegionDefinitionToNative(

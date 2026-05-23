@@ -64,6 +64,10 @@ final class MaplibreNativeCApi {
   int logSetAsyncSeverityMask(int mask) =>
       _raw.mln_log_set_async_severity_mask(mask).value;
 
+  /// Returns default runtime options.
+  raw.mln_runtime_options runtimeOptionsDefault() =>
+      _raw.mln_runtime_options_default();
+
   /// Creates a runtime handle.
   int runtimeCreate(
     Pointer<raw.mln_runtime_options> options,

@@ -43,6 +43,17 @@ void main() {
   test(
     'runtime and map handles use the native C ABI',
     () {
+      expect(
+        () => RuntimeHandle.create(
+          options: const RuntimeOptions(maximumCacheSize: -1),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      final defaultedRuntime = RuntimeHandle.create(
+        options: const RuntimeOptions(maximumCacheSize: 0),
+      );
+      defaultedRuntime.close();
+
       final runtime = RuntimeHandle.create();
       expect(runtime.isClosed, isFalse);
       runtime.setResourceUrlRewriteRules([
