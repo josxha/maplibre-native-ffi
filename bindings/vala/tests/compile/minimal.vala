@@ -1,3 +1,8 @@
+[CCode (cname = "MTLCreateSystemDefaultDevice")]
+extern void* mtl_create_system_default_device();
+
+const uint32 RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
+
 int log_first_count = 0;
 int log_second_count = 0;
 int provider_call_count = 0;
@@ -46,6 +51,69 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
   } catch (GLib.Error error) {
     return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
   }
+}
+
+bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, uint32 event_type, uint attempts) throws GLib.Error {
+  for (uint attempt = 0; attempt < attempts; attempt++) {
+    runtime.run_once();
+    MaplibreNative.RuntimeEvent? event = null;
+    runtime.poll_event(out event);
+    if (event != null && event.type == event_type) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, MaplibreNative.MapHandle map, MaplibreNative.RenderBackendFlags backends) throws GLib.Error {
+  if ((backends & MaplibreNative.RenderBackendFlags.METAL) == 0) {
+    return true;
+  }
+  void* device = mtl_create_system_default_device();
+  if (device == null) {
+    return true;
+  }
+
+  MaplibreNative.MetalOwnedTextureDescriptor descriptor = {};
+  descriptor.default();
+  descriptor.extent.width = 32;
+  descriptor.extent.height = 16;
+  descriptor.extent.scale_factor = 1.0;
+  descriptor.context.size = (uint32) sizeof(MaplibreNative.MetalContextDescriptor);
+  descriptor.context.device = device;
+
+  var session = map.attach_metal_owned_texture(descriptor);
+  map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":\"background\",\"paint\":{\"background-color\":\"#d8f1ff\"}}]}");
+  wait_for_runtime_event(runtime, RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE, 64);
+  session.render_update();
+
+  var frame = session.acquire_metal_owned_texture_frame();
+  uint32 width;
+  frame.get_width(out width);
+  if (width != 32) {
+    frame.close();
+    session.close();
+    return false;
+  }
+
+  bool reentrant_render_rejected = false;
+  try {
+    session.render_update();
+  } catch (GLib.Error error) {
+    reentrant_render_rejected = true;
+  }
+  frame.close();
+
+  bool frame_closed_error_seen = false;
+  try {
+    frame.get_width(out width);
+  } catch (GLib.Error error) {
+    frame_closed_error_seen = true;
+  }
+  session.render_update();
+  session.close();
+  session.close();
+  return reentrant_render_rejected && frame_closed_error_seen;
 }
 
 bool probe_wrong_thread(MaplibreNative.MapHandle map) {
@@ -293,7 +361,6 @@ int main(string[] args) {
     if (event != null) {
       var event_copy = event.copy();
       event_copy_matches = event_copy.type == event.type && event_copy.source_type == event.source_type && event_copy.payload_type == event.payload_type && event_copy.code == event.code;
-      event_copy.free();
     }
 
     MaplibreNative.MapOptions map_options = {};
@@ -303,9 +370,10 @@ int main(string[] args) {
     map_options.scale_factor = 1.0;
     map_options.map_mode = MaplibreNative.MapMode.CONTINUOUS;
     var map = new MaplibreNative.MapHandle.with_options(runtime, map_options);
-    map.set_style_url("https://provider-style.invalid/style.json");
-    for (int provider_spin = 0; provider_spin < 8; provider_spin++) {
+    map.set_style_url("custom://style.json");
+    for (int provider_spin = 0; provider_spin < 200 && provider_call_count == 0; provider_spin++) {
       runtime.run_once();
+      GLib.Thread.usleep(10000);
     }
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
     map.add_geojson_source_url("fixture-source", "asset://fixture.geojson");
@@ -420,17 +488,7 @@ int main(string[] args) {
     vulkan_borrowed_texture.default();
     MaplibreNative.TextureImageInfo texture_info = {};
     texture_info.default();
-    var metal_frame_object = GLib.Object.new(typeof(MaplibreNative.MetalOwnedTextureFrameHandle));
-    var metal_frame = (MaplibreNative.MetalOwnedTextureFrameHandle) metal_frame_object;
-    metal_frame.close();
-    metal_frame.close();
-    bool metal_frame_closed_error_seen = false;
-    try {
-      uint32 closed_frame_width;
-      metal_frame.get_width(out closed_frame_width);
-    } catch (GLib.Error error) {
-      metal_frame_closed_error_seen = true;
-    }
+    bool metal_frame_runtime_seen = exercise_metal_owned_texture_runtime(runtime, map, backends);
     var vulkan_frame_object = GLib.Object.new(typeof(MaplibreNative.VulkanOwnedTextureFrameHandle));
     var vulkan_frame = (MaplibreNative.VulkanOwnedTextureFrameHandle) vulkan_frame_object;
     vulkan_frame.close();
@@ -556,8 +614,8 @@ int main(string[] args) {
     runtime.close();
     MaplibreNative.log_clear_callback();
 
-    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || log_first_count != 0 || log_second_count == 0 || !metal_frame_closed_error_seen || !vulkan_frame_closed_error_seen) {
-      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), provider_cancel_checked.to_string(), provider_second_complete_failed.to_string(), provider_call_count, log_first_count, log_second_count, metal_frame_closed_error_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
+    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || !provider_cancel_checked || !provider_second_complete_failed || provider_call_count == 0 || log_first_count != 0 || log_second_count == 0 || !metal_frame_runtime_seen || !vulkan_frame_closed_error_seen) {
+      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), provider_cancel_checked.to_string(), provider_second_complete_failed.to_string(), provider_call_count, log_first_count, log_second_count, metal_frame_runtime_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
       return 1;
     }
   } catch (GLib.Error error) {

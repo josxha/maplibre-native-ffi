@@ -62,6 +62,8 @@ valac \
   -X -lmaplibre_native_vala \
   -X -Wl,-rpath,"{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
   -X -Wl,-rpath,"$CONDA_PREFIX/lib" \
+  -X -framework \
+  -X Metal \
   tests/compile/minimal.vala \
   -o build/minimal
 

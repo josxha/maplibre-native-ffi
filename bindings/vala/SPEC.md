@@ -644,13 +644,13 @@ unsupported reason before the binding leaves draft status.
 
 Use the testing pyramid below as coverage grows:
 
-| Test layer                     | Required coverage                                                                                                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| Rust adapter unit tests        | Status mapping, diagnostic capture, handle state, double-close no-ops, GObject finalizers, callback accounting, frame state.    |
-| Rust adapter integration tests | Small real C calls for version, network status, runtime/map lifecycle, event copying.                                           |
-| GIR/VAPI generation tests      | Scanner success, typelib generation, vapigen success, generated diff review.                                                    |
-| Vala compile tests             | Ownership transfer, nullability, `throws`, boxed value copying, callback signatures.                                            |
-| Vala runtime tests             | Closed handles, wrong-thread errors, callback replacement, resource request one-shot completion, event copying, frame lifetime. |
+| Test layer                     | Required coverage                                                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust adapter unit tests        | Status mapping, diagnostic capture, handle state, double-close no-ops, GObject finalizers, callback accounting, frame state.                                                                                        |
+| Rust adapter integration tests | Small real C calls for version, network status, runtime/map lifecycle, event copying.                                                                                                                               |
+| GIR/VAPI generation tests      | Scanner success, typelib generation, vapigen success, generated diff review.                                                                                                                                        |
+| Vala compile tests             | Ownership transfer, nullability, `throws`, boxed value copying, callback signatures.                                                                                                                                |
+| Vala runtime tests             | Closed handles, wrong-thread errors, callback replacement, resource request one-shot completion through a real custom style request, event copying, and Metal owned-texture frame lifetime when Metal is available. |
 
 A binding test proves Vala adaptation behavior. If a C ABI test already proves
 native validation, the Vala test only needs to prove that the binding propagates
