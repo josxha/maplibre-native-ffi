@@ -157,6 +157,8 @@ export declare class MapHandle {
   setDebugOptions(options: Iterable<MapDebugOption>): void;
   getCamera(): CameraOptions;
   jumpTo(camera: CameraOptions): void;
+  pixelForLatLng(coordinate: LatLng): ScreenPoint;
+  latLngForPixel(point: ScreenPoint): LatLng;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;
@@ -170,6 +172,11 @@ export interface LatLng {
 export interface ProjectedMeters {
   northing: number;
   easting: number;
+}
+
+export interface ScreenPoint {
+  x: number;
+  y: number;
 }
 
 export declare function cVersion(): number;

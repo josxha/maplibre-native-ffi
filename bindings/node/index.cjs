@@ -336,6 +336,14 @@ class MapHandle {
     return translateNativeErrors(() => this.native.jumpTo(camera));
   }
 
+  pixelForLatLng(coordinate) {
+    return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
+  }
+
+  latLngForPixel(point) {
+    return translateNativeErrors(() => this.native.latLngForPixel(point));
+  }
+
   get renderingStatsViewEnabled() {
     return translateNativeErrors(() => this.native.renderingStatsViewEnabled);
   }

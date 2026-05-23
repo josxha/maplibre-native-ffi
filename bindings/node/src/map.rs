@@ -5,7 +5,11 @@ use maplibre_native_sys as sys;
 use napi::bindgen_prelude::Result;
 use napi_derive::napi;
 
-use crate::{error, runtime::NativeRuntimeHandle, values::LatLng};
+use crate::{
+    error,
+    runtime::NativeRuntimeHandle,
+    values::{LatLng, ScreenPoint},
+};
 
 #[napi(object)]
 pub struct MapOptions {
@@ -115,6 +119,37 @@ impl NativeMapHandle {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
         core::check(unsafe { sys::mln_map_jump_to(self.state.as_ptr(), &camera) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "pixelForLatLng")]
+    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
+        let mut raw_point = sys::mln_screen_point { x: 0.0, y: 0.0 };
+        core::check(unsafe {
+            sys::mln_map_pixel_for_lat_lng(
+                self.state.as_ptr(),
+                coordinate.into_native(),
+                &mut raw_point,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(ScreenPoint::from_native(raw_point))
+    }
+
+    #[napi(js_name = "latLngForPixel")]
+    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
+        let mut raw_coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        core::check(unsafe {
+            sys::mln_map_lat_lng_for_pixel(
+                self.state.as_ptr(),
+                point.into_native(),
+                &mut raw_coordinate,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(LatLng::from_native(raw_coordinate))
     }
 
     #[napi(js_name = "getDebugOptionsRaw")]

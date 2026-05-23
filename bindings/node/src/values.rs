@@ -12,6 +12,12 @@ pub struct LatLng {
 }
 
 #[napi(object)]
+pub struct ScreenPoint {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[napi(object)]
 pub struct ProjectedMeters {
     pub northing: f64,
     pub easting: f64,
@@ -55,12 +61,33 @@ impl LatLng {
         }
     }
 
-    fn into_native(self) -> sys::mln_lat_lng {
+    pub(crate) fn into_native(self) -> sys::mln_lat_lng {
         core::values::lat_lng_to_native(self.into_core())
     }
 
-    fn from_native(raw: sys::mln_lat_lng) -> Self {
+    pub(crate) fn from_native(raw: sys::mln_lat_lng) -> Self {
         Self::from_core(core::values::lat_lng_from_native(raw))
+    }
+}
+
+impl ScreenPoint {
+    pub(crate) fn into_core(self) -> core::ScreenPoint {
+        core::ScreenPoint::new(self.x, self.y)
+    }
+
+    pub(crate) fn from_core(value: core::ScreenPoint) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+        }
+    }
+
+    pub(crate) fn into_native(self) -> sys::mln_screen_point {
+        core::values::screen_point_to_native(self.into_core())
+    }
+
+    pub(crate) fn from_native(raw: sys::mln_screen_point) -> Self {
+        Self::from_core(core::values::screen_point_from_native(raw))
     }
 }
 

@@ -179,6 +179,25 @@ test("map camera commands copy descriptor values", () => {
   }
 });
 
+test("map screen projection helpers copy point values", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 256, height: 256 });
+  const coordinate = { latitude: 10, longitude: 20 };
+
+  try {
+    map.jumpTo({ center: coordinate, zoom: 2 });
+    const point = map.pixelForLatLng(coordinate);
+    const roundTripped = map.latLngForPixel(point);
+    assert.equal(typeof point.x, "number");
+    assert.equal(typeof point.y, "number");
+    assert.ok(Math.abs(roundTripped.latitude - coordinate.latitude) < 1e-9);
+    assert.ok(Math.abs(roundTripped.longitude - coordinate.longitude) < 1e-9);
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map debug options map stable strings to native bitmasks", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });
