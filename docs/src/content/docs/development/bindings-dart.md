@@ -104,8 +104,10 @@ MapLibre-specific rules.
 
 Dart callbacks are stored strongly for the C owner scope that can invoke them.
 Internal adapters copy or scope callback arguments, catch Dart exceptions, and
-convert failures to the documented C callback behavior. Dart exceptions never
-escape through native frames.
+convert failures to the documented C callback behavior. Retained callback state
+keeps native callables alive until queued and active Dart upcalls drain after
+replacement or owner teardown. Dart exceptions never escape through native
+frames.
 
 MapLibre callbacks may arrive on worker, network, logging, or render-related
 threads. The core binding does not run Dart user callbacks directly on those
@@ -144,7 +146,7 @@ Custom geometry callbacks use the same handoff model. Fetch and cancel callbacks
 copy tile identifiers and source state, notify the owning isolate, and return
 quickly. Dart submits tile data later through owner-thread map/style APIs.
 Callback replacement keeps the old callback state alive until native
-unregistration completes and in-flight callbacks drain.
+unregistration completes and queued or in-flight Dart upcalls drain.
 
 ## Rendering and Tests
 
@@ -161,4 +163,6 @@ detach, or session destruction.
 Test the Dart adaptation layer against real C calls when practical. Cover handle
 close semantics, parent retention, native diagnostic mapping, wrong-thread
 status propagation, string and typed-data copying, scoped frame invalidation,
-callback exception conversion, and one-shot resource request completion.
+callback queue handoff, retained callback replacement, callback exception
+conversion, custom-geometry notification delivery, and one-shot resource request
+completion.

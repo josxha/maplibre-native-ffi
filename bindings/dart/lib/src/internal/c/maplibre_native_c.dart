@@ -398,6 +398,37 @@ final class MaplibreNativeCApi {
     >('mln_dart_resource_provider_request_destroy')(request);
   }
 
+  /// Invokes a custom-geometry tile callback through the native Dart shim.
+  void dartTestInvokeCustomGeometryTileCallback(
+    Pointer<
+      NativeFunction<raw.mln_custom_geometry_source_tile_callbackFunction>
+    >
+    callback,
+    Pointer<Void> userData,
+    raw.mln_canonical_tile_id tileId,
+  ) {
+    library.lookupFunction<
+      Void Function(
+        Pointer<
+          NativeFunction<raw.mln_custom_geometry_source_tile_callbackFunction>
+        >,
+        Pointer<Void>,
+        raw.mln_canonical_tile_id,
+      ),
+      void Function(
+        Pointer<
+          NativeFunction<raw.mln_custom_geometry_source_tile_callbackFunction>
+        >,
+        Pointer<Void>,
+        raw.mln_canonical_tile_id,
+      )
+    >('mln_dart_test_invoke_custom_geometry_tile_callback')(
+      callback,
+      userData,
+      tileId,
+    );
+  }
+
   /// Registers or updates a runtime-scoped URL transform.
   int runtimeSetResourceTransform(
     Pointer<raw.mln_runtime> runtime,

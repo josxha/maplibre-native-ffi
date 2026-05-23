@@ -367,17 +367,17 @@ application lifecycle belong in adapters above this package.
 This table describes planned binding coverage. Tests advance with landed API
 slices and stay focused on Dart adaptation behavior.
 
-| Area                 | Tests                                                                                                                                                                                              |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Process globals      | ABI version, supported backend mask, network status get/set, invalid raw network status.                                                                                                           |
-| Errors               | Native status-to-exception mapping, diagnostic capture, binding-side validation with null raw status.                                                                                              |
-| Handles              | Idempotent close after success, failed close leaves handle live, closed-handle validation, parent retention.                                                                                       |
-| Runtime events       | Polling returns copied events independent of the next native poll; map-originated events identify the live Dart map wrapper.                                                                       |
-| Strings and bytes    | Embedded-NUL rejection, string-view byte lengths, copied C strings, copied typed-data payloads.                                                                                                    |
-| Callbacks            | Strong callback retention, native-shim queue handoff, replacement release after active upcalls drain, exception containment, resource request one-shot completion/release, queue failure behavior. |
-| Rendering            | Descriptor materialization, `NativePointer` values, frame acquisition invalidation, readback buffer sizing and copying.                                                                            |
-| Offline              | Operation start, completion event matching, take/discard semantics, result handle release.                                                                                                         |
-| Isolates and threads | Detectable isolate-owner misuse, native wrong-thread propagation, callback threads that avoid thread-affine APIs.                                                                                  |
+| Area                 | Tests                                                                                                                                                                                                           |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Process globals      | ABI version, supported backend mask, network status get/set, invalid raw network status.                                                                                                                        |
+| Errors               | Native status-to-exception mapping, diagnostic capture, binding-side validation with null raw status.                                                                                                           |
+| Handles              | Idempotent close after success, failed close leaves handle live, closed-handle validation, parent retention.                                                                                                    |
+| Runtime events       | Polling returns copied events independent of the next native poll; map-originated events identify the live Dart map wrapper.                                                                                    |
+| Strings and bytes    | Embedded-NUL rejection, string-view byte lengths, copied C strings, copied typed-data payloads.                                                                                                                 |
+| Callbacks            | Strong callback retention, native-shim queue handoff, replacement release after active upcalls drain, exception containment, resource request one-shot completion/release, and native queue-failure conversion. |
+| Rendering            | Descriptor materialization, `NativePointer` values, frame acquisition invalidation, readback buffer sizing and copying.                                                                                         |
+| Offline              | Operation start, completion event matching, take/discard semantics, result handle release.                                                                                                                      |
+| Isolates and threads | Detectable isolate-owner misuse, native wrong-thread propagation, callback threads that avoid thread-affine APIs.                                                                                               |
 
 Prefer small adaptation tests around real C calls. Raw C validation already
 lives in the C ABI tests; Dart tests prove the language boundary preserves that
@@ -418,11 +418,20 @@ trampolines remain internal.
 The callback handoff strategy is implemented for landed arbitrary-thread slices:
 native shim entry points copy log and resource request payloads, route work to
 `NativeCallable.listener` owner-isolate listeners, contain exceptions, and
-return immediate C decisions. Resource URL transforms use native-owned
-synchronous rewrite rules. Resource providers use copied request records and
-one-shot request handles. Custom geometry fetch and cancel notifications are
-retained for the source lifetime and later tile-data submission uses
-owner-thread map APIs.
+return immediate C decisions. Retained callback states keep native callable
+resources alive until queued and active Dart upcalls drain after replacement,
+clear, style reload, source removal, map close, or runtime close. Resource URL
+transforms use native-owned synchronous rewrite rules. Resource providers use
+copied request records and one-shot request handles. Custom geometry fetch and
+cancel notifications are retained for the source lifetime and later tile-data
+submission uses owner-thread map APIs.
+
+Focused Dart tests cover actual queued resource provider invocation through the
+C ABI, one-shot request completion and post-release errors, provider exception
+containment, custom-geometry tile callback delivery through the native shim, and
+retained callback state release after queued/active upcalls drain. Native C and
+Zig tests continue to cover lower-level C ABI validation, including raw callback
+descriptor shapes and native-side failure paths.
 
 Deferred items are out of scope for this package layer: package distribution
 policy, generated API reference publishing, standalone examples, Flutter

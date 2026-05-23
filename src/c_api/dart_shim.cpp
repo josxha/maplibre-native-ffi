@@ -314,3 +314,12 @@ extern "C" MLN_API void mln_dart_resource_provider_request_destroy(
 ) noexcept {
   destroy_queued_request(static_cast<DartQueuedResourceRequestView*>(request));
 }
+
+extern "C" MLN_API void mln_dart_test_invoke_custom_geometry_tile_callback(
+  mln_custom_geometry_source_tile_callback callback, void* user_data,
+  mln_canonical_tile_id tile_id
+) noexcept {
+  if (callback != nullptr) {
+    callback(user_data, tile_id);
+  }
+}

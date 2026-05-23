@@ -1,12 +1,22 @@
 import 'dart:ffi';
 
 import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
+import 'package:maplibre_native_ffi/src/internal/callback/callback_state.dart';
 import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
 import 'package:test/test.dart';
 
 final class _FakeNativeHandle extends Opaque {}
+
+final class _FakeCallbackState extends RetainedCallbackState {
+  var closes = 0;
+
+  @override
+  void closeResources() {
+    closes += 1;
+  }
+}
 
 void main() {
   group('status conversion', () {
@@ -69,6 +79,30 @@ void main() {
         expect(value.value.size, 3);
         expect(value.value.data.cast<Uint8>()[1], 0);
       });
+    });
+  });
+
+  group('callback state', () {
+    test('retired callback state waits until queued turn to close', () async {
+      final state = _FakeCallbackState();
+
+      state.close();
+      expect(state.closes, 0);
+
+      await Future<void>.delayed(Duration.zero);
+      expect(state.closes, 1);
+    });
+
+    test('retired callback state waits for active upcalls', () async {
+      final state = _FakeCallbackState();
+      state.runUpcall(() {
+        state.close();
+        expect(state.closes, 0);
+      });
+
+      expect(state.closes, 0);
+      await Future<void>.delayed(Duration.zero);
+      expect(state.closes, 1);
     });
   });
 

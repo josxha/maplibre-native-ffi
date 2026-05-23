@@ -5,6 +5,7 @@ import 'package:ffi/ffi.dart';
 
 import '../camera/camera.dart';
 import '../geo/geo.dart';
+import '../internal/callback/callback_state.dart';
 import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
@@ -539,12 +540,14 @@ final class _ResourceProviderRulesState {
   }
 }
 
-final class _ResourceProviderCallbackState {
+final class _ResourceProviderCallbackState extends RetainedCallbackState {
   _ResourceProviderCallbackState(ResourceProvider provider) {
     callback = NativeCallable<_QueuedResourceRequestListenerFunction>.listener((
       Pointer<Void> request,
     ) {
-      _invokeQueuedResourceProvider(provider.callback, request);
+      runUpcall(
+        () => _invokeQueuedResourceProvider(provider.callback, request),
+      );
     });
     pointer = calloc<_NativeQueuedResourceProvider>();
     pointer.ref.routeCount = provider.routes.length;
@@ -562,7 +565,8 @@ final class _ResourceProviderCallbackState {
   late final Pointer<_NativeQueuedResourceProvider> pointer;
   late final NativeCallable<_QueuedResourceRequestListenerFunction> callback;
 
-  void close() {
+  @override
+  void closeResources() {
     final routes = pointer.ref.routes;
     for (var index = 0; index < pointer.ref.routeCount; index += 1) {
       calloc.free(routes[index].url);
@@ -3154,28 +3158,34 @@ StyleImageInfo _styleImageInfoFromNative(raw.mln_style_image_info info) {
   );
 }
 
-final class _CustomGeometryCallbackState {
-  _CustomGeometryCallbackState(CustomGeometrySourceOptions options)
-    : fetchTile =
-          NativeCallable<
+final class _CustomGeometryCallbackState extends RetainedCallbackState {
+  _CustomGeometryCallbackState(CustomGeometrySourceOptions options) {
+    fetchTile =
+        NativeCallable<
+          raw.mln_custom_geometry_source_tile_callbackFunction
+        >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+          runUpcall(() => _invokeTileCallback(options.fetchTile, tileId));
+        });
+    cancelTile = options.cancelTile == null
+        ? null
+        : NativeCallable<
             raw.mln_custom_geometry_source_tile_callbackFunction
           >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
-            _invokeTileCallback(options.fetchTile, tileId);
-          }),
-      cancelTile = options.cancelTile == null
-          ? null
-          : NativeCallable<
-              raw.mln_custom_geometry_source_tile_callbackFunction
-            >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
-              _invokeTileCallback(options.cancelTile!, tileId);
-            });
+            runUpcall(() => _invokeTileCallback(options.cancelTile!, tileId));
+          });
+  }
 
-  final NativeCallable<raw.mln_custom_geometry_source_tile_callbackFunction>
+  late final NativeCallable<
+    raw.mln_custom_geometry_source_tile_callbackFunction
+  >
   fetchTile;
-  final NativeCallable<raw.mln_custom_geometry_source_tile_callbackFunction>?
+  late final NativeCallable<
+    raw.mln_custom_geometry_source_tile_callbackFunction
+  >?
   cancelTile;
 
-  void close() {
+  @override
+  void closeResources() {
     fetchTile.close();
     cancelTile?.close();
   }

@@ -1,7 +1,11 @@
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
+    as raw;
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
@@ -36,6 +40,117 @@ void main() {
       Maplibre.setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
       Maplibre.restoreDefaultAsyncLogSeverityMask();
       Maplibre.clearLogCallback();
+    },
+    skip: hasNativeLibrary ? false : 'Native C library is not built.',
+  );
+
+  test(
+    'queued resource provider callbacks cross the native C ABI',
+    () async {
+      const styleUrl = 'custom://dart-provider-style.json';
+      final runtime = RuntimeHandle.create();
+      final requests = <ResourceRequest>[];
+      final secondCompleteErrors = <Object>[];
+
+      runtime.setResourceProvider(
+        ResourceProvider(
+          routes: const [
+            ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ],
+          callback: (request, handle) {
+            requests.add(request);
+            expect(request.url, styleUrl);
+            expect(request.kind, ResourceKind.style);
+            expect(handle.cancelled(), isFalse);
+            handle.complete(
+              ResourceResponse(
+                status: ResourceResponseStatus.ok,
+                bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+              ),
+            );
+            expect(handle.isReleased, isTrue);
+            try {
+              handle.complete(
+                const ResourceResponse(
+                  status: ResourceResponseStatus.noContent,
+                ),
+              );
+            } catch (error) {
+              secondCompleteErrors.add(error);
+            }
+          },
+        ),
+      );
+
+      final map = runtime.createMap();
+      map.setStyleUrl(styleUrl);
+      await _pumpUntil(runtime, () => requests.isNotEmpty);
+
+      expect(secondCompleteErrors.single, isA<InvalidArgumentException>());
+      map.close();
+      runtime.close();
+    },
+    skip: hasNativeLibrary ? false : 'Native C library is not built.',
+  );
+
+  test(
+    'queued resource provider callback exceptions are contained',
+    () async {
+      const styleUrl = 'custom://dart-provider-throws.json';
+      final runtime = RuntimeHandle.create();
+      var calls = 0;
+
+      runtime.setResourceProvider(
+        ResourceProvider(
+          routes: const [
+            ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ],
+          callback: (_, _) {
+            calls += 1;
+            throw StateError('provider failed');
+          },
+        ),
+      );
+
+      final map = runtime.createMap();
+      map.setStyleUrl(styleUrl);
+      await _pumpUntil(runtime, () => calls > 0);
+
+      map.close();
+      runtime.close();
+    },
+    skip: hasNativeLibrary ? false : 'Native C library is not built.',
+  );
+
+  test(
+    'custom geometry tile callbacks cross the native shim',
+    () async {
+      final c = MaplibreNativeCApi.open();
+      final deliveredTiles = <CanonicalTileId>[];
+      final callback =
+          NativeCallable<
+            raw.mln_custom_geometry_source_tile_callbackFunction
+          >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+            deliveredTiles.add(
+              CanonicalTileId(z: tileId.z, x: tileId.x, y: tileId.y),
+            );
+          });
+      final tileId = Struct.create<raw.mln_canonical_tile_id>();
+      tileId.z = 3;
+      tileId.x = 4;
+      tileId.y = 5;
+
+      c.dartTestInvokeCustomGeometryTileCallback(
+        callback.nativeFunction,
+        nullptr,
+        tileId,
+      );
+      await _waitUntil(() => deliveredTiles.isNotEmpty);
+
+      expect(deliveredTiles.single.z, 3);
+      expect(deliveredTiles.single.x, 4);
+      expect(deliveredTiles.single.y, 5);
+      callback.close();
     },
     skip: hasNativeLibrary ? false : 'Native C library is not built.',
   );
@@ -468,6 +583,31 @@ void main() {
     expect(pointer.isNull, isFalse);
     expect(NativePointer.nullPointer.isNull, isTrue);
   });
+}
+
+Future<void> _pumpUntil(
+  RuntimeHandle runtime,
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  await _waitUntil(() {
+    runtime.runOnce();
+    runtime.drainEvents();
+    return condition();
+  }, timeout: timeout);
+}
+
+Future<void> _waitUntil(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+    if (DateTime.now().isAfter(deadline)) {
+      fail('condition was not met within $timeout');
+    }
+  }
 }
 
 String? _nativeLibraryPath() {

@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 import 'geo/geo.dart';
+import 'internal/callback/callback_state.dart';
 import 'internal/c/maplibre_native_c.dart';
 import 'internal/c/maplibre_native_c.g.dart' as raw;
 import 'internal/memory/memory.dart';
@@ -34,16 +35,18 @@ final class _NativeLogRecord extends Struct {
   external Pointer<Char> message;
 }
 
-final class _LogCallbackState {
+final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
     listener = NativeCallable<_LogRecordListenerFunction>.listener((
       Pointer<Void> record,
     ) {
-      try {
-        callback(_copyLogRecord(record.cast<_NativeLogRecord>().ref));
-      } finally {
-        Maplibre._c.dartLogRecordDestroy(record);
-      }
+      runUpcall(() {
+        try {
+          callback(_copyLogRecord(record.cast<_NativeLogRecord>().ref));
+        } finally {
+          Maplibre._c.dartLogRecordDestroy(record);
+        }
+      });
     });
     pointer = calloc<_NativeLogCallbackState>();
     pointer.ref.listener = listener.nativeFunction;
@@ -53,7 +56,8 @@ final class _LogCallbackState {
   late final Pointer<_NativeLogCallbackState> pointer;
   late final NativeCallable<_LogRecordListenerFunction> listener;
 
-  void close() {
+  @override
+  void closeResources() {
     calloc.free(pointer);
     listener.close();
   }
