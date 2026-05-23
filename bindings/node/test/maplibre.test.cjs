@@ -337,6 +337,17 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     });
     map.addStyleLayerJson({ id: "background-2", type: "background" });
     map.moveStyleLayer("background-2", "background");
+    map.setLayerProperty("background", "background-color", "#ff0000");
+    const backgroundColor = map.getLayerProperty(
+      "background",
+      "background-color",
+    );
+    assert.deepEqual(backgroundColor, ["rgba", 255, 0, 0, 1]);
+    assert.equal(
+      map.getLayerProperty("background", "background-opacity"),
+      null,
+    );
+    assert.equal(map.getLayerFilter("background"), null);
     assert.equal(map.styleLayerExists("background"), true);
     assert.equal(map.listStyleLayerIds().includes("background"), true);
     assert.equal(map.getStyleLayerType("background"), "background");

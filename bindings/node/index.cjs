@@ -500,6 +500,39 @@ class MapHandle {
     );
   }
 
+  setLayerProperty(layerId, propertyName, value) {
+    return translateNativeErrors(() =>
+      this.native.setLayerPropertyJson(
+        layerId,
+        propertyName,
+        stringifyJson(value),
+      ),
+    );
+  }
+
+  getLayerProperty(layerId, propertyName) {
+    const json = translateNativeErrors(() =>
+      this.native.getLayerPropertyJson(layerId, propertyName),
+    );
+    return json === null ? null : JSON.parse(json);
+  }
+
+  setLayerFilter(layerId, filter) {
+    return translateNativeErrors(() =>
+      this.native.setLayerFilterJson(
+        layerId,
+        filter === null ? null : stringifyJson(filter),
+      ),
+    );
+  }
+
+  getLayerFilter(layerId) {
+    const json = translateNativeErrors(() =>
+      this.native.getLayerFilterJson(layerId),
+    );
+    return json === null ? null : JSON.parse(json);
+  }
+
   setStyleJson(json) {
     return translateNativeErrors(() => this.native.setStyleJson(json));
   }

@@ -419,9 +419,7 @@ impl NativeMapHandle {
         if !found {
             return Ok(None);
         }
-        let value = unsafe { core::json::copy_json_snapshot(std::ptr::NonNull::new(snapshot)) }
-            .map_err(error::from_core)?;
-        value.map(json_value_to_string).transpose()
+        json_snapshot_to_string(snapshot)
     }
 
     #[napi(js_name = "moveStyleLayer")]
@@ -441,6 +439,83 @@ impl NativeMapHandle {
             )
         })
         .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setLayerPropertyJson")]
+    pub fn set_layer_property_json(
+        &self,
+        layer_id: String,
+        property_name: String,
+        value_json: String,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let property_name = core::string::string_view(&property_name);
+        let value = parse_json_value(value_json)?;
+        let native_value =
+            core::json::json_value_try_to_native(&value).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_set_layer_property(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                property_name.raw(),
+                native_value.as_ptr(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getLayerPropertyJson")]
+    pub fn get_layer_property_json(
+        &self,
+        layer_id: String,
+        property_name: String,
+    ) -> Result<Option<String>> {
+        let layer_id = core::string::string_view(&layer_id);
+        let property_name = core::string::string_view(&property_name);
+        let mut snapshot = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_map_get_layer_property(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                property_name.raw(),
+                &mut snapshot,
+            )
+        })
+        .map_err(error::from_core)?;
+        json_snapshot_to_string(snapshot)
+    }
+
+    #[napi(js_name = "setLayerFilterJson")]
+    pub fn set_layer_filter_json(
+        &self,
+        layer_id: String,
+        filter_json: Option<String>,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let filter = filter_json.map(parse_json_value).transpose()?;
+        let native_filter = filter
+            .as_ref()
+            .map(core::json::json_value_try_to_native)
+            .transpose()
+            .map_err(error::from_core)?;
+        let filter_ptr = native_filter
+            .as_ref()
+            .map_or(std::ptr::null(), |filter| filter.as_ptr());
+        core::check(unsafe {
+            sys::mln_map_set_layer_filter(self.state.as_ptr(), layer_id.raw(), filter_ptr)
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getLayerFilterJson")]
+    pub fn get_layer_filter_json(&self, layer_id: String) -> Result<Option<String>> {
+        let layer_id = core::string::string_view(&layer_id);
+        let mut snapshot = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_map_get_layer_filter(self.state.as_ptr(), layer_id.raw(), &mut snapshot)
+        })
+        .map_err(error::from_core)?;
+        json_snapshot_to_string(snapshot)
     }
 
     #[napi(js_name = "setStyleJson")]
@@ -543,6 +618,12 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
             "debug option must be a known MapDebugOption, got '{other}'"
         ))),
     }
+}
+
+fn json_snapshot_to_string(snapshot: *mut sys::mln_json_snapshot) -> Result<Option<String>> {
+    let value = unsafe { core::json::copy_json_snapshot(std::ptr::NonNull::new(snapshot)) }
+        .map_err(error::from_core)?;
+    value.map(json_value_to_string).transpose()
 }
 
 fn copy_style_source_attribution(

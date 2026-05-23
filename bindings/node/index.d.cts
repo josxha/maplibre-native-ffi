@@ -189,6 +189,14 @@ export declare class MapHandle {
   getStyleLayerType(layerId: string): string | null;
   getStyleLayerJson(layerId: string): JsonValue | null;
   moveStyleLayer(layerId: string, beforeLayerId?: string | null): void;
+  setLayerProperty(
+    layerId: string,
+    propertyName: string,
+    value: JsonValue,
+  ): void;
+  getLayerProperty(layerId: string, propertyName: string): JsonValue | null;
+  setLayerFilter(layerId: string, filter: JsonValue | null): void;
+  getLayerFilter(layerId: string): JsonValue | null;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;
