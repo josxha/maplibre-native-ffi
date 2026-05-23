@@ -248,6 +248,14 @@ impl NativeMapHandle {
         Ok(removed)
     }
 
+    #[napi(js_name = "listStyleSourceIds")]
+    pub fn list_style_source_ids(&self) -> Result<Vec<String>> {
+        let mut list = std::ptr::null_mut();
+        core::check(unsafe { sys::mln_map_list_style_source_ids(self.state.as_ptr(), &mut list) })
+            .map_err(error::from_core)?;
+        copy_style_id_list(list).map_err(error::from_core)
+    }
+
     #[napi(js_name = "addStyleLayerJson")]
     pub fn add_style_layer_json(
         &self,
@@ -289,6 +297,14 @@ impl NativeMapHandle {
         })
         .map_err(error::from_core)?;
         Ok(removed)
+    }
+
+    #[napi(js_name = "listStyleLayerIds")]
+    pub fn list_style_layer_ids(&self) -> Result<Vec<String>> {
+        let mut list = std::ptr::null_mut();
+        core::check(unsafe { sys::mln_map_list_style_layer_ids(self.state.as_ptr(), &mut list) })
+            .map_err(error::from_core)?;
+        copy_style_id_list(list).map_err(error::from_core)
     }
 
     #[napi(js_name = "setStyleJson")]
@@ -391,6 +407,30 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
             "debug option must be a known MapDebugOption, got '{other}'"
         ))),
     }
+}
+
+fn copy_style_id_list(list: *mut sys::mln_style_id_list) -> core::Result<Vec<String>> {
+    struct StyleIdListGuard(*mut sys::mln_style_id_list);
+
+    impl Drop for StyleIdListGuard {
+        fn drop(&mut self) {
+            unsafe { sys::mln_style_id_list_destroy(self.0) };
+        }
+    }
+
+    let list = StyleIdListGuard(list);
+    let mut count = 0;
+    core::check(unsafe { sys::mln_style_id_list_count(list.0, &mut count) })?;
+    let mut ids = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut raw_id = sys::mln_string_view {
+            data: std::ptr::null(),
+            size: 0,
+        };
+        core::check(unsafe { sys::mln_style_id_list_get(list.0, index, &mut raw_id) })?;
+        ids.push(unsafe { core::string::copy_string_view(raw_id) }?);
+    }
+    Ok(ids)
 }
 
 fn parse_json_value(value: String) -> Result<core::JsonValue> {

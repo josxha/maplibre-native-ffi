@@ -449,6 +449,10 @@ class MapHandle {
     return translateNativeErrors(() => this.native.removeStyleSource(sourceId));
   }
 
+  listStyleSourceIds() {
+    return translateNativeErrors(() => this.native.listStyleSourceIds());
+  }
+
   addStyleLayerJson(layer, beforeLayerId = null) {
     return translateNativeErrors(() =>
       this.native.addStyleLayerJson(stringifyJson(layer), beforeLayerId),
@@ -461,6 +465,10 @@ class MapHandle {
 
   removeStyleLayer(layerId) {
     return translateNativeErrors(() => this.native.removeStyleLayer(layerId));
+  }
+
+  listStyleLayerIds() {
+    return translateNativeErrors(() => this.native.listStyleLayerIds());
   }
 
   setStyleJson(json) {

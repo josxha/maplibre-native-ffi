@@ -179,9 +179,11 @@ export declare class MapHandle {
   addStyleSourceJson(sourceId: string, source: JsonValue): void;
   styleSourceExists(sourceId: string): boolean;
   removeStyleSource(sourceId: string): boolean;
+  listStyleSourceIds(): string[];
   addStyleLayerJson(layer: JsonValue, beforeLayerId?: string | null): void;
   styleLayerExists(layerId: string): boolean;
   removeStyleLayer(layerId: string): boolean;
+  listStyleLayerIds(): string[];
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;
