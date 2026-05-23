@@ -136,7 +136,8 @@ The current implementation includes these completed slices:
 - `maplibre_native.log` provides process-global logging callback configuration,
   bounded copied-record queues, async severity masks, and copied log records.
 - `maplibre_native.query` provides rendered/source query descriptors, feature
-  state selectors, and copied query result value shapes.
+  state selectors, copied query result value shapes, and `RenderSessionHandle`
+  feature-state APIs.
 - `maplibre_native.offline` provides offline operation, region definition,
   region status, and runtime event payload value shapes.
 - `RuntimeHandle.run_ambient_cache_operation()` starts native ambient cache

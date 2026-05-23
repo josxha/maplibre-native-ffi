@@ -678,6 +678,83 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert vulkan.format == 44
 
 
+def test_render_session_feature_state_public_api_uses_json_wire_values() -> None:
+    class FakeNativeRenderSession:
+        closed = False
+        detached = False
+
+        def __init__(self) -> None:
+            self.set_call = None
+            self.remove_call = None
+
+        def set_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+            state: object,
+        ) -> None:
+            self.set_call = (
+                source_id,
+                source_layer_id,
+                feature_id,
+                state_key,
+                state,
+            )
+
+        def get_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+        ) -> object:
+            assert (source_id, source_layer_id, feature_id, state_key) == (
+                "points",
+                "symbols",
+                "feature-1",
+                "hover",
+            )
+            return {
+                "type": "object",
+                "members": [("hover", {"type": "bool", "value": True})],
+            }
+
+        def remove_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+        ) -> None:
+            self.remove_call = (source_id, source_layer_id, feature_id, state_key)
+
+    fake_native = FakeNativeRenderSession()
+    session = render.RenderSessionHandle(fake_native, object())
+    selector = query.FeatureStateSelector(
+        source_id="points",
+        source_layer_id="symbols",
+        feature_id="feature-1",
+        state_key="hover",
+    )
+    state = json.JsonObject.from_pairs([("hover", True)])
+
+    session.set_feature_state(selector, state)
+    returned = session.get_feature_state(selector)
+    session.remove_feature_state(selector)
+
+    assert fake_native.set_call == (
+        "points",
+        "symbols",
+        "feature-1",
+        "hover",
+        {"type": "object", "members": [("hover", True)]},
+    )
+    assert returned == state
+    assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
+
+
 def test_invalid_render_target_attach_reports_native_status() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:

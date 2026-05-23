@@ -2494,6 +2494,93 @@ impl RenderSessionHandle {
             .map_err(map_error)
     }
 
+    fn set_feature_state(
+        &self,
+        source_id: String,
+        source_layer_id: Option<String>,
+        feature_id: Option<String>,
+        state_key: Option<String>,
+        state_value: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let selector =
+            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
+        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
+        let state_value = json_value_from_wire(state_value)?;
+        let state_value =
+            maplibre_core::json::json_value_try_to_native(&state_value).map_err(map_error)?;
+        // SAFETY: The C API validates the render-session pointer, selector, and JSON state.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_set_feature_state(
+                state.as_ptr(),
+                selector.as_ptr(),
+                state_value.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn get_feature_state(
+        &self,
+        py: Python<'_>,
+        source_id: String,
+        source_layer_id: Option<String>,
+        feature_id: Option<String>,
+        state_key: Option<String>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let selector =
+            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
+        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: The C API validates the render-session pointer, selector, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_get_feature_state(
+                state.as_ptr(),
+                selector.as_ptr(),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let snapshot = out.into_option();
+        // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+        let value =
+            unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
+        let value = value
+            .ok_or_else(|| map_error(Error::invalid_argument("missing feature state snapshot")))?;
+        json_value_to_wire(py, &value)
+    }
+
+    fn remove_feature_state(
+        &self,
+        source_id: String,
+        source_layer_id: Option<String>,
+        feature_id: Option<String>,
+        state_key: Option<String>,
+    ) -> PyResult<()> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let selector =
+            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
+        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
+        // SAFETY: The C API validates the render-session pointer and selector.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_remove_feature_state(state.as_ptr(), selector.as_ptr())
+        })
+        .map_err(map_error)
+    }
+
     fn texture_image_info(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self
             .state
@@ -3320,6 +3407,25 @@ fn tile_options_from_parts(
         raw.lod_mode = lod_mode;
     }
     raw
+}
+
+fn feature_state_selector_from_parts(
+    source_id: String,
+    source_layer_id: Option<String>,
+    feature_id: Option<String>,
+    state_key: Option<String>,
+) -> PyResult<maplibre_core::FeatureStateSelector> {
+    let mut selector = maplibre_core::FeatureStateSelector::new(source_id);
+    if let Some(source_layer_id) = source_layer_id {
+        selector = selector.with_source_layer_id(source_layer_id);
+    }
+    if let Some(feature_id) = feature_id {
+        selector = selector.with_feature_id(feature_id);
+    }
+    if let Some(state_key) = state_key {
+        selector = selector.with_state_key(state_key).map_err(map_error)?;
+    }
+    Ok(selector)
 }
 
 fn free_camera_options_from_parts(

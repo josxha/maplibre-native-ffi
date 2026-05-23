@@ -8,7 +8,9 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from .json import JsonValue
     from .map import MapHandle
+    from .query import FeatureStateSelector
 
 
 class RenderBackend(IntFlag):
@@ -304,6 +306,44 @@ class RenderSessionHandle:
         """Acquire a borrowed Vulkan frame from a session-owned texture target."""
         return VulkanOwnedTextureFrameHandle(
             self._native.acquire_vulkan_owned_texture_frame()
+        )
+
+    def set_feature_state(
+        self,
+        selector: FeatureStateSelector,
+        state: JsonValue,
+    ) -> None:
+        """Set per-feature state on a render source for this render session."""
+        from .json import _to_native_wire as _json_to_native_wire
+
+        self._native.set_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+            _json_to_native_wire(state),
+        )
+
+    def get_feature_state(self, selector: FeatureStateSelector) -> JsonValue:
+        """Return copied per-feature state from a render source."""
+        from .json import _from_native_wire as _json_from_native_wire
+
+        return _json_from_native_wire(
+            self._native.get_feature_state(
+                selector.source_id,
+                selector.source_layer_id,
+                selector.feature_id,
+                selector.state_key,
+            )
+        )
+
+    def remove_feature_state(self, selector: FeatureStateSelector) -> None:
+        """Remove per-feature state from a render source."""
+        self._native.remove_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
         )
 
     def __enter__(self) -> "RenderSessionHandle":
