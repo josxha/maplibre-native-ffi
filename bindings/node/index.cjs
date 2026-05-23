@@ -200,8 +200,35 @@ class NativePointer {
   }
 }
 
+const HANDLE_ENVIRONMENT = Symbol("handleEnvironment");
+const ENVIRONMENT_TOKEN = Object.freeze({});
 const TEXTURE_FRAME_RAW = Symbol("textureFrameRaw");
 const TEXTURE_FRAME_DEACTIVATE = Symbol("textureFrameDeactivate");
+
+function recordHandleEnvironment(handle) {
+  Object.defineProperty(handle, HANDLE_ENVIRONMENT, {
+    value: ENVIRONMENT_TOKEN,
+  });
+}
+
+function assertHandleEnvironment(handle) {
+  if (handle?.[HANDLE_ENVIRONMENT] !== ENVIRONMENT_TOKEN) {
+    throw new InvalidStateError(
+      null,
+      "handle belongs to a different N-API environment",
+    );
+  }
+}
+
+function defineCheckedNative(owner, nativeHandle) {
+  Object.defineProperty(owner, "native", {
+    enumerable: true,
+    get() {
+      assertHandleEnvironment(owner);
+      return nativeHandle;
+    },
+  });
+}
 
 class NativeBuffer {
   static allocate(byteLength) {
@@ -408,11 +435,13 @@ function validateByteLength(byteLength) {
 
 class ResourceRequestHandle {
   constructor(handleId) {
+    recordHandleEnvironment(this);
     this.handleId = handleId;
     this.closed = false;
   }
 
   complete(response = {}) {
+    assertHandleEnvironment(this);
     if (this.closed) {
       throw new InvalidStateError(null, "ResourceRequestHandle is closed");
     }
@@ -423,12 +452,14 @@ class ResourceRequestHandle {
   }
 
   cancelled() {
+    assertHandleEnvironment(this);
     return translateNativeErrors(() =>
       native.nativeResourceRequestCancelled(this.handleId),
     );
   }
 
   close() {
+    assertHandleEnvironment(this);
     if (this.closed) {
       return;
     }
@@ -445,6 +476,7 @@ class ResourceRequestHandle {
 
 class OfflineOperationHandle {
   constructor(runtime, operationId) {
+    recordHandleEnvironment(this);
     if (!(runtime instanceof RuntimeHandle)) {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
     }
@@ -460,6 +492,7 @@ class OfflineOperationHandle {
   }
 
   close() {
+    assertHandleEnvironment(this);
     if (this.discarded) {
       return;
     }
@@ -470,6 +503,7 @@ class OfflineOperationHandle {
   }
 
   get closed() {
+    assertHandleEnvironment(this);
     return this.discarded;
   }
 
@@ -480,8 +514,12 @@ class OfflineOperationHandle {
 
 class RuntimeHandle {
   constructor(options) {
-    this.native = translateNativeErrors(() =>
-      native.createNativeRuntimeHandle(options ?? {}),
+    recordHandleEnvironment(this);
+    defineCheckedNative(
+      this,
+      translateNativeErrors(() =>
+        native.createNativeRuntimeHandle(options ?? {}),
+      ),
     );
   }
 
@@ -661,11 +699,15 @@ class RuntimeHandle {
 
 class MapProjectionHandle {
   constructor(map) {
+    recordHandleEnvironment(this);
     if (!(map instanceof MapHandle)) {
       throw new InvalidArgumentError(null, "map must be a MapHandle");
     }
-    this.native = translateNativeErrors(() =>
-      native.createNativeMapProjectionHandle(map.native),
+    defineCheckedNative(
+      this,
+      translateNativeErrors(() =>
+        native.createNativeMapProjectionHandle(map.native),
+      ),
     );
   }
 
@@ -712,7 +754,8 @@ class MapProjectionHandle {
 
 class RenderSessionHandle {
   constructor(nativeHandle, map) {
-    this.native = nativeHandle;
+    recordHandleEnvironment(this);
+    defineCheckedNative(this, nativeHandle);
     this.map = map;
   }
 
@@ -918,12 +961,16 @@ function attachRenderSession(map, attach) {
 
 class MapHandle {
   constructor(runtime, options) {
+    recordHandleEnvironment(this);
     if (!(runtime instanceof RuntimeHandle)) {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
     }
     this.runtime = runtime;
-    this.native = translateNativeErrors(() =>
-      native.createNativeMapHandle(runtime.native, options ?? {}),
+    defineCheckedNative(
+      this,
+      translateNativeErrors(() =>
+        native.createNativeMapHandle(runtime.native, options ?? {}),
+      ),
     );
   }
 

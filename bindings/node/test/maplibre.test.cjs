@@ -215,6 +215,15 @@ test("handles stay local while workers create their own runtime", async () => {
     const clone = structuredClone(runtime);
     assert.equal(clone instanceof RuntimeHandle, false);
     assert.equal(typeof clone.close, "undefined");
+
+    assert.throws(
+      () =>
+        ResourceRequestHandle.prototype.complete.call(
+          { handleId: "detached", closed: false },
+          {},
+        ),
+      InvalidStateError,
+    );
   } finally {
     runtime.close();
   }

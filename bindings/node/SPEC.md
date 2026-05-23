@@ -149,7 +149,7 @@ modules. Planned public TypeScript modules group C API concepts:
 Current internal Rust modules:
 
 ```text
-index.cjs          public JavaScript wrapper, error classes, NativePointer, and NativeBuffer values
+index.cjs          public JavaScript wrapper, error classes, environment-token handle guards, NativePointer, and NativeBuffer values
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, thread-local diagnostics, log callback bridge, async log severity controls, and root exports
@@ -536,8 +536,8 @@ area instead of retesting all native C validation rules.
    diagnostic properties. _(Initial proof-slice wrapper complete.)_
 3. Add environment ownership, cleanup hooks, close-once handle state, leak
    reporting, `close()`, and `Symbol.dispose`. _(Initial `RuntimeHandle`
-   close-once proof slice, JavaScript parent-retention checks, and
-   `NativePointer` value complete.)_
+   close-once proof slice, JavaScript parent-retention and environment-token
+   checks, and `NativePointer` value complete.)_
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
    polling. _(Initial event envelope polling, ambient cache operation, and
    offline region operation start/take-result proof slices complete.)_
