@@ -7,6 +7,52 @@ from enum import IntEnum
 from typing import Any
 
 
+class StyleSourceType(IntEnum):
+    """Style source type values returned by MapLibre Native."""
+
+    UNKNOWN = 0
+    VECTOR = 1
+    RASTER = 2
+    RASTER_DEM = 3
+    GEOJSON = 4
+    IMAGE = 5
+    VIDEO = 6
+    ANNOTATIONS = 7
+    CUSTOM_VECTOR = 8
+
+    @classmethod
+    def _missing_(cls, value: object) -> "StyleSourceType | None":
+        if not isinstance(value, int) or value < 0:
+            return None
+        unknown = int.__new__(cls, value)
+        unknown._name_ = f"UNKNOWN_{value}"
+        unknown._value_ = value
+        return unknown
+
+    @property
+    def native_code(self) -> int:
+        """Return the C enum value for this source type."""
+        return int(self)
+
+
+@dataclass(frozen=True, slots=True)
+class StyleSourceInfo:
+    """Copied fixed metadata for one style source."""
+
+    source_type: StyleSourceType
+    is_volatile: bool
+    attribution: str | None = None
+
+    @classmethod
+    def from_native(cls, raw: dict[str, Any]) -> "StyleSourceInfo":
+        """Build source metadata from private native bridge values."""
+        return cls(
+            source_type=StyleSourceType(raw["source_type"]),
+            is_volatile=raw["is_volatile"],
+            attribution=raw["attribution"],
+        )
+
+
 class CustomGeometrySourceEventType(IntEnum):
     """Custom geometry source callback event kind."""
 
@@ -84,4 +130,6 @@ __all__ = [
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "StyleSourceInfo",
+    "StyleSourceType",
 ]

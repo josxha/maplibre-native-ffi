@@ -1018,6 +1018,127 @@ impl MapHandle {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn add_geojson_source_url(&self, source_id: String, url: String) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let url = maplibre_core::string::string_view(&url);
+        // SAFETY: The C API validates the map pointer and borrowed string views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_geojson_source_url(state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(map_error)
+    }
+
+    fn remove_style_source(&self, source_id: String) -> PyResult<bool> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let mut removed = false;
+        // SAFETY: The C API validates the map pointer, source ID view, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_remove_style_source(state.as_ptr(), source_id.raw(), &mut removed)
+        })
+        .map_err(map_error)?;
+        Ok(removed)
+    }
+
+    fn style_source_exists(&self, source_id: String) -> PyResult<bool> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let mut exists = false;
+        // SAFETY: The C API validates the map pointer, source ID view, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_style_source_exists(state.as_ptr(), source_id.raw(), &mut exists)
+        })
+        .map_err(map_error)?;
+        Ok(exists)
+    }
+
+    fn get_style_source_type(&self, source_id: String) -> PyResult<Option<u32>> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let mut source_type = 0;
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer, source ID view, and out pointers.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_source_type(
+                state.as_ptr(),
+                source_id.raw(),
+                &mut source_type,
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(found.then_some(source_type))
+    }
+
+    fn get_style_source_info(
+        &self,
+        py: Python<'_>,
+        source_id: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let mut info = maplibre_core::style::empty_style_source_info();
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer, source ID view, info, and found pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_source_info(
+                state.as_ptr(),
+                source_id.raw(),
+                &mut info,
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+        let attribution = if info.has_attribution {
+            let mut bytes = vec![0u8; info.attribution_size];
+            let mut attribution_size = 0;
+            let mut attribution_found = false;
+            // SAFETY: bytes is writable for attribution_size bytes and retained
+            // for this call. The C API validates all pointers.
+            maplibre_core::check(unsafe {
+                sys::mln_map_copy_style_source_attribution(
+                    state.as_ptr(),
+                    source_id.raw(),
+                    bytes.as_mut_ptr().cast::<c_char>(),
+                    bytes.len(),
+                    &mut attribution_size,
+                    &mut attribution_found,
+                )
+            })
+            .map_err(map_error)?;
+            if attribution_found && attribution_size > 0 {
+                bytes.truncate(attribution_size);
+                Some(String::from_utf8(bytes).map_err(|error| {
+                    invalid_argument_error(format!("native attribution is not UTF-8: {error}"))
+                })?)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let copied = maplibre_core::style::style_source_info_from_native(&info, attribution);
+        source_info_to_py(py, copied).map(Some)
+    }
+
+    fn list_style_source_ids(&self) -> PyResult<Vec<String>> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_list_style_source_ids(state.as_ptr(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let ptr = out.into_non_null("mln_style_id_list").map_err(map_error)?;
+        // SAFETY: ptr is an owned style ID list returned by native.
+        unsafe { maplibre_core::style::copy_style_id_list(ptr) }.map_err(map_error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn add_custom_geometry_source(
         &self,
         source_id: String,
@@ -2191,6 +2312,14 @@ fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> Py
     dict.set_item("z", event.tile_id.z)?;
     dict.set_item("x", event.tile_id.x)?;
     dict.set_item("y", event.tile_id.y)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("source_type", info.raw_source_type)?;
+    dict.set_item("is_volatile", info.is_volatile)?;
+    dict.set_item("attribution", info.attribution)?;
     Ok(dict.into_any().unbind())
 }
 

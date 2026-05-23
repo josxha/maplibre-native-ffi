@@ -115,6 +115,8 @@ The current implementation includes these completed slices:
   map options.
 - `MapHandle` exposes map debug overlay options, rendering-stats view state,
   loaded-state queries, viewport options, and tile options.
+- `MapHandle` exposes style source URL insertion, removal, existence checks,
+  type/info lookup, attribution copying, and source ID listing.
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
 - `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes

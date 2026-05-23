@@ -177,6 +177,35 @@ def test_map_debug_and_status_options_round_trip_public_values() -> None:
             assert map_handle.get_rendering_stats_view_enabled() is False
 
 
+def test_style_source_url_metadata_and_removal_public_api() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            map_handle.add_geojson_source_url(
+                "points", "https://example.test/points.geojson"
+            )
+
+            assert map_handle.style_source_exists("points") is True
+            assert map_handle.style_source_exists("missing") is False
+            assert (
+                map_handle.get_style_source_type("points")
+                == style.StyleSourceType.GEOJSON
+            )
+            assert map_handle.get_style_source_type("missing") is None
+            source_ids = map_handle.list_style_source_ids()
+            assert "points" in source_ids
+
+            info = map_handle.get_style_source_info("points")
+            assert info is not None
+            assert info.source_type == style.StyleSourceType.GEOJSON
+            assert info.attribution is None
+            assert map_handle.get_style_source_info("missing") is None
+
+            assert map_handle.remove_style_source("points") is True
+            assert map_handle.remove_style_source("points") is False
+            assert "points" not in map_handle.list_style_source_ids()
+
+
 def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
     viewport = map_module.MapViewportOptions(
         north_orientation=map_module.NorthOrientation.RIGHT,

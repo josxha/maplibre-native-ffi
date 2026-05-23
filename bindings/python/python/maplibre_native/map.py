@@ -23,7 +23,12 @@ if TYPE_CHECKING:
         VulkanOwnedTextureDescriptor,
         VulkanSurfaceDescriptor,
     )
-    from .style import CustomGeometrySourceHandle, CustomGeometrySourceOptions
+    from .style import (
+        CustomGeometrySourceHandle,
+        CustomGeometrySourceOptions,
+        StyleSourceInfo,
+        StyleSourceType,
+    )
 
 
 class MapDebugOptions(IntFlag):
@@ -395,6 +400,36 @@ class MapHandle:
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
+
+    def add_geojson_source_url(self, source_id: str, url: str) -> None:
+        """Add a GeoJSON source that loads data from a URL."""
+        self._native.add_geojson_source_url(source_id, url)
+
+    def remove_style_source(self, source_id: str) -> bool:
+        """Remove a style source by ID and report whether it existed."""
+        return self._native.remove_style_source(source_id)
+
+    def style_source_exists(self, source_id: str) -> bool:
+        """Return whether a style source ID exists."""
+        return self._native.style_source_exists(source_id)
+
+    def get_style_source_type(self, source_id: str) -> StyleSourceType | None:
+        """Return a style source type, or None when the source is missing."""
+        from .style import StyleSourceType
+
+        raw = self._native.get_style_source_type(source_id)
+        return StyleSourceType(raw) if raw is not None else None
+
+    def get_style_source_info(self, source_id: str) -> StyleSourceInfo | None:
+        """Return copied fixed metadata for one style source."""
+        from .style import StyleSourceInfo
+
+        raw = self._native.get_style_source_info(source_id)
+        return StyleSourceInfo.from_native(raw) if raw is not None else None
+
+    def list_style_source_ids(self) -> tuple[str, ...]:
+        """Return style source IDs in style order."""
+        return tuple(self._native.list_style_source_ids())
 
     def create_projection(self) -> MapProjectionHandle:
         """Create a standalone projection helper from the current map transform."""
