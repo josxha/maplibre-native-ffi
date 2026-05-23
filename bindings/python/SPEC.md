@@ -111,6 +111,8 @@ This scaffold implements one proof slice:
   for failures.
 - `RuntimeHandle` creates, runs, closes, and supports context-manager cleanup
   for a native runtime handle.
+- `MapHandle` creates and closes maps with parent runtime retention and basic
+  map options.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish naming and value semantics for later concept
   implementations.
@@ -168,6 +170,9 @@ supported_render_backends()
 EXPECTED_C_ABI_VERSION
 InvalidArgumentError
 InvalidStateError
+MapHandle
+MapMode
+MapOptions
 MaplibreError
 MaplibreStatus
 NativeError
@@ -399,7 +404,7 @@ Coverage targets:
       conversion.
 - [x] Add `RuntimeHandle` with context-manager close and owner-thread error
       propagation.
-- [ ] Add `MapHandle`, map options, and parent retention.
+- [x] Add `MapHandle`, map options, and parent retention.
 - [ ] Add runtime event polling with copied Python event values.
 - [ ] Add render session descriptors, writable-buffer readback, and texture
       frame handles.

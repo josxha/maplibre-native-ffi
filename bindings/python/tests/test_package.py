@@ -105,3 +105,39 @@ def test_runtime_close_from_wrong_thread_reports_wrong_thread() -> None:
         assert raised_error[0].status == mln.MaplibreStatus.WRONG_THREAD
     finally:
         runtime.close()
+
+
+def test_map_handle_context_manager_closes_once() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with mln.MapHandle(runtime, mln.MapOptions(width=128, height=64)) as map_handle:
+            assert not map_handle.closed
+            map_handle.request_repaint()
+
+        assert map_handle.closed
+        map_handle.close()
+        assert map_handle.closed
+
+
+def test_runtime_rejects_close_while_map_is_live() -> None:
+    runtime = mln.RuntimeHandle()
+    map_handle = runtime.create_map(mln.MapOptions(width=64, height=64))
+    try:
+        with pytest.raises(mln.InvalidStateError) as raised:
+            runtime.close()
+
+        assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
+        assert (
+            raised.value.native_status_code
+            == mln.MaplibreStatus.INVALID_STATE.native_code
+        )
+    finally:
+        map_handle.close()
+        runtime.close()
+
+
+def test_map_create_from_closed_runtime_reports_invalid_argument() -> None:
+    runtime = mln.RuntimeHandle()
+    runtime.close()
+
+    with pytest.raises(mln.InvalidArgumentError):
+        runtime.create_map()

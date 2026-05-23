@@ -19,8 +19,21 @@ struct RuntimeHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_runtime>>,
 }
 
+#[pyclass(name = "_MapHandle")]
+struct MapHandle {
+    state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_map>>,
+}
+
 impl RuntimeHandle {
     fn state(&self) -> MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_runtime>> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+impl MapHandle {
+    fn state(&self) -> MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_map>> {
         self.state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -41,6 +54,29 @@ impl RuntimeHandle {
         // SAFETY: The C API validates that the pointer is a live runtime handle
         // and that the call occurs on the runtime owner thread.
         maplibre_core::check(unsafe { sys::mln_runtime_run_once(state.as_ptr()) })
+            .map_err(map_error)
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        self.state().is_closed()
+    }
+}
+
+#[pymethods]
+impl MapHandle {
+    fn close(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: state owns an mln_map pointer created by mln_map_create and
+        // pairs it with the matching status-returning destroy function.
+        unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)
+    }
+
+    fn request_repaint(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates that the pointer is a live map handle and
+        // that the call occurs on the map owner thread.
+        maplibre_core::check(unsafe { sys::mln_map_request_repaint(state.as_ptr()) })
             .map_err(map_error)
     }
 
@@ -151,10 +187,46 @@ fn create_runtime(
     })
 }
 
+/// Creates a map handle owned by a runtime.
+#[pyfunction]
+fn create_map(
+    runtime: &RuntimeHandle,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    map_mode: u32,
+) -> PyResult<MapHandle> {
+    let Some(mode) = maplibre_core::MapMode::from_raw(map_mode) else {
+        return Err(py_errors::InvalidArgumentError::new_err((
+            Option::<i32>::None,
+            format!("unknown map mode: {map_mode}"),
+        )));
+    };
+    let options = maplibre_core::MapOptions::new(width, height, scale_factor).with_mode(mode);
+    let raw_options = maplibre_core::options::map_options_to_native(&options);
+    let runtime_state = runtime.state();
+    let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();
+    // SAFETY: runtime_state owns or has released the runtime pointer. The C API
+    // validates that it is live. raw_options is a fully initialized value, and
+    // out is a valid null-initialized out-pointer owned by this call.
+    maplibre_core::check(unsafe {
+        sys::mln_map_create(runtime_state.as_ptr(), &raw_options, out.as_mut_ptr())
+    })
+    .map_err(map_error)?;
+    let ptr = out.into_non_null("mln_map").map_err(map_error)?;
+    // SAFETY: ptr came from successful mln_map_create and is paired with the
+    // matching status-returning destroy function in MapHandle.close.
+    let state = unsafe { maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_map") };
+    Ok(MapHandle {
+        state: Mutex::new(state),
+    })
+}
+
 /// Private PyO3 extension for the public maplibre_native package.
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
+    module.add_class::<MapHandle>()?;
     module.add_function(wrap_pyfunction!(expected_c_abi_version, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backends_raw, module)?)?;
@@ -165,5 +237,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(create_runtime, module)?)?;
+    module.add_function(wrap_pyfunction!(create_map, module)?)?;
     Ok(())
 }

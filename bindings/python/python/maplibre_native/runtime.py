@@ -67,6 +67,12 @@ class RuntimeHandle:
         """Run one pending owner-thread task for this runtime."""
         self._native.run_once()
 
+    def create_map(self, options: object | None = None) -> object:
+        """Create a map owned by this runtime."""
+        from .map import MapHandle
+
+        return MapHandle(self, options)
+
     def __enter__(self) -> "RuntimeHandle":
         return self
 

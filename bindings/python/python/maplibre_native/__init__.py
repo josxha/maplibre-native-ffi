@@ -17,6 +17,7 @@ from .errors import (
     UnsupportedFeatureError,
     WrongThreadError,
 )
+from .map import MapHandle, MapMode, MapOptions
 from .render import NativePointer, RenderBackend
 from .runtime import NetworkStatus, RuntimeHandle, RuntimeOptions
 
@@ -24,6 +25,9 @@ __all__ = [
     "EXPECTED_C_ABI_VERSION",
     "InvalidArgumentError",
     "InvalidStateError",
+    "MapHandle",
+    "MapMode",
+    "MapOptions",
     "MaplibreError",
     "MaplibreStatus",
     "NativeError",
