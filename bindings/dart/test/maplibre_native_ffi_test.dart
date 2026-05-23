@@ -34,6 +34,14 @@ void main() {
     () {
       final runtime = RuntimeHandle.create();
       expect(runtime.isClosed, isFalse);
+      runtime.setResourceUrlRewriteRules([
+        const ResourceUrlRewriteRule(
+          kind: ResourceKind.style,
+          url: 'https://example.com/style.json',
+          replacementUrl: 'https://example.com/rewritten-style.json',
+        ),
+      ]);
+      runtime.clearResourceTransform();
       final offlineOperation = runtime.runAmbientCacheOperation(
         AmbientCacheOperation.clear,
       );

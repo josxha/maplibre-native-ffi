@@ -202,6 +202,25 @@ final class ResourceProviderDecision {
   final String name;
 }
 
+/// Exact URL rewrite rule used by the runtime resource transform.
+final class ResourceUrlRewriteRule {
+  /// Creates an exact URL rewrite rule.
+  const ResourceUrlRewriteRule({
+    this.kind,
+    required this.url,
+    required this.replacementUrl,
+  });
+
+  /// Optional resource kind filter. Null matches any kind.
+  final ResourceKind? kind;
+
+  /// Original URL to match exactly.
+  final String url;
+
+  /// Replacement URL returned to native code.
+  final String replacementUrl;
+}
+
 /// Resource response returned by a Dart resource provider.
 final class ResourceResponse {
   /// Creates a resource response.

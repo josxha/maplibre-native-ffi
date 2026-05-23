@@ -86,6 +86,16 @@ final class MaplibreNativeCApi {
     Pointer<Bool> outHasEvent,
   ) => _raw.mln_runtime_poll_event(runtime, outEvent, outHasEvent).value;
 
+  /// Registers or updates a runtime-scoped URL transform.
+  int runtimeSetResourceTransform(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<raw.mln_resource_transform> transform,
+  ) => _raw.mln_runtime_set_resource_transform(runtime, transform).value;
+
+  /// Clears the runtime-scoped URL transform.
+  int runtimeClearResourceTransform(Pointer<raw.mln_runtime> runtime) =>
+      _raw.mln_runtime_clear_resource_transform(runtime).value;
+
   /// Returns native default map options.
   raw.mln_map_options mapOptionsDefault() => _raw.mln_map_options_default();
 
