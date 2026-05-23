@@ -62,9 +62,12 @@ bindings/vala/
   crates/maplibre-native-vala/
     Cargo.toml
     include/maplibre-native-vala/maplibre-native-vala.h
+    build.rs
+    src/glib.rs
     src/lib.rs
     src/native_pointer.rs
     src/status.rs
+  tools/generate.py
   tests/compile/minimal.vala
 ```
 
@@ -74,15 +77,15 @@ The scaffold implements one proof slice in Rust:
 - `mln_vala_supported_render_backend_mask()` calls
   `mln_supported_render_backend_mask()`.
 - `mln_vala_network_status_get()` and `mln_vala_network_status_set()` cross the
-  real C ABI and preserve status plus diagnostic text in a scaffold-only result.
+  real C ABI and expose failure through GLib `GError`.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and
   the proof-slice functions.
 
-The scaffold-only `mln_vala_status_result` is not the final GObject ABI. Final
-status-returning public entry points use GLib's `gboolean`/`GError**` convention
-and expose `throws MaplibreNative.Error` in Vala.
+The Rust tests retain a scaffold-only `StatusResult` helper for direct status
+assertions. Public status-returning entry points use GLib's
+`gboolean`/`GError**` convention and expose `throws` in generated Vala.
 
 ## Build artifacts and tasks
 
@@ -98,19 +101,19 @@ and expose `throws MaplibreNative.Error` in Vala.
 
 Implemented tasks:
 
-| Task                             | Required behavior                                               |
-| -------------------------------- | --------------------------------------------------------------- |
-| `mise run //bindings/vala:build` | Build the Rust adapter crate after the native C library exists. |
-| `mise run //bindings/vala:test`  | Run Rust proof-slice tests against the real C library.          |
-| `mise run //bindings/vala:ci`    | Run tests and clippy for the scaffold crate.                    |
+| Task                                     | Required behavior                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `mise run //bindings/vala:build`         | Build the Rust adapter crate after the native C library exists.                             |
+| `mise run //bindings/vala:generate`      | Generate annotated C headers, GIR, typelib, and VAPI from metadata and Rust adapter source. |
+| `mise run //bindings/vala:compile-tests` | Compile and run Vala fixtures against the generated VAPI and linked Rust adapter.           |
+| `mise run //bindings/vala:test`          | Run generation, Vala compile tests, and Rust tests against the real C library.              |
+| `mise run //bindings/vala:ci`            | Run tests and clippy for the scaffold crate.                                                |
 
 Future tasks:
 
-| Task                                     | Required behavior                                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `mise run //bindings/vala:generate`      | Generate annotated C headers, GIR, typelib, and VAPI from metadata and Rust adapter source. |
-| `mise run //bindings/vala:compile-tests` | Compile Vala fixtures against the generated VAPI and linked Rust adapter.                   |
-| `mise run //bindings/vala:api-diff`      | Compare generated GIR and VAPI against checked-in review baselines when baselines exist.    |
+| Task                                | Required behavior                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `mise run //bindings/vala:api-diff` | Compare generated GIR and VAPI against checked-in review baselines when baselines exist. |
 
 ## Module responsibilities
 

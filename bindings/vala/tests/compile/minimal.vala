@@ -1,5 +1,13 @@
 int main(string[] args) {
-  // Future compile tests import MaplibreNative after g-ir-scanner and vapigen
-  // produce the GIR, typelib, and VAPI artifacts.
-  return 0;
+  uint32 version = MaplibreNative.c_version();
+  uint32 status = 0;
+
+  try {
+    MaplibreNative.network_status_get(out status);
+    MaplibreNative.network_status_set(status);
+  } catch (GLib.Error error) {
+    return 1;
+  }
+
+  return version == 0 ? 0 : 0;
 }

@@ -686,6 +686,7 @@ version = "0.0.0"
 dependencies = [
  "maplibre-native-core",
  "maplibre-native-sys",
+ "pkg-config",
 ]
 
 [[package]]

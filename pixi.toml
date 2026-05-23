@@ -43,6 +43,11 @@ VK_ADD_DRIVER_FILES = "$CONDA_PREFIX/share/vulkan/icd.d/lvp_icd.x86_64.json"
 BINDGEN_EXTRA_CLANG_ARGS = "--sysroot=$CONDA_BUILD_SYSROOT -isystem$CONDA_PREFIX/lib/gcc/aarch64-conda-linux-gnu/14.3.0/include -isystem$CONDA_PREFIX/lib/gcc/aarch64-conda-linux-gnu/14.3.0/include-fixed"
 VK_ADD_DRIVER_FILES = "$CONDA_PREFIX/share/vulkan/icd.d/lvp_icd.aarch64.json"
 
+[target.unix.dependencies]
+glib = ">=2.86,<3"
+gobject-introspection = ">=1.86,<2"
+vala = ">=0.56,<1"
+
 [target.win.activation.env]
 # Rust bindgen's clang-sys uses LIBCLANG_PATH to find Pixi's libclang.
 LIBCLANG_PATH = "%CONDA_PREFIX%\\Library\\bin"

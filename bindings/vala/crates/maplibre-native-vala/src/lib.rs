@@ -4,9 +4,11 @@
 //! Rust. The initial scaffold keeps the first native calls in one place so the
 //! generated GIR/VAPI layer can grow from real C ABI behavior.
 
+pub mod glib;
 pub mod native_pointer;
 pub mod status;
 
+use glib::{GBoolean, GError, GFALSE, GTRUE};
 use maplibre_native_sys as sys;
 use status::StatusResult;
 
@@ -49,22 +51,50 @@ pub extern "C" fn mln_vala_supported_render_backend_mask() -> u32 {
     supported_render_backend_mask()
 }
 
-/// C-callable proof-slice entry point that reports status without allocating a
-/// GLib error. The generated GObject ABI will wrap this in `GError`-returning
-/// entry points.
+/// C-callable proof-slice entry point that exposes network status through the
+/// GLib `GError` convention used by the generated GIR/VAPI API.
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_network_status_get() -> StatusResult {
+pub extern "C" fn mln_vala_network_status_get(
+    out_status: *mut u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match network_status().and_then(|value| glib::clear_optional_out_pointer(out_status, value)) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+/// C-callable proof-slice entry point that exposes network status through the
+/// GLib `GError` convention used by the generated GIR/VAPI API.
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_network_status_set(
+    raw_status: u32,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_network_status(raw_status) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+/// Scaffold-only status-result adapter retained for Rust tests while the full
+/// generated GObject ABI grows.
+pub fn network_status_result() -> StatusResult {
     match network_status() {
         Ok(value) => StatusResult::ok(value),
         Err(error) => StatusResult::from_error(error),
     }
 }
 
-/// C-callable proof-slice entry point that reports status without allocating a
-/// GLib error. The generated GObject ABI will wrap this in `GError`-returning
-/// entry points.
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_network_status_set(raw_status: u32) -> StatusResult {
+/// Scaffold-only status-result adapter retained for Rust tests while the full
+/// generated GObject ABI grows.
+pub fn set_network_status_result(raw_status: u32) -> StatusResult {
     match set_network_status(raw_status) {
         Ok(()) => StatusResult::ok(0),
         Err(error) => StatusResult::from_error(error),
@@ -101,8 +131,16 @@ mod tests {
 
     #[test]
     fn invalid_network_status_preserves_diagnostic() {
-        let result = mln_vala_network_status_set(999_999);
+        let result = set_network_status_result(999_999);
         assert_ne!(result.status, 0);
         assert_ne!(result.diagnostic_len, 0);
+    }
+
+    #[test]
+    fn gerror_network_status_reports_invalid_argument() {
+        let mut error = std::ptr::null_mut();
+
+        assert_eq!(mln_vala_network_status_set(999_999, &mut error), GFALSE);
+        assert!(!error.is_null());
     }
 }

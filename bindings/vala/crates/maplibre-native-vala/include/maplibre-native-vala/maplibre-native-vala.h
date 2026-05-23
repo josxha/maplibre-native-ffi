@@ -1,33 +1,55 @@
 #pragma once
 
-#include <stddef.h>
+#include <glib-object.h>
 #include <stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+G_BEGIN_DECLS
 
-#define MLN_VALA_DIAGNOSTIC_CAPACITY 512
+#define MLN_VALA_ERROR (mln_vala_error_quark())
 
-/*
- * Scaffold-only result for the first Rust adapter slice.
+typedef enum {
+  MLN_VALA_ERROR_INVALID_ARGUMENT,
+  MLN_VALA_ERROR_INVALID_STATE,
+  MLN_VALA_ERROR_WRONG_THREAD,
+  MLN_VALA_ERROR_UNSUPPORTED,
+  MLN_VALA_ERROR_NATIVE_ERROR,
+  MLN_VALA_ERROR_UNKNOWN_STATUS,
+} MlnValaError;
+
+GQuark mln_vala_error_quark(void);
+
+/**
+ * mln_vala_c_version:
  *
- * The generated GObject ABI will expose status-returning operations as
- * gboolean-returning functions with GError**. Keep this struct private to
- * scaffold tests and generator experiments.
+ * Returns: the MapLibre Native C ABI version.
  */
-typedef struct mln_vala_status_result {
-  int32_t status;
-  uint32_t value;
-  size_t diagnostic_len;
-  uint8_t diagnostic[MLN_VALA_DIAGNOSTIC_CAPACITY];
-} mln_vala_status_result;
-
 uint32_t mln_vala_c_version(void);
-uint32_t mln_vala_supported_render_backend_mask(void);
-mln_vala_status_result mln_vala_network_status_get(void);
-mln_vala_status_result mln_vala_network_status_set(uint32_t raw_status);
 
-#ifdef __cplusplus
-}
-#endif
+/**
+ * mln_vala_supported_render_backend_mask:
+ *
+ * Returns: a bit mask of supported `MlnValaRenderBackendFlags` values.
+ */
+uint32_t mln_vala_supported_render_backend_mask(void);
+
+/**
+ * mln_vala_network_status_get:
+ * @out_status: (out): return location for the raw network status value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_network_status_get(uint32_t* out_status, GError** error);
+
+/**
+ * mln_vala_network_status_set:
+ * @raw_status: raw network status value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_network_status_set(uint32_t raw_status, GError** error);
+
+G_END_DECLS

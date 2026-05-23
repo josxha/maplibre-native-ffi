@@ -3,8 +3,71 @@ depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = "cargo build -p maplibre-native-vala"
 
+[tasks.generate]
+depends = [":build"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
+run = '''
+python tools/generate.py
+mkdir -p build/gir build/typelib build/vapi
+
+PYTHONPATH="{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/lib/gobject-introspection" \
+  "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/bin/python" \
+  "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/bin/g-ir-scanner" \
+  --namespace=MaplibreNative \
+  --nsversion=0.1 \
+  --identifier-prefix=MlnVala \
+  --symbol-prefix=mln_vala \
+  --include=GObject-2.0 \
+  --warn-all \
+  --library-path="{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
+  --library=maplibre_native_vala \
+  -Ibuild/include \
+  build/include/maplibre-native-vala.h \
+  --output build/gir/MaplibreNative-0.1.gir
+
+g-ir-compiler \
+  build/gir/MaplibreNative-0.1.gir \
+  --output build/typelib/MaplibreNative-0.1.typelib
+
+python - <<'PY'
+from pathlib import Path
+source = Path("build/gir/MaplibreNative-0.1.gir")
+target = Path("build/gir/MaplibreNative-0.1.vapigen.gir")
+target.write_text("\n".join(
+    line for line in source.read_text().splitlines()
+    if "<doc:format" not in line
+) + "\n")
+PY
+
+vapigen \
+  --library=maplibre-native \
+  --directory build/vapi \
+  --metadatadir metadata \
+  --pkg gobject-2.0 \
+  build/gir/MaplibreNative-0.1.vapigen.gir
+'''
+
+[tasks."compile-tests"]
+depends = [":generate"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
+run = '''
+valac \
+  --vapidir build/vapi \
+  --pkg maplibre-native \
+  --pkg gobject-2.0 \
+  -X -Ibuild/include \
+  -X -L"{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
+  -X -lmaplibre_native_vala \
+  -X -Wl,-rpath,"{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
+  -X -Wl,-rpath,"$CONDA_PREFIX/lib" \
+  tests/compile/minimal.vala \
+  -o build/minimal
+
+./build/minimal
+'''
+
 [tasks.test]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", ":compile-tests"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = "cargo test -p maplibre-native-vala"
 

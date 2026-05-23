@@ -8,6 +8,9 @@ repository.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[build-dependencies]
+pkg-config = "0.3"
+
 [dependencies]
 maplibre-native-core = { path = "../../../rust/crates/maplibre-native-core" }
 maplibre-native-sys = { path = "../../../rust/crates/maplibre-native-sys" }
