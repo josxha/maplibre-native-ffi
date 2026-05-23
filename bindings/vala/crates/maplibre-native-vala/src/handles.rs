@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::{CStr, c_char, c_void};
+use std::hash::{Hash, Hasher};
 use std::ptr;
 use std::sync::Mutex;
 
@@ -25,6 +27,7 @@ pub struct RuntimeHandle {
     native: *mut sys::mln_runtime,
     resource_transform: *mut ResourceTransformState,
     resource_provider: *mut ResourceProviderState,
+    owner_thread: u64,
 }
 
 pub type ResourceTransformCallback =
@@ -49,11 +52,34 @@ struct ResourceProviderState {
     destroy_notify: GDestroyNotify,
 }
 
+fn current_thread_token() -> u64 {
+    let mut hasher = DefaultHasher::new();
+    std::thread::current().id().hash(&mut hasher);
+    hasher.finish()
+}
+
+fn runtime_should_finalize_on_owner_thread(handle: *mut RuntimeHandle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    // SAFETY: The caller passes a RuntimeHandle GObject during finalization.
+    unsafe { !(*handle).native.is_null() && (*handle).owner_thread == current_thread_token() }
+}
+
+fn map_should_finalize_on_owner_thread(handle: *mut MapHandle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    // SAFETY: The caller passes a MapHandle GObject during finalization.
+    unsafe { !(*handle).native.is_null() && (*handle).owner_thread == current_thread_token() }
+}
+
 #[repr(C)]
 pub struct MapHandle {
     parent_instance: GObject,
     native: *mut sys::mln_map,
     runtime: *mut RuntimeHandle,
+    owner_thread: u64,
 }
 
 #[repr(C)]
@@ -82,13 +108,27 @@ pub struct OfflineRegionListHandle {
 
 impl glib::ObjectFinalize for RuntimeHandle {
     unsafe extern "C" fn finalize(object: *mut GObject) {
-        let _ = close_runtime_handle(object.cast::<RuntimeHandle>());
+        let handle = object.cast::<RuntimeHandle>();
+        if runtime_should_finalize_on_owner_thread(handle) {
+            let _ = close_runtime_handle(handle);
+        } else if unsafe { !(*handle).native.is_null() } {
+            eprintln!(
+                "RuntimeHandle finalized off its owner thread; call close() on the owner thread to release native state"
+            );
+        }
     }
 }
 
 impl glib::ObjectFinalize for MapHandle {
     unsafe extern "C" fn finalize(object: *mut GObject) {
-        let _ = close_map_handle(object.cast::<MapHandle>());
+        let handle = object.cast::<MapHandle>();
+        if map_should_finalize_on_owner_thread(handle) {
+            let _ = close_map_handle(handle);
+        } else if unsafe { !(*handle).native.is_null() } {
+            eprintln!(
+                "MapHandle finalized off its owner thread; call close() on the owner thread to release native state"
+            );
+        }
     }
 }
 
@@ -4495,6 +4535,10 @@ unsafe extern "C" fn resource_transform_trampoline(
     }
 
     let state = user_data.cast::<ResourceTransformState>();
+    // Native copies the previous callback response before returning from that
+    // callback, so only the most recent replacement URL must stay alive across
+    // calls.
+    free_returned_transform_urls(state);
     // SAFETY: Native passes the state pointer installed by
     // `set_resource_transform`; clear/replace waits for in-flight callbacks.
     let replacement_url = unsafe { ((*state).callback)(kind, url, (*state).user_data) };
@@ -4514,6 +4558,20 @@ unsafe extern "C" fn resource_transform_trampoline(
             .push(replacement_url);
     }
     sys::MLN_STATUS_OK
+}
+
+fn free_returned_transform_urls(state: *mut ResourceTransformState) {
+    if state.is_null() {
+        return;
+    }
+    let mut urls = unsafe { &*state }
+        .returned_urls
+        .lock()
+        .expect("resource transform URL storage lock poisoned");
+    for url in urls.drain(..) {
+        // SAFETY: Vala returns owned strings allocated with GLib allocation.
+        unsafe { glib::free(url.cast::<c_void>()) };
+    }
 }
 
 fn destroy_resource_transform_state(state: *mut ResourceTransformState) {
@@ -4598,10 +4656,13 @@ unsafe extern "C" fn resource_provider_trampoline(
     let decision = unsafe { ((*state).callback)(request, handle, (*state).user_data) };
     if decision != sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE {
         // SAFETY: Pass-through/invalid decisions leave request ownership with
-        // the C API. Disarm and unref the temporary wrapper without releasing.
+        // the C API. Disarm the temporary wrapper without releasing.
         unsafe { resource_request_handle_disarm(handle) };
-        glib::unref_object(handle);
     }
+    // The callback parameter is callback-duration borrowed in the Vala API. If
+    // the provider handled the request, finalizing the wrapper releases any
+    // native request still held after synchronous completion.
+    glib::unref_object(handle);
     decision
 }
 
@@ -5034,6 +5095,7 @@ fn create_runtime_handle(
         (*handle).native = native;
         (*handle).resource_transform = ptr::null_mut();
         (*handle).resource_provider = ptr::null_mut();
+        (*handle).owner_thread = current_thread_token();
     }
     Ok(handle)
 }
@@ -5121,6 +5183,7 @@ fn create_map_handle_with_options(
     unsafe {
         (*handle).native = native;
         (*handle).runtime = glib::ref_object(runtime);
+        (*handle).owner_thread = current_thread_token();
     }
     Ok(handle)
 }

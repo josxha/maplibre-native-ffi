@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;
+use std::hash::{Hash, Hasher};
 use std::ptr;
 
 use maplibre_native_core::error::{self, Error};
@@ -12,11 +14,44 @@ const RENDER_SESSION_TYPE_NAME: &CStr = c"MlnValaRenderSessionHandle";
 const METAL_FRAME_TYPE_NAME: &CStr = c"MlnValaMetalOwnedTextureFrameHandle";
 const VULKAN_FRAME_TYPE_NAME: &CStr = c"MlnValaVulkanOwnedTextureFrameHandle";
 
+fn current_thread_token() -> u64 {
+    let mut hasher = DefaultHasher::new();
+    std::thread::current().id().hash(&mut hasher);
+    hasher.finish()
+}
+
+fn render_session_should_finalize_on_owner_thread(handle: *mut RenderSessionHandle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    // SAFETY: The caller passes a RenderSessionHandle GObject during finalization.
+    unsafe { !(*handle).native.is_null() && (*handle).owner_thread == current_thread_token() }
+}
+
+fn metal_frame_should_finalize_on_owner_thread(handle: *mut MetalOwnedTextureFrameHandle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    // SAFETY: The caller passes a MetalOwnedTextureFrameHandle GObject during finalization.
+    unsafe { !(*handle).session.is_null() && (*handle).owner_thread == current_thread_token() }
+}
+
+fn vulkan_frame_should_finalize_on_owner_thread(
+    handle: *mut VulkanOwnedTextureFrameHandle,
+) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    // SAFETY: The caller passes a VulkanOwnedTextureFrameHandle GObject during finalization.
+    unsafe { !(*handle).session.is_null() && (*handle).owner_thread == current_thread_token() }
+}
+
 #[repr(C)]
 pub struct RenderSessionHandle {
     parent_instance: GObject,
     native: *mut sys::mln_render_session,
     map: *mut MapHandle,
+    owner_thread: u64,
 }
 
 #[repr(C)]
@@ -24,6 +59,7 @@ pub struct MetalOwnedTextureFrameHandle {
     parent_instance: GObject,
     session: *mut RenderSessionHandle,
     frame: sys::mln_metal_owned_texture_frame,
+    owner_thread: u64,
 }
 
 #[repr(C)]
@@ -31,23 +67,45 @@ pub struct VulkanOwnedTextureFrameHandle {
     parent_instance: GObject,
     session: *mut RenderSessionHandle,
     frame: sys::mln_vulkan_owned_texture_frame,
+    owner_thread: u64,
 }
 
 impl glib::ObjectFinalize for RenderSessionHandle {
     unsafe extern "C" fn finalize(object: *mut GObject) {
-        let _ = close_render_session(object.cast::<RenderSessionHandle>());
+        let handle = object.cast::<RenderSessionHandle>();
+        if render_session_should_finalize_on_owner_thread(handle) {
+            let _ = close_render_session(handle);
+        } else if unsafe { !(*handle).native.is_null() } {
+            eprintln!(
+                "RenderSessionHandle finalized off its owner thread; call close() on the owner thread to release native state"
+            );
+        }
     }
 }
 
 impl glib::ObjectFinalize for MetalOwnedTextureFrameHandle {
     unsafe extern "C" fn finalize(object: *mut GObject) {
-        let _ = release_metal_frame(object.cast::<MetalOwnedTextureFrameHandle>());
+        let handle = object.cast::<MetalOwnedTextureFrameHandle>();
+        if metal_frame_should_finalize_on_owner_thread(handle) {
+            let _ = release_metal_frame(handle);
+        } else if unsafe { !(*handle).session.is_null() } {
+            eprintln!(
+                "MetalOwnedTextureFrameHandle finalized off its owner thread; call close() on the owner thread to release native frame state"
+            );
+        }
     }
 }
 
 impl glib::ObjectFinalize for VulkanOwnedTextureFrameHandle {
     unsafe extern "C" fn finalize(object: *mut GObject) {
-        let _ = release_vulkan_frame(object.cast::<VulkanOwnedTextureFrameHandle>());
+        let handle = object.cast::<VulkanOwnedTextureFrameHandle>();
+        if vulkan_frame_should_finalize_on_owner_thread(handle) {
+            let _ = release_vulkan_frame(handle);
+        } else if unsafe { !(*handle).session.is_null() } {
+            eprintln!(
+                "VulkanOwnedTextureFrameHandle finalized off its owner thread; call close() on the owner thread to release native frame state"
+            );
+        }
     }
 }
 
@@ -822,6 +880,7 @@ fn wrap_native_session(
     unsafe {
         (*handle).native = native;
         (*handle).map = glib::ref_object(map);
+        (*handle).owner_thread = current_thread_token();
     }
     Ok(handle)
 }
@@ -956,6 +1015,7 @@ fn acquire_metal_frame(
     unsafe {
         (*frame_handle).session = glib::ref_object(handle);
         (*frame_handle).frame = frame;
+        (*frame_handle).owner_thread = current_thread_token();
     }
     Ok(frame_handle)
 }
@@ -987,6 +1047,7 @@ fn acquire_vulkan_frame(
     unsafe {
         (*frame_handle).session = glib::ref_object(handle);
         (*frame_handle).frame = frame;
+        (*frame_handle).owner_thread = current_thread_token();
     }
     Ok(frame_handle)
 }

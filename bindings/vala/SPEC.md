@@ -68,7 +68,6 @@ bindings/vala/
     src/geo.rs
     src/glib.rs
     src/handles.rs
-    src/json.rs
     src/lib.rs
     src/logging.rs
     src/native_pointer.rs
@@ -234,7 +233,7 @@ or generated fragments, but concept names stay stable.
 - `MaplibreNative.c_version()`
 - `MaplibreNative.supported_render_backends()` returning
   `[Flags] RenderBackendFlags`; raw backend masks stay internal
-- `MaplibreNative.network_status`
+- `MaplibreNative.NetworkStatus.get()` and `NetworkStatus.set()`
 - process-global logging functions
 - process-global coordinate projection helpers
 

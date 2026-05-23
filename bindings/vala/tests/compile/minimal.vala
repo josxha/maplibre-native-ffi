@@ -1,13 +1,60 @@
-[CCode (cname = "MTLCreateSystemDefaultDevice")]
-extern void* mtl_create_system_default_device();
+[CCode (has_target = false)]
+delegate void* MetalCreateSystemDefaultDeviceFunc();
 
 const uint32 RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
 
 int log_first_count = 0;
 int log_second_count = 0;
+GLib.Mutex provider_lock;
 int provider_call_count = 0;
 bool provider_cancel_checked = false;
 bool provider_second_complete_failed = false;
+
+void* create_system_default_metal_device() {
+  var module = GLib.Module.open("/System/Library/Frameworks/Metal.framework/Metal", GLib.ModuleFlags.LAZY);
+  if (module == null) {
+    return null;
+  }
+  void* symbol = null;
+  if (!module.symbol("MTLCreateSystemDefaultDevice", out symbol) || symbol == null) {
+    return null;
+  }
+  var create_device = (MetalCreateSystemDefaultDeviceFunc) symbol;
+  return create_device();
+}
+
+int read_provider_call_count() {
+  provider_lock.lock();
+  int count = provider_call_count;
+  provider_lock.unlock();
+  return count;
+}
+
+void note_provider_call() {
+  provider_lock.lock();
+  provider_call_count++;
+  provider_lock.unlock();
+}
+
+void note_provider_cancel_checked() {
+  provider_lock.lock();
+  provider_cancel_checked = true;
+  provider_lock.unlock();
+}
+
+void note_provider_second_complete_failed() {
+  provider_lock.lock();
+  provider_second_complete_failed = true;
+  provider_lock.unlock();
+}
+
+void read_provider_state(out int call_count, out bool cancel_checked, out bool second_complete_failed) {
+  provider_lock.lock();
+  call_count = provider_call_count;
+  cancel_checked = provider_cancel_checked;
+  second_complete_failed = provider_second_complete_failed;
+  provider_lock.unlock();
+}
 
 bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
   log_first_count++;
@@ -28,11 +75,11 @@ string? replacement_transform_resource(MaplibreNative.ResourceKind kind, string 
 }
 
 MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceRequestHandle handle) {
-  provider_call_count++;
+  note_provider_call();
   try {
     bool cancelled = false;
     handle.is_cancelled(out cancelled);
-    provider_cancel_checked = true;
+    note_provider_cancel_checked();
 
     MaplibreNative.ResourceResponse response = {};
     response.default();
@@ -43,7 +90,7 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
     try {
       handle.complete(response);
     } catch (GLib.Error second_error) {
-      provider_second_complete_failed = true;
+      note_provider_second_complete_failed();
     }
     handle.release();
     handle.release();
@@ -69,7 +116,7 @@ bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, 
   if ((backends & MaplibreNative.RenderBackendFlags.METAL) == 0) {
     return true;
   }
-  void* device = mtl_create_system_default_device();
+  void* device = create_system_default_metal_device();
   if (device == null) {
     return true;
   }
@@ -84,7 +131,10 @@ bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, 
 
   var session = map.attach_metal_owned_texture(descriptor);
   map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":\"background\",\"paint\":{\"background-color\":\"#d8f1ff\"}}]}");
-  wait_for_runtime_event(runtime, RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE, 64);
+  if (!wait_for_runtime_event(runtime, RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE, 64)) {
+    session.close();
+    return false;
+  }
   session.render_update();
 
   var frame = session.acquire_metal_owned_texture_frame();
@@ -371,7 +421,7 @@ int main(string[] args) {
     map_options.map_mode = MaplibreNative.MapMode.CONTINUOUS;
     var map = new MaplibreNative.MapHandle.with_options(runtime, map_options);
     map.set_style_url("custom://style.json");
-    for (int provider_spin = 0; provider_spin < 200 && provider_call_count == 0; provider_spin++) {
+    for (int provider_spin = 0; provider_spin < 200 && read_provider_call_count() == 0; provider_spin++) {
       runtime.run_once();
       GLib.Thread.usleep(10000);
     }
@@ -384,9 +434,10 @@ int main(string[] args) {
     map.get_style_source_type("fixture-source", out source_type, out source_found);
     MaplibreNative.StyleSourceInfo source_info;
     map.get_style_source_info("fixture-source", out source_info, out source_found);
+    char[] attribution_buffer = new char[256];
     size_t attribution_size = 0;
     bool attribution_found = false;
-    map.copy_style_source_attribution("fixture-source", null, out attribution_size, out attribution_found);
+    map.copy_style_source_attribution("fixture-source", attribution_buffer, out attribution_size, out attribution_found);
     map.set_geojson_source_url("fixture-source", "asset://fixture-updated.geojson");
     var source_ids = map.list_style_source_ids();
     size_t source_id_count;
@@ -432,6 +483,10 @@ int main(string[] args) {
     MaplibreNative.StyleImageInfo style_image_info = {};
     style_image_info.default();
     map.set_style_image("fixture-image", style_image, style_image_options);
+    uint8[] style_image_copy = new uint8[4];
+    size_t style_image_copy_size = 0;
+    bool style_image_copy_found = false;
+    map.copy_style_image_premultiplied_rgba8("fixture-image", style_image_copy, out style_image_copy_size, out style_image_copy_found);
     bool image_exists = false;
     map.style_image_exists("fixture-image", out image_exists);
     bool image_found = false;
@@ -447,6 +502,9 @@ int main(string[] args) {
     map.add_image_source_url("image-source", image_coordinates, "asset://image.png");
     map.set_image_source_url("image-source", "asset://image-updated.png");
     map.set_image_source_coordinates("image-source", image_coordinates);
+    MaplibreNative.LatLng[] copied_image_coordinates = new MaplibreNative.LatLng[4];
+    size_t copied_image_coordinate_count = 0;
+    map.get_image_source_coordinates("image-source", copied_image_coordinates, out copied_image_coordinate_count, out source_found);
     map.remove_style_source("image-source", out source_removed);
     map.add_image_source_image("inline-image-source", image_coordinates, style_image);
     map.set_image_source_image("inline-image-source", style_image);
@@ -543,6 +601,10 @@ int main(string[] args) {
     MaplibreNative.ScreenPoint map_point;
     map.pixel_for_lat_lng(coordinate, out map_point);
     map.lat_lng_for_pixel(map_point, out round_trip);
+    MaplibreNative.ScreenPoint[] projected_points = new MaplibreNative.ScreenPoint[fit_coordinates.length];
+    map.pixels_for_lat_lngs(fit_coordinates, projected_points);
+    MaplibreNative.LatLng[] unprojected_coordinates = new MaplibreNative.LatLng[projected_points.length];
+    map.lat_lngs_for_pixels(projected_points, unprojected_coordinates);
 
     MaplibreNative.BoundOptions bounds = {};
     bounds.default();
@@ -614,8 +676,12 @@ int main(string[] args) {
     runtime.close();
     MaplibreNative.log_clear_callback();
 
-    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || !provider_cancel_checked || !provider_second_complete_failed || provider_call_count == 0 || log_first_count != 0 || log_second_count == 0 || !metal_frame_runtime_seen || !vulkan_frame_closed_error_seen) {
-      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), provider_cancel_checked.to_string(), provider_second_complete_failed.to_string(), provider_call_count, log_first_count, log_second_count, metal_frame_runtime_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
+    int final_provider_call_count;
+    bool final_provider_cancel_checked;
+    bool final_provider_second_complete_failed;
+    read_provider_state(out final_provider_call_count, out final_provider_cancel_checked, out final_provider_second_complete_failed);
+    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || !final_provider_cancel_checked || !final_provider_second_complete_failed || final_provider_call_count == 0 || log_first_count != 0 || log_second_count == 0 || !metal_frame_runtime_seen || !vulkan_frame_closed_error_seen) {
+      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), final_provider_cancel_checked.to_string(), final_provider_second_complete_failed.to_string(), final_provider_call_count, log_first_count, log_second_count, metal_frame_runtime_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
       return 1;
     }
   } catch (GLib.Error error) {

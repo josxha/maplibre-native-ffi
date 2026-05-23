@@ -24,11 +24,13 @@ policy.
 
 Binding metadata drives the repetitive ABI surface. A generator emits
 scanner-facing annotated C headers for the GObject-style ABI and validates the
-Rust adapter entry points against the public inventory: type declarations,
-function prototypes, transfer ownership, nullability, `out`/`inout`, array
-lengths, closure and destroy-notify metadata, and error behavior. The generated
-C headers describe the compiled Rust shared library to GObject Introspection;
-they are not a separate C implementation.
+Rust adapter entry points against the public symbol/type inventory plus coarse
+annotation categories. Type declarations, function prototypes, transfer
+ownership, nullability, `out`/`inout`, array lengths, closure and destroy-notify
+metadata, and error behavior still require generated GIR/VAPI and compile-test
+review for exact parameter-level semantics. The generated C headers describe the
+compiled Rust shared library to GObject Introspection; they are not a separate C
+implementation.
 
 `g-ir-scanner` consumes the generated annotated headers and compiled Rust
 library to produce GIR and typelib files. `vapigen` produces the generated
@@ -117,17 +119,18 @@ thread handoff.
 
 Callback adapters keep closures, destroy notifies, and user data alive for the
 native owner scope. Native upcalls may arrive on worker, network, logging, or
-render-related threads, so callback state must be safe for those threads. The
-adapter catches Vala/GLib failures and converts them to the documented C
-callback behavior; exceptions must not unwind through native frames.
+render-related threads, so callback state must be safe for those threads.
+Callbacks return documented fallback decisions or status values when the binding
+can detect invalid callback state; Vala errors stay inside user callback code
+and must not cross native frames.
 
-Resource-provider callbacks copy borrowed request fields before user code can
-retain them. Matching requests own a handled request object that completes or
-releases the C request handle exactly once, possibly from another thread when
-the C API allows it. Pass-through requests return immediately and do not retain
-the native handle. Custom geometry callbacks stay map/style scoped, track active
-upcalls, and hand work to the map owner thread before calling thread-affine map
-APIs.
+Resource-provider callbacks receive request fields and request handles for the
+callback duration. Matching requests complete or release the C request handle
+exactly once at that boundary. Pass-through requests return immediately and do
+not retain the native handle. Higher-level adapters may add asynchronous
+retention when the C API allows it. Custom geometry callbacks stay map/style
+scoped, track active upcalls, and hand work to the map owner thread before
+calling thread-affine map APIs.
 
 ## Rendering and Memory
 

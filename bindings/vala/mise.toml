@@ -8,6 +8,8 @@ depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = '''
 set -euo pipefail
+export LD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_REPO_ROOT}}/target/debug:$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+export DYLD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_REPO_ROOT}}/target/debug:$CONDA_PREFIX/lib:${DYLD_LIBRARY_PATH:-}"
 python tools/generate.py
 mkdir -p build/gir build/typelib build/vapi
 
@@ -21,6 +23,7 @@ PYTHONPATH="{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/lib/gobject-introspecti
   --include=GObject-2.0 \
   --warn-all \
   --library-path="{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
+  --library-path="{{env.MLN_FFI_BUILD_DIR}}" \
   --library=maplibre_native_vala \
   -Ibuild/include \
   build/include/maplibre-native-vala.h \
@@ -53,17 +56,20 @@ depends = [":generate"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = '''
 set -euo pipefail
+export LD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_REPO_ROOT}}/target/debug:$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
+export DYLD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_REPO_ROOT}}/target/debug:$CONDA_PREFIX/lib:${DYLD_LIBRARY_PATH:-}"
 valac \
   --vapidir build/vapi \
   --pkg maplibre-native \
   --pkg gobject-2.0 \
+  --pkg gmodule-2.0 \
   -X -Ibuild/include \
   -X -L"{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
+  -X -L"{{env.MLN_FFI_BUILD_DIR}}" \
   -X -lmaplibre_native_vala \
   -X -Wl,-rpath,"{{env.MLN_FFI_REPO_ROOT}}/target/debug" \
+  -X -Wl,-rpath,"{{env.MLN_FFI_BUILD_DIR}}" \
   -X -Wl,-rpath,"$CONDA_PREFIX/lib" \
-  -X -framework \
-  -X Metal \
   tests/compile/minimal.vala \
   -o build/minimal
 
