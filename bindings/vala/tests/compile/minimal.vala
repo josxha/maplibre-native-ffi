@@ -96,6 +96,13 @@ void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws
   source_result.close();
 }
 
+void exercise_feature_extensions(MaplibreNative.RenderSessionHandle session, MaplibreNative.Feature feature, MaplibreNative.JsonValue arguments) throws GLib.Error {
+  var result = session.query_feature_extensions("fixture-source", feature, "supercluster", "children", arguments);
+  MaplibreNative.FeatureExtensionResultInfo info;
+  result.get(out info);
+  result.close();
+}
+
 void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
   uint64 generation;
   uint32 width;

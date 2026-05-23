@@ -8,6 +8,7 @@ use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::render::{self, RenderSessionHandle};
 
 const FEATURE_QUERY_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureQueryResultHandle";
+const FEATURE_EXTENSION_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureExtensionResultHandle";
 
 #[repr(C)]
 pub struct FeatureQueryResultHandle {
@@ -15,9 +16,20 @@ pub struct FeatureQueryResultHandle {
     native: *mut sys::mln_feature_query_result,
 }
 
+#[repr(C)]
+pub struct FeatureExtensionResultHandle {
+    parent_instance: GObject,
+    native: *mut sys::mln_feature_extension_result,
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_feature_query_result_handle_get_type() -> GType {
     glib::register_object_type::<FeatureQueryResultHandle>(FEATURE_QUERY_RESULT_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_handle_get_type() -> GType {
+    glib::register_object_type::<FeatureExtensionResultHandle>(FEATURE_EXTENSION_RESULT_TYPE_NAME)
 }
 
 #[unsafe(no_mangle)]
@@ -127,6 +139,32 @@ pub extern "C" fn mln_vala_render_session_handle_query_source_features(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_render_session_handle_query_feature_extensions(
+    session: *mut RenderSessionHandle,
+    source_id: *const c_char,
+    feature: *const sys::mln_feature,
+    extension: *const c_char,
+    extension_field: *const c_char,
+    arguments: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> *mut FeatureExtensionResultHandle {
+    match query_feature_extensions(
+        session,
+        source_id,
+        feature,
+        extension,
+        extension_field,
+        arguments,
+    ) {
+        Ok(handle) => handle,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_feature_query_result_handle_count(
     handle: *mut FeatureQueryResultHandle,
     out_count: *mut usize,
@@ -162,6 +200,28 @@ pub extern "C" fn mln_vala_feature_query_result_handle_close(
     handle: *mut FeatureQueryResultHandle,
 ) {
     close_feature_query_result(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_handle_get(
+    handle: *mut FeatureExtensionResultHandle,
+    out_info: *mut sys::mln_feature_extension_result_info,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match feature_extension_result_get(handle, out_info) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_feature_extension_result_handle_close(
+    handle: *mut FeatureExtensionResultHandle,
+) {
+    close_feature_extension_result(handle);
 }
 
 fn default_rendered_feature_query_options(
@@ -264,6 +324,43 @@ fn query_source_features(
     wrap_feature_query_result(result)
 }
 
+fn query_feature_extensions(
+    session: *mut RenderSessionHandle,
+    source_id: *const c_char,
+    feature: *const sys::mln_feature,
+    extension: *const c_char,
+    extension_field: *const c_char,
+    arguments: *const sys::mln_json_value,
+) -> error::Result<*mut FeatureExtensionResultHandle> {
+    if feature.is_null() {
+        return Err(Error::invalid_argument("feature descriptor is null"));
+    }
+    if arguments.is_null() {
+        return Err(Error::invalid_argument(
+            "feature extension arguments are null",
+        ));
+    }
+    let session = render::session_native(session)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let extension = string_view_from_c(extension, "feature extension name")?;
+    let extension_field = string_view_from_c(extension_field, "feature extension field")?;
+    let mut result = ptr::null_mut();
+    // SAFETY: `session` is live, descriptors and string views are borrowed for
+    // this call, and result output storage is valid.
+    error::check(unsafe {
+        sys::mln_render_session_query_feature_extensions(
+            session,
+            source_id,
+            feature,
+            extension,
+            extension_field,
+            arguments,
+            &mut result,
+        )
+    })?;
+    wrap_feature_extension_result(result)
+}
+
 fn wrap_feature_query_result(
     native: *mut sys::mln_feature_query_result,
 ) -> error::Result<*mut FeatureQueryResultHandle> {
@@ -350,6 +447,85 @@ fn close_feature_query_result(handle: *mut FeatureQueryResultHandle) {
     if !native.is_null() {
         // SAFETY: This wrapper owns the native query result and closes it exactly once.
         unsafe { sys::mln_feature_query_result_destroy(native) };
+    }
+}
+
+fn wrap_feature_extension_result(
+    native: *mut sys::mln_feature_extension_result,
+) -> error::Result<*mut FeatureExtensionResultHandle> {
+    if native.is_null() {
+        return Err(Error::invalid_argument(
+            "native feature extension result is null",
+        ));
+    }
+    let handle = glib::new_object::<FeatureExtensionResultHandle>(
+        mln_vala_feature_extension_result_handle_get_type(),
+    );
+    if handle.is_null() {
+        // SAFETY: `native` came from a successful query operation.
+        unsafe { sys::mln_feature_extension_result_destroy(native) };
+        return Err(Error::invalid_argument(
+            "failed to allocate FeatureExtensionResultHandle",
+        ));
+    }
+    // SAFETY: `handle` points to a newly allocated query result wrapper.
+    unsafe {
+        (*handle).native = native;
+    }
+    Ok(handle)
+}
+
+fn feature_extension_result_native(
+    handle: *mut FeatureExtensionResultHandle,
+) -> error::Result<*mut sys::mln_feature_extension_result> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument(
+            "FeatureExtensionResultHandle is null",
+        ));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe { (*handle).native };
+    if native.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "FeatureExtensionResultHandle is closed",
+        ));
+    }
+    Ok(native)
+}
+
+fn feature_extension_result_get(
+    handle: *mut FeatureExtensionResultHandle,
+    out_info: *mut sys::mln_feature_extension_result_info,
+) -> error::Result<()> {
+    let native = feature_extension_result_native(handle)?;
+    if out_info.is_null() {
+        return Err(Error::invalid_argument(
+            "feature extension result info output pointer is null",
+        ));
+    }
+    // SAFETY: `out_info` is valid output storage by the null check above.
+    unsafe {
+        (*out_info).size = std::mem::size_of::<sys::mln_feature_extension_result_info>() as u32;
+    }
+    // SAFETY: `native` is live and output storage has the required size field.
+    error::check(unsafe { sys::mln_feature_extension_result_get(native, out_info) })
+}
+
+fn close_feature_extension_result(handle: *mut FeatureExtensionResultHandle) {
+    if handle.is_null() {
+        return;
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe {
+        let native = (*handle).native;
+        (*handle).native = ptr::null_mut();
+        native
+    };
+    if !native.is_null() {
+        // SAFETY: This wrapper owns the native extension result and closes it exactly once.
+        unsafe { sys::mln_feature_extension_result_destroy(native) };
     }
 }
 

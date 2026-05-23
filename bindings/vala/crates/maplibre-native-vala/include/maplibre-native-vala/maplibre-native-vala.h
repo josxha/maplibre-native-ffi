@@ -206,6 +206,11 @@ typedef enum {
   MLN_VALA_FEATURE_IDENTIFIER_TYPE_STRING = 4,
 } MlnValaFeatureIdentifierType;
 
+typedef enum {
+  MLN_VALA_FEATURE_EXTENSION_RESULT_TYPE_VALUE = 1,
+  MLN_VALA_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION = 2,
+} MlnValaFeatureExtensionResultType;
+
 /**
  * MlnValaResourceTransformCallback:
  * @kind: resource kind.
@@ -234,6 +239,8 @@ typedef struct {
 typedef struct _MlnValaResourceRequestHandle MlnValaResourceRequestHandle;
 typedef struct _MlnValaRenderSessionHandle MlnValaRenderSessionHandle;
 typedef struct _MlnValaFeatureQueryResultHandle MlnValaFeatureQueryResultHandle;
+typedef struct _MlnValaFeatureExtensionResultHandle
+  MlnValaFeatureExtensionResultHandle;
 typedef struct _MlnValaOfflineRegionSnapshotHandle
   MlnValaOfflineRegionSnapshotHandle;
 typedef struct _MlnValaOfflineRegionListHandle MlnValaOfflineRegionListHandle;
@@ -480,6 +487,20 @@ typedef struct {
   MlnValaStringView source_layer_id;
   const MlnValaJsonValue* state;
 } MlnValaQueriedFeature;
+
+typedef struct {
+  const MlnValaFeature* features;
+  size_t feature_count;
+} MlnValaFeatureCollection;
+
+typedef struct {
+  uint32_t size;
+  MlnValaFeatureExtensionResultType type;
+  union {
+    const MlnValaJsonValue* value;
+    MlnValaFeatureCollection feature_collection;
+  } data;
+} MlnValaFeatureExtensionResultInfo;
 
 typedef struct {
   uint32_t size;
@@ -988,6 +1009,26 @@ mln_vala_render_session_handle_query_source_features(
 );
 
 /**
+ * mln_vala_render_session_handle_query_feature_extensions:
+ * @self: a render session handle.
+ * @source_id: (not nullable): source identifier.
+ * @feature: (not nullable): feature descriptor.
+ * @extension: (not nullable): extension name.
+ * @extension_field: (not nullable): extension field.
+ * @arguments: (not nullable): extension arguments JSON value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): owned feature extension result handle.
+ * Throws: MlnValaError
+ */
+MlnValaFeatureExtensionResultHandle*
+mln_vala_render_session_handle_query_feature_extensions(
+  MlnValaRenderSessionHandle* self, const char* source_id,
+  const MlnValaFeature* feature, const char* extension,
+  const char* extension_field, const MlnValaJsonValue* arguments, GError** error
+);
+
+/**
  * mln_vala_feature_query_result_handle_count:
  * @self: a feature query result handle.
  * @out_count: (out): return location for the feature count.
@@ -1016,6 +1057,23 @@ gboolean mln_vala_feature_query_result_handle_get(
 );
 void mln_vala_feature_query_result_handle_close(
   MlnValaFeatureQueryResultHandle* self
+);
+
+/**
+ * mln_vala_feature_extension_result_handle_get:
+ * @self: a feature extension result handle.
+ * @out_info: (out): return location for extension result info.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_feature_extension_result_handle_get(
+  MlnValaFeatureExtensionResultHandle* self,
+  MlnValaFeatureExtensionResultInfo* out_info, GError** error
+);
+void mln_vala_feature_extension_result_handle_close(
+  MlnValaFeatureExtensionResultHandle* self
 );
 
 gboolean mln_vala_metal_surface_descriptor_default(
@@ -1148,6 +1206,13 @@ G_DECLARE_FINAL_TYPE(
 G_DECLARE_FINAL_TYPE(
   MlnValaFeatureQueryResultHandle, mln_vala_feature_query_result_handle,
   MLN_VALA, FEATURE_QUERY_RESULT_HANDLE, GObject
+)
+
+#define MLN_VALA_TYPE_FEATURE_EXTENSION_RESULT_HANDLE \
+  (mln_vala_feature_extension_result_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaFeatureExtensionResultHandle, mln_vala_feature_extension_result_handle,
+  MLN_VALA, FEATURE_EXTENSION_RESULT_HANDLE, GObject
 )
 
 #define MLN_VALA_TYPE_METAL_OWNED_TEXTURE_FRAME_HANDLE \
