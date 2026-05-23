@@ -327,7 +327,16 @@ export declare class MapHandle {
   getStyleImageInfo(imageId: string): StyleImageInfo | null;
   copyStyleImagePremultipliedRgba8(imageId: string): StyleImage | null;
   addImageSourceUrl(sourceId: string, coordinates: LatLng[], url: string): void;
+  addImageSourceImage(
+    sourceId: string,
+    coordinates: LatLng[],
+    image: PremultipliedRgba8ImageInput,
+  ): void;
   setImageSourceUrl(sourceId: string, url: string): void;
+  setImageSourceImage(
+    sourceId: string,
+    image: PremultipliedRgba8ImageInput,
+  ): void;
   setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;
   getImageSourceCoordinates(sourceId: string): LatLng[] | null;
   addHillshadeLayer(
@@ -428,11 +437,14 @@ export interface StyleSourceInfo {
   attribution?: string | null;
 }
 
-export interface StyleImageInput {
+export interface PremultipliedRgba8ImageInput {
   width: number;
   height: number;
   stride?: number | null;
   pixels: Uint8Array;
+}
+
+export interface StyleImageInput extends PremultipliedRgba8ImageInput {
   pixelRatio?: number | null;
   sdf?: boolean | null;
 }

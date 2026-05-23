@@ -693,9 +693,21 @@ class MapHandle {
     );
   }
 
+  addImageSourceImage(sourceId, coordinates, image) {
+    return translateNativeErrors(() =>
+      this.native.addImageSourceImage(sourceId, coordinates, image),
+    );
+  }
+
   setImageSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
       this.native.setImageSourceUrl(sourceId, url),
+    );
+  }
+
+  setImageSourceImage(sourceId, image) {
+    return translateNativeErrors(() =>
+      this.native.setImageSourceImage(sourceId, image),
     );
   }
 

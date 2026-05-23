@@ -552,7 +552,7 @@ area instead of retesting all native C validation rules.
 8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
    descriptor, camera fitting/movement/animation/free-camera commands,
    standalone projection handle, screen projection helpers,
-   URL/tile/style-image/image-source values, style
+   URL/tile/style-image/inline-image-source values, style
    JSON/list/metadata/layer/light/location/terrain/property helpers, and style
    probe proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,

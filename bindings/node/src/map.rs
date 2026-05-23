@@ -123,6 +123,14 @@ pub struct StyleSourceInfo {
 }
 
 #[napi(object)]
+pub struct PremultipliedRgba8ImageInput {
+    pub width: u32,
+    pub height: u32,
+    pub stride: Option<u32>,
+    pub pixels: Uint8Array,
+}
+
+#[napi(object)]
 pub struct StyleImageInput {
     pub width: u32,
     pub height: u32,
@@ -1004,12 +1012,48 @@ impl NativeMapHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "addImageSourceImage")]
+    pub fn add_image_source_image(
+        &self,
+        source_id: String,
+        coordinates: Vec<LatLng>,
+        image: PremultipliedRgba8ImageInput,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let coordinates = lat_lngs_to_native(coordinates);
+        let image = premultiplied_rgba8_image_from_input(&image);
+        core::check(unsafe {
+            sys::mln_map_add_image_source_image(
+                self.state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                &image,
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "setImageSourceUrl")]
     pub fn set_image_source_url(&self, source_id: String, url: String) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
         core::check(unsafe {
             sys::mln_map_set_image_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setImageSourceImage")]
+    pub fn set_image_source_image(
+        &self,
+        source_id: String,
+        image: PremultipliedRgba8ImageInput,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let image = premultiplied_rgba8_image_from_input(&image);
+        core::check(unsafe {
+            sys::mln_map_set_image_source_image(self.state.as_ptr(), source_id.raw(), &image)
         })
         .map_err(error::from_core)
     }
@@ -1889,6 +1933,19 @@ fn location_indicator_image_kind_from_string(kind: &str) -> Result<u32> {
         other => Err(error::invalid_argument(format!(
             "location indicator image kind must be 'top', 'bearing', or 'shadow', got '{other}'"
         ))),
+    }
+}
+
+fn premultiplied_rgba8_image_from_input(
+    image: &PremultipliedRgba8ImageInput,
+) -> sys::mln_premultiplied_rgba8_image {
+    sys::mln_premultiplied_rgba8_image {
+        size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+        width: image.width,
+        height: image.height,
+        stride: image.stride.unwrap_or(image.width.saturating_mul(4)),
+        pixels: image.pixels.as_ptr(),
+        byte_length: image.pixels.len(),
     }
 }
 

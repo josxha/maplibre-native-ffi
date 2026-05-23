@@ -562,6 +562,11 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     assert.equal(map.removeStyleLayer("color-relief"), true);
     assert.equal(map.removeStyleLayer("hillshade"), true);
 
+    const inlineImage = {
+      width: 1,
+      height: 1,
+      pixels: new Uint8Array([0, 255, 0, 255]),
+    };
     map.addImageSourceUrl(
       "image-source",
       imageCoordinates,
@@ -569,12 +574,20 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     );
     assert.equal(map.getStyleSourceType("image-source"), "image");
     map.setImageSourceUrl("image-source", "https://example.test/updated.png");
+    map.setImageSourceImage("image-source", inlineImage);
     map.setImageSourceCoordinates("image-source", imageCoordinates);
     assert.deepEqual(
       map.getImageSourceCoordinates("image-source"),
       imageCoordinates,
     );
+    map.addImageSourceImage(
+      "inline-image-source",
+      imageCoordinates,
+      inlineImage,
+    );
+    assert.equal(map.getStyleSourceType("inline-image-source"), "image");
     assert.equal(map.getImageSourceCoordinates("missing-source"), null);
+    assert.equal(map.removeStyleSource("inline-image-source"), true);
     assert.equal(map.removeStyleSource("image-source"), true);
     assert.equal(map.removeStyleSource("raster-dem-tiles"), true);
     assert.equal(map.removeStyleSource("raster-tiles"), true);
