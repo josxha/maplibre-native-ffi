@@ -18,6 +18,24 @@ typedef enum {
 
 GQuark mln_vala_error_quark(void);
 
+#define MLN_VALA_TYPE_RUNTIME_EVENT (mln_vala_runtime_event_get_type())
+typedef struct _MlnValaRuntimeEvent MlnValaRuntimeEvent;
+
+struct _MlnValaRuntimeEvent {
+  uint32_t type;
+  uint32_t source_type;
+  int32_t code;
+  uint32_t payload_type;
+  char* message;
+  size_t message_size;
+};
+
+GType mln_vala_runtime_event_get_type(void);
+MlnValaRuntimeEvent* mln_vala_runtime_event_copy(
+  const MlnValaRuntimeEvent* event
+);
+void mln_vala_runtime_event_free(MlnValaRuntimeEvent* event);
+
 #define MLN_VALA_TYPE_RUNTIME_HANDLE (mln_vala_runtime_handle_get_type())
 G_DECLARE_FINAL_TYPE(
   MlnValaRuntimeHandle, mln_vala_runtime_handle, MLN_VALA, RUNTIME_HANDLE,
@@ -94,6 +112,20 @@ gboolean mln_vala_runtime_handle_close(
  */
 gboolean mln_vala_runtime_handle_run_once(
   MlnValaRuntimeHandle* self, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_poll_event:
+ * @self: a runtime handle.
+ * @out_event: (out) (transfer full) (optional): return location for a copied
+ * event, or `NULL` when no event is queued.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` when polling succeeds; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_poll_event(
+  MlnValaRuntimeHandle* self, MlnValaRuntimeEvent** out_event, GError** error
 );
 
 /**

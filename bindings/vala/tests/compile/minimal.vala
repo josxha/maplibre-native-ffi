@@ -8,6 +8,8 @@ int main(string[] args) {
 
     var runtime = new MaplibreNative.RuntimeHandle();
     runtime.run_once();
+    MaplibreNative.RuntimeEvent event;
+    runtime.poll_event(out event);
 
     var map = new MaplibreNative.MapHandle(runtime, 512, 512, 1.0);
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");

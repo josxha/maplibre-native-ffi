@@ -63,6 +63,7 @@ bindings/vala/
     Cargo.toml
     include/maplibre-native-vala/maplibre-native-vala.h
     build.rs
+    src/events.rs
     src/glib.rs
     src/handles.rs
     src/lib.rs
@@ -81,6 +82,8 @@ The scaffold implements one proof slice in Rust:
   real C ABI and expose failure through GLib `GError`.
 - `RuntimeHandle` and `MapHandle` are registered as GObject classes with
   deterministic close methods and a minimal lifecycle slice.
+- Runtime event polling copies event metadata and message bytes into a boxed
+  `RuntimeEvent` value.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and

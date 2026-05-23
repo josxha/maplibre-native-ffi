@@ -4,6 +4,7 @@ use std::ptr;
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
+use crate::events::RuntimeEvent;
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
@@ -66,6 +67,21 @@ pub extern "C" fn mln_vala_runtime_handle_run_once(
         // SAFETY: `runtime_native` returns a live native runtime pointer.
         error::check(unsafe { sys::mln_runtime_run_once(runtime) })
     }) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_poll_event(
+    handle: *mut RuntimeHandle,
+    out_event: *mut *mut RuntimeEvent,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match poll_runtime_event(handle, out_event) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -145,6 +161,35 @@ fn set_style_json(handle: *mut MapHandle, json: *const std::ffi::c_char) -> erro
     // SAFETY: `json` is a caller-provided NUL-terminated string pointer and
     // `map_native` returns a live map pointer. The C API copies the input.
     error::check(unsafe { sys::mln_map_set_style_json(map, json) })
+}
+
+fn poll_runtime_event(
+    handle: *mut RuntimeHandle,
+    out_event: *mut *mut RuntimeEvent,
+) -> error::Result<()> {
+    if out_event.is_null() {
+        return Err(Error::invalid_argument(
+            "runtime event output pointer is null",
+        ));
+    }
+
+    let runtime = runtime_native(handle)?;
+    // SAFETY: Zero is a valid baseline before setting the public size field.
+    let mut event: sys::mln_runtime_event = unsafe { std::mem::zeroed() };
+    event.size = std::mem::size_of::<sys::mln_runtime_event>() as u32;
+    let mut has_event = false;
+    // SAFETY: `runtime` is live and output pointers are valid for this call.
+    error::check(unsafe { sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event) })?;
+
+    // SAFETY: `out_event` was null-checked above.
+    unsafe {
+        *out_event = if has_event {
+            Box::into_raw(Box::new(RuntimeEvent::from_native(&event)))
+        } else {
+            ptr::null_mut()
+        };
+    }
+    Ok(())
 }
 
 fn create_runtime_handle() -> error::Result<*mut RuntimeHandle> {

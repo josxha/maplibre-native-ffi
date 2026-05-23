@@ -4,6 +4,7 @@
 //! Rust. The initial scaffold keeps the first native calls in one place so the
 //! generated GIR/VAPI layer can grow from real C ABI behavior.
 
+pub mod events;
 pub mod glib;
 pub mod handles;
 pub mod native_pointer;

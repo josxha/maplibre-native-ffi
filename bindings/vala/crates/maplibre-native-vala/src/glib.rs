@@ -48,6 +48,11 @@ pub struct GError {
 unsafe extern "C" {
     fn g_quark_from_static_string(string: *const c_char) -> GQuark;
     fn g_error_new_literal(domain: GQuark, code: c_int, message: *const c_char) -> *mut GError;
+    fn g_boxed_type_register_static(
+        name: *const c_char,
+        boxed_copy: Option<unsafe extern "C" fn(*mut c_void) -> *mut c_void>,
+        boxed_free: Option<unsafe extern "C" fn(*mut c_void)>,
+    ) -> GType;
     fn g_object_get_type() -> GType;
     fn g_object_new_with_properties(
         object_type: GType,
@@ -142,6 +147,29 @@ impl ErrorCode {
     fn code(self) -> c_int {
         self as c_int
     }
+}
+
+pub fn register_boxed_type(
+    type_name: &'static CStr,
+    boxed_copy: unsafe extern "C" fn(*mut c_void) -> *mut c_void,
+    boxed_free: unsafe extern "C" fn(*mut c_void),
+) -> GType {
+    static BOXED_TYPE_REGISTRY: OnceLock<std::sync::Mutex<Vec<(&'static CStr, GType)>>> =
+        OnceLock::new();
+    let registry = BOXED_TYPE_REGISTRY.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    let mut registry = registry.lock().expect("GBoxed type registry lock poisoned");
+
+    if let Some((_, gtype)) = registry.iter().find(|(name, _)| *name == type_name) {
+        return *gtype;
+    }
+
+    // SAFETY: The type name is static and NUL-terminated, and the copy/free
+    // functions satisfy GLib boxed ownership conventions for this type.
+    let gtype = unsafe {
+        g_boxed_type_register_static(type_name.as_ptr(), Some(boxed_copy), Some(boxed_free))
+    };
+    registry.push((type_name, gtype));
+    gtype
 }
 
 pub fn register_object_type<T>(type_name: &'static CStr) -> GType {
