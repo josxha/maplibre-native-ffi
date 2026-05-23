@@ -1,0 +1,15 @@
+[package]
+name = "maplibre-native-python"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+maplibre-native-core = { path = "../rust/crates/maplibre-native-core" }
+maplibre-native-sys = { path = "../rust/crates/maplibre-native-sys" }
+pyo3 = "0.28.3"
