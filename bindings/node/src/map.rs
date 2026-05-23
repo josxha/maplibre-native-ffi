@@ -123,6 +123,24 @@ pub struct StyleSourceInfo {
 }
 
 #[napi(object)]
+pub struct CanonicalTileId {
+    pub z: u32,
+    pub x: u32,
+    pub y: u32,
+}
+
+#[napi(object)]
+pub struct CustomGeometrySourceOptions {
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub tolerance: Option<f64>,
+    pub tile_size: Option<u32>,
+    pub buffer: Option<u32>,
+    pub clip: Option<bool>,
+    pub wrap: Option<bool>,
+}
+
+#[napi(object)]
 pub struct PremultipliedRgba8ImageInput {
     pub width: u32,
     pub height: u32,
@@ -920,6 +938,76 @@ impl NativeMapHandle {
                 tiles.as_ptr(),
                 tiles.len(),
                 std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addCustomGeometrySource")]
+    pub fn add_custom_geometry_source(
+        &self,
+        source_id: String,
+        options: Option<CustomGeometrySourceOptions>,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let options = custom_geometry_source_options_to_native(options.unwrap_or_default());
+        core::check(unsafe {
+            sys::mln_map_add_custom_geometry_source(self.state.as_ptr(), source_id.raw(), &options)
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setCustomGeometrySourceTileData")]
+    pub fn set_custom_geometry_source_tile_data(
+        &self,
+        source_id: String,
+        tile_id: CanonicalTileId,
+        data: String,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let data = parse_geojson(data)?;
+        let native_data = core::geojson::geojson_try_to_native(&data).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_set_custom_geometry_source_tile_data(
+                self.state.as_ptr(),
+                source_id.raw(),
+                tile_id.into_native(),
+                native_data.as_ptr(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "invalidateCustomGeometrySourceTile")]
+    pub fn invalidate_custom_geometry_source_tile(
+        &self,
+        source_id: String,
+        tile_id: CanonicalTileId,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        core::check(unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_tile(
+                self.state.as_ptr(),
+                source_id.raw(),
+                tile_id.into_native(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "invalidateCustomGeometrySourceRegion")]
+    pub fn invalidate_custom_geometry_source_region(
+        &self,
+        source_id: String,
+        bounds: LatLngBounds,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let bounds = core::values::lat_lng_bounds_to_native(bounds.into_core());
+        core::check(unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_region(
+                self.state.as_ptr(),
+                source_id.raw(),
+                bounds,
             )
         })
         .map_err(error::from_core)
@@ -1799,6 +1887,30 @@ impl Quaternion {
     }
 }
 
+impl Default for CustomGeometrySourceOptions {
+    fn default() -> Self {
+        Self {
+            min_zoom: None,
+            max_zoom: None,
+            tolerance: None,
+            tile_size: None,
+            buffer: None,
+            clip: None,
+            wrap: None,
+        }
+    }
+}
+
+impl CanonicalTileId {
+    fn into_native(self) -> sys::mln_canonical_tile_id {
+        sys::mln_canonical_tile_id {
+            z: self.z,
+            x: self.x,
+            y: self.y,
+        }
+    }
+}
+
 impl FreeCameraOptions {
     fn into_core(self) -> core::FreeCameraOptions {
         let mut options = core::FreeCameraOptions::new();
@@ -1984,6 +2096,49 @@ fn location_indicator_image_kind_from_string(kind: &str) -> Result<u32> {
             "location indicator image kind must be 'top', 'bearing', or 'shadow', got '{other}'"
         ))),
     }
+}
+
+extern "C" fn custom_geometry_source_noop_tile_callback(
+    _user_data: *mut std::ffi::c_void,
+    _tile_id: sys::mln_canonical_tile_id,
+) {
+}
+
+fn custom_geometry_source_options_to_native(
+    options: CustomGeometrySourceOptions,
+) -> sys::mln_custom_geometry_source_options {
+    let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
+    raw.fetch_tile = Some(custom_geometry_source_noop_tile_callback);
+    raw.cancel_tile = Some(custom_geometry_source_noop_tile_callback);
+    if let Some(value) = options.min_zoom {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = value;
+    }
+    if let Some(value) = options.max_zoom {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = value;
+    }
+    if let Some(value) = options.tolerance {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+        raw.tolerance = value;
+    }
+    if let Some(value) = options.tile_size {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+        raw.tile_size = value;
+    }
+    if let Some(value) = options.buffer {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+        raw.buffer = value;
+    }
+    if let Some(value) = options.clip {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+        raw.clip = value;
+    }
+    if let Some(value) = options.wrap {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+        raw.wrap = value;
+    }
+    raw
 }
 
 fn premultiplied_rgba8_image_from_input(

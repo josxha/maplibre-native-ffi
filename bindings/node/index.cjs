@@ -693,6 +693,34 @@ class MapHandle {
     );
   }
 
+  addCustomGeometrySource(sourceId, options = null) {
+    return translateNativeErrors(() =>
+      this.native.addCustomGeometrySource(sourceId, options),
+    );
+  }
+
+  setCustomGeometrySourceTileData(sourceId, tileId, data) {
+    return translateNativeErrors(() =>
+      this.native.setCustomGeometrySourceTileData(
+        sourceId,
+        tileId,
+        stringifyJson(data),
+      ),
+    );
+  }
+
+  invalidateCustomGeometrySourceTile(sourceId, tileId) {
+    return translateNativeErrors(() =>
+      this.native.invalidateCustomGeometrySourceTile(sourceId, tileId),
+    );
+  }
+
+  invalidateCustomGeometrySourceRegion(sourceId, bounds) {
+    return translateNativeErrors(() =>
+      this.native.invalidateCustomGeometrySourceRegion(sourceId, bounds),
+    );
+  }
+
   setStyleImage(imageId, image) {
     return translateNativeErrors(() =>
       this.native.setStyleImage(imageId, image),

@@ -595,6 +595,31 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       "https://example.test/dem/{z}/{x}/{y}.png",
     ]);
     assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
+    map.addCustomGeometrySource("custom-geometry", {
+      minZoom: 0,
+      maxZoom: 14,
+      tolerance: 0.375,
+      tileSize: 512,
+      buffer: 128,
+      clip: true,
+      wrap: true,
+    });
+    assert.equal(map.styleSourceExists("custom-geometry"), true);
+    map.setCustomGeometrySourceTileData(
+      "custom-geometry",
+      { z: 0, x: 0, y: 0 },
+      geojsonData,
+    );
+    map.invalidateCustomGeometrySourceTile("custom-geometry", {
+      z: 0,
+      x: 0,
+      y: 0,
+    });
+    map.invalidateCustomGeometrySourceRegion("custom-geometry", {
+      southwest: { latitude: -1, longitude: -2 },
+      northeast: { latitude: 1, longitude: 2 },
+    });
+    assert.equal(map.removeStyleSource("custom-geometry"), true);
     map.addHillshadeLayer("hillshade", "raster-dem-url");
     map.addColorReliefLayer("color-relief", "raster-dem-tiles", "hillshade");
     assert.equal(map.getStyleLayerType("hillshade"), "hillshade");

@@ -326,6 +326,23 @@ export declare class MapHandle {
   addVectorSourceTiles(sourceId: string, tiles: Iterable<string>): void;
   addRasterSourceTiles(sourceId: string, tiles: Iterable<string>): void;
   addRasterDemSourceTiles(sourceId: string, tiles: Iterable<string>): void;
+  addCustomGeometrySource(
+    sourceId: string,
+    options?: CustomGeometrySourceOptions | null,
+  ): void;
+  setCustomGeometrySourceTileData(
+    sourceId: string,
+    tileId: CanonicalTileId,
+    data: JsonValue,
+  ): void;
+  invalidateCustomGeometrySourceTile(
+    sourceId: string,
+    tileId: CanonicalTileId,
+  ): void;
+  invalidateCustomGeometrySourceRegion(
+    sourceId: string,
+    bounds: LatLngBounds,
+  ): void;
   setStyleImage(imageId: string, image: StyleImageInput): void;
   styleImageExists(imageId: string): boolean;
   removeStyleImage(imageId: string): boolean;
@@ -440,6 +457,22 @@ export interface StyleSourceInfo {
   hasAttribution: boolean;
   attributionSize: number;
   attribution?: string | null;
+}
+
+export interface CanonicalTileId {
+  z: number;
+  x: number;
+  y: number;
+}
+
+export interface CustomGeometrySourceOptions {
+  minZoom?: number | null;
+  maxZoom?: number | null;
+  tolerance?: number | null;
+  tileSize?: number | null;
+  buffer?: number | null;
+  clip?: boolean | null;
+  wrap?: boolean | null;
 }
 
 export interface PremultipliedRgba8ImageInput {

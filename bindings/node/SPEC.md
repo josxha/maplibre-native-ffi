@@ -553,9 +553,9 @@ area instead of retesting all native C validation rules.
    descriptor, camera fitting/movement/animation/free-camera commands,
    standalone projection handle, visible-coordinate/geometry and screen
    projection helpers, geometry camera fitting,
-   URL/tile/GeoJSON-data/style-image/inline-image-source values, style
-   JSON/list/metadata/layer/light/location/terrain/property helpers, and style
-   probe proof slices complete.)_
+   URL/tile/custom-geometry/GeoJSON-data/style-image/inline-image-source values,
+   style JSON/list/metadata/layer/light/location/terrain/property helpers, and
+   style probe proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result
