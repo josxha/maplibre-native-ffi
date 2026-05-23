@@ -9,13 +9,12 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
 from .geo import Geometry, LatLngBounds
+from .resource import ResourceErrorReason
 
 if TYPE_CHECKING:
-    from .resource import ResourceErrorReason
     from .runtime import RuntimeHandle
 
 else:
-    ResourceErrorReason = Any
     RuntimeHandle = Any
 
 

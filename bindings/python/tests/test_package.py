@@ -96,6 +96,7 @@ def test_public_type_hints_are_resolvable() -> None:
         mln.RuntimeHandle.set_resource_transform,
         mln.RuntimeHandle.set_resource_provider,
         offline.OfflineOperationHandle.__init__,
+        offline.OfflineRegionResponseError.__init__,
     )
 
     for target in targets:
@@ -137,6 +138,9 @@ def test_public_type_hints_are_resolvable() -> None:
     )
     assert rendered_hints["geometry"] is query.RenderedQueryGeometry
     assert rendered_hints["options"] != typing.Any
+
+    response_error_hints = typing.get_type_hints(offline.OfflineRegionResponseError)
+    assert response_error_hints["reason"] is resource.ResourceErrorReason
 
 
 def test_runtime_handle_context_manager_closes_once() -> None:

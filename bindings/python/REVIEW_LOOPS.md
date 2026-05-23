@@ -488,3 +488,45 @@ and review-record accuracy.
   `uv run ty check --error-on-warning .mise`, and
   `mise run //bindings/python:ci` (59 Python tests, wheel build, and
   metadata/`_native` import check) passed.
+
+## Round 10
+
+Review fanout: post-Round-9 final lifecycle, typing/API, and review-record
+audit.
+
+### Applied findings
+
+- Preserve the offline response-error reason annotation at runtime.
+  - Evidence: typing review found `OfflineRegionResponseError.reason` resolved
+    to `Any` because `ResourceErrorReason` was imported only under
+    `TYPE_CHECKING`, even though `resource.py` does not create a module cycle
+    for this dependency.
+  - Resolution: import `ResourceErrorReason` unconditionally in `offline.py`,
+    keep only the cyclic `RuntimeHandle` fallback, and add a
+    `typing.get_type_hints()` assertion for `OfflineRegionResponseError.reason`.
+
+### Rejected or deferred findings
+
+- Remaining `Any` fallbacks are tied to real import cycles: `render.MapHandle`,
+  `runtime.MapHandle`/`MapOptions`, and `offline.RuntimeHandle`. Static
+  `TYPE_CHECKING` imports keep type-checker behavior precise.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, broad enum deduplication, and
+  broader root export expansion.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused type-hint regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_public_type_hints_are_resolvable`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`,
+  `uv run ty check --error-on-warning .mise`, and
+  `mise run //bindings/python:ci` (59 Python tests, wheel build, and
+  metadata/`_native` import check) passed.
