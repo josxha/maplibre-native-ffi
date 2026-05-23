@@ -7,7 +7,9 @@ use napi_derive::napi;
 
 use crate::{
     error,
-    map::{NativeMapHandle, json_value_to_serde, json_value_to_string, parse_json_value},
+    map::{
+        NativeMapHandle, json_value_to_serde, json_value_to_string, parse_geojson, parse_json_value,
+    },
     values::ScreenPoint,
 };
 
@@ -366,6 +368,43 @@ impl NativeRenderSessionHandle {
         queried_features_to_string(result)
     }
 
+    #[napi(js_name = "queryFeatureExtension")]
+    pub fn query_feature_extension(
+        &self,
+        source_id: String,
+        feature: String,
+        extension: String,
+        extension_field: String,
+        arguments: Option<String>,
+    ) -> Result<String> {
+        let source_id = core::string::string_view(&source_id);
+        let extension = core::string::string_view(&extension);
+        let extension_field = core::string::string_view(&extension_field);
+        let feature = feature_from_geojson_string(feature)?;
+        let native_feature =
+            core::geojson::feature_try_to_native(&feature, 0).map_err(error::from_core)?;
+        let arguments = arguments
+            .map(parse_json_value)
+            .transpose()?
+            .unwrap_or(core::JsonValue::Object(Vec::new()));
+        let native_arguments =
+            core::json::json_value_try_to_native(&arguments).map_err(error::from_core)?;
+        let mut result = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_render_session_query_feature_extensions(
+                self.state.as_ptr(),
+                source_id.raw(),
+                native_feature.as_ref(),
+                extension.raw(),
+                extension_field.raw(),
+                native_arguments.as_ref(),
+                &mut result,
+            )
+        })
+        .map_err(error::from_core)?;
+        feature_extension_result_to_string(result)
+    }
+
     #[napi(js_name = "readPremultipliedRgba8")]
     pub fn read_premultiplied_rgba8(&self) -> Result<TextureReadback> {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
@@ -537,6 +576,39 @@ impl TextureImageInfo {
             byte_length: raw.byte_length as i64,
         }
     }
+}
+
+fn feature_from_geojson_string(value: String) -> Result<core::Feature> {
+    match parse_geojson(value)? {
+        core::GeoJson::Feature(feature) => Ok(feature),
+        _ => Err(error::invalid_argument(
+            "feature extension query requires a GeoJSON Feature",
+        )),
+    }
+}
+
+fn feature_extension_result_to_string(
+    result: *mut sys::mln_feature_extension_result,
+) -> Result<String> {
+    let result = std::ptr::NonNull::new(result)
+        .ok_or_else(|| error::invalid_argument("feature extension result was null"))?;
+    let result =
+        unsafe { core::query::copy_feature_extension_result(result) }.map_err(error::from_core)?;
+    let value = match result {
+        core::query::FeatureExtensionResult::Value(value) => json_value_to_serde(value),
+        core::query::FeatureExtensionResult::FeatureCollection(features) => {
+            serde_json::Value::Array(features.into_iter().map(feature_to_serde).collect())
+        }
+        core::query::FeatureExtensionResult::Unknown(raw) => serde_json::json!({
+            "unknownType": raw
+        }),
+        _ => serde_json::Value::Null,
+    };
+    serde_json::to_string(&value).map_err(|serialize_error| {
+        error::invalid_argument(format!(
+            "feature extension result could not be serialized: {serialize_error}"
+        ))
+    })
 }
 
 fn queried_features_to_string(result: *mut sys::mln_feature_query_result) -> Result<String> {

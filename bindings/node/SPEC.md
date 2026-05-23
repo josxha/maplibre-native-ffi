@@ -560,8 +560,8 @@ area instead of retesting all native C validation rules.
    style probe proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value and initial
-   render session/Metal and Vulkan descriptor, feature-state, and feature-query
-   proof slices complete.)_
+   render session/Metal and Vulkan descriptor, feature-state, feature-query, and
+   feature-extension proof slices complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result
     adaptation into `maplibre-native-core` as broad coverage replaces the proof
     slice.

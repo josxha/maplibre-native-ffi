@@ -565,6 +565,13 @@ export declare class RenderSessionHandle {
     sourceId: string,
     options?: SourceFeatureQueryOptions | null,
   ): QueriedFeature[];
+  queryFeatureExtension(
+    sourceId: string,
+    feature: JsonValue,
+    extension: string,
+    extensionField: string,
+    args?: JsonValue | null,
+  ): JsonValue;
   readPremultipliedRgba8(): TextureReadback;
   [Symbol.dispose](): void;
 }

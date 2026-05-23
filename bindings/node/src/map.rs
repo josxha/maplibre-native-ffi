@@ -2261,7 +2261,7 @@ pub(crate) fn parse_geometry(value: String) -> Result<core::Geometry> {
     geometry_from_serde(&value)
 }
 
-fn parse_geojson(value: String) -> Result<core::GeoJson> {
+pub(crate) fn parse_geojson(value: String) -> Result<core::GeoJson> {
     let value: serde_json::Value = serde_json::from_str(&value).map_err(|parse_error| {
         error::invalid_argument(format!("GeoJSON input is invalid: {parse_error}"))
     })?;

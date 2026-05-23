@@ -706,6 +706,26 @@ class RenderSessionHandle {
     );
   }
 
+  queryFeatureExtension(
+    sourceId,
+    feature,
+    extension,
+    extensionField,
+    args = null,
+  ) {
+    return translateNativeErrors(() =>
+      JSON.parse(
+        this.native.queryFeatureExtension(
+          sourceId,
+          stringifyJson(feature),
+          extension,
+          extensionField,
+          args == null ? null : stringifyJson(args),
+        ),
+      ),
+    );
+  }
+
   readPremultipliedRgba8() {
     return translateNativeErrors(() => this.native.readPremultipliedRgba8());
   }

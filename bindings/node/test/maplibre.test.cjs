@@ -317,6 +317,10 @@ test("render session attach descriptors translate native failures", () => {
       typeof RenderSessionHandle.prototype.queryRenderedFeatures,
       "function",
     );
+    assert.equal(
+      typeof RenderSessionHandle.prototype.queryFeatureExtension,
+      "function",
+    );
   } finally {
     map.close();
     runtime.close();
