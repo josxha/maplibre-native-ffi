@@ -54,6 +54,44 @@ impl NativeMapHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "requestStillImage")]
+    pub fn request_still_image(&self) -> Result<()> {
+        core::check(unsafe { sys::mln_map_request_still_image(self.state.as_ptr()) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "isFullyLoaded")]
+    pub fn is_fully_loaded(&self) -> Result<bool> {
+        let mut loaded = false;
+        core::check(unsafe { sys::mln_map_is_fully_loaded(self.state.as_ptr(), &mut loaded) })
+            .map_err(error::from_core)?;
+        Ok(loaded)
+    }
+
+    #[napi(js_name = "dumpDebugLogs")]
+    pub fn dump_debug_logs(&self) -> Result<()> {
+        core::check(unsafe { sys::mln_map_dump_debug_logs(self.state.as_ptr()) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(getter, js_name = "renderingStatsViewEnabled")]
+    pub fn rendering_stats_view_enabled(&self) -> Result<bool> {
+        let mut enabled = false;
+        core::check(unsafe {
+            sys::mln_map_get_rendering_stats_view_enabled(self.state.as_ptr(), &mut enabled)
+        })
+        .map_err(error::from_core)?;
+        Ok(enabled)
+    }
+
+    #[napi(setter, js_name = "renderingStatsViewEnabled")]
+    pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<()> {
+        core::check(unsafe {
+            sys::mln_map_set_rendering_stats_view_enabled(self.state.as_ptr(), enabled)
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "setStyleJson")]
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;

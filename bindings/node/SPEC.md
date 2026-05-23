@@ -154,7 +154,7 @@ index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, async log severity controls, and root exports
 src/runtime.rs    runtime handle, runtime option materialization, and event polling proof slice
-src/map.rs        map handle, map option materialization, style-loading, and repaint proof slice
+src/map.rs        map handle, map option materialization, style-loading, repaint, and utility proof slices
 src/values.rs     copied coordinate values and projection helper proof slice
 ```
 
@@ -537,8 +537,8 @@ area instead of retesting all native C validation rules.
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
    polling. _(Initial event envelope polling proof slice complete.)_
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent
-   retention. _(Initial lifecycle, options, style-loading, and parent-retention
-   proof slice complete.)_
+   retention. _(Initial lifecycle, options, style-loading, map utility methods,
+   and parent-retention proof slice complete.)_
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,
    and TypeScript concept modules. _(Initial coordinate value and projection
    helper proof slice complete.)_

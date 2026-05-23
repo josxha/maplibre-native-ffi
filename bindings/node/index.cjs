@@ -217,6 +217,28 @@ class MapHandle {
     return translateNativeErrors(() => this.native.requestRepaint());
   }
 
+  requestStillImage() {
+    return translateNativeErrors(() => this.native.requestStillImage());
+  }
+
+  isFullyLoaded() {
+    return translateNativeErrors(() => this.native.isFullyLoaded());
+  }
+
+  dumpDebugLogs() {
+    return translateNativeErrors(() => this.native.dumpDebugLogs());
+  }
+
+  get renderingStatsViewEnabled() {
+    return translateNativeErrors(() => this.native.renderingStatsViewEnabled);
+  }
+
+  set renderingStatsViewEnabled(enabled) {
+    translateNativeErrors(() => {
+      this.native.renderingStatsViewEnabled = enabled;
+    });
+  }
+
   setStyleJson(json) {
     return translateNativeErrors(() => this.native.setStyleJson(json));
   }

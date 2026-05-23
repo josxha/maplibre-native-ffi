@@ -121,8 +121,12 @@ export declare class RuntimeHandle {
 export declare class MapHandle {
   constructor(runtime: RuntimeHandle, options?: MapOptions | null);
   readonly closed: boolean;
+  renderingStatsViewEnabled: boolean;
   close(): void;
   requestRepaint(): void;
+  requestStillImage(): void;
+  isFullyLoaded(): boolean;
+  dumpDebugLogs(): void;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;

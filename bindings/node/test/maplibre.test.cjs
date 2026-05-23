@@ -103,6 +103,35 @@ test("map handle retains runtime parent and closes before runtime", () => {
   runtime.close();
 });
 
+test("map utility methods expose copied booleans and native commands", () => {
+  const runtime = new RuntimeHandle();
+  const continuousMap = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    assert.equal(typeof continuousMap.isFullyLoaded(), "boolean");
+    continuousMap.renderingStatsViewEnabled = true;
+    assert.equal(continuousMap.renderingStatsViewEnabled, true);
+    continuousMap.renderingStatsViewEnabled = false;
+    assert.equal(continuousMap.renderingStatsViewEnabled, false);
+    continuousMap.requestRepaint();
+    continuousMap.dumpDebugLogs();
+  } finally {
+    continuousMap.close();
+  }
+
+  const staticMap = runtime.createMap({
+    width: 16,
+    height: 16,
+    mapMode: "static",
+  });
+  try {
+    staticMap.requestStillImage();
+  } finally {
+    staticMap.close();
+    runtime.close();
+  }
+});
+
 test("map options reject unknown map modes", () => {
   const runtime = new RuntimeHandle();
   assert.throws(
