@@ -50,6 +50,7 @@ unsafe extern "C" {
     fn g_quark_from_static_string(string: *const c_char) -> GQuark;
     fn g_error_new_literal(domain: GQuark, code: c_int, message: *const c_char) -> *mut GError;
     fn g_free(mem: *mut c_void);
+    fn g_strndup(string: *const c_char, n: usize) -> *mut c_char;
     fn g_boxed_type_register_static(
         name: *const c_char,
         boxed_copy: Option<unsafe extern "C" fn(*mut c_void) -> *mut c_void>,
@@ -267,6 +268,23 @@ pub(crate) fn clear_optional_out_pointer<T>(out: *mut T, value: T) -> Result<(),
         ptr::write(out, value);
     }
     Ok(())
+}
+
+pub(crate) fn copy_string_view(view: sys::mln_string_view) -> Result<*mut c_char, Error> {
+    let data = if view.data.is_null() && view.size == 0 {
+        c"".as_ptr()
+    } else if view.data.is_null() {
+        return Err(Error::invalid_argument("string view data is null"));
+    } else {
+        view.data
+    };
+    // SAFETY: `data` is non-null and points to at least `view.size` bytes for a
+    // native-provided string view. GLib allocates a NUL-terminated copy.
+    let copy = unsafe { g_strndup(data, view.size) };
+    if copy.is_null() {
+        return Err(Error::invalid_argument("failed to allocate string copy"));
+    }
+    Ok(copy)
 }
 
 #[cfg(test)]

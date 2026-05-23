@@ -747,6 +747,13 @@ G_DECLARE_FINAL_TYPE(
   MlnValaMapHandle, mln_vala_map_handle, MLN_VALA, MAP_HANDLE, GObject
 )
 
+#define MLN_VALA_TYPE_STYLE_ID_LIST_HANDLE \
+  (mln_vala_style_id_list_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaStyleIdListHandle, mln_vala_style_id_list_handle, MLN_VALA,
+  STYLE_ID_LIST_HANDLE, GObject
+)
+
 #define MLN_VALA_TYPE_MAP_PROJECTION_HANDLE \
   (mln_vala_map_projection_handle_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -1922,6 +1929,75 @@ gboolean mln_vala_map_handle_remove_style_layer(
   MlnValaMapHandle* self, const char* layer_id, gboolean* out_removed,
   GError** error
 );
+
+/**
+ * mln_vala_map_handle_get_style_layer_type:
+ * @self: a map handle.
+ * @layer_id: (not nullable): style layer identifier.
+ * @out_layer_type: (out) (transfer full) (nullable): return location for layer
+ * type string.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_style_layer_type(
+  MlnValaMapHandle* self, const char* layer_id, char** out_layer_type,
+  gboolean* out_found, GError** error
+);
+
+/**
+ * mln_vala_map_handle_list_style_source_ids:
+ * @self: a map handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): style source ID list handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaStyleIdListHandle* mln_vala_map_handle_list_style_source_ids(
+  MlnValaMapHandle* self, GError** error
+);
+
+/**
+ * mln_vala_map_handle_list_style_layer_ids:
+ * @self: a map handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): style layer ID list handle, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+MlnValaStyleIdListHandle* mln_vala_map_handle_list_style_layer_ids(
+  MlnValaMapHandle* self, GError** error
+);
+
+/**
+ * mln_vala_style_id_list_handle_count:
+ * @self: a style ID list handle.
+ * @out_count: (out): return location for list count.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_style_id_list_handle_count(
+  MlnValaStyleIdListHandle* self, size_t* out_count, GError** error
+);
+
+/**
+ * mln_vala_style_id_list_handle_get:
+ * @self: a style ID list handle.
+ * @index: zero-based list index.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): style identifier string, or `NULL` on failure.
+ * Throws: MlnValaError
+ */
+char* mln_vala_style_id_list_handle_get(
+  MlnValaStyleIdListHandle* self, size_t index, GError** error
+);
+
+void mln_vala_style_id_list_handle_close(MlnValaStyleIdListHandle* self);
 
 /**
  * mln_vala_map_handle_attach_metal_surface:

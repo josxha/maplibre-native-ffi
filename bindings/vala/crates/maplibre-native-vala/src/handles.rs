@@ -10,6 +10,7 @@ use crate::glib::{self, GBoolean, GDestroyNotify, GError, GFALSE, GObject, GTRUE
 
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
+const STYLE_ID_LIST_TYPE_NAME: &CStr = c"MlnValaStyleIdListHandle";
 
 #[repr(C)]
 pub struct RuntimeHandle {
@@ -35,6 +36,12 @@ pub struct MapHandle {
     runtime: *mut RuntimeHandle,
 }
 
+#[repr(C)]
+pub struct StyleIdListHandle {
+    parent_instance: GObject,
+    native: *mut sys::mln_style_id_list,
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_get_type() -> GType {
     glib::register_object_type::<RuntimeHandle>(RUNTIME_TYPE_NAME)
@@ -43,6 +50,11 @@ pub extern "C" fn mln_vala_runtime_handle_get_type() -> GType {
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_get_type() -> GType {
     glib::register_object_type::<MapHandle>(MAP_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_id_list_handle_get_type() -> GType {
+    glib::register_object_type::<StyleIdListHandle>(STYLE_ID_LIST_TYPE_NAME)
 }
 
 #[unsafe(no_mangle)]
@@ -1410,6 +1422,86 @@ pub extern "C" fn mln_vala_map_handle_remove_style_layer(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_style_layer_type(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_layer_type: *mut *mut c_char,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_style_layer_type(handle, layer_id, out_layer_type, out_found) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_list_style_source_ids(
+    handle: *mut MapHandle,
+    error_out: *mut *mut GError,
+) -> *mut StyleIdListHandle {
+    match list_style_source_ids(handle) {
+        Ok(list) => list,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_list_style_layer_ids(
+    handle: *mut MapHandle,
+    error_out: *mut *mut GError,
+) -> *mut StyleIdListHandle {
+    match list_style_layer_ids(handle) {
+        Ok(list) => list,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_id_list_handle_count(
+    handle: *mut StyleIdListHandle,
+    out_count: *mut usize,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match style_id_list_count(handle, out_count) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_id_list_handle_get(
+    handle: *mut StyleIdListHandle,
+    index: usize,
+    error_out: *mut *mut GError,
+) -> *mut c_char {
+    match style_id_list_get(handle, index) {
+        Ok(id) => id,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_id_list_handle_close(handle: *mut StyleIdListHandle) {
+    close_style_id_list(handle);
+}
+
 fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_runtime_options_default() };
@@ -2359,6 +2451,127 @@ fn remove_style_layer(
     // and `removed` is valid output storage.
     error::check(unsafe { sys::mln_map_remove_style_layer(map, layer_id, &mut removed) })?;
     glib::clear_optional_out_pointer(out_removed, if removed { GTRUE } else { GFALSE })
+}
+
+fn get_style_layer_type(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_layer_type: *mut *mut c_char,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_layer_type.is_null() {
+        return Err(Error::invalid_argument(
+            "style layer type output pointer is null",
+        ));
+    }
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let mut layer_type = sys::mln_string_view {
+        data: ptr::null(),
+        size: 0,
+    };
+    let mut found = false;
+    // SAFETY: `map` is live and output pointers are writable for this call.
+    error::check(unsafe {
+        sys::mln_map_get_style_layer_type(map, layer_id, &mut layer_type, &mut found)
+    })?;
+    let layer_type_copy = if found {
+        glib::copy_string_view(layer_type)?
+    } else {
+        ptr::null_mut()
+    };
+    glib::clear_optional_out_pointer(out_layer_type, layer_type_copy)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
+fn list_style_source_ids(handle: *mut MapHandle) -> error::Result<*mut StyleIdListHandle> {
+    let map = map_native(handle)?;
+    let mut native = ptr::null_mut();
+    // SAFETY: `map` is live and `native` is null before the call as required.
+    error::check(unsafe { sys::mln_map_list_style_source_ids(map, &mut native) })?;
+    wrap_style_id_list(native)
+}
+
+fn list_style_layer_ids(handle: *mut MapHandle) -> error::Result<*mut StyleIdListHandle> {
+    let map = map_native(handle)?;
+    let mut native = ptr::null_mut();
+    // SAFETY: `map` is live and `native` is null before the call as required.
+    error::check(unsafe { sys::mln_map_list_style_layer_ids(map, &mut native) })?;
+    wrap_style_id_list(native)
+}
+
+fn wrap_style_id_list(
+    native: *mut sys::mln_style_id_list,
+) -> error::Result<*mut StyleIdListHandle> {
+    if native.is_null() {
+        return Err(Error::invalid_argument("native style ID list is null"));
+    }
+    let handle = glib::new_object::<StyleIdListHandle>(mln_vala_style_id_list_handle_get_type());
+    if handle.is_null() {
+        // SAFETY: `native` came from a successful list operation.
+        unsafe { sys::mln_style_id_list_destroy(native) };
+        return Err(Error::invalid_argument(
+            "failed to allocate StyleIdListHandle",
+        ));
+    }
+    // SAFETY: `handle` points to a newly allocated list handle wrapper.
+    unsafe {
+        (*handle).native = native;
+    }
+    Ok(handle)
+}
+
+fn style_id_list_native(
+    handle: *mut StyleIdListHandle,
+) -> error::Result<*mut sys::mln_style_id_list> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument("StyleIdListHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe { (*handle).native };
+    if native.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "StyleIdListHandle is closed",
+        ));
+    }
+    Ok(native)
+}
+
+fn style_id_list_count(handle: *mut StyleIdListHandle, out_count: *mut usize) -> error::Result<()> {
+    let native = style_id_list_native(handle)?;
+    let mut count = 0;
+    // SAFETY: `native` is live and `count` is valid output storage.
+    error::check(unsafe { sys::mln_style_id_list_count(native, &mut count) })?;
+    glib::clear_optional_out_pointer(out_count, count)
+}
+
+fn style_id_list_get(handle: *mut StyleIdListHandle, index: usize) -> error::Result<*mut c_char> {
+    let native = style_id_list_native(handle)?;
+    let mut id = sys::mln_string_view {
+        data: ptr::null(),
+        size: 0,
+    };
+    // SAFETY: `native` is live and `id` is valid output storage.
+    error::check(unsafe { sys::mln_style_id_list_get(native, index, &mut id) })?;
+    glib::copy_string_view(id)
+}
+
+fn close_style_id_list(handle: *mut StyleIdListHandle) {
+    if handle.is_null() {
+        return;
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe {
+        let native = (*handle).native;
+        (*handle).native = ptr::null_mut();
+        native
+    };
+    if !native.is_null() {
+        // SAFETY: This wrapper owns the native list and closes it exactly once.
+        unsafe { sys::mln_style_id_list_destroy(native) };
+    }
 }
 
 fn string_view_from_c(value: *const c_char, label: &str) -> error::Result<sys::mln_string_view> {
@@ -3316,6 +3529,49 @@ mod tests {
             GTRUE
         );
         assert_eq!(exists, GTRUE);
+
+        let mut layer_type = ptr::null_mut();
+        let mut found = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_get_style_layer_type(
+                map,
+                c"location-layer".as_ptr(),
+                &mut layer_type,
+                &mut found,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(found, GTRUE);
+        assert!(!layer_type.is_null());
+        // SAFETY: Layer type was allocated with GLib allocation by the wrapper.
+        unsafe { glib::free(layer_type.cast::<c_void>()) };
+
+        let layer_ids = mln_vala_map_handle_list_style_layer_ids(map, ptr::null_mut());
+        assert!(!layer_ids.is_null());
+        let mut layer_count = 0;
+        assert_eq!(
+            mln_vala_style_id_list_handle_count(layer_ids, &mut layer_count, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(layer_count, 0);
+        let first_layer_id = mln_vala_style_id_list_handle_get(layer_ids, 0, ptr::null_mut());
+        assert!(!first_layer_id.is_null());
+        // SAFETY: ID was allocated with GLib allocation by the wrapper.
+        unsafe { glib::free(first_layer_id.cast::<c_void>()) };
+        mln_vala_style_id_list_handle_close(layer_ids);
+        glib::unref_object(layer_ids);
+
+        let source_ids = mln_vala_map_handle_list_style_source_ids(map, ptr::null_mut());
+        assert!(!source_ids.is_null());
+        let mut source_count = 0;
+        assert_eq!(
+            mln_vala_style_id_list_handle_count(source_ids, &mut source_count, ptr::null_mut()),
+            GTRUE
+        );
+        mln_vala_style_id_list_handle_close(source_ids);
+        glib::unref_object(source_ids);
+
         assert_eq!(
             mln_vala_map_handle_move_style_layer(
                 map,

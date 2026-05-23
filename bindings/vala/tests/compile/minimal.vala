@@ -103,6 +103,16 @@ int main(string[] args) {
     MaplibreNative.StyleSourceInfo source_info;
     map.get_style_source_info("fixture-source", out source_info, out source_found);
     map.set_geojson_source_url("fixture-source", "asset://fixture-updated.geojson");
+    var source_ids = map.list_style_source_ids();
+    size_t source_id_count;
+    source_ids.count(out source_id_count);
+    if (source_id_count > 0) {
+      string first_source_id = source_ids.get(0);
+      if (first_source_id.length == 0) {
+        return 1;
+      }
+    }
+    source_ids.close();
     bool source_removed = false;
     map.remove_style_source("fixture-source", out source_removed);
     MaplibreNative.StyleTileSourceOptions tile_source_options = {};
@@ -147,6 +157,19 @@ int main(string[] args) {
     map.set_location_indicator_image_name("location-layer", MaplibreNative.LocationIndicatorImageKind.TOP, "fixture-image");
     bool layer_exists = false;
     map.style_layer_exists("location-layer", out layer_exists);
+    string? layer_type;
+    bool layer_found = false;
+    map.get_style_layer_type("location-layer", out layer_type, out layer_found);
+    var layer_ids = map.list_style_layer_ids();
+    size_t layer_id_count;
+    layer_ids.count(out layer_id_count);
+    if (layer_id_count > 0) {
+      string first_layer_id = layer_ids.get(0);
+      if (first_layer_id.length == 0) {
+        return 1;
+      }
+    }
+    layer_ids.close();
     map.move_style_layer("location-layer", "");
     bool layer_removed = false;
     map.remove_style_layer("location-layer", out layer_removed);
