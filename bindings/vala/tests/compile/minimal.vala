@@ -19,6 +19,13 @@ int main(string[] args) {
 
     var map = new MaplibreNative.MapHandle(runtime, 512, 512, 1.0);
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+
+    var projection = new MaplibreNative.MapProjectionHandle(map);
+    MaplibreNative.ScreenPoint point;
+    projection.pixel_for_lat_lng(coordinate, out point);
+    projection.lat_lng_for_pixel(point, out round_trip);
+    projection.close();
+
     map.close();
     runtime.close();
   } catch (GLib.Error error) {

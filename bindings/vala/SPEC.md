@@ -68,6 +68,7 @@ bindings/vala/
     src/handles.rs
     src/lib.rs
     src/native_pointer.rs
+    src/projection.rs
     src/status.rs
   tools/generate.py
   tests/compile/minimal.vala
@@ -86,6 +87,8 @@ The scaffold implements one proof slice in Rust:
   `RuntimeEvent` value.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
+- `MapProjectionHandle` is registered as a standalone GObject class with
+  close-once lifecycle and coordinate conversion methods.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and

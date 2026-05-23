@@ -9,6 +9,7 @@ pub mod geo;
 pub mod glib;
 pub mod handles;
 pub mod native_pointer;
+pub mod projection;
 pub mod status;
 
 use glib::{GBoolean, GError, GFALSE, GTRUE};

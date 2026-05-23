@@ -289,7 +289,7 @@ fn close_map_handle(handle: *mut MapHandle) -> error::Result<()> {
     Ok(())
 }
 
-fn map_native(handle: *mut MapHandle) -> error::Result<*mut sys::mln_map> {
+pub(crate) fn map_native(handle: *mut MapHandle) -> error::Result<*mut sys::mln_map> {
     if handle.is_null() {
         return Err(Error::invalid_argument("MapHandle is null"));
     }

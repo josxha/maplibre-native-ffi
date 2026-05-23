@@ -62,6 +62,13 @@ G_DECLARE_FINAL_TYPE(
   MlnValaMapHandle, mln_vala_map_handle, MLN_VALA, MAP_HANDLE, GObject
 )
 
+#define MLN_VALA_TYPE_MAP_PROJECTION_HANDLE \
+  (mln_vala_map_projection_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaMapProjectionHandle, mln_vala_map_projection_handle, MLN_VALA,
+  MAP_PROJECTION_HANDLE, GObject
+)
+
 /**
  * mln_vala_c_version:
  *
@@ -220,6 +227,60 @@ gboolean mln_vala_map_handle_request_repaint(
  */
 gboolean mln_vala_map_handle_set_style_json(
   MlnValaMapHandle* self, const char* json, GError** error
+);
+
+/**
+ * mln_vala_map_projection_handle_new:
+ * @map: a map handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full): a new standalone projection handle, or `NULL` on
+ * failure. Throws: MlnValaError
+ */
+MlnValaMapProjectionHandle* mln_vala_map_projection_handle_new(
+  MlnValaMapHandle* map, GError** error
+);
+
+/**
+ * mln_vala_map_projection_handle_close:
+ * @self: a projection handle.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_projection_handle_close(
+  MlnValaMapProjectionHandle* self, GError** error
+);
+
+/**
+ * mln_vala_map_projection_handle_pixel_for_lat_lng:
+ * @self: a projection handle.
+ * @coordinate: (not nullable): geographic coordinate in degrees.
+ * @out_point: (out): return location for the projected screen point.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_projection_handle_pixel_for_lat_lng(
+  MlnValaMapProjectionHandle* self, const MlnValaLatLng* coordinate,
+  MlnValaScreenPoint* out_point, GError** error
+);
+
+/**
+ * mln_vala_map_projection_handle_lat_lng_for_pixel:
+ * @self: a projection handle.
+ * @point: (not nullable): screen point in logical pixels.
+ * @out_coordinate: (out): return location for the geographic coordinate.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_projection_handle_lat_lng_for_pixel(
+  MlnValaMapProjectionHandle* self, const MlnValaScreenPoint* point,
+  MlnValaLatLng* out_coordinate, GError** error
 );
 
 G_END_DECLS
