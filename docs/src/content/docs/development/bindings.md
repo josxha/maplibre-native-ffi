@@ -262,8 +262,12 @@ Callback state is thread-safe because callbacks may arrive on MapLibre worker,
 network, logging, or render-related threads. Adapters do not assume the runtime
 owner thread.
 
-Callbacks catch language exceptions, panics, and errors and convert them to the
-documented C callback behavior. They do not unwind through native code.
+Callbacks use the strongest failure containment their language ABI can safely
+provide. Where exceptions, panics, or errors can be caught at the callback
+boundary, adapters convert them to the documented C callback behavior. Languages
+that cannot safely catch failures across native callback frames document the
+supported boundary and require user callbacks to keep language errors inside the
+callback.
 
 Synchronous callbacks must finish before native code continues. Bindings whose
 runtimes cannot safely execute user code on arbitrary native threads keep those

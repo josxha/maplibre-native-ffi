@@ -13,9 +13,9 @@ export DYLD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_REPO_ROOT}}/ta
 python tools/generate.py
 mkdir -p build/gir build/typelib build/vapi
 
-PYTHONPATH="{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/lib/gobject-introspection" \
-  "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/bin/python" \
-  "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/bin/g-ir-scanner" \
+PYTHONPATH="$CONDA_PREFIX/lib/gobject-introspection" \
+  "$CONDA_PREFIX/bin/python" \
+  "$CONDA_PREFIX/bin/g-ir-scanner" \
   --namespace=MaplibreNative \
   --nsversion=0.1 \
   --identifier-prefix=MlnVala \

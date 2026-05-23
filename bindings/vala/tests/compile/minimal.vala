@@ -140,6 +140,9 @@ bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, 
   var frame = session.acquire_metal_owned_texture_frame();
   uint32 width;
   frame.get_width(out width);
+  uint8[] readback_pixels = new uint8[32 * 16 * 4];
+  MaplibreNative.TextureImageInfo readback_info;
+  session.read_premultiplied_rgba8(readback_pixels, out readback_info);
   if (width != 32) {
     frame.close();
     session.close();

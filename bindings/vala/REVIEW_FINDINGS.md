@@ -34,9 +34,11 @@ Review artifacts:
 - Unref resource-provider request wrappers after every callback decision, while
   disarming pass-through decisions so handled requests no longer leak the
   temporary GObject wrapper.
-- Freed historical resource-transform replacement URLs on subsequent callbacks,
-  retaining only the most recent URL until native has returned from the callback
-  or the transform state is destroyed.
+- Investigated resource-transform URL retention. The attempted per-callback
+  cleanup was rejected in Round 2 because transform callbacks may overlap across
+  native worker/network threads; the adapter retains returned URLs until
+  transform clear/replacement/runtime close to preserve callback-returned
+  pointers safely.
 - Narrowed Vala generator/convention documentation to match current coarse
   annotation validation, and aligned SPEC notes for the current source tree and
   generated `NetworkStatus.get()`/`set()` API shape.
@@ -60,11 +62,16 @@ Review artifacts:
 - Typed runtime-event enum/payload wrappers are deferred. The current boxed
   event copies common metadata; exposing all typed payloads is a separate
   event-model expansion.
+- Struct-field byte buffer wrappers are deferred. Caller-allocated buffer
+  parameters now generate and compile as arrays, but transparent C structs such
+  as `ResourceResponse`, `ResourceRequest`, `OfflineRegionInfo`, and
+  `PremultipliedRgba8Image` still expose low-level pointer/length fields; a
+  GLib.Bytes/native-buffer wrapper pass would be a broader API-shape change.
 - Callback panic/exception containment was documented too strongly, so the docs
   now describe the actual fallback/error boundary. Catching language-level Vala
   exceptions across C callback frames is not a safe small patch.
-- The `MlnVala`/`mln_vala` prefix is kept for this PR to avoid whole-ABI churn;
-  renaming can be revisited deliberately before publication.
+- The `MlnVala`/`mln_vala` prefix is kept for this PR to avoid whole-ABI churn,
+  and the SPEC now documents it as the current prefix.
 
 ### User-input-needed findings
 

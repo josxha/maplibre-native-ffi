@@ -268,9 +268,10 @@ successful close releases once; later close calls no-op. Failed native
 destruction leaves the object live so callers can retry on the owner thread.
 `dispose` releases managed parent and callback references only after native
 unregistration or `close()` makes callbacks unreachable and in-flight callbacks
-complete. `finalize` reports leaks; it does not destroy thread-affine native
-handles, and it preserves callback state that native code may still reach from a
-leaked handle.
+complete. `finalize` may close thread-affine native handles only after proving
+owner-thread context; otherwise it reports the leak, preserves native state, and
+keeps callback state that native code may still reach from a leaked handle.
+Users call `close()` on the owner thread for deterministic release.
 
 `ResourceRequestHandle` is the request-lifetime exception. It is a `GLib.Object`
 that owns the provider's native request reference, enforces one-shot completion,
@@ -339,23 +340,23 @@ Implement these Rust modules as the binding grows:
 | `render`         | Render target descriptors, native buffers, texture frames, readback helpers.                                   |
 | `resource`       | Resource request, response, transform, provider, and one-shot request state.                                   |
 | `style`          | Style source, image, layer, light, and custom geometry conversion.                                             |
-| `callbacks`      | Closure storage, destroy notify, atomic replacement, active-upcall accounting, panic containment.              |
+| `callbacks`      | Closure storage, destroy notify, atomic replacement, and active-upcall accounting.                             |
 | `generator`      | Metadata reader, public inventory/annotation verifier, and scanner-facing header emission.                     |
 
 ## Naming and packaging
 
-Use `MaplibreNative` as the GIR and Vala namespace. Use `Mln` as the C/GObject
-identifier prefix unless generator experiments prove a more idiomatic prefix is
-needed. Keep `maplibre` one word inside generated symbols.
+Use `MaplibreNative` as the GIR and Vala namespace. Use `MlnVala` as the
+C/GObject identifier prefix and `mln_vala_` as the C function prefix. Keep
+`maplibre` one word inside generated symbols.
 
 Examples:
 
-| Vala name             | C/GObject symbol family                                 |
-| --------------------- | ------------------------------------------------------- |
-| `RuntimeHandle`       | `MlnRuntimeHandle`, `mln_runtime_handle_*`              |
-| `MapHandle`           | `MlnMapHandle`, `mln_map_handle_*`                      |
-| `RenderSessionHandle` | `MlnRenderSessionHandle`, `mln_render_session_handle_*` |
-| `NativePointer`       | `MlnNativePointer`, `mln_native_pointer_*`              |
+| Vala name             | C/GObject symbol family                                          |
+| --------------------- | ---------------------------------------------------------------- |
+| `RuntimeHandle`       | `MlnValaRuntimeHandle`, `mln_vala_runtime_handle_*`              |
+| `MapHandle`           | `MlnValaMapHandle`, `mln_vala_map_handle_*`                      |
+| `RenderSessionHandle` | `MlnValaRenderSessionHandle`, `mln_vala_render_session_handle_*` |
+| `NativePointer`       | `MlnValaNativePointer`, `mln_vala_native_pointer_*`              |
 
 The package eventually installs:
 

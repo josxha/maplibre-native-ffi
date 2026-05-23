@@ -4535,10 +4535,6 @@ unsafe extern "C" fn resource_transform_trampoline(
     }
 
     let state = user_data.cast::<ResourceTransformState>();
-    // Native copies the previous callback response before returning from that
-    // callback, so only the most recent replacement URL must stay alive across
-    // calls.
-    free_returned_transform_urls(state);
     // SAFETY: Native passes the state pointer installed by
     // `set_resource_transform`; clear/replace waits for in-flight callbacks.
     let replacement_url = unsafe { ((*state).callback)(kind, url, (*state).user_data) };
@@ -4558,20 +4554,6 @@ unsafe extern "C" fn resource_transform_trampoline(
             .push(replacement_url);
     }
     sys::MLN_STATUS_OK
-}
-
-fn free_returned_transform_urls(state: *mut ResourceTransformState) {
-    if state.is_null() {
-        return;
-    }
-    let mut urls = unsafe { &*state }
-        .returned_urls
-        .lock()
-        .expect("resource transform URL storage lock poisoned");
-    for url in urls.drain(..) {
-        // SAFETY: Vala returns owned strings allocated with GLib allocation.
-        unsafe { glib::free(url.cast::<c_void>()) };
-    }
 }
 
 fn destroy_resource_transform_state(state: *mut ResourceTransformState) {

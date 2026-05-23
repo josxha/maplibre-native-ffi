@@ -1,4 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;
+use std::hash::{Hash, Hasher};
 use std::ptr;
 
 use maplibre_native_core::error::{self, Error};
@@ -14,11 +16,33 @@ const PROJECTION_TYPE_NAME: &CStr = c"MlnValaMapProjectionHandle";
 pub struct MapProjectionHandle {
     parent_instance: GObject,
     native: *mut sys::mln_map_projection,
+    owner_thread: u64,
+}
+
+fn current_thread_token() -> u64 {
+    let mut hasher = DefaultHasher::new();
+    std::thread::current().id().hash(&mut hasher);
+    hasher.finish()
+}
+
+fn projection_should_finalize_on_owner_thread(handle: *mut MapProjectionHandle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    // SAFETY: The caller passes a MapProjectionHandle GObject during finalization.
+    unsafe { !(*handle).native.is_null() && (*handle).owner_thread == current_thread_token() }
 }
 
 impl glib::ObjectFinalize for MapProjectionHandle {
     unsafe extern "C" fn finalize(object: *mut GObject) {
-        let _ = close_projection_handle(object.cast::<MapProjectionHandle>());
+        let handle = object.cast::<MapProjectionHandle>();
+        if projection_should_finalize_on_owner_thread(handle) {
+            let _ = close_projection_handle(handle);
+        } else if unsafe { !(*handle).native.is_null() } {
+            eprintln!(
+                "MapProjectionHandle finalized off its owner thread; call close() on the owner thread to release native state"
+            );
+        }
     }
 }
 
@@ -169,6 +193,7 @@ fn create_projection_handle(map: *mut MapHandle) -> error::Result<*mut MapProjec
     // `MapProjectionHandle`.
     unsafe {
         (*handle).native = native;
+        (*handle).owner_thread = current_thread_token();
     }
     Ok(handle)
 }
