@@ -37,6 +37,7 @@ MetalSurfaceDescriptor.size skip
 MetalSurfaceDescriptor.layer skip
 OfflineGeometryRegionDefinition.size skip
 OfflineGeometryRegionDefinition.style_url skip
+OfflineGeometryRegionDefinition.geometry skip
 OfflineRegionDefinition.size skip
 OfflineRegionDefinition.data skip
 OfflineRegionInfo.size skip

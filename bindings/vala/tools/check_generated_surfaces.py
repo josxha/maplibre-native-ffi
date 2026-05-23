@@ -21,6 +21,7 @@ VAPI_FORBIDDEN_PATTERNS = {
     r"\b[A-Za-z]+OptionFields\b": "raw field-mask enum",
     r"\b(?:FeatureExtensionResultHandle|FeatureQueryResultHandle|JsonSnapshotHandle|OfflineRegionListHandle|OfflineRegionSnapshotHandle|StyleIdListHandle)(?:Class)?\b": "native result/list/snapshot handle",
     r"\bpublic\s+weak\s+string\b": "public weak string field",
+    r"\bpublic\s+weak\s+MaplibreNative\.Geometry\b": "public borrowed geometry field",
     r"\bset_(?:source_id|source_layer_id|feature_id|state_key|layer_ids|source_layer_ids|attribution)\b": "sidecar-backed descriptor setter",
     r"\bget_raw_(?:type|source_type|payload_type)\b": "raw runtime event getter",
 }
@@ -115,7 +116,7 @@ GIR_FORBIDDEN_FIELDS = {
     "MetalContextDescriptor": {"size", "device"},
     "MetalOwnedTextureDescriptor": {"size"},
     "MetalSurfaceDescriptor": {"size", "layer"},
-    "OfflineGeometryRegionDefinition": {"size", "style_url"},
+    "OfflineGeometryRegionDefinition": {"size", "style_url", "geometry"},
     "OfflineRegionDefinition": {"size", "data"},
     "OfflineRegionInfo": {"size", "metadata", "metadata_size"},
     "OfflineTilePyramidRegionDefinition": {"size", "style_url"},

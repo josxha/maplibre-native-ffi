@@ -107,29 +107,31 @@ The Rust adapter implements the low-level GLib/GObject surface:
   replacement, and async severity-mask operations are exposed in generated Vala.
 - Resource response descriptors, safe response byte setters, resource request
   prior-data byte accessors, resource transform/provider callbacks, offline
-  operation create/start/status-result/snapshot/list info/discard helpers, and
-  `ResourceRequestHandle` one-shot completion/cancellation/release/async-retain
-  methods are visible in generated Vala.
+  operation create/start/status/discard helpers, copied offline status/info
+  values, and `ResourceRequestHandle` one-shot
+  completion/cancellation/release/async-retain methods are visible in generated
+  Vala.
 - Basic style-source operations for GeoJSON URL and inline data sources,
   vector/raster/raster DEM tile source URL and inline tile sources, custom
   geometry sources, image sources, source metadata and attribution, source
-  lifecycle, runtime style images, style ID list handles, JSON snapshots, DEM
-  helper layers, style JSON/property/light/filter operations, basic style-layer
-  lifecycle operations, and map coordinate conversion helpers are exposed
-  through `MapHandle`.
+  lifecycle, runtime style images, DEM helper layers, style
+  JSON/property/light/filter operations, basic style-layer lifecycle operations,
+  and map coordinate conversion helpers are exposed through `MapHandle`.
 - Geographic value structs, boxed geometry/GeoJSON value builders, boxed JSON
   value builders, and projected-meter conversion helpers are visible in
-  generated Vala.
+  generated Vala. Borrowed offline geometry-definition fields stay hidden until
+  the binding has an owned constructor/API shape for them.
 - `MapProjectionHandle` is registered as a standalone GObject class with
   close-once lifecycle, camera, visible-coordinate/geometry fitting, and
   coordinate conversion methods.
 - `RenderSessionHandle` is registered as a GObject class with descriptor
   defaults, `NativePointer` render-target descriptor setters, render-target
-  attach methods, feature-state JSON snapshot helpers, readback helpers, texture
-  frame handles, and basic session lifecycle methods.
-- Rendered/source feature query option descriptors, rendered query geometry
-  constructors, queried feature views, feature query result handles, and feature
-  extension result handles are exposed for Vala bindability.
+  attach methods, readback helpers, texture frame handles, and basic session
+  lifecycle methods.
+- Rendered/source feature query option descriptors and rendered query geometry
+  constructors are exposed for Vala bindability. Native feature query result and
+  feature extension result handles remain internal until owned result APIs are
+  available.
 - `NativePointer` records borrowed opaque-address value semantics for the public
   boxed type.
 - `metadata/api.toml` is the generator manifest for namespace, error domain,
@@ -297,7 +299,7 @@ completion.
 | C field masks                       | Vala callers use semantic defaults and setters; generated VAPI does not expose mask fields.                                            |
 | copied coordinates and geometry     | Boxed geometry values and compact coordinate structs preserve copying and ownership.                                                   |
 | JSON and GeoJSON                    | Boxed JSON, geometry, and GeoJSON constructors materialize native descriptor trees at the call boundary.                               |
-| runtime events                      | Copied event boxed values expose typed enums, raw diagnostic getters, and payload accessors independent of the next native poll.       |
+| runtime events                      | Copied event boxed values expose typed enums, payload accessors, and copied unknown payload bytes independent of the next native poll. |
 | native result/list/snapshot handles | Internal guards copied into GLib-owned values before release.                                                                          |
 | backend `void*` handles             | `NativePointer` boxed values are used for frame accessors and render descriptor setters.                                               |
 | CPU images and bytes                | Caller-allocated buffer parameters expose Vala arrays; resource request prior data and unknown event payloads use copied `GLib.Bytes`. |
@@ -308,13 +310,13 @@ completion.
   projection-mode descriptors.
 - `geo`: lat/lng, bounds, projected meters, screen points, tile IDs, vectors,
   quaternions, geometry, feature, and GeoJSON values.
-- `json`: JSON values and snapshot-copy helpers.
+- `json`: JSON values and hidden snapshot-copy helpers.
 - `log`: log severity, log event, log record, callback registration, and async
   severity mask.
 - `map`: map lifecycle, style loading, debug options, repaint, still-image, and
   map-level camera operations.
-- `offline`: offline region definitions, snapshots, status, lists, operation
-  handles, and operation results.
+- `offline`: offline region definitions, copied status/info values, operation
+  handles, operation results, and hidden native snapshot/list guards.
 - `query`: rendered/source query descriptors, query geometries, queried
   features, and feature-extension results.
 - `render`: render sessions, render modes, target descriptors, readback, native
@@ -332,24 +334,24 @@ completion.
 
 These source modules and tools contain the current adapter implementation:
 
-| File / module                 | Contents                                                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `glib.rs`                     | GLib type registration, boxed/object helpers, `GBytes`, `GError`, quarks, and object reference utilities.    |
-| `status.rs`                   | Public error-domain constants and raw C status to GLib error mapping support.                                |
-| `string_list.rs`              | Boxed string-list storage that hides string-view pointer/length arrays behind copied Vala-visible values.    |
-| `handles.rs`                  | Runtime/map handles, style/source/camera/offline/resource callbacks, descriptor setters, and list handles.   |
-| `events.rs`                   | Runtime event copying, typed event/source/payload accessors, and unknown payload storage.                    |
-| `values.rs`                   | Boxed JSON, geometry, and GeoJSON values plus native materialization helpers.                                |
-| `geo.rs`                      | Coordinate, bounds, screen point, tile ID, projected-meter, and small geometry-compatible value helpers.     |
-| `native_pointer.rs`           | Non-null borrowed opaque pointer value and nullable metadata helpers.                                        |
-| `projection.rs`               | Standalone map projection handle and projection/camera/visible-coordinate helpers.                           |
-| `query.rs`                    | Query descriptors, rendered geometry constructors, query execution, and copied query result readers.         |
-| `render.rs`                   | Render target descriptors, native pointer setters, render sessions, texture frames, and readback helpers.    |
-| `resource.rs`                 | Resource request, response, byte helpers, async retain, provider decision finalization, and request release. |
-| `logging.rs`                  | Logging callback registration, destroy-notify replacement, and severity-mask operations.                     |
-| `generate.py`                 | Metadata reader, public inventory/annotation verifier, and scanner-facing header emission.                   |
-| `sanitize_gir.py`             | Review-artifact sanitizer that removes C-ABI bookkeeping from generated GIR while preserving Vala surfaces.  |
-| `check_generated_surfaces.py` | Generated VAPI/GIR safety-surface check for raw ABI leaks.                                                   |
+| File / module                 | Contents                                                                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `glib.rs`                     | GLib type registration, boxed/object helpers, `GBytes`, `GError`, quarks, and object reference utilities.               |
+| `status.rs`                   | Public error-domain constants and raw C status to GLib error mapping support.                                           |
+| `string_list.rs`              | Boxed string-list storage that hides string-view pointer/length arrays behind copied Vala-visible values.               |
+| `handles.rs`                  | Runtime/map handles, style/source/camera/offline/resource callbacks, descriptor setters, and hidden result/list guards. |
+| `events.rs`                   | Runtime event copying, typed event/source/payload accessors, and unknown payload storage.                               |
+| `values.rs`                   | Boxed JSON, geometry, and GeoJSON values plus native materialization helpers.                                           |
+| `geo.rs`                      | Coordinate, bounds, screen point, tile ID, projected-meter, and small geometry-compatible value helpers.                |
+| `native_pointer.rs`           | Non-null borrowed opaque pointer value and nullable metadata helpers.                                                   |
+| `projection.rs`               | Standalone map projection handle and projection/camera/visible-coordinate helpers.                                      |
+| `query.rs`                    | Query descriptors, rendered geometry constructors, query execution, and copied query result readers.                    |
+| `render.rs`                   | Render target descriptors, native pointer setters, render sessions, texture frames, and readback helpers.               |
+| `resource.rs`                 | Resource request, response, byte helpers, async retain, provider decision finalization, and request release.            |
+| `logging.rs`                  | Logging callback registration, destroy-notify replacement, and severity-mask operations.                                |
+| `generate.py`                 | Metadata reader, public inventory/annotation verifier, and scanner-facing header emission.                              |
+| `sanitize_gir.py`             | Review-artifact sanitizer that removes C-ABI bookkeeping from generated GIR while preserving Vala surfaces.             |
+| `check_generated_surfaces.py` | Generated VAPI/GIR safety-surface check for raw ABI leaks.                                                              |
 
 ## Naming and packaging
 

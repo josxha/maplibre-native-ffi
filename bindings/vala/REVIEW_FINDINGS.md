@@ -753,3 +753,44 @@ Review artifacts:
   typelib-derived GIR.
 - Reviewers verified the branch was clean and pushed at `5062c2a`; the follow-up
   `8c60ee0` commit records this final review outcome only.
+
+## Round 20
+
+Review artifacts:
+
+- Independent completion auditor for goal `mpith25e-nv475v`.
+
+### Applied findings
+
+- Updated `bindings/vala/SPEC.md` so the implementation map no longer describes
+  native style ID list handles, JSON snapshot handles, feature query result
+  handles, or feature extension result handles as public generated Vala
+  surfaces.
+- Hid `OfflineGeometryRegionDefinition.geometry` from generated VAPI, GIR, and
+  typelib-derived GIR because the transparent struct field was a public borrowed
+  geometry lifetime workaround. The field remains available only to the adapter
+  internals until an owned offline-region-definition API shape exists.
+- Extended `check_generated_surfaces.py` so future generated artifacts reject a
+  public borrowed geometry field in VAPI and `OfflineGeometryRegionDefinition`
+  raw geometry fields in GIR.
+- Updated the Vala binding conventions page to say runtime-event raw ABI fields
+  and getters are hidden rather than public diagnostic getters.
+
+### Rejected or deferred findings
+
+- The owned offline geometry-region constructor/API remains future work. The
+  current pre-merge policy is satisfied by hiding the borrowed field and keeping
+  the native definition detail out of the public generated surface.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- `mise run //bindings/vala:generate`
+- `mise run fix`
+- `mise run //bindings/vala:ci`
+- `mise run test`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`

@@ -115,10 +115,10 @@ native thread identity visible.
 
 Runtime event polling returns copied GLib/Vala values. Event objects expose
 typed event, source, payload, render-mode, and tile-operation enums plus payload
-accessors. Raw getters preserve forward-compatible native values for
-diagnostics. Signals may mirror events as a convenience only while the owner
-thread explicitly drains the runtime event queue. A signal must not imply
-background pumping, main-loop ownership, or UI thread handoff.
+accessors and copied unknown payload bytes. The generated Vala/GIR surface hides
+raw ABI event fields and getters. Signals may mirror events as a convenience
+only while the owner thread explicitly drains the runtime event queue. A signal
+must not imply background pumping, main-loop ownership, or UI thread handoff.
 
 Callback adapters keep closures, destroy notifies, and user data alive for the
 native owner scope. Native upcalls may arrive on worker, network, logging, or
