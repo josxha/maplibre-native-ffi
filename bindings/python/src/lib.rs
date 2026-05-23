@@ -635,6 +635,54 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn set_debug_options(&self, options: u32) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer, owner-thread affinity,
+        // and debug option mask bits.
+        maplibre_core::check(unsafe { sys::mln_map_set_debug_options(state.as_ptr(), options) })
+            .map_err(map_error)
+    }
+
+    fn get_debug_options(&self) -> PyResult<u32> {
+        let state = self.state();
+        let mut options = 0;
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_debug_options(state.as_ptr(), &mut options)
+        })
+        .map_err(map_error)?;
+        Ok(options)
+    }
+
+    fn set_rendering_stats_view_enabled(&self, enabled: bool) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and owner-thread affinity.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_rendering_stats_view_enabled(state.as_ptr(), enabled)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_rendering_stats_view_enabled(&self) -> PyResult<bool> {
+        let state = self.state();
+        let mut enabled = false;
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_rendering_stats_view_enabled(state.as_ptr(), &mut enabled)
+        })
+        .map_err(map_error)?;
+        Ok(enabled)
+    }
+
+    fn is_fully_loaded(&self) -> PyResult<bool> {
+        let state = self.state();
+        let mut loaded = false;
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe { sys::mln_map_is_fully_loaded(state.as_ptr(), &mut loaded) })
+            .map_err(map_error)?;
+        Ok(loaded)
+    }
+
     fn create_projection(&self) -> PyResult<MapProjectionHandle> {
         let state = self.state();
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map_projection>::new();

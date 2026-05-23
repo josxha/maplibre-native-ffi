@@ -113,6 +113,8 @@ The current implementation includes these completed slices:
   for a native runtime handle.
 - `MapHandle` creates and closes maps with parent runtime retention and basic
   map options.
+- `MapHandle` exposes map debug overlay options, rendering-stats view state, and
+  loaded-state queries.
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
 - `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 from types import TracebackType
 from typing import TYPE_CHECKING
 
@@ -23,6 +23,19 @@ if TYPE_CHECKING:
         VulkanSurfaceDescriptor,
     )
     from .style import CustomGeometrySourceHandle, CustomGeometrySourceOptions
+
+
+class MapDebugOptions(IntFlag):
+    """Map debug overlay mask bits."""
+
+    NONE = 0
+    TILE_BORDERS = 1 << 1
+    PARSE_STATUS = 1 << 2
+    TIMESTAMPS = 1 << 3
+    COLLISION = 1 << 4
+    OVERDRAW = 1 << 5
+    STENCIL_CLIP = 1 << 6
+    DEPTH_BUFFER = 1 << 7
 
 
 class MapMode(IntEnum):
@@ -226,6 +239,26 @@ class MapHandle:
     def request_repaint(self) -> None:
         """Request a repaint for a continuous map."""
         self._native.request_repaint()
+
+    def set_debug_options(self, options: MapDebugOptions) -> None:
+        """Apply MapLibre debug overlay mask bits."""
+        self._native.set_debug_options(int(options))
+
+    def get_debug_options(self) -> MapDebugOptions:
+        """Return the current MapLibre debug overlay mask bits."""
+        return MapDebugOptions(self._native.get_debug_options())
+
+    def set_rendering_stats_view_enabled(self, enabled: bool) -> None:
+        """Enable or disable MapLibre's rendering stats overlay view."""
+        self._native.set_rendering_stats_view_enabled(enabled)
+
+    def get_rendering_stats_view_enabled(self) -> bool:
+        """Return whether MapLibre's rendering stats overlay view is enabled."""
+        return self._native.get_rendering_stats_view_enabled()
+
+    def is_fully_loaded(self) -> bool:
+        """Return whether MapLibre currently considers the map fully loaded."""
+        return self._native.is_fully_loaded()
 
     def dump_debug_logs(self) -> None:
         """Dump map debug logs through MapLibre Native logging."""

@@ -157,6 +157,26 @@ def test_map_create_from_closed_runtime_reports_invalid_argument() -> None:
         runtime.create_map()
 
 
+def test_map_debug_and_status_options_round_trip_public_values() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            debug_options = (
+                map_module.MapDebugOptions.TILE_BORDERS
+                | map_module.MapDebugOptions.PARSE_STATUS
+            )
+            map_handle.set_debug_options(debug_options)
+            map_handle.set_rendering_stats_view_enabled(True)
+
+            assert map_handle.get_debug_options() == debug_options
+            assert map_handle.get_rendering_stats_view_enabled() is True
+            assert isinstance(map_handle.is_fully_loaded(), bool)
+
+            map_handle.set_debug_options(map_module.MapDebugOptions.NONE)
+            map_handle.set_rendering_stats_view_enabled(False)
+            assert map_handle.get_debug_options() == map_module.MapDebugOptions.NONE
+            assert map_handle.get_rendering_stats_view_enabled() is False
+
+
 def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
