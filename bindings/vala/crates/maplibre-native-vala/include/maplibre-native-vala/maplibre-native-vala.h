@@ -436,6 +436,7 @@ typedef struct {
 } MlnValaStringView;
 
 typedef struct _MlnValaJsonValue MlnValaJsonValue;
+typedef struct _MlnValaJsonSnapshotHandle MlnValaJsonSnapshotHandle;
 
 typedef struct {
   uint32_t size;
@@ -1049,6 +1050,13 @@ G_DECLARE_FINAL_TYPE(
 G_DECLARE_FINAL_TYPE(
   MlnValaStyleIdListHandle, mln_vala_style_id_list_handle, MLN_VALA,
   STYLE_ID_LIST_HANDLE, GObject
+)
+
+#define MLN_VALA_TYPE_JSON_SNAPSHOT_HANDLE \
+  (mln_vala_json_snapshot_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaJsonSnapshotHandle, mln_vala_json_snapshot_handle, MLN_VALA,
+  JSON_SNAPSHOT_HANDLE, GObject
 )
 
 #define MLN_VALA_TYPE_OFFLINE_REGION_SNAPSHOT_HANDLE \
@@ -2766,6 +2774,96 @@ gboolean mln_vala_map_handle_get_style_layer_type(
   MlnValaMapHandle* self, const char* layer_id, char** out_layer_type,
   gboolean* out_found, GError** error
 );
+
+gboolean mln_vala_map_handle_add_style_source_json(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaJsonValue* source_json, GError** error
+);
+gboolean mln_vala_map_handle_add_style_layer_json(
+  MlnValaMapHandle* self, const MlnValaJsonValue* layer_json,
+  const char* before_layer_id, GError** error
+);
+/**
+ * mln_vala_map_handle_get_style_layer_json:
+ * @self: a map handle.
+ * @layer_id: (not nullable): style layer identifier.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): owned JSON snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_style_layer_json(
+  MlnValaMapHandle* self, const char* layer_id, gboolean* out_found,
+  GError** error
+);
+gboolean mln_vala_map_handle_set_style_light_json(
+  MlnValaMapHandle* self, const MlnValaJsonValue* light_json, GError** error
+);
+gboolean mln_vala_map_handle_set_style_light_property(
+  MlnValaMapHandle* self, const char* property_name,
+  const MlnValaJsonValue* value, GError** error
+);
+/**
+ * mln_vala_map_handle_get_style_light_property:
+ * @self: a map handle.
+ * @property_name: (not nullable): style light property name.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): owned JSON snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_style_light_property(
+  MlnValaMapHandle* self, const char* property_name, GError** error
+);
+gboolean mln_vala_map_handle_set_layer_property(
+  MlnValaMapHandle* self, const char* layer_id, const char* property_name,
+  const MlnValaJsonValue* value, GError** error
+);
+/**
+ * mln_vala_map_handle_get_layer_property:
+ * @self: a map handle.
+ * @layer_id: (not nullable): style layer identifier.
+ * @property_name: (not nullable): style layer property name.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): owned JSON snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_layer_property(
+  MlnValaMapHandle* self, const char* layer_id, const char* property_name,
+  GError** error
+);
+gboolean mln_vala_map_handle_set_layer_filter(
+  MlnValaMapHandle* self, const char* layer_id, const MlnValaJsonValue* filter,
+  GError** error
+);
+/**
+ * mln_vala_map_handle_get_layer_filter:
+ * @self: a map handle.
+ * @layer_id: (not nullable): style layer identifier.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: (transfer full) (nullable): owned JSON snapshot handle.
+ * Throws: MlnValaError
+ */
+MlnValaJsonSnapshotHandle* mln_vala_map_handle_get_layer_filter(
+  MlnValaMapHandle* self, const char* layer_id, GError** error
+);
+/**
+ * mln_vala_json_snapshot_handle_get:
+ * @self: a JSON snapshot handle.
+ * @out_value: (out) (transfer none): return location for root JSON value.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_json_snapshot_handle_get(
+  MlnValaJsonSnapshotHandle* self, const MlnValaJsonValue** out_value,
+  GError** error
+);
+void mln_vala_json_snapshot_handle_close(MlnValaJsonSnapshotHandle* self);
 
 /**
  * mln_vala_map_handle_list_style_source_ids:

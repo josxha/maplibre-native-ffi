@@ -15,6 +15,7 @@ use crate::resource::{
 const RUNTIME_TYPE_NAME: &CStr = c"MlnValaRuntimeHandle";
 const MAP_TYPE_NAME: &CStr = c"MlnValaMapHandle";
 const STYLE_ID_LIST_TYPE_NAME: &CStr = c"MlnValaStyleIdListHandle";
+const JSON_SNAPSHOT_TYPE_NAME: &CStr = c"MlnValaJsonSnapshotHandle";
 const OFFLINE_REGION_SNAPSHOT_TYPE_NAME: &CStr = c"MlnValaOfflineRegionSnapshotHandle";
 const OFFLINE_REGION_LIST_TYPE_NAME: &CStr = c"MlnValaOfflineRegionListHandle";
 
@@ -62,6 +63,12 @@ pub struct StyleIdListHandle {
 }
 
 #[repr(C)]
+pub struct JsonSnapshotHandle {
+    parent_instance: GObject,
+    native: *mut sys::mln_json_snapshot,
+}
+
+#[repr(C)]
 pub struct OfflineRegionSnapshotHandle {
     parent_instance: GObject,
     native: *mut sys::mln_offline_region_snapshot,
@@ -86,6 +93,11 @@ pub extern "C" fn mln_vala_map_handle_get_type() -> GType {
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_style_id_list_handle_get_type() -> GType {
     glib::register_object_type::<StyleIdListHandle>(STYLE_ID_LIST_TYPE_NAME)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_json_snapshot_handle_get_type() -> GType {
+    glib::register_object_type::<JsonSnapshotHandle>(JSON_SNAPSHOT_TYPE_NAME)
 }
 
 #[unsafe(no_mangle)]
@@ -1979,6 +1991,38 @@ pub extern "C" fn mln_vala_map_handle_set_location_indicator_image_name(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_style_source_json(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    source_json: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_style_source_json(handle, source_id, source_json) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_style_layer_json(
+    handle: *mut MapHandle,
+    layer_json: *const sys::mln_json_value,
+    before_layer_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_style_layer_json(handle, layer_json, before_layer_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_style_layer_exists(
     handle: *mut MapHandle,
     layer_id: *const c_char,
@@ -2058,6 +2102,132 @@ pub extern "C" fn mln_vala_map_handle_list_style_source_ids(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_style_layer_json(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> *mut JsonSnapshotHandle {
+    match get_style_layer_json(handle, layer_id, out_found) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_style_light_json(
+    handle: *mut MapHandle,
+    light_json: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_light_json(handle, light_json) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_style_light_property(
+    handle: *mut MapHandle,
+    property_name: *const c_char,
+    value: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_light_property(handle, property_name, value) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_style_light_property(
+    handle: *mut MapHandle,
+    property_name: *const c_char,
+    error_out: *mut *mut GError,
+) -> *mut JsonSnapshotHandle {
+    match get_style_light_property(handle, property_name) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_layer_property(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    property_name: *const c_char,
+    value: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_layer_property(handle, layer_id, property_name, value) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_layer_property(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    property_name: *const c_char,
+    error_out: *mut *mut GError,
+) -> *mut JsonSnapshotHandle {
+    match get_layer_property(handle, layer_id, property_name) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_layer_filter(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    filter: *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_layer_filter(handle, layer_id, filter) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_layer_filter(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> *mut JsonSnapshotHandle {
+    match get_layer_filter(handle, layer_id) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_list_style_layer_ids(
     handle: *mut MapHandle,
     error_out: *mut *mut GError,
@@ -2104,6 +2274,26 @@ pub extern "C" fn mln_vala_style_id_list_handle_get(
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_style_id_list_handle_close(handle: *mut StyleIdListHandle) {
     close_style_id_list(handle);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_json_snapshot_handle_get(
+    handle: *mut JsonSnapshotHandle,
+    out_value: *mut *const sys::mln_json_value,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match json_snapshot_get(handle, out_value) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_json_snapshot_handle_close(handle: *mut JsonSnapshotHandle) {
+    close_json_snapshot(handle);
 }
 
 #[unsafe(no_mangle)]
@@ -3418,6 +3608,145 @@ fn get_style_layer_type(
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
 }
 
+fn add_style_source_json(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    source_json: *const sys::mln_json_value,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    let source_json = json_value_native(source_json, "source JSON")?;
+    // SAFETY: `map` is live and descriptors are borrowed for this call.
+    error::check(unsafe { sys::mln_map_add_style_source_json(map, source_id, source_json) })
+}
+
+fn add_style_layer_json(
+    handle: *mut MapHandle,
+    layer_json: *const sys::mln_json_value,
+    before_layer_id: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_json = json_value_native(layer_json, "layer JSON")?;
+    let before_layer_id = string_view_from_c(before_layer_id, "before layer ID")?;
+    // SAFETY: `map` is live and descriptors are borrowed for this call.
+    error::check(unsafe { sys::mln_map_add_style_layer_json(map, layer_json, before_layer_id) })
+}
+
+fn get_style_layer_json(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_found: *mut GBoolean,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    if out_found.is_null() {
+        return Err(Error::invalid_argument(
+            "style layer found output pointer is null",
+        ));
+    }
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let mut snapshot = ptr::null_mut();
+    let mut found = false;
+    // SAFETY: `map` is live and output storage is valid.
+    error::check(unsafe {
+        sys::mln_map_get_style_layer_json(map, layer_id, &mut snapshot, &mut found)
+    })?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })?;
+    if found {
+        wrap_json_snapshot(snapshot)
+    } else {
+        Ok(ptr::null_mut())
+    }
+}
+
+fn set_style_light_json(
+    handle: *mut MapHandle,
+    light_json: *const sys::mln_json_value,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let light_json = json_value_native(light_json, "style light JSON")?;
+    // SAFETY: `map` is live and JSON is borrowed for this call.
+    error::check(unsafe { sys::mln_map_set_style_light_json(map, light_json) })
+}
+
+fn set_style_light_property(
+    handle: *mut MapHandle,
+    property_name: *const c_char,
+    value: *const sys::mln_json_value,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let property_name = string_view_from_c(property_name, "style light property name")?;
+    let value = json_value_native(value, "style light property value")?;
+    // SAFETY: `map` is live and descriptors are borrowed for this call.
+    error::check(unsafe { sys::mln_map_set_style_light_property(map, property_name, value) })
+}
+
+fn get_style_light_property(
+    handle: *mut MapHandle,
+    property_name: *const c_char,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    let map = map_native(handle)?;
+    let property_name = string_view_from_c(property_name, "style light property name")?;
+    let mut snapshot = ptr::null_mut();
+    // SAFETY: `map` is live and output storage is valid and null-initialized.
+    error::check(unsafe {
+        sys::mln_map_get_style_light_property(map, property_name, &mut snapshot)
+    })?;
+    wrap_nullable_json_snapshot(snapshot)
+}
+
+fn set_layer_property(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    property_name: *const c_char,
+    value: *const sys::mln_json_value,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let property_name = string_view_from_c(property_name, "style layer property name")?;
+    let value = json_value_native(value, "style layer property value")?;
+    // SAFETY: `map` is live and descriptors are borrowed for this call.
+    error::check(unsafe { sys::mln_map_set_layer_property(map, layer_id, property_name, value) })
+}
+
+fn get_layer_property(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    property_name: *const c_char,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let property_name = string_view_from_c(property_name, "style layer property name")?;
+    let mut snapshot = ptr::null_mut();
+    // SAFETY: `map` is live and output storage is valid and null-initialized.
+    error::check(unsafe {
+        sys::mln_map_get_layer_property(map, layer_id, property_name, &mut snapshot)
+    })?;
+    wrap_nullable_json_snapshot(snapshot)
+}
+
+fn set_layer_filter(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    filter: *const sys::mln_json_value,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    // SAFETY: `map` is live and filter is nullable by contract.
+    error::check(unsafe { sys::mln_map_set_layer_filter(map, layer_id, filter) })
+}
+
+fn get_layer_filter(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let mut snapshot = ptr::null_mut();
+    // SAFETY: `map` is live and output storage is valid and null-initialized.
+    error::check(unsafe { sys::mln_map_get_layer_filter(map, layer_id, &mut snapshot) })?;
+    wrap_nullable_json_snapshot(snapshot)
+}
+
 fn list_style_source_ids(handle: *mut MapHandle) -> error::Result<*mut StyleIdListHandle> {
     let map = map_native(handle)?;
     let mut native = ptr::null_mut();
@@ -3505,6 +3834,93 @@ fn close_style_id_list(handle: *mut StyleIdListHandle) {
     if !native.is_null() {
         // SAFETY: This wrapper owns the native list and closes it exactly once.
         unsafe { sys::mln_style_id_list_destroy(native) };
+    }
+}
+
+fn json_value_native(
+    value: *const sys::mln_json_value,
+    label: &str,
+) -> error::Result<*const sys::mln_json_value> {
+    if value.is_null() {
+        return Err(Error::invalid_argument(format!("{label} is null")));
+    }
+    Ok(value)
+}
+
+fn wrap_nullable_json_snapshot(
+    native: *mut sys::mln_json_snapshot,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    if native.is_null() {
+        Ok(ptr::null_mut())
+    } else {
+        wrap_json_snapshot(native)
+    }
+}
+
+fn wrap_json_snapshot(
+    native: *mut sys::mln_json_snapshot,
+) -> error::Result<*mut JsonSnapshotHandle> {
+    if native.is_null() {
+        return Err(Error::invalid_argument("native JSON snapshot is null"));
+    }
+    let handle = glib::new_object::<JsonSnapshotHandle>(mln_vala_json_snapshot_handle_get_type());
+    if handle.is_null() {
+        // SAFETY: `native` came from a successful snapshot-producing operation.
+        unsafe { sys::mln_json_snapshot_destroy(native) };
+        return Err(Error::invalid_argument(
+            "failed to allocate JsonSnapshotHandle",
+        ));
+    }
+    // SAFETY: `handle` points to a newly allocated snapshot wrapper.
+    unsafe {
+        (*handle).native = native;
+    }
+    Ok(handle)
+}
+
+fn json_snapshot_native(
+    handle: *mut JsonSnapshotHandle,
+) -> error::Result<*mut sys::mln_json_snapshot> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument("JsonSnapshotHandle is null"));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe { (*handle).native };
+    if native.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "JsonSnapshotHandle is closed",
+        ));
+    }
+    Ok(native)
+}
+
+fn json_snapshot_get(
+    handle: *mut JsonSnapshotHandle,
+    out_value: *mut *const sys::mln_json_value,
+) -> error::Result<()> {
+    let native = json_snapshot_native(handle)?;
+    if out_value.is_null() {
+        return Err(Error::invalid_argument("JSON value output pointer is null"));
+    }
+    // SAFETY: `native` is live and output storage is valid.
+    error::check(unsafe { sys::mln_json_snapshot_get(native, out_value) })
+}
+
+fn close_json_snapshot(handle: *mut JsonSnapshotHandle) {
+    if handle.is_null() {
+        return;
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe {
+        let native = (*handle).native;
+        (*handle).native = ptr::null_mut();
+        native
+    };
+    if !native.is_null() {
+        // SAFETY: This wrapper owns the native snapshot and closes it exactly once.
+        unsafe { sys::mln_json_snapshot_destroy(native) };
     }
 }
 

@@ -48,6 +48,34 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   runtime.offline_operation_discard(operation_id);
 }
 
+void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue json) throws GLib.Error {
+  map.add_style_source_json("json-source", json);
+  map.add_style_layer_json(json, "");
+  bool found = false;
+  var layer_json = map.get_style_layer_json("json-layer", out found);
+  if (layer_json != null) {
+    unowned MaplibreNative.JsonValue root;
+    layer_json.get(out root);
+    layer_json.close();
+  }
+  map.set_style_light_json(json);
+  map.set_style_light_property("anchor", json);
+  var light_property = map.get_style_light_property("anchor");
+  if (light_property != null) {
+    light_property.close();
+  }
+  map.set_layer_property("json-layer", "visibility", json);
+  var layer_property = map.get_layer_property("json-layer", "visibility");
+  if (layer_property != null) {
+    layer_property.close();
+  }
+  map.set_layer_filter("json-layer", json);
+  var layer_filter = map.get_layer_filter("json-layer");
+  if (layer_filter != null) {
+    layer_filter.close();
+  }
+}
+
 void exercise_feature_queries(MaplibreNative.RenderSessionHandle session) throws GLib.Error {
   MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
   rendered_options.default();
