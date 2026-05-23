@@ -471,6 +471,9 @@ Review artifacts:
 - Kept the custom-geometry callback cleanup tests from the earlier Round 12
   pass, proving destroy-notify state is released after successful matching
   source removal and successful inline style JSON replacement.
+- Added direct in-flight custom-geometry teardown coverage that holds an active
+  callback guard during state destruction, verifies destroy-notify is delayed,
+  then releases the guard and verifies teardown completes exactly once.
 
 ### Rejected or deferred findings
 
@@ -499,4 +502,5 @@ Review artifacts:
 ### Validation
 
 - `mise run fix`
-- `mise run //bindings/vala:ci`
+- `mise run //bindings/vala:ci` (50-test run before the in-flight coverage, then
+  51-test run after adding the in-flight custom-geometry teardown test)

@@ -6659,8 +6659,8 @@ pub(crate) fn map_native(handle: *mut MapHandle) -> error::Result<*mut sys::mln_
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::ffi::CStr;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::ffi::{CStr, CString};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     static PROVIDER_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -7092,6 +7092,57 @@ mod tests {
 
         glib::unref_object(map);
         glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn custom_geometry_destroy_waits_for_in_flight_callback() {
+        let destroy_count = AtomicUsize::new(0);
+        let state = Box::into_raw(Box::new(CustomGeometrySourceCallbackState {
+            source_id: CString::new("custom-geometry-source").unwrap(),
+            fetch_tile: counted_custom_geometry_tile_delegate,
+            fetch_user_data: &destroy_count as *const AtomicUsize as *mut c_void,
+            fetch_destroy_notify: Some(counted_custom_geometry_destroy_notify),
+            cancel_tile: None,
+            cancel_user_data: ptr::null_mut(),
+            cancel_destroy_notify: None,
+            lifecycle: Mutex::new(CustomGeometrySourceLifecycle {
+                closing: false,
+                active_callbacks: 0,
+            }),
+            idle: Condvar::new(),
+        }));
+        let guard = custom_geometry_enter_callback(unsafe { &*state })
+            .expect("callback guard should enter before teardown starts");
+
+        let teardown_started = std::sync::Arc::new(AtomicBool::new(false));
+        let teardown_started_on_thread = teardown_started.clone();
+        let state_bits = state as usize;
+        let teardown = std::thread::spawn(move || {
+            teardown_started_on_thread.store(true, Ordering::SeqCst);
+            destroy_custom_geometry_state(state_bits as *mut CustomGeometrySourceCallbackState);
+        });
+
+        while !teardown_started.load(Ordering::SeqCst) {
+            std::thread::yield_now();
+        }
+        for _ in 0..1_000 {
+            let closing = unsafe { &*state }
+                .lifecycle
+                .lock()
+                .expect("custom geometry lifecycle lock should not be poisoned")
+                .closing;
+            if closing {
+                break;
+            }
+            std::thread::yield_now();
+        }
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 0);
+
+        drop(guard);
+        teardown
+            .join()
+            .expect("custom geometry teardown should finish after callback exits");
+        assert_eq!(destroy_count.load(Ordering::SeqCst), 1);
     }
 
     #[test]
