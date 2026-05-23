@@ -206,6 +206,18 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                     raster_dem_encoding=style.RasterDemEncoding.MAPBOX,
                 ),
             )
+            map_handle.add_vector_source_tiles(
+                "vector-inline",
+                ("https://example.test/vector/{z}/{x}/{y}.pbf",),
+            )
+            map_handle.add_raster_source_tiles(
+                "raster-inline",
+                ("https://example.test/raster/{z}/{x}/{y}.png",),
+            )
+            map_handle.add_raster_dem_source_tiles(
+                "dem-inline",
+                ("https://example.test/dem/{z}/{x}/{y}.png",),
+            )
 
             assert map_handle.style_source_exists("points") is True
             assert map_handle.style_source_exists("missing") is False
@@ -225,12 +237,27 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 map_handle.get_style_source_type("dem-tiles")
                 == style.StyleSourceType.RASTER_DEM
             )
+            assert (
+                map_handle.get_style_source_type("vector-inline")
+                == style.StyleSourceType.VECTOR
+            )
+            assert (
+                map_handle.get_style_source_type("raster-inline")
+                == style.StyleSourceType.RASTER
+            )
+            assert (
+                map_handle.get_style_source_type("dem-inline")
+                == style.StyleSourceType.RASTER_DEM
+            )
             assert map_handle.get_style_source_type("missing") is None
             source_ids = map_handle.list_style_source_ids()
             assert "points" in source_ids
             assert "vector-tiles" in source_ids
             assert "raster-tiles" in source_ids
             assert "dem-tiles" in source_ids
+            assert "vector-inline" in source_ids
+            assert "raster-inline" in source_ids
+            assert "dem-inline" in source_ids
 
             info = map_handle.get_style_source_info("points")
             assert info is not None
@@ -243,11 +270,17 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert map_handle.remove_style_source("vector-tiles") is True
             assert map_handle.remove_style_source("raster-tiles") is True
             assert map_handle.remove_style_source("dem-tiles") is True
+            assert map_handle.remove_style_source("vector-inline") is True
+            assert map_handle.remove_style_source("raster-inline") is True
+            assert map_handle.remove_style_source("dem-inline") is True
             source_ids = map_handle.list_style_source_ids()
             assert "points" not in source_ids
             assert "vector-tiles" not in source_ids
             assert "raster-tiles" not in source_ids
             assert "dem-tiles" not in source_ids
+            assert "vector-inline" not in source_ids
+            assert "raster-inline" not in source_ids
+            assert "dem-inline" not in source_ids
 
 
 def test_style_image_metadata_copy_and_removal_public_api() -> None:

@@ -1149,6 +1149,129 @@ impl MapHandle {
         .map_err(map_error)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn add_vector_source_tiles(
+        &self,
+        source_id: String,
+        tiles: Vec<String>,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        attribution: Option<String>,
+        scheme: Option<u32>,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        tile_size: Option<u32>,
+        vector_encoding: Option<u32>,
+        raster_dem_encoding: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let tiles = maplibre_core::style::NativeTileUrls::new(&tiles);
+        let options = tile_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            attribution,
+            scheme,
+            bounds,
+            tile_size,
+            vector_encoding,
+            raster_dem_encoding,
+        )?;
+        let options = maplibre_core::style::tile_source_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer, source ID, tile URL views, and options.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_vector_source_tiles(
+                state.as_ptr(),
+                source_id.raw(),
+                tiles.as_ptr(),
+                tiles.len(),
+                options.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_raster_source_tiles(
+        &self,
+        source_id: String,
+        tiles: Vec<String>,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        attribution: Option<String>,
+        scheme: Option<u32>,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        tile_size: Option<u32>,
+        vector_encoding: Option<u32>,
+        raster_dem_encoding: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let tiles = maplibre_core::style::NativeTileUrls::new(&tiles);
+        let options = tile_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            attribution,
+            scheme,
+            bounds,
+            tile_size,
+            vector_encoding,
+            raster_dem_encoding,
+        )?;
+        let options = maplibre_core::style::tile_source_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer, source ID, tile URL views, and options.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_raster_source_tiles(
+                state.as_ptr(),
+                source_id.raw(),
+                tiles.as_ptr(),
+                tiles.len(),
+                options.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_raster_dem_source_tiles(
+        &self,
+        source_id: String,
+        tiles: Vec<String>,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        attribution: Option<String>,
+        scheme: Option<u32>,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        tile_size: Option<u32>,
+        vector_encoding: Option<u32>,
+        raster_dem_encoding: Option<u32>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let tiles = maplibre_core::style::NativeTileUrls::new(&tiles);
+        let options = tile_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            attribution,
+            scheme,
+            bounds,
+            tile_size,
+            vector_encoding,
+            raster_dem_encoding,
+        )?;
+        let options = maplibre_core::style::tile_source_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer, source ID, tile URL views, and options.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_raster_dem_source_tiles(
+                state.as_ptr(),
+                source_id.raw(),
+                tiles.as_ptr(),
+                tiles.len(),
+                options.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
     fn remove_style_source(&self, source_id: String) -> PyResult<bool> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);

@@ -474,6 +474,45 @@ class MapHandle:
             source_id, url, *_tile_source_parts(options)
         )
 
+    def add_vector_source_tiles(
+        self,
+        source_id: str,
+        tiles: list[str] | tuple[str, ...],
+        options: TileSourceOptions | None = None,
+    ) -> None:
+        """Add a vector source with inline tile URLs."""
+        self._native.add_vector_source_tiles(
+            source_id,
+            list(tiles),
+            *_tile_source_parts(options),
+        )
+
+    def add_raster_source_tiles(
+        self,
+        source_id: str,
+        tiles: list[str] | tuple[str, ...],
+        options: TileSourceOptions | None = None,
+    ) -> None:
+        """Add a raster source with inline tile URLs."""
+        self._native.add_raster_source_tiles(
+            source_id,
+            list(tiles),
+            *_tile_source_parts(options),
+        )
+
+    def add_raster_dem_source_tiles(
+        self,
+        source_id: str,
+        tiles: list[str] | tuple[str, ...],
+        options: TileSourceOptions | None = None,
+    ) -> None:
+        """Add a raster DEM source with inline tile URLs."""
+        self._native.add_raster_dem_source_tiles(
+            source_id,
+            list(tiles),
+            *_tile_source_parts(options),
+        )
+
     def remove_style_source(self, source_id: str) -> bool:
         """Remove a style source by ID and report whether it existed."""
         return self._native.remove_style_source(source_id)
