@@ -64,6 +64,15 @@ final class ResourceLoadingMethod {
   /// Network-only loading.
   static const networkOnly = ResourceLoadingMethod._(2, 'networkOnly');
 
+  /// Creates a resource loading method from a raw native value.
+  factory ResourceLoadingMethod.fromRawValue(int rawValue) =>
+      switch (rawValue) {
+        0 => all,
+        1 => cacheOnly,
+        2 => networkOnly,
+        _ => ResourceLoadingMethod._(rawValue, 'unknown($rawValue)'),
+      };
+
   /// Raw native value.
   final int rawValue;
 
@@ -80,6 +89,13 @@ final class ResourcePriority {
 
   /// Low priority.
   static const low = ResourcePriority._(1, 'low');
+
+  /// Creates a resource priority from a raw native value.
+  factory ResourcePriority.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => regular,
+    1 => low,
+    _ => ResourcePriority._(rawValue, 'unknown($rawValue)'),
+  };
 
   /// Raw native value.
   final int rawValue;
@@ -98,6 +114,13 @@ final class ResourceUsage {
   /// Offline usage.
   static const offline = ResourceUsage._(1, 'offline');
 
+  /// Creates a resource usage from a raw native value.
+  factory ResourceUsage.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => online,
+    1 => offline,
+    _ => ResourceUsage._(rawValue, 'unknown($rawValue)'),
+  };
+
   /// Raw native value.
   final int rawValue;
 
@@ -114,6 +137,14 @@ final class ResourceStoragePolicy {
 
   /// Volatile storage.
   static const volatile = ResourceStoragePolicy._(1, 'volatile');
+
+  /// Creates a resource storage policy from a raw native value.
+  factory ResourceStoragePolicy.fromRawValue(int rawValue) =>
+      switch (rawValue) {
+        0 => permanent,
+        1 => volatile,
+        _ => ResourceStoragePolicy._(rawValue, 'unknown($rawValue)'),
+      };
 
   /// Raw native value.
   final int rawValue;
@@ -219,6 +250,69 @@ final class ResourceUrlRewriteRule {
 
   /// Replacement URL returned to native code.
   final String replacementUrl;
+}
+
+/// Copied resource request delivered to a Dart resource provider.
+final class ResourceRequest {
+  /// Creates a copied resource request.
+  const ResourceRequest({
+    required this.url,
+    required this.kind,
+    required this.loadingMethod,
+    required this.priority,
+    required this.usage,
+    required this.storagePolicy,
+    this.range,
+    this.priorModifiedUnixMs,
+    this.priorExpiresUnixMs,
+    this.priorEtag,
+    this.priorData,
+  });
+
+  /// Requested URL.
+  final String url;
+
+  /// Requested resource kind.
+  final ResourceKind kind;
+
+  /// Loading method requested by native code.
+  final ResourceLoadingMethod loadingMethod;
+
+  /// Request priority.
+  final ResourcePriority priority;
+
+  /// Request usage.
+  final ResourceUsage usage;
+
+  /// Request storage policy.
+  final ResourceStoragePolicy storagePolicy;
+
+  /// Optional byte range as inclusive start/end values.
+  final ({int start, int end})? range;
+
+  /// Optional previously modified timestamp in Unix milliseconds.
+  final int? priorModifiedUnixMs;
+
+  /// Optional previously expires timestamp in Unix milliseconds.
+  final int? priorExpiresUnixMs;
+
+  /// Optional previous entity tag.
+  final String? priorEtag;
+
+  /// Optional previous data bytes copied from native code.
+  final Uint8List? priorData;
+}
+
+/// Exact URL route used by a queued Dart resource provider callback.
+final class ResourceProviderRoute {
+  /// Creates an exact URL provider route.
+  const ResourceProviderRoute({this.kind, required this.url});
+
+  /// Optional resource kind filter. Null matches any kind.
+  final ResourceKind? kind;
+
+  /// Request URL to match exactly.
+  final String url;
 }
 
 /// Exact URL provider rule used by the runtime resource provider.

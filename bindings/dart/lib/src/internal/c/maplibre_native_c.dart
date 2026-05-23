@@ -97,18 +97,40 @@ final class MaplibreNativeCApi {
   dartResourceProviderRulesCallback() =>
       library.lookup('mln_dart_resource_provider_rules_callback');
 
+  /// Native Dart-shim callback for queued resource providers.
+  Pointer<NativeFunction<raw.mln_resource_provider_callbackFunction>>
+  dartQueuedResourceProviderCallback() =>
+      library.lookup('mln_dart_queued_resource_provider_callback');
+
   /// Native Dart-shim callback for exact URL resource transforms.
   Pointer<NativeFunction<raw.mln_resource_transform_callbackFunction>>
   dartResourceTransformRewriteCallback() =>
       library.lookup('mln_dart_resource_transform_rewrite_callback');
 
-  /// Address of mln_resource_request_complete.
-  int resourceRequestCompleteAddress() =>
-      library.lookup('mln_resource_request_complete').address;
+  /// Completes a resource provider request.
+  int resourceRequestComplete(
+    Pointer<raw.mln_resource_request_handle> handle,
+    Pointer<raw.mln_resource_response> response,
+  ) => _raw.mln_resource_request_complete(handle, response).value;
 
-  /// Address of mln_resource_request_release.
-  int resourceRequestReleaseAddress() =>
-      library.lookup('mln_resource_request_release').address;
+  /// Reports whether a resource provider request was cancelled.
+  int resourceRequestCancelled(
+    Pointer<raw.mln_resource_request_handle> handle,
+    Pointer<Bool> outCancelled,
+  ) => _raw.mln_resource_request_cancelled(handle, outCancelled).value;
+
+  /// Releases the provider's reference to a handled resource request.
+  void resourceRequestRelease(Pointer<raw.mln_resource_request_handle> handle) {
+    _raw.mln_resource_request_release(handle);
+  }
+
+  /// Destroys a copied Dart-shim resource request record.
+  void dartResourceProviderRequestDestroy(Pointer<Void> request) {
+    library.lookupFunction<
+      Void Function(Pointer<Void>),
+      void Function(Pointer<Void>)
+    >('mln_dart_resource_provider_request_destroy')(request);
+  }
 
   /// Registers or updates a runtime-scoped URL transform.
   int runtimeSetResourceTransform(
@@ -474,23 +496,6 @@ final class MaplibreNativeCApi {
   /// Destroys a JSON snapshot handle.
   void jsonSnapshotDestroy(Pointer<raw.mln_json_snapshot> snapshot) {
     _raw.mln_json_snapshot_destroy(snapshot);
-  }
-
-  /// Completes a C API resource provider request.
-  int resourceRequestComplete(
-    Pointer<raw.mln_resource_request_handle> handle,
-    Pointer<raw.mln_resource_response> response,
-  ) => _raw.mln_resource_request_complete(handle, response).value;
-
-  /// Reports whether a resource provider request was cancelled.
-  int resourceRequestCancelled(
-    Pointer<raw.mln_resource_request_handle> handle,
-    Pointer<Bool> outCancelled,
-  ) => _raw.mln_resource_request_cancelled(handle, outCancelled).value;
-
-  /// Releases the provider's reference to a resource request handle.
-  void resourceRequestRelease(Pointer<raw.mln_resource_request_handle> handle) {
-    _raw.mln_resource_request_release(handle);
   }
 
   /// Adds one style source from a style-spec source JSON object.

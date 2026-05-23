@@ -23,6 +23,22 @@ import '../style/style.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
+/// Dart resource provider callback run on the owner isolate.
+typedef ResourceProviderCallback =
+    void Function(ResourceRequest request, ResourceRequestHandle handle);
+
+/// Owner-isolate resource provider definition.
+final class ResourceProvider {
+  /// Creates a resource provider with native-owned routing rules.
+  const ResourceProvider({required this.routes, required this.callback});
+
+  /// Exact routes handled by this provider.
+  final List<ResourceProviderRoute> routes;
+
+  /// Callback invoked on the owner isolate for matching requests.
+  final ResourceProviderCallback callback;
+}
+
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
 final class RuntimeHandle {
   RuntimeHandle._(Pointer<raw.mln_runtime> pointer)
@@ -31,6 +47,7 @@ final class RuntimeHandle {
   final NativeHandleState<raw.mln_runtime> _state;
   _ResourceTransformState? _resourceTransformState;
   _ResourceProviderRulesState? _resourceProviderRulesState;
+  _ResourceProviderCallbackState? _resourceProviderCallbackState;
 
   /// Creates a runtime on the current native thread using native defaults.
   factory RuntimeHandle.create() {
@@ -119,6 +136,31 @@ final class RuntimeHandle {
       });
       _resourceProviderRulesState?.close();
       _resourceProviderRulesState = state;
+      _resourceProviderCallbackState?.close();
+      _resourceProviderCallbackState = null;
+    } catch (_) {
+      state.close();
+      rethrow;
+    }
+  }
+
+  /// Registers a queued Dart resource provider callback.
+  ///
+  /// The provider must be set before this runtime creates maps.
+  void setResourceProvider(ResourceProvider provider) {
+    final state = _ResourceProviderCallbackState(provider);
+    try {
+      withNativeArena((arena) {
+        final nativeProvider = arena<raw.mln_resource_provider>();
+        nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
+        nativeProvider.ref.callback = _c.dartQueuedResourceProviderCallback();
+        nativeProvider.ref.user_data = state.pointer.cast<Void>();
+        _check(_c.runtimeSetResourceProvider(_pointer, nativeProvider));
+      });
+      _resourceProviderCallbackState?.close();
+      _resourceProviderCallbackState = state;
+      _resourceProviderRulesState?.close();
+      _resourceProviderRulesState = null;
     } catch (_) {
       state.close();
       rethrow;
@@ -153,6 +195,8 @@ final class RuntimeHandle {
     _resourceTransformState = null;
     _resourceProviderRulesState?.close();
     _resourceProviderRulesState = null;
+    _resourceProviderCallbackState?.close();
+    _resourceProviderCallbackState = null;
   }
 }
 
@@ -220,6 +264,76 @@ final class _NativeResourceProviderRule extends Struct {
   external raw.mln_resource_response response;
 }
 
+typedef _QueuedResourceRequestListenerFunction = Void Function(Pointer<Void>);
+
+final class _NativeQueuedResourceProviderRoute extends Struct {
+  @Uint32()
+  external int kind;
+
+  external Pointer<Char> url;
+}
+
+final class _NativeQueuedResourceProvider extends Struct {
+  external Pointer<_NativeQueuedResourceProviderRoute> routes;
+
+  @Size()
+  external int routeCount;
+
+  external Pointer<NativeFunction<_QueuedResourceRequestListenerFunction>>
+  listener;
+}
+
+final class _NativeQueuedResourceRequest extends Struct {
+  external Pointer<Void> owner;
+
+  external Pointer<raw.mln_resource_request_handle> handle;
+
+  external Pointer<Char> url;
+
+  @Uint32()
+  external int kind;
+
+  @Uint32()
+  external int loadingMethod;
+
+  @Uint32()
+  external int priority;
+
+  @Uint32()
+  external int usage;
+
+  @Uint32()
+  external int storagePolicy;
+
+  @Bool()
+  external bool hasRange;
+
+  @Uint64()
+  external int rangeStart;
+
+  @Uint64()
+  external int rangeEnd;
+
+  @Bool()
+  external bool hasPriorModified;
+
+  @Int64()
+  external int priorModifiedUnixMs;
+
+  @Bool()
+  external bool hasPriorExpires;
+
+  @Int64()
+  external int priorExpiresUnixMs;
+
+  external Pointer<Char> priorEtag;
+
+  external Pointer<Uint8> priorData;
+
+  @Size()
+  external int priorDataSize;
+}
+
 final class _ResourceProviderRulesState {
   _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
     pointer = calloc<_NativeResourceProviderRules>();
@@ -251,6 +365,100 @@ final class _ResourceProviderRulesState {
     }
     calloc.free(pointer);
   }
+}
+
+final class _ResourceProviderCallbackState {
+  _ResourceProviderCallbackState(ResourceProvider provider) {
+    callback = NativeCallable<_QueuedResourceRequestListenerFunction>.listener((
+      Pointer<Void> request,
+    ) {
+      _invokeQueuedResourceProvider(provider.callback, request);
+    });
+    pointer = calloc<_NativeQueuedResourceProvider>();
+    pointer.ref.routeCount = provider.routes.length;
+    pointer.ref.routes = provider.routes.isEmpty
+        ? nullptr.cast<_NativeQueuedResourceProviderRoute>()
+        : calloc<_NativeQueuedResourceProviderRoute>(provider.routes.length);
+    for (var index = 0; index < provider.routes.length; index += 1) {
+      final route = provider.routes[index];
+      pointer.ref.routes[index].kind = route.kind?.rawValue ?? 0;
+      pointer.ref.routes[index].url = route.url.toNativeUtf8().cast<Char>();
+    }
+    pointer.ref.listener = callback.nativeFunction;
+  }
+
+  late final Pointer<_NativeQueuedResourceProvider> pointer;
+  late final NativeCallable<_QueuedResourceRequestListenerFunction> callback;
+
+  void close() {
+    final routes = pointer.ref.routes;
+    for (var index = 0; index < pointer.ref.routeCount; index += 1) {
+      calloc.free(routes[index].url);
+    }
+    if (routes != nullptr) {
+      calloc.free(routes);
+    }
+    calloc.free(pointer);
+    callback.close();
+  }
+}
+
+void _invokeQueuedResourceProvider(
+  ResourceProviderCallback callback,
+  Pointer<Void> rawRequest,
+) {
+  try {
+    final request = rawRequest.cast<_NativeQueuedResourceRequest>().ref;
+    final handle = ResourceRequestHandle._(request.handle);
+    try {
+      callback(_copyResourceRequest(request), handle);
+    } catch (_) {
+      if (!handle.isReleased) {
+        try {
+          handle.complete(
+            const ResourceResponse(
+              status: ResourceResponseStatus.error,
+              errorReason: ResourceErrorReason.other,
+              errorMessage: 'Dart resource provider callback threw',
+            ),
+          );
+        } catch (_) {
+          handle.close();
+        }
+      }
+    }
+  } finally {
+    _c.dartResourceProviderRequestDestroy(rawRequest);
+  }
+}
+
+ResourceRequest _copyResourceRequest(_NativeQueuedResourceRequest request) {
+  final priorData = request.priorData == nullptr || request.priorDataSize == 0
+      ? null
+      : Uint8List.fromList(
+          request.priorData.asTypedList(request.priorDataSize),
+        );
+  return ResourceRequest(
+    url: request.url.cast<Utf8>().toDartString(),
+    kind: ResourceKind.fromRawValue(request.kind),
+    loadingMethod: ResourceLoadingMethod.fromRawValue(request.loadingMethod),
+    priority: ResourcePriority.fromRawValue(request.priority),
+    usage: ResourceUsage.fromRawValue(request.usage),
+    storagePolicy: ResourceStoragePolicy.fromRawValue(request.storagePolicy),
+    range: request.hasRange
+        ? (start: request.rangeStart, end: request.rangeEnd)
+        : null,
+    priorModifiedUnixMs: request.hasPriorModified
+        ? request.priorModifiedUnixMs
+        : null,
+    priorExpiresUnixMs: request.hasPriorExpires
+        ? request.priorExpiresUnixMs
+        : null,
+    priorEtag: request.priorEtag == nullptr
+        ? null
+        : request.priorEtag.cast<Utf8>().toDartString(),
+    priorData: priorData,
+  );
 }
 
 /// Runtime-owned offline operation handle.
@@ -1284,6 +1492,9 @@ final class ResourceRequestHandle {
   bool get isReleased => _released;
 
   /// Reports whether MapLibre has cancelled this provider request.
+  bool get isCancelled => cancelled();
+
+  /// Reports whether MapLibre has cancelled this provider request.
   bool cancelled() {
     return withNativeArena((arena) {
       final outCancelled = arena<Bool>();
@@ -1292,13 +1503,18 @@ final class ResourceRequestHandle {
     });
   }
 
-  /// Completes this request with [response]. Completion is one-shot.
+  /// Completes this request with [response] and releases it. Completion is one-shot.
   void complete(ResourceResponse response) {
-    withNativeArena((arena) {
-      final nativeResponse = arena<raw.mln_resource_response>();
-      nativeResponse.ref = _resourceResponseToNative(response, arena);
-      _check(_c.resourceRequestComplete(_livePointer, nativeResponse));
-    });
+    final pointer = _takePointer();
+    try {
+      withNativeArena((arena) {
+        final nativeResponse = arena<raw.mln_resource_response>();
+        nativeResponse.ref = _resourceResponseToNative(response, arena);
+        _check(_c.resourceRequestComplete(pointer, nativeResponse));
+      });
+    } finally {
+      _c.resourceRequestRelease(pointer);
+    }
   }
 
   /// Releases the provider reference. The handle must not be used afterwards.
@@ -1309,6 +1525,13 @@ final class ResourceRequestHandle {
     _c.resourceRequestRelease(_pointer);
     _pointer = nullptr;
     _released = true;
+  }
+
+  Pointer<raw.mln_resource_request_handle> _takePointer() {
+    final pointer = _livePointer;
+    _pointer = nullptr;
+    _released = true;
+    return pointer;
   }
 
   Pointer<raw.mln_resource_request_handle> get _livePointer {

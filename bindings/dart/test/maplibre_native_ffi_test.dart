@@ -53,6 +53,25 @@ void main() {
           ),
         ),
       ]);
+      runtime.setResourceProvider(
+        ResourceProvider(
+          routes: const [
+            ResourceProviderRoute(
+              kind: ResourceKind.style,
+              url: 'https://example.com/provider-style.json',
+            ),
+          ],
+          callback: (request, handle) {
+            expect(request.kind, ResourceKind.style);
+            handle.complete(
+              ResourceResponse(
+                status: ResourceResponseStatus.ok,
+                bytes: Uint8List.fromList([123]),
+              ),
+            );
+          },
+        ),
+      );
       final offlineOperation = runtime.runAmbientCacheOperation(
         AmbientCacheOperation.clear,
       );
