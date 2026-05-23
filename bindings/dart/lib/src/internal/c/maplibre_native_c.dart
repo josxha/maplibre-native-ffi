@@ -106,6 +106,17 @@ final class MaplibreNativeCApi {
     _raw.mln_style_id_list_destroy(list);
   }
 
+  /// Borrows the root value from a JSON snapshot.
+  int jsonSnapshotGet(
+    Pointer<raw.mln_json_snapshot> snapshot,
+    Pointer<Pointer<raw.mln_json_value>> outValue,
+  ) => _raw.mln_json_snapshot_get(snapshot, outValue).value;
+
+  /// Destroys a JSON snapshot handle.
+  void jsonSnapshotDestroy(Pointer<raw.mln_json_snapshot> snapshot) {
+    _raw.mln_json_snapshot_destroy(snapshot);
+  }
+
   /// Adds one style source from a style-spec source JSON object.
   int mapAddStyleSourceJson(
     Pointer<raw.mln_map> map,
@@ -190,6 +201,15 @@ final class MaplibreNativeCApi {
     Pointer<Bool> outExists,
   ) => _raw.mln_map_style_layer_exists(map, layerId, outExists).value;
 
+  /// Copies one style layer as a style-spec layer JSON snapshot.
+  int mapGetStyleLayerJson(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    Pointer<Pointer<raw.mln_json_snapshot>> outLayer,
+    Pointer<Bool> outFound,
+  ) =>
+      _raw.mln_map_get_style_layer_json(map, layerId, outLayer, outFound).value;
+
   /// Gets one style layer type string.
   int mapGetStyleLayerType(
     Pointer<raw.mln_map> map,
@@ -199,6 +219,58 @@ final class MaplibreNativeCApi {
   ) => _raw
       .mln_map_get_style_layer_type(map, layerId, outLayerType, outFound)
       .value;
+
+  /// Sets the style light from a style-spec light JSON object.
+  int mapSetStyleLightJson(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_json_value> lightJson,
+  ) => _raw.mln_map_set_style_light_json(map, lightJson).value;
+
+  /// Sets one style light property.
+  int mapSetStyleLightProperty(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view propertyName,
+    Pointer<raw.mln_json_value> value,
+  ) => _raw.mln_map_set_style_light_property(map, propertyName, value).value;
+
+  /// Copies one style light property as a JSON snapshot.
+  int mapGetStyleLightProperty(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view propertyName,
+    Pointer<Pointer<raw.mln_json_snapshot>> outValue,
+  ) => _raw.mln_map_get_style_light_property(map, propertyName, outValue).value;
+
+  /// Sets one layer property.
+  int mapSetLayerProperty(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_string_view propertyName,
+    Pointer<raw.mln_json_value> value,
+  ) => _raw.mln_map_set_layer_property(map, layerId, propertyName, value).value;
+
+  /// Copies one layer property as a JSON snapshot.
+  int mapGetLayerProperty(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_string_view propertyName,
+    Pointer<Pointer<raw.mln_json_snapshot>> outValue,
+  ) => _raw
+      .mln_map_get_layer_property(map, layerId, propertyName, outValue)
+      .value;
+
+  /// Sets or clears one layer filter.
+  int mapSetLayerFilter(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    Pointer<raw.mln_json_value> filter,
+  ) => _raw.mln_map_set_layer_filter(map, layerId, filter).value;
+
+  /// Copies one layer filter as a JSON snapshot.
+  int mapGetLayerFilter(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    Pointer<Pointer<raw.mln_json_snapshot>> outFilter,
+  ) => _raw.mln_map_get_layer_filter(map, layerId, outFilter).value;
 
   /// Removes one style layer by ID.
   int mapRemoveStyleLayer(

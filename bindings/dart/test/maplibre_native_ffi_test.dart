@@ -80,6 +80,37 @@ void main() {
       expect(map.styleLayerExists('dart-circle-layer'), isTrue);
       expect(map.getStyleLayerType('dart-circle-layer'), 'circle');
       expect(map.listStyleLayerIds(), contains('dart-circle-layer'));
+      final layerJson = map.getStyleLayerJson('dart-circle-layer');
+      expect(layerJson, isA<JsonObject>());
+      expect(
+        (layerJson! as JsonObject).members.map((member) => member.key),
+        contains('id'),
+      );
+
+      map.setLayerProperty(
+        'dart-circle-layer',
+        'circle-radius',
+        const JsonDouble(6.5),
+      );
+      expect(
+        map.getLayerProperty('dart-circle-layer', 'circle-radius'),
+        isA<JsonDouble>(),
+      );
+      map.setLayerFilter(
+        'dart-circle-layer',
+        const JsonArray([
+          JsonString('=='),
+          JsonArray([JsonString('get'), JsonString('kind')]),
+          JsonString('dart'),
+        ]),
+      );
+      expect(map.getLayerFilter('dart-circle-layer'), isA<JsonArray>());
+      map.setLayerFilter('dart-circle-layer', null);
+      expect(
+        map.getLayerFilter('dart-circle-layer'),
+        anyOf(isNull, isA<JsonNull>()),
+      );
+
       expect(map.removeStyleLayer('dart-circle-layer'), isTrue);
       expect(map.removeStyleSource('dart-geojson-source'), isTrue);
 

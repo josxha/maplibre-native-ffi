@@ -333,6 +333,121 @@ final class MapHandle {
     });
   }
 
+  /// Copies one style layer as a full style-spec layer JSON snapshot.
+  JsonValue? getStyleLayerJson(String layerId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      final outLayer = arena<Pointer<raw.mln_json_snapshot>>();
+      outLayer.value = nullptr;
+      final outFound = arena<Bool>();
+      _check(
+        _c.mapGetStyleLayerJson(_pointer, nativeId.value, outLayer, outFound),
+      );
+      if (!outFound.value) {
+        return null;
+      }
+      return _copyJsonSnapshot(outLayer.value);
+    });
+  }
+
+  /// Sets the style light from a style-spec light JSON object.
+  void setStyleLightJson(JsonValue lightJson) {
+    withNativeArena((arena) {
+      final nativeLightJson = native_json.nativeJsonValue(lightJson, arena);
+      _check(_c.mapSetStyleLightJson(_pointer, nativeLightJson.pointer));
+    });
+  }
+
+  /// Sets one style light property by style-spec property name.
+  void setStyleLightProperty(String propertyName, JsonValue value) {
+    withNativeArena((arena) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final nativeValue = native_json.nativeJsonValue(value, arena);
+      _check(
+        _c.mapSetStyleLightProperty(
+          _pointer,
+          nativePropertyName.value,
+          nativeValue.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Copies one style light property, or null when the property is undefined.
+  JsonValue? getStyleLightProperty(String propertyName) {
+    return withNativeArena((arena) {
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final outValue = arena<Pointer<raw.mln_json_snapshot>>();
+      outValue.value = nullptr;
+      _check(
+        _c.mapGetStyleLightProperty(
+          _pointer,
+          nativePropertyName.value,
+          outValue,
+        ),
+      );
+      return _copyJsonSnapshot(outValue.value);
+    });
+  }
+
+  /// Sets one layer property by style-spec property name.
+  void setLayerProperty(String layerId, String propertyName, JsonValue value) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final nativeValue = native_json.nativeJsonValue(value, arena);
+      _check(
+        _c.mapSetLayerProperty(
+          _pointer,
+          nativeLayerId.value,
+          nativePropertyName.value,
+          nativeValue.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Copies one layer property, or null when the property is undefined.
+  JsonValue? getLayerProperty(String layerId, String propertyName) {
+    return withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativePropertyName = nativeStringView(propertyName, arena);
+      final outValue = arena<Pointer<raw.mln_json_snapshot>>();
+      outValue.value = nullptr;
+      _check(
+        _c.mapGetLayerProperty(
+          _pointer,
+          nativeLayerId.value,
+          nativePropertyName.value,
+          outValue,
+        ),
+      );
+      return _copyJsonSnapshot(outValue.value);
+    });
+  }
+
+  /// Sets or clears one layer filter.
+  void setLayerFilter(String layerId, JsonValue? filter) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeFilter = filter == null
+          ? nullptr.cast<raw.mln_json_value>()
+          : native_json.nativeJsonValue(filter, arena).pointer;
+      _check(_c.mapSetLayerFilter(_pointer, nativeLayerId.value, nativeFilter));
+    });
+  }
+
+  /// Copies one layer filter, or null when the layer has no filter.
+  JsonValue? getLayerFilter(String layerId) {
+    return withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final outFilter = arena<Pointer<raw.mln_json_snapshot>>();
+      outFilter.value = nullptr;
+      _check(_c.mapGetLayerFilter(_pointer, nativeLayerId.value, outFilter));
+      return _copyJsonSnapshot(outFilter.value);
+    });
+  }
+
   /// Reports whether a style layer ID exists.
   bool styleLayerExists(String layerId) {
     return withNativeArena((arena) {
@@ -422,6 +537,25 @@ String? _copyStyleSourceAttribution(
     return '';
   }
   return buffer.cast<Utf8>().toDartString(length: outSize.value);
+}
+
+JsonValue? _copyJsonSnapshot(Pointer<raw.mln_json_snapshot> snapshot) {
+  if (snapshot == nullptr) {
+    return null;
+  }
+  try {
+    return withNativeArena((arena) {
+      final outValue = arena<Pointer<raw.mln_json_value>>();
+      outValue.value = nullptr;
+      _check(_c.jsonSnapshotGet(snapshot, outValue));
+      if (outValue.value == nullptr) {
+        return null;
+      }
+      return native_json.jsonValueFromNative(outValue.value.ref);
+    });
+  } finally {
+    _c.jsonSnapshotDestroy(snapshot);
+  }
 }
 
 List<String> _copyStyleIdList(Pointer<raw.mln_style_id_list> list) {
