@@ -379,3 +379,21 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Final post-redesign review
+
+Review evidence:
+
+- Ran a final focused review agent after correcting the review log callback
+  type.
+- The reviewer checked resource transform/provider design in `SPEC.md`, the
+  review log through post-redesign round 5, native provider/transform routing,
+  request registry and teardown paths, the JavaScript wrapper, TypeScript
+  declarations, resource-focused tests, ESM smoke coverage, and branch hygiene.
+- The reviewer reported no actionable findings remain.
+
+Applied findings: none.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.
