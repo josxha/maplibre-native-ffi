@@ -17,6 +17,8 @@ int main(string[] args) {
     MaplibreNative.NativePointer native_pointer;
     MaplibreNative.NativePointer.@new(0x1234, out native_pointer);
     size_t pointer_bits = native_pointer.get_bits();
+    MaplibreNative.ResourceResponse response = {};
+    response.default();
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ProjectedMeters meters;

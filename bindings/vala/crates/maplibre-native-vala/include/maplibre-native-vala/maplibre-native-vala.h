@@ -45,6 +45,59 @@ typedef enum {
 } MlnValaMapMode;
 
 typedef enum {
+  MLN_VALA_RESOURCE_KIND_UNKNOWN = 0,
+  MLN_VALA_RESOURCE_KIND_STYLE = 1,
+  MLN_VALA_RESOURCE_KIND_SOURCE = 2,
+  MLN_VALA_RESOURCE_KIND_TILE = 3,
+  MLN_VALA_RESOURCE_KIND_GLYPHS = 4,
+  MLN_VALA_RESOURCE_KIND_SPRITE_IMAGE = 5,
+  MLN_VALA_RESOURCE_KIND_SPRITE_JSON = 6,
+  MLN_VALA_RESOURCE_KIND_IMAGE = 7,
+} MlnValaResourceKind;
+
+typedef enum {
+  MLN_VALA_RESOURCE_LOADING_METHOD_ALL = 0,
+  MLN_VALA_RESOURCE_LOADING_METHOD_CACHE_ONLY = 1,
+  MLN_VALA_RESOURCE_LOADING_METHOD_NETWORK_ONLY = 2,
+} MlnValaResourceLoadingMethod;
+
+typedef enum {
+  MLN_VALA_RESOURCE_PRIORITY_REGULAR = 0,
+  MLN_VALA_RESOURCE_PRIORITY_LOW = 1,
+} MlnValaResourcePriority;
+
+typedef enum {
+  MLN_VALA_RESOURCE_USAGE_ONLINE = 0,
+  MLN_VALA_RESOURCE_USAGE_OFFLINE = 1,
+} MlnValaResourceUsage;
+
+typedef enum {
+  MLN_VALA_RESOURCE_STORAGE_POLICY_PERMANENT = 0,
+  MLN_VALA_RESOURCE_STORAGE_POLICY_VOLATILE = 1,
+} MlnValaResourceStoragePolicy;
+
+typedef enum {
+  MLN_VALA_RESOURCE_RESPONSE_STATUS_OK = 0,
+  MLN_VALA_RESOURCE_RESPONSE_STATUS_ERROR = 1,
+  MLN_VALA_RESOURCE_RESPONSE_STATUS_NO_CONTENT = 2,
+  MLN_VALA_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED = 3,
+} MlnValaResourceResponseStatus;
+
+typedef enum {
+  MLN_VALA_RESOURCE_ERROR_REASON_NONE = 0,
+  MLN_VALA_RESOURCE_ERROR_REASON_NOT_FOUND = 1,
+  MLN_VALA_RESOURCE_ERROR_REASON_SERVER = 2,
+  MLN_VALA_RESOURCE_ERROR_REASON_CONNECTION = 3,
+  MLN_VALA_RESOURCE_ERROR_REASON_RATE_LIMIT = 4,
+  MLN_VALA_RESOURCE_ERROR_REASON_OTHER = 5,
+} MlnValaResourceErrorReason;
+
+typedef enum {
+  MLN_VALA_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0,
+  MLN_VALA_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
+} MlnValaResourceProviderDecision;
+
+typedef enum {
   MLN_VALA_LOG_SEVERITY_INFO = 1,
   MLN_VALA_LOG_SEVERITY_WARNING = 2,
   MLN_VALA_LOG_SEVERITY_ERROR = 3,
@@ -216,6 +269,23 @@ typedef struct {
   double scale_factor;
   MlnValaMapMode map_mode;
 } MlnValaMapOptions;
+
+typedef struct {
+  uint32_t size;
+  MlnValaResourceResponseStatus status;
+  MlnValaResourceErrorReason error_reason;
+  const uint8_t* bytes;
+  size_t byte_count;
+  const char* error_message;
+  bool must_revalidate;
+  bool has_modified;
+  int64_t modified_unix_ms;
+  bool has_expires;
+  int64_t expires_unix_ms;
+  const char* etag;
+  bool has_retry_after;
+  int64_t retry_after_unix_ms;
+} MlnValaResourceResponse;
 
 /**
  * mln_vala_runtime_options_default:
@@ -450,6 +520,25 @@ G_DECLARE_FINAL_TYPE(
   MAP_PROJECTION_HANDLE, GObject
 )
 
+#define MLN_VALA_TYPE_RESOURCE_REQUEST_HANDLE \
+  (mln_vala_resource_request_handle_get_type())
+G_DECLARE_FINAL_TYPE(
+  MlnValaResourceRequestHandle, mln_vala_resource_request_handle, MLN_VALA,
+  RESOURCE_REQUEST_HANDLE, GObject
+)
+
+/**
+ * mln_vala_resource_response_default:
+ * @out_response: (out): return location for initialized resource response.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_resource_response_default(
+  MlnValaResourceResponse* out_response, GError** error
+);
+
 /**
  * mln_vala_c_version:
  *
@@ -639,6 +728,52 @@ gboolean mln_vala_runtime_handle_run_ambient_cache_operation_start(
 gboolean mln_vala_runtime_handle_offline_operation_discard(
   MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
 );
+
+/**
+ * mln_vala_resource_request_handle_complete:
+ * @self: a resource request handle.
+ * @response: (not nullable): response descriptor copied by native code.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_resource_request_handle_complete(
+  MlnValaResourceRequestHandle* self, const MlnValaResourceResponse* response,
+  GError** error
+);
+
+/**
+ * mln_vala_resource_request_handle_is_cancelled:
+ * @self: a resource request handle.
+ * @out_cancelled: (out): return location for cancellation state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_resource_request_handle_is_cancelled(
+  MlnValaResourceRequestHandle* self, gboolean* out_cancelled, GError** error
+);
+
+/**
+ * mln_vala_resource_request_handle_release:
+ * @self: (nullable): a resource request handle.
+ *
+ * Releases the provider-owned request reference exactly once. Null and repeated
+ * release are no-ops.
+ */
+void mln_vala_resource_request_handle_release(
+  MlnValaResourceRequestHandle* self
+);
+
+/**
+ * mln_vala_resource_request_handle_close:
+ * @self: (nullable): a resource request handle.
+ *
+ * Alias for release().
+ */
+void mln_vala_resource_request_handle_close(MlnValaResourceRequestHandle* self);
 
 /**
  * mln_vala_map_handle_new:
