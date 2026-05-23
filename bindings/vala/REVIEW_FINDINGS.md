@@ -78,3 +78,76 @@ Review artifacts:
 - None requiring immediate user input for this round. Deferred API-shape items
   above should be revisited only if maintainers want to expand the PR scope
   before merge.
+
+## Round 2
+
+Review artifacts:
+
+- `review-loop/round2-api-spec.md`
+- `review-loop/round2-runtime-lifecycle.md`
+- `review-loop/round2-build-generation-tests.md`
+- `review-loop/round2-maintainability-docs.md`
+
+### Applied findings
+
+- Recorded the remaining struct-field byte-buffer gap as deferred, with affected
+  low-level structs and scope rationale.
+- Applied the owner-thread finalizer policy to `MapProjectionHandle` and aligned
+  SPEC finalizer wording with the implementation.
+- Kept transform replacement URLs retained until transform state teardown after
+  rejecting an attempted per-callback cleanup that could race overlapping native
+  transform callbacks.
+- Replaced hardcoded Pixi `default` scanner paths with `$CONDA_PREFIX` paths.
+- Added Vala readback compile/runtime coverage for
+  `RenderSessionHandle.read_premultiplied_rgba8` in the Metal owned-texture
+  fixture.
+- Aligned the SPEC with the current `MlnVala` / `mln_vala_` prefix and narrowed
+  shared callback-failure wording to language-safe boundaries.
+
+### Rejected or deferred findings
+
+- Per-callback transform URL cleanup is rejected for now because transform
+  callbacks may overlap on worker/network threads. Retain-until-clear is a safe
+  conservative policy; bounded per-invocation retention can be a future
+  optimization.
+- Linux CI validation remains deferred to the configured runner; local macOS
+  validation covers generation, VAPI shape, compile fixture execution, and Rust
+  tests.
+
+### User-input-needed findings
+
+- None.
+
+## Round 3
+
+Review artifacts:
+
+- `review-loop/round3-api-spec.md`
+- `review-loop/round3-runtime-lifecycle.md`
+- `review-loop/round3-build-generation-tests.md`
+- `review-loop/round3-maintainability-docs.md`
+
+### Applied findings
+
+- Moved Metal readback before frame acquisition and assert readback metadata so
+  the fixture does not call readback while a texture frame is held.
+- Protected Vala logging fixture counters with a mutex, matching provider-state
+  synchronization.
+- Added a Rust adapter regression test for non-null resource-transform
+  replacement URL retention through repeated trampoline calls.
+- Added projection owner-thread finalizer helper coverage for owner-thread and
+  off-owner-thread checks.
+- Updated the Vala conventions page to document the owner-thread finalizer
+  exception and preserve/report behavior.
+- Added this Round 2/Round 3 provenance so the committed log reflects iterative
+  review artifacts and outcomes.
+
+### Rejected or deferred findings
+
+- First-class async Vala provider retention ergonomics remain deferred as a
+  broader API-shape follow-up; the current low-level callback parameter is
+  callback-duration borrowed.
+
+### User-input-needed findings
+
+- None.

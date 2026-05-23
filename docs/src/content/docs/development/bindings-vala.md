@@ -57,11 +57,12 @@ Child objects hold strong GObject references to parents while native validity
 depends on them: maps retain runtimes, render sessions retain maps, and
 style-scoped objects retain their owner. `dispose` releases managed references
 after native unregistration or `close()` makes callbacks unreachable and
-in-flight callbacks complete. `finalize` reports leaks; it must preserve native
-callback state that may still be reachable from leaked thread-affine handles.
-`MapProjectionHandle` follows the shared exception: it owns a standalone
-projection snapshot and does not retain its source `MapHandle` for native
-validity after creation.
+in-flight callbacks complete. `finalize` may close native state only after the
+binding proves owner-thread context and dependency order; otherwise it reports
+the leak and preserves native callback state that may still be reachable from
+leaked thread-affine handles. `MapProjectionHandle` follows the shared
+exception: it owns a standalone projection snapshot and does not retain its
+source `MapHandle` for native validity after creation.
 
 Copied descriptors, events, snapshots, camera values, geometry values, and
 render metadata are GLib-friendly value objects. Use boxed types for immutable

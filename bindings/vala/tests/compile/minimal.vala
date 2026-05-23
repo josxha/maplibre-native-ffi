@@ -3,6 +3,7 @@ delegate void* MetalCreateSystemDefaultDeviceFunc();
 
 const uint32 RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE = 9;
 
+GLib.Mutex log_lock;
 int log_first_count = 0;
 int log_second_count = 0;
 GLib.Mutex provider_lock;
@@ -56,13 +57,32 @@ void read_provider_state(out int call_count, out bool cancel_checked, out bool s
   provider_lock.unlock();
 }
 
-bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+void note_first_log() {
+  log_lock.lock();
   log_first_count++;
+  log_lock.unlock();
+}
+
+void note_replacement_log() {
+  log_lock.lock();
+  log_second_count++;
+  log_lock.unlock();
+}
+
+void read_log_state(out int first_count, out int second_count) {
+  log_lock.lock();
+  first_count = log_first_count;
+  second_count = log_second_count;
+  log_lock.unlock();
+}
+
+bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+  note_first_log();
   return false;
 }
 
 bool handle_replacement_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
-  log_second_count++;
+  note_replacement_log();
   return false;
 }
 
@@ -137,13 +157,15 @@ bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, 
   }
   session.render_update();
 
-  var frame = session.acquire_metal_owned_texture_frame();
-  uint32 width;
-  frame.get_width(out width);
   uint8[] readback_pixels = new uint8[32 * 16 * 4];
   MaplibreNative.TextureImageInfo readback_info;
   session.read_premultiplied_rgba8(readback_pixels, out readback_info);
-  if (width != 32) {
+  bool readback_matches_extent = readback_info.width == 32 && readback_info.height == 16 && readback_info.byte_length <= readback_pixels.length;
+
+  var frame = session.acquire_metal_owned_texture_frame();
+  uint32 width;
+  frame.get_width(out width);
+  if (width != 32 || !readback_matches_extent) {
     frame.close();
     session.close();
     return false;
@@ -683,8 +705,11 @@ int main(string[] args) {
     bool final_provider_cancel_checked;
     bool final_provider_second_complete_failed;
     read_provider_state(out final_provider_call_count, out final_provider_cancel_checked, out final_provider_second_complete_failed);
-    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || !final_provider_cancel_checked || !final_provider_second_complete_failed || final_provider_call_count == 0 || log_first_count != 0 || log_second_count == 0 || !metal_frame_runtime_seen || !vulkan_frame_closed_error_seen) {
-      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), final_provider_cancel_checked.to_string(), final_provider_second_complete_failed.to_string(), final_provider_call_count, log_first_count, log_second_count, metal_frame_runtime_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
+    int final_log_first_count;
+    int final_log_second_count;
+    read_log_state(out final_log_first_count, out final_log_second_count);
+    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || !final_provider_cancel_checked || !final_provider_second_complete_failed || final_provider_call_count == 0 || final_log_first_count != 0 || final_log_second_count == 0 || !metal_frame_runtime_seen || !vulkan_frame_closed_error_seen) {
+      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), final_provider_cancel_checked.to_string(), final_provider_second_complete_failed.to_string(), final_provider_call_count, final_log_first_count, final_log_second_count, metal_frame_runtime_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
       return 1;
     }
   } catch (GLib.Error error) {

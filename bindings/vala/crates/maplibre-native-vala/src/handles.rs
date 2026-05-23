@@ -5210,6 +5210,7 @@ pub(crate) fn map_native(handle: *mut MapHandle) -> error::Result<*mut sys::mln_
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ffi::CStr;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static TRANSFORM_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -5221,6 +5222,18 @@ mod tests {
         _user_data: *mut c_void,
     ) -> *mut c_char {
         ptr::null_mut()
+    }
+
+    unsafe extern "C" fn replacing_transform(
+        _kind: u32,
+        _url: *const c_char,
+        _user_data: *mut c_void,
+    ) -> *mut c_char {
+        crate::glib::copy_string_view(sys::mln_string_view {
+            data: c"asset://replacement".as_ptr(),
+            size: "asset://replacement".len(),
+        })
+        .expect("test replacement URL allocation should succeed")
     }
 
     unsafe extern "C" fn transform_destroy_notify(_user_data: *mut c_void) {
@@ -5417,6 +5430,71 @@ mod tests {
             GTRUE
         );
         glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn resource_transform_retains_non_null_replacement_urls_until_destroy() {
+        let state = Box::into_raw(Box::new(ResourceTransformState {
+            callback: replacing_transform,
+            user_data: ptr::null_mut(),
+            destroy_notify: None,
+            returned_urls: Mutex::new(Vec::new()),
+        }));
+        // SAFETY: Zeroed storage is initialized by the trampoline before use.
+        let mut first_response: sys::mln_resource_transform_response =
+            unsafe { std::mem::zeroed() };
+        // SAFETY: Zeroed storage is initialized by the trampoline before use.
+        let mut second_response: sys::mln_resource_transform_response =
+            unsafe { std::mem::zeroed() };
+
+        // SAFETY: `state` is valid callback state, input URLs are static
+        // NUL-terminated strings, and response pointers are writable.
+        assert_eq!(
+            unsafe {
+                resource_transform_trampoline(
+                    state.cast::<c_void>(),
+                    sys::MLN_RESOURCE_KIND_STYLE,
+                    c"asset://one".as_ptr(),
+                    &mut first_response,
+                )
+            },
+            sys::MLN_STATUS_OK
+        );
+        assert_eq!(
+            unsafe {
+                resource_transform_trampoline(
+                    state.cast::<c_void>(),
+                    sys::MLN_RESOURCE_KIND_STYLE,
+                    c"asset://two".as_ptr(),
+                    &mut second_response,
+                )
+            },
+            sys::MLN_STATUS_OK
+        );
+
+        assert!(!first_response.url.is_null());
+        assert!(!second_response.url.is_null());
+        // SAFETY: The transform state retains both GLib-allocated URLs until
+        // `destroy_resource_transform_state` below.
+        assert_eq!(
+            unsafe { CStr::from_ptr(first_response.url) },
+            c"asset://replacement"
+        );
+        // SAFETY: The second response URL is likewise retained until teardown.
+        assert_eq!(
+            unsafe { CStr::from_ptr(second_response.url) },
+            c"asset://replacement"
+        );
+        assert_eq!(
+            unsafe { &*state }
+                .returned_urls
+                .lock()
+                .expect("resource transform URL storage lock poisoned")
+                .len(),
+            2
+        );
+
+        destroy_resource_transform_state(state);
     }
 
     #[test]

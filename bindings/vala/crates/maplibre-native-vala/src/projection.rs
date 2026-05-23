@@ -428,6 +428,15 @@ mod tests {
             GTRUE
         );
 
+        assert!(projection_should_finalize_on_owner_thread(projection));
+        let projection_bits = projection as usize;
+        let off_owner_would_not_finalize = std::thread::spawn(move || {
+            !projection_should_finalize_on_owner_thread(projection_bits as *mut MapProjectionHandle)
+        })
+        .join()
+        .expect("projection finalizer thread probe should not panic");
+        assert!(off_owner_would_not_finalize);
+
         assert_eq!(
             mln_vala_map_projection_handle_close(projection, ptr::null_mut()),
             GTRUE
