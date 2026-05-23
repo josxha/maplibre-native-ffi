@@ -140,6 +140,12 @@ typedef enum {
   MLN_VALA_STYLE_IMAGE_OPTION_FIELDS_SDF = 1u << 1u,
 } MlnValaStyleImageOptionFields;
 
+typedef enum {
+  MLN_VALA_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0,
+  MLN_VALA_LOCATION_INDICATOR_IMAGE_KIND_BEARING = 1,
+  MLN_VALA_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2,
+} MlnValaLocationIndicatorImageKind;
+
 /**
  * MlnValaResourceTransformCallback:
  * @kind: resource kind.
@@ -1862,6 +1868,58 @@ gboolean mln_vala_map_handle_set_image_source_coordinates(
 gboolean mln_vala_map_handle_get_image_source_coordinates(
   MlnValaMapHandle* self, const char* source_id, MlnValaLatLng* out_coordinates,
   size_t coordinate_capacity, size_t* out_coordinate_count, gboolean* out_found,
+  GError** error
+);
+
+gboolean mln_vala_map_handle_add_location_indicator_layer(
+  MlnValaMapHandle* self, const char* layer_id, const char* before_layer_id,
+  GError** error
+);
+gboolean mln_vala_map_handle_set_location_indicator_location(
+  MlnValaMapHandle* self, const char* layer_id, const MlnValaLatLng* coordinate,
+  double altitude, GError** error
+);
+gboolean mln_vala_map_handle_set_location_indicator_bearing(
+  MlnValaMapHandle* self, const char* layer_id, double bearing, GError** error
+);
+gboolean mln_vala_map_handle_set_location_indicator_accuracy_radius(
+  MlnValaMapHandle* self, const char* layer_id, double radius, GError** error
+);
+gboolean mln_vala_map_handle_set_location_indicator_image_name(
+  MlnValaMapHandle* self, const char* layer_id,
+  MlnValaLocationIndicatorImageKind image_kind, const char* image_id,
+  GError** error
+);
+/**
+ * mln_vala_map_handle_style_layer_exists:
+ * @self: a map handle.
+ * @layer_id: (not nullable): style layer identifier.
+ * @out_exists: (out): return location for existence state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_style_layer_exists(
+  MlnValaMapHandle* self, const char* layer_id, gboolean* out_exists,
+  GError** error
+);
+gboolean mln_vala_map_handle_move_style_layer(
+  MlnValaMapHandle* self, const char* layer_id, const char* before_layer_id,
+  GError** error
+);
+/**
+ * mln_vala_map_handle_remove_style_layer:
+ * @self: a map handle.
+ * @layer_id: (not nullable): style layer identifier.
+ * @out_removed: (out): return location for removal state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_remove_style_layer(
+  MlnValaMapHandle* self, const char* layer_id, gboolean* out_removed,
   GError** error
 );
 

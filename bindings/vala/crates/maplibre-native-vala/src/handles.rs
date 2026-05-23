@@ -1280,6 +1280,136 @@ pub extern "C" fn mln_vala_map_handle_get_image_source_coordinates(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_location_indicator_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    before_layer_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_location_indicator_layer(handle, layer_id, before_layer_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_location_indicator_location(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    coordinate: *const sys::mln_lat_lng,
+    altitude: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_location_indicator_location(handle, layer_id, coordinate, altitude) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_location_indicator_bearing(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    bearing: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_location_indicator_bearing(handle, layer_id, bearing) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_location_indicator_accuracy_radius(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    radius: f64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_location_indicator_accuracy_radius(handle, layer_id, radius) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_location_indicator_image_name(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    image_kind: u32,
+    image_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_location_indicator_image_name(handle, layer_id, image_kind, image_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_style_layer_exists(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_exists: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match style_layer_exists(handle, layer_id, out_exists) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_move_style_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    before_layer_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match move_style_layer(handle, layer_id, before_layer_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_remove_style_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_removed: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match remove_style_layer(handle, layer_id, out_removed) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
 fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_runtime_options_default() };
@@ -2116,6 +2246,119 @@ fn get_image_source_coordinates(
     })?;
     glib::clear_optional_out_pointer(out_coordinate_count, coordinate_count)?;
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
+fn add_location_indicator_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    before_layer_id: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "location indicator layer ID")?;
+    let before_layer_id = string_view_from_c(before_layer_id, "before layer ID")?;
+    // SAFETY: `map` is live and string views borrow caller strings for this call.
+    error::check(unsafe {
+        sys::mln_map_add_location_indicator_layer(map, layer_id, before_layer_id)
+    })
+}
+
+fn set_location_indicator_location(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    coordinate: *const sys::mln_lat_lng,
+    altitude: f64,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "location indicator layer ID")?;
+    if coordinate.is_null() {
+        return Err(Error::invalid_argument(
+            "location indicator coordinate is null",
+        ));
+    }
+    // SAFETY: `coordinate` was checked non-null and points to a borrowed value
+    // for this call. `map` is live and the C API validates values.
+    error::check(unsafe {
+        sys::mln_map_set_location_indicator_location(map, layer_id, *coordinate, altitude)
+    })
+}
+
+fn set_location_indicator_bearing(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    bearing: f64,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "location indicator layer ID")?;
+    // SAFETY: `map` is live and the C API validates bearing.
+    error::check(unsafe { sys::mln_map_set_location_indicator_bearing(map, layer_id, bearing) })
+}
+
+fn set_location_indicator_accuracy_radius(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    radius: f64,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "location indicator layer ID")?;
+    // SAFETY: `map` is live and the C API validates radius.
+    error::check(unsafe {
+        sys::mln_map_set_location_indicator_accuracy_radius(map, layer_id, radius)
+    })
+}
+
+fn set_location_indicator_image_name(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    image_kind: u32,
+    image_id: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "location indicator layer ID")?;
+    let image_id = string_view_from_c(image_id, "location indicator image ID")?;
+    // SAFETY: `map` is live and the C API validates image kind.
+    error::check(unsafe {
+        sys::mln_map_set_location_indicator_image_name(map, layer_id, image_kind, image_id)
+    })
+}
+
+fn style_layer_exists(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_exists: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let mut exists = false;
+    // SAFETY: `map` is live, `layer_id` borrows a caller string for this call,
+    // and `exists` is valid output storage.
+    error::check(unsafe { sys::mln_map_style_layer_exists(map, layer_id, &mut exists) })?;
+    glib::clear_optional_out_pointer(out_exists, if exists { GTRUE } else { GFALSE })
+}
+
+fn move_style_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    before_layer_id: *const c_char,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let before_layer_id = string_view_from_c(before_layer_id, "before layer ID")?;
+    // SAFETY: `map` is live and string views borrow caller strings for this call.
+    error::check(unsafe { sys::mln_map_move_style_layer(map, layer_id, before_layer_id) })
+}
+
+fn remove_style_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    out_removed: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "style layer ID")?;
+    let mut removed = false;
+    // SAFETY: `map` is live, `layer_id` borrows a caller string for this call,
+    // and `removed` is valid output storage.
+    error::check(unsafe { sys::mln_map_remove_style_layer(map, layer_id, &mut removed) })?;
+    glib::clear_optional_out_pointer(out_removed, if removed { GTRUE } else { GFALSE })
 }
 
 fn string_view_from_c(value: *const c_char, label: &str) -> error::Result<sys::mln_string_view> {
@@ -2985,6 +3228,114 @@ mod tests {
             ),
             GTRUE
         );
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn location_indicator_layer_lifecycle_round_trips_existence() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_add_location_indicator_layer(
+                map,
+                c"location-layer".as_ptr(),
+                c"".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let coordinate = sys::mln_lat_lng {
+            latitude: 37.7749,
+            longitude: -122.4194,
+        };
+        assert_eq!(
+            mln_vala_map_handle_set_location_indicator_location(
+                map,
+                c"location-layer".as_ptr(),
+                &coordinate,
+                0.0,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_location_indicator_bearing(
+                map,
+                c"location-layer".as_ptr(),
+                15.0,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_location_indicator_accuracy_radius(
+                map,
+                c"location-layer".as_ptr(),
+                10.0,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_location_indicator_image_name(
+                map,
+                c"location-layer".as_ptr(),
+                sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
+                c"fixture-image".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut exists = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_style_layer_exists(
+                map,
+                c"location-layer".as_ptr(),
+                &mut exists,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(exists, GTRUE);
+        assert_eq!(
+            mln_vala_map_handle_move_style_layer(
+                map,
+                c"location-layer".as_ptr(),
+                c"".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut removed = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_remove_style_layer(
+                map,
+                c"location-layer".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

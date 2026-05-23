@@ -140,6 +140,16 @@ int main(string[] args) {
     map.add_image_source_image("inline-image-source", image_coordinates, style_image);
     map.set_image_source_image("inline-image-source", style_image);
     map.remove_style_source("inline-image-source", out source_removed);
+    map.add_location_indicator_layer("location-layer", "");
+    map.set_location_indicator_location("location-layer", coordinate, 0.0);
+    map.set_location_indicator_bearing("location-layer", 0.0);
+    map.set_location_indicator_accuracy_radius("location-layer", 0.0);
+    map.set_location_indicator_image_name("location-layer", MaplibreNative.LocationIndicatorImageKind.TOP, "fixture-image");
+    bool layer_exists = false;
+    map.style_layer_exists("location-layer", out layer_exists);
+    map.move_style_layer("location-layer", "");
+    bool layer_removed = false;
+    map.remove_style_layer("location-layer", out layer_removed);
     MaplibreNative.MetalSurfaceDescriptor metal_surface = {};
     metal_surface.default();
     MaplibreNative.VulkanSurfaceDescriptor vulkan_surface = {};
