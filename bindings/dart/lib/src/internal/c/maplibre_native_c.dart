@@ -39,6 +39,24 @@ final class MaplibreNativeCApi {
   /// Sets MapLibre Native's process-global network status.
   int networkStatusSet(int status) => _raw.mln_network_status_set(status).value;
 
+  /// Sets the process-global native log callback.
+  int logSetCallback(
+    Pointer<NativeFunction<raw.mln_log_callbackFunction>> callback,
+    Pointer<Void> userData,
+  ) => _raw.mln_log_set_callback(callback, userData).value;
+
+  /// Native Dart-shim callback for queued log records.
+  Pointer<NativeFunction<raw.mln_log_callbackFunction>> dartLogCallback() =>
+      library.lookup('mln_dart_log_callback');
+
+  /// Destroys a copied Dart-shim log record.
+  void dartLogRecordDestroy(Pointer<Void> record) {
+    library.lookupFunction<
+      Void Function(Pointer<Void>),
+      void Function(Pointer<Void>)
+    >('mln_dart_log_record_destroy')(record);
+  }
+
   /// Clears the process-global native log callback.
   int logClearCallback() => _raw.mln_log_clear_callback().value;
 

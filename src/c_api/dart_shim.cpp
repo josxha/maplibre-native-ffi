@@ -74,6 +74,26 @@ struct DartQueuedResourceRequest {
   std::vector<std::uint8_t> prior_data;
 };
 
+using DartLogRecordListener = void (*)(void* record);
+
+struct DartLogCallbackState {
+  DartLogRecordListener listener;
+  std::uint32_t consume;
+};
+
+struct DartLogRecordView {
+  void* owner;
+  std::uint32_t severity;
+  std::uint32_t event;
+  std::int64_t code;
+  const char* message;
+};
+
+struct DartLogRecord {
+  DartLogRecordView view{};
+  std::string message;
+};
+
 auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
   return rule_kind == MLN_RESOURCE_KIND_UNKNOWN || rule_kind == request_kind;
 }
@@ -148,7 +168,54 @@ void destroy_queued_request(DartQueuedResourceRequestView* request) noexcept {
   static_cast<void>(std::unique_ptr<DartQueuedResourceRequest>{owner});
 }
 
+auto copy_log_record(
+  std::uint32_t severity, std::uint32_t event, std::int64_t code,
+  const char* message
+) -> DartLogRecordView* {
+  auto copy = std::make_unique<DartLogRecord>();
+  copy->message = message == nullptr ? std::string{} : std::string{message};
+  copy->view = DartLogRecordView{
+    .owner = copy.get(),
+    .severity = severity,
+    .event = event,
+    .code = code,
+    .message = copy->message.c_str(),
+  };
+  return &copy.release()->view;
+}
+
+void destroy_log_record(DartLogRecordView* record) noexcept {
+  if (record == nullptr) {
+    return;
+  }
+  auto* owner = static_cast<DartLogRecord*>(record->owner);
+  static_cast<void>(std::unique_ptr<DartLogRecord>{owner});
+}
+
 }  // namespace
+
+extern "C" MLN_API auto mln_dart_log_callback(
+  void* user_data, std::uint32_t severity, std::uint32_t event,
+  std::int64_t code, const char* message
+) noexcept -> std::uint32_t {
+  if (user_data == nullptr) {
+    return 0;
+  }
+  const auto& state = *static_cast<const DartLogCallbackState*>(user_data);
+  if (state.listener == nullptr) {
+    return state.consume;
+  }
+  try {
+    state.listener(copy_log_record(severity, event, code, message));
+  } catch (...) {
+    return state.consume;
+  }
+  return state.consume;
+}
+
+extern "C" MLN_API void mln_dart_log_record_destroy(void* record) noexcept {
+  destroy_log_record(static_cast<DartLogRecordView*>(record));
+}
 
 extern "C" MLN_API auto mln_dart_resource_transform_rewrite_callback(
   void* user_data, std::uint32_t kind, const char* url,

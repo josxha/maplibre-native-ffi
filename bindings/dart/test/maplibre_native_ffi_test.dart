@@ -31,6 +31,8 @@ void main() {
         isIn([NetworkStatus.online.rawValue, NetworkStatus.offline.rawValue]),
       );
       Maplibre.setNetworkStatus(status);
+      final logRecords = <LogRecord>[];
+      Maplibre.setLogCallback(logRecords.add);
       Maplibre.setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
       Maplibre.restoreDefaultAsyncLogSeverityMask();
       Maplibre.clearLogCallback();
