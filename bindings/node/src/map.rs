@@ -1017,14 +1017,12 @@ impl NativeMapHandle {
     pub fn set_style_image(&self, image_id: String, image: StyleImageInput) -> Result<()> {
         let image_id = core::string::string_view(&image_id);
         let stride = image.stride.unwrap_or(image.width.saturating_mul(4));
-        let raw_image = sys::mln_premultiplied_rgba8_image {
-            size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
-            width: image.width,
-            height: image.height,
-            stride,
-            pixels: image.pixels.as_ptr(),
-            byte_length: image.pixels.len(),
-        };
+        let mut raw_image = unsafe { sys::mln_premultiplied_rgba8_image_default() };
+        raw_image.width = image.width;
+        raw_image.height = image.height;
+        raw_image.stride = stride;
+        raw_image.pixels = image.pixels.as_ptr();
+        raw_image.byte_length = image.pixels.len();
         let mut options = unsafe { sys::mln_style_image_options_default() };
         if let Some(pixel_ratio) = image.pixel_ratio {
             options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
@@ -2144,14 +2142,13 @@ fn custom_geometry_source_options_to_native(
 fn premultiplied_rgba8_image_from_input(
     image: &PremultipliedRgba8ImageInput,
 ) -> sys::mln_premultiplied_rgba8_image {
-    sys::mln_premultiplied_rgba8_image {
-        size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
-        width: image.width,
-        height: image.height,
-        stride: image.stride.unwrap_or(image.width.saturating_mul(4)),
-        pixels: image.pixels.as_ptr(),
-        byte_length: image.pixels.len(),
-    }
+    let mut raw = unsafe { sys::mln_premultiplied_rgba8_image_default() };
+    raw.width = image.width;
+    raw.height = image.height;
+    raw.stride = image.stride.unwrap_or(image.width.saturating_mul(4));
+    raw.pixels = image.pixels.as_ptr();
+    raw.byte_length = image.pixels.len();
+    raw
 }
 
 fn style_image_info_from_native(raw: sys::mln_style_image_info) -> StyleImageInfo {
