@@ -273,6 +273,22 @@ export declare class MapHandle {
   setImageSourceUrl(sourceId: string, url: string): void;
   setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;
   getImageSourceCoordinates(sourceId: string): LatLng[] | null;
+  addLocationIndicatorLayer(
+    layerId: string,
+    beforeLayerId?: string | null,
+  ): void;
+  setLocationIndicatorLocation(
+    layerId: string,
+    coordinate: LatLng,
+    altitude?: number,
+  ): void;
+  setLocationIndicatorBearing(layerId: string, bearing: number): void;
+  setLocationIndicatorAccuracyRadius(layerId: string, radius: number): void;
+  setLocationIndicatorImageName(
+    layerId: string,
+    imageKind: LocationIndicatorImageKind,
+    imageId: string,
+  ): void;
   addStyleLayerJson(layer: JsonValue, beforeLayerId?: string | null): void;
   styleLayerExists(layerId: string): boolean;
   removeStyleLayer(layerId: string): boolean;
@@ -366,6 +382,8 @@ export interface StyleImageInfo {
 export interface StyleImage extends StyleImageInfo {
   pixels: Uint8Array;
 }
+
+export type LocationIndicatorImageKind = "top" | "bearing" | "shadow";
 
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;

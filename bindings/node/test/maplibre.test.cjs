@@ -568,6 +568,27 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     assert.equal(map.removeStyleSource("geojson-url"), true);
     assert.equal(map.removeStyleSource("empty-geojson"), true);
 
+    map.addLocationIndicatorLayer("location");
+    map.setLocationIndicatorLocation(
+      "location",
+      { latitude: 1, longitude: 2 },
+      3,
+    );
+    map.setLocationIndicatorBearing("location", 45);
+    map.setLocationIndicatorAccuracyRadius("location", 12);
+    map.setLocationIndicatorImageName("location", "top", "red-pixel");
+    assert.equal(map.getStyleLayerType("location"), "location-indicator");
+    assert.equal(map.removeStyleLayer("location"), true);
+    assert.throws(
+      () =>
+        map.setLocationIndicatorImageName(
+          "location",
+          /** @type {any} */ ("halo"),
+          "x",
+        ),
+      InvalidArgumentError,
+    );
+
     map.addStyleLayerJson({
       id: "background",
       type: "background",

@@ -902,6 +902,94 @@ impl NativeMapHandle {
         ))
     }
 
+    #[napi(js_name = "addLocationIndicatorLayer")]
+    pub fn add_location_indicator_layer(
+        &self,
+        layer_id: String,
+        before_layer_id: Option<String>,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = core::string::string_view(&before_layer_id);
+        core::check(unsafe {
+            sys::mln_map_add_location_indicator_layer(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setLocationIndicatorLocation")]
+    pub fn set_location_indicator_location(
+        &self,
+        layer_id: String,
+        coordinate: LatLng,
+        altitude: f64,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        core::check(unsafe {
+            sys::mln_map_set_location_indicator_location(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                coordinate.into_native(),
+                altitude,
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setLocationIndicatorBearing")]
+    pub fn set_location_indicator_bearing(&self, layer_id: String, bearing: f64) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        core::check(unsafe {
+            sys::mln_map_set_location_indicator_bearing(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                bearing,
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setLocationIndicatorAccuracyRadius")]
+    pub fn set_location_indicator_accuracy_radius(
+        &self,
+        layer_id: String,
+        radius: f64,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        core::check(unsafe {
+            sys::mln_map_set_location_indicator_accuracy_radius(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                radius,
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setLocationIndicatorImageName")]
+    pub fn set_location_indicator_image_name(
+        &self,
+        layer_id: String,
+        image_kind: String,
+        image_id: String,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let image_id = core::string::string_view(&image_id);
+        core::check(unsafe {
+            sys::mln_map_set_location_indicator_image_name(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                location_indicator_image_kind_from_string(&image_kind)?,
+                image_id.raw(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "addStyleLayerJson")]
     pub fn add_style_layer_json(
         &self,
@@ -1489,6 +1577,17 @@ impl StringViews {
 
     fn len(&self) -> usize {
         self.views.len()
+    }
+}
+
+fn location_indicator_image_kind_from_string(kind: &str) -> Result<u32> {
+    match kind {
+        "top" => Ok(sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP),
+        "bearing" => Ok(sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING),
+        "shadow" => Ok(sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW),
+        other => Err(error::invalid_argument(format!(
+            "location indicator image kind must be 'top', 'bearing', or 'shadow', got '{other}'"
+        ))),
     }
 }
 

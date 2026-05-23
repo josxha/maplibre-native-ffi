@@ -669,6 +669,36 @@ class MapHandle {
     );
   }
 
+  addLocationIndicatorLayer(layerId, beforeLayerId = null) {
+    return translateNativeErrors(() =>
+      this.native.addLocationIndicatorLayer(layerId, beforeLayerId),
+    );
+  }
+
+  setLocationIndicatorLocation(layerId, coordinate, altitude = 0) {
+    return translateNativeErrors(() =>
+      this.native.setLocationIndicatorLocation(layerId, coordinate, altitude),
+    );
+  }
+
+  setLocationIndicatorBearing(layerId, bearing) {
+    return translateNativeErrors(() =>
+      this.native.setLocationIndicatorBearing(layerId, bearing),
+    );
+  }
+
+  setLocationIndicatorAccuracyRadius(layerId, radius) {
+    return translateNativeErrors(() =>
+      this.native.setLocationIndicatorAccuracyRadius(layerId, radius),
+    );
+  }
+
+  setLocationIndicatorImageName(layerId, imageKind, imageId) {
+    return translateNativeErrors(() =>
+      this.native.setLocationIndicatorImageName(layerId, imageKind, imageId),
+    );
+  }
+
   addStyleLayerJson(layer, beforeLayerId = null) {
     return translateNativeErrors(() =>
       this.native.addStyleLayerJson(stringifyJson(layer), beforeLayerId),
