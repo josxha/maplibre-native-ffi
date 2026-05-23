@@ -1738,7 +1738,7 @@ final class MapHandle {
     return withNativeArena((arena) {
       final nativeId = nativeStringView(imageId, arena);
       final outInfo = arena<raw.mln_style_image_info>();
-      outInfo.ref.size = sizeOf<raw.mln_style_image_info>();
+      outInfo.ref = _c.styleImageInfoDefault();
       final outFound = arena<Bool>();
       _check(
         _c.mapGetStyleImageInfo(_pointer, nativeId.value, outInfo, outFound),
@@ -2834,7 +2834,7 @@ final class RenderSessionHandle {
   TextureImage readPremultipliedRgba8() {
     return withNativeArena((arena) {
       final info = arena<raw.mln_texture_image_info>();
-      info.ref.size = sizeOf<raw.mln_texture_image_info>();
+      info.ref = _c.textureImageInfoDefault();
       final probeStatus = _c.textureReadPremultipliedRgba8(
         _pointer,
         nullptr.cast<Uint8>(),
@@ -3708,8 +3708,7 @@ raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
 raw.mln_metal_owned_texture_descriptor _metalOwnedTextureDescriptorToNative(
   MetalOwnedTextureDescriptor value,
 ) {
-  final result = Struct.create<raw.mln_metal_owned_texture_descriptor>();
-  result.size = sizeOf<raw.mln_metal_owned_texture_descriptor>();
+  final result = _c.metalOwnedTextureDescriptorDefault();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _metalContextDescriptorToNative(value.context);
   return result;
@@ -3717,8 +3716,7 @@ raw.mln_metal_owned_texture_descriptor _metalOwnedTextureDescriptorToNative(
 
 raw.mln_metal_borrowed_texture_descriptor
 _metalBorrowedTextureDescriptorToNative(MetalBorrowedTextureDescriptor value) {
-  final result = Struct.create<raw.mln_metal_borrowed_texture_descriptor>();
-  result.size = sizeOf<raw.mln_metal_borrowed_texture_descriptor>();
+  final result = _c.metalBorrowedTextureDescriptorDefault();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.texture = Pointer<Void>.fromAddress(value.texture.address);
   return result;
@@ -3727,8 +3725,7 @@ _metalBorrowedTextureDescriptorToNative(MetalBorrowedTextureDescriptor value) {
 raw.mln_vulkan_owned_texture_descriptor _vulkanOwnedTextureDescriptorToNative(
   VulkanOwnedTextureDescriptor value,
 ) {
-  final result = Struct.create<raw.mln_vulkan_owned_texture_descriptor>();
-  result.size = sizeOf<raw.mln_vulkan_owned_texture_descriptor>();
+  final result = _c.vulkanOwnedTextureDescriptorDefault();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _vulkanContextDescriptorToNative(value.context);
   return result;
@@ -3738,8 +3735,7 @@ raw.mln_vulkan_borrowed_texture_descriptor
 _vulkanBorrowedTextureDescriptorToNative(
   VulkanBorrowedTextureDescriptor value,
 ) {
-  final result = Struct.create<raw.mln_vulkan_borrowed_texture_descriptor>();
-  result.size = sizeOf<raw.mln_vulkan_borrowed_texture_descriptor>();
+  final result = _c.vulkanBorrowedTextureDescriptorDefault();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _vulkanContextDescriptorToNative(value.context);
   result.image = Pointer<Void>.fromAddress(value.image.address);

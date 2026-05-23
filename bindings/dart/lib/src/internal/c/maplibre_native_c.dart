@@ -533,6 +533,14 @@ final class MaplibreNativeCApi {
   int mapDumpDebugLogs(Pointer<raw.mln_map> map) =>
       _raw.mln_map_dump_debug_logs(map).value;
 
+  /// Returns default camera options.
+  raw.mln_camera_options cameraOptionsDefault() =>
+      _raw.mln_camera_options_default();
+
+  /// Returns default animation options.
+  raw.mln_animation_options animationOptionsDefault() =>
+      _raw.mln_animation_options_default();
+
   /// Returns default camera fitting options.
   raw.mln_camera_fit_options cameraFitOptionsDefault() =>
       _raw.mln_camera_fit_options_default();
@@ -572,6 +580,29 @@ final class MaplibreNativeCApi {
   /// Returns native default Vulkan surface descriptor.
   raw.mln_vulkan_surface_descriptor vulkanSurfaceDescriptorDefault() =>
       _raw.mln_vulkan_surface_descriptor_default();
+
+  /// Returns native default Metal owned-texture descriptor.
+  raw.mln_metal_owned_texture_descriptor metalOwnedTextureDescriptorDefault() =>
+      _raw.mln_metal_owned_texture_descriptor_default();
+
+  /// Returns native default Metal borrowed-texture descriptor.
+  raw.mln_metal_borrowed_texture_descriptor
+  metalBorrowedTextureDescriptorDefault() =>
+      _raw.mln_metal_borrowed_texture_descriptor_default();
+
+  /// Returns native default Vulkan owned-texture descriptor.
+  raw.mln_vulkan_owned_texture_descriptor
+  vulkanOwnedTextureDescriptorDefault() =>
+      _raw.mln_vulkan_owned_texture_descriptor_default();
+
+  /// Returns native default Vulkan borrowed-texture descriptor.
+  raw.mln_vulkan_borrowed_texture_descriptor
+  vulkanBorrowedTextureDescriptorDefault() =>
+      _raw.mln_vulkan_borrowed_texture_descriptor_default();
+
+  /// Returns native default texture image info.
+  raw.mln_texture_image_info textureImageInfoDefault() =>
+      _raw.mln_texture_image_info_default();
 
   /// Attaches a Metal native surface render target.
   int metalSurfaceAttach(
@@ -1275,6 +1306,10 @@ final class MaplibreNativeCApi {
   raw.mln_style_image_options styleImageOptionsDefault() =>
       _raw.mln_style_image_options_default();
 
+  /// Returns default style image metadata.
+  raw.mln_style_image_info styleImageInfoDefault() =>
+      _raw.mln_style_image_info_default();
+
   /// Sets or replaces one runtime style image.
   int mapSetStyleImage(
     Pointer<raw.mln_map> map,
@@ -1372,6 +1407,16 @@ final class MaplibreNativeCApi {
     raw.mln_string_view sourceId,
     Pointer<Bool> outRemoved,
   ) => _raw.mln_map_remove_style_source(map, sourceId, outRemoved).value;
+
+  /// Gets one style source type string.
+  int mapGetStyleSourceType(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<Uint32> outSourceType,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_map_get_style_source_type(map, sourceId, outSourceType, outFound)
+      .value;
 
   /// Gets fixed style source metadata.
   int mapGetStyleSourceInfo(
