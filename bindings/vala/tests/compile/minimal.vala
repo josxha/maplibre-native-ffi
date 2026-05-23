@@ -243,6 +243,9 @@ int main(string[] args) {
     map.pitch_by(0.0);
     map.pitch_by_animated(0.0, animation);
     map.cancel_transitions();
+    MaplibreNative.ScreenPoint map_point;
+    map.pixel_for_lat_lng(coordinate, out map_point);
+    map.lat_lng_for_pixel(map_point, out round_trip);
 
     MaplibreNative.BoundOptions bounds = {};
     bounds.default();

@@ -99,7 +99,8 @@ The scaffold implements one proof slice in Rust:
 - Basic style-source operations for GeoJSON URL sources, vector/raster/raster
   DEM tile source URL sources, image sources, source metadata, source lifecycle,
   runtime style images, style ID list handles, DEM helper layers, and basic
-  style-layer lifecycle operations are exposed through `MapHandle`.
+  style-layer lifecycle operations, and map coordinate conversion helpers are
+  exposed through `MapHandle`.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with

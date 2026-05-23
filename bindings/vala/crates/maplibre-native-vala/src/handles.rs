@@ -6,6 +6,7 @@ use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
 use crate::events::RuntimeEvent;
+use crate::geo::{LatLng, ScreenPoint};
 use crate::glib::{self, GBoolean, GDestroyNotify, GError, GFALSE, GObject, GTRUE, GType};
 use crate::resource::{
     ResourceRequestHandle, resource_request_handle_disarm, resource_request_handle_from_native,
@@ -935,6 +936,72 @@ pub extern "C" fn mln_vala_map_handle_cancel_transitions(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match cancel_transitions(handle) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_pixel_for_lat_lng(
+    handle: *mut MapHandle,
+    coordinate: *const LatLng,
+    out_point: *mut ScreenPoint,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match map_pixel_for_lat_lng(handle, coordinate, out_point) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_lat_lng_for_pixel(
+    handle: *mut MapHandle,
+    point: *const ScreenPoint,
+    out_coordinate: *mut LatLng,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match map_lat_lng_for_pixel(handle, point, out_coordinate) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_pixels_for_lat_lngs(
+    handle: *mut MapHandle,
+    coordinates: *const LatLng,
+    coordinate_count: usize,
+    out_points: *mut ScreenPoint,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match map_pixels_for_lat_lngs(handle, coordinates, coordinate_count, out_points) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_lat_lngs_for_pixels(
+    handle: *mut MapHandle,
+    points: *const ScreenPoint,
+    point_count: usize,
+    out_coordinates: *mut LatLng,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match map_lat_lngs_for_pixels(handle, points, point_count, out_coordinates) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -2025,6 +2092,97 @@ fn cancel_transitions(handle: *mut MapHandle) -> error::Result<()> {
     let map = map_native(handle)?;
     // SAFETY: `map` is live.
     error::check(unsafe { sys::mln_map_cancel_transitions(map) })
+}
+
+fn map_pixel_for_lat_lng(
+    handle: *mut MapHandle,
+    coordinate: *const LatLng,
+    out_point: *mut ScreenPoint,
+) -> error::Result<()> {
+    if coordinate.is_null() {
+        return Err(Error::invalid_argument("coordinate is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: `coordinate` was null-checked and points to one LatLng.
+    let coordinate = unsafe { *coordinate };
+    let mut native_point = sys::mln_screen_point { x: 0.0, y: 0.0 };
+    // SAFETY: `map` is live and output storage is valid.
+    error::check(unsafe {
+        sys::mln_map_pixel_for_lat_lng(map, coordinate.into(), &mut native_point)
+    })?;
+    glib::clear_optional_out_pointer(out_point, native_point.into())
+}
+
+fn map_lat_lng_for_pixel(
+    handle: *mut MapHandle,
+    point: *const ScreenPoint,
+    out_coordinate: *mut LatLng,
+) -> error::Result<()> {
+    if point.is_null() {
+        return Err(Error::invalid_argument("screen point is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: `point` was null-checked and points to one ScreenPoint.
+    let point = unsafe { *point };
+    let mut native_coordinate = sys::mln_lat_lng {
+        latitude: 0.0,
+        longitude: 0.0,
+    };
+    // SAFETY: `map` is live and output storage is valid.
+    error::check(unsafe {
+        sys::mln_map_lat_lng_for_pixel(map, point.into(), &mut native_coordinate)
+    })?;
+    glib::clear_optional_out_pointer(out_coordinate, native_coordinate.into())
+}
+
+fn map_pixels_for_lat_lngs(
+    handle: *mut MapHandle,
+    coordinates: *const LatLng,
+    coordinate_count: usize,
+    out_points: *mut ScreenPoint,
+) -> error::Result<()> {
+    if coordinates.is_null() {
+        return Err(Error::invalid_argument("coordinates are null"));
+    }
+    if out_points.is_null() {
+        return Err(Error::invalid_argument("points output is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: `LatLng`/`ScreenPoint` are repr-compatible with native structs;
+    // pointers are borrowed for this call and native validates counts/capacity.
+    error::check(unsafe {
+        sys::mln_map_pixels_for_lat_lngs(
+            map,
+            coordinates.cast::<sys::mln_lat_lng>(),
+            coordinate_count,
+            out_points.cast::<sys::mln_screen_point>(),
+        )
+    })
+}
+
+fn map_lat_lngs_for_pixels(
+    handle: *mut MapHandle,
+    points: *const ScreenPoint,
+    point_count: usize,
+    out_coordinates: *mut LatLng,
+) -> error::Result<()> {
+    if points.is_null() {
+        return Err(Error::invalid_argument("screen points are null"));
+    }
+    if out_coordinates.is_null() {
+        return Err(Error::invalid_argument("coordinates output is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: `LatLng`/`ScreenPoint` are repr-compatible with native structs;
+    // pointers are borrowed for this call and native validates counts/capacity.
+    error::check(unsafe {
+        sys::mln_map_lat_lngs_for_pixels(
+            map,
+            points.cast::<sys::mln_screen_point>(),
+            point_count,
+            out_coordinates.cast::<sys::mln_lat_lng>(),
+        )
+    })
 }
 
 fn is_fully_loaded(handle: *mut MapHandle, out_loaded: *mut GBoolean) -> error::Result<()> {
@@ -3932,6 +4090,50 @@ mod tests {
         );
         assert_eq!(
             mln_vala_map_handle_cancel_transitions(map, ptr::null_mut()),
+            GTRUE
+        );
+
+        let coordinate = LatLng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        let mut point = ScreenPoint { x: 0.0, y: 0.0 };
+        assert_eq!(
+            mln_vala_map_handle_pixel_for_lat_lng(map, &coordinate, &mut point, ptr::null_mut()),
+            GTRUE
+        );
+        let mut round_trip = LatLng {
+            latitude: 999.0,
+            longitude: 999.0,
+        };
+        assert_eq!(
+            mln_vala_map_handle_lat_lng_for_pixel(map, &point, &mut round_trip, ptr::null_mut()),
+            GTRUE
+        );
+        let coordinates = [coordinate];
+        let mut points = [ScreenPoint { x: 0.0, y: 0.0 }];
+        assert_eq!(
+            mln_vala_map_handle_pixels_for_lat_lngs(
+                map,
+                coordinates.as_ptr(),
+                coordinates.len(),
+                points.as_mut_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let mut round_trips = [LatLng {
+            latitude: 0.0,
+            longitude: 0.0,
+        }];
+        assert_eq!(
+            mln_vala_map_handle_lat_lngs_for_pixels(
+                map,
+                points.as_ptr(),
+                points.len(),
+                round_trips.as_mut_ptr(),
+                ptr::null_mut(),
+            ),
             GTRUE
         );
 

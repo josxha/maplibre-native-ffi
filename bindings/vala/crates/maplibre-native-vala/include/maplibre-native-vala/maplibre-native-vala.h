@@ -1664,6 +1664,70 @@ gboolean mln_vala_map_handle_cancel_transitions(
 );
 
 /**
+ * mln_vala_map_handle_pixel_for_lat_lng:
+ * @self: a map handle.
+ * @coordinate: (not nullable): geographic coordinate.
+ * @out_point: (out): return location for screen point.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_pixel_for_lat_lng(
+  MlnValaMapHandle* self, const MlnValaLatLng* coordinate,
+  MlnValaScreenPoint* out_point, GError** error
+);
+
+/**
+ * mln_vala_map_handle_lat_lng_for_pixel:
+ * @self: a map handle.
+ * @point: (not nullable): screen point.
+ * @out_coordinate: (out): return location for coordinate.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_lat_lng_for_pixel(
+  MlnValaMapHandle* self, const MlnValaScreenPoint* point,
+  MlnValaLatLng* out_coordinate, GError** error
+);
+
+/**
+ * mln_vala_map_handle_pixels_for_lat_lngs:
+ * @self: a map handle.
+ * @coordinates: (array length=coordinate_count): input coordinates.
+ * @coordinate_count: number of coordinates.
+ * @out_points: (out caller-allocates) (array length=coordinate_count): output
+ * points.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_pixels_for_lat_lngs(
+  MlnValaMapHandle* self, const MlnValaLatLng* coordinates,
+  size_t coordinate_count, MlnValaScreenPoint* out_points, GError** error
+);
+
+/**
+ * mln_vala_map_handle_lat_lngs_for_pixels:
+ * @self: a map handle.
+ * @points: (array length=point_count): input screen points.
+ * @point_count: number of points.
+ * @out_coordinates: (out caller-allocates) (array length=point_count): output
+ * coordinates.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_lat_lngs_for_pixels(
+  MlnValaMapHandle* self, const MlnValaScreenPoint* points, size_t point_count,
+  MlnValaLatLng* out_coordinates, GError** error
+);
+
+/**
  * mln_vala_map_handle_is_fully_loaded:
  * @self: a map handle.
  * @out_loaded: (out): return location for fully-loaded state.
