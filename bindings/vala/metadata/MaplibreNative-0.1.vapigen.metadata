@@ -73,6 +73,7 @@ VulkanContextDescriptor.instance skip
 VulkanContextDescriptor.physical_device skip
 VulkanContextDescriptor.device skip
 VulkanContextDescriptor.graphics_queue skip
+VulkanContextDescriptor.graphics_queue_family_index skip
 VulkanOwnedTextureDescriptor.size skip
 VulkanSurfaceDescriptor.size skip
 VulkanSurfaceDescriptor.surface skip

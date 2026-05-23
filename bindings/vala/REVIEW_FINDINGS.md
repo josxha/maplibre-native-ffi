@@ -386,3 +386,25 @@ Review artifacts:
 ### User-input-needed findings
 
 - None.
+
+## Round 10
+
+### Applied findings
+
+- Removed backend descriptor pointer fields from generated GIR review artifacts:
+  Metal texture/device/layer fields and Vulkan image/image-view/instance/device/
+  physical-device/graphics-queue/surface fields now stay hidden behind
+  `NativePointer` setters.
+- Hid `VulkanContextDescriptor.graphics_queue_family_index` from VAPI/GIR as
+  part of the semantic `set_handles()` call, keeping Vulkan context setup on the
+  safe setter path.
+- Confirmed descriptor scans over generated GIR report only the descriptor
+  records and no writable raw pointer fields.
+
+### Validation
+
+- `mise run //bindings/vala:generate`
+
+### User-input-needed findings
+
+- None.
