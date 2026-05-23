@@ -1,8 +1,8 @@
-//! Rust adapter seed for the Vala/GLib binding.
+//! Rust adapter for the Vala/GLib binding.
 //!
-//! The final crate exports a GObject Introspection-friendly ABI implemented in
-//! Rust. The initial scaffold keeps the first native calls in one place so the
-//! generated GIR/VAPI layer can grow from real C ABI behavior.
+//! The crate exports a GObject Introspection-friendly ABI implemented in Rust.
+//! It adapts the MapLibre Native C ABI to GLib object, boxed value, callback,
+//! and `GError` conventions consumed by GIR and VAPI generation.
 
 pub mod events;
 pub mod geo;
@@ -47,20 +47,20 @@ pub fn set_network_status(raw_status: u32) -> maplibre_native_core::error::Resul
     maplibre_native_core::error::check(unsafe { sys::mln_network_status_set(raw_status) })
 }
 
-/// C-callable proof-slice entry point used by future GIR scanner fixtures.
+/// C-callable entry point used by GIR scanner fixtures.
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_c_version() -> u32 {
     c_version()
 }
 
-/// C-callable proof-slice entry point used by GIR scanner fixtures.
+/// C-callable entry point used by GIR scanner fixtures.
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_supported_render_backends() -> u32 {
     supported_render_backend_mask()
 }
 
-/// C-callable proof-slice entry point that exposes network status through the
-/// GLib `GError` convention used by the generated GIR/VAPI API.
+/// C-callable entry point that exposes network status through the GLib `GError`
+/// convention used by the generated GIR/VAPI API.
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_network_status_get(
     out_status: *mut u32,
@@ -75,8 +75,8 @@ pub extern "C" fn mln_vala_network_status_get(
     }
 }
 
-/// C-callable proof-slice entry point that exposes network status through the
-/// GLib `GError` convention used by the generated GIR/VAPI API.
+/// C-callable entry point that exposes network status through the GLib `GError`
+/// convention used by the generated GIR/VAPI API.
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_network_status_set(
     status: u32,
@@ -91,8 +91,7 @@ pub extern "C" fn mln_vala_network_status_set(
     }
 }
 
-/// Scaffold-only status-result adapter retained for Rust tests while the full
-/// generated GObject ABI grows.
+/// Status-result adapter retained for Rust tests of diagnostic mapping.
 pub fn network_status_result() -> StatusResult {
     match network_status() {
         Ok(value) => StatusResult::ok(value),
@@ -100,8 +99,7 @@ pub fn network_status_result() -> StatusResult {
     }
 }
 
-/// Scaffold-only status-result adapter retained for Rust tests while the full
-/// generated GObject ABI grows.
+/// Status-result adapter retained for Rust tests of diagnostic mapping.
 pub fn set_network_status_result(raw_status: u32) -> StatusResult {
     match set_network_status(raw_status) {
         Ok(()) => StatusResult::ok(0),

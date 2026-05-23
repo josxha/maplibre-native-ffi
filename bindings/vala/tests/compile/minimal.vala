@@ -1,4 +1,16 @@
+int log_first_count = 0;
+int log_second_count = 0;
+int provider_call_count = 0;
+bool provider_cancel_checked = false;
+bool provider_second_complete_failed = false;
+
 bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+  log_first_count++;
+  return false;
+}
+
+bool handle_replacement_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+  log_second_count++;
   return false;
 }
 
@@ -6,11 +18,44 @@ string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
   return null;
 }
 
+string? replacement_transform_resource(MaplibreNative.ResourceKind kind, string url) {
+  return null;
+}
+
 MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceRequestHandle handle) {
-  if (request.url == null) {
+  provider_call_count++;
+  try {
+    bool cancelled = false;
+    handle.is_cancelled(out cancelled);
+    provider_cancel_checked = true;
+
+    MaplibreNative.ResourceResponse response = {};
+    response.default();
+    response.status = MaplibreNative.ResourceResponseStatus.ERROR;
+    response.error_reason = MaplibreNative.ResourceErrorReason.OTHER;
+    response.error_message = "vala provider handled request";
+    handle.complete(response);
+    try {
+      handle.complete(response);
+    } catch (GLib.Error second_error) {
+      provider_second_complete_failed = true;
+    }
+    handle.release();
+    handle.release();
+    return MaplibreNative.ResourceProviderDecision.HANDLE;
+  } catch (GLib.Error error) {
     return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
   }
-  return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
+}
+
+bool probe_wrong_thread(MaplibreNative.MapHandle map) {
+  try {
+    bool loaded = false;
+    map.is_fully_loaded(out loaded);
+    return false;
+  } catch (GLib.Error error) {
+    return true;
+  }
 }
 
 void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GLib.Error {
@@ -209,7 +254,7 @@ int main(string[] args) {
     status.set();
     MaplibreNative.log_set_async_severity_mask(MaplibreNative.LogSeverityFlags.DEFAULT);
     MaplibreNative.log_set_callback(handle_log);
-    MaplibreNative.log_clear_callback();
+    MaplibreNative.log_set_callback(handle_replacement_log);
 
     MaplibreNative.NativePointer native_pointer;
     MaplibreNative.NativePointer.@new(0x1234, out native_pointer);
@@ -240,9 +285,16 @@ int main(string[] args) {
     var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
     runtime.set_resource_provider(provide_resource);
     runtime.set_resource_transform(transform_resource);
+    runtime.set_resource_transform(replacement_transform_resource);
     runtime.run_once();
-    MaplibreNative.RuntimeEvent event;
+    MaplibreNative.RuntimeEvent? event = null;
     runtime.poll_event(out event);
+    bool event_copy_matches = true;
+    if (event != null) {
+      var event_copy = event.copy();
+      event_copy_matches = event_copy.type == event.type && event_copy.source_type == event.source_type && event_copy.payload_type == event.payload_type && event_copy.code == event.code;
+      event_copy.free();
+    }
 
     MaplibreNative.MapOptions map_options = {};
     map_options.default();
@@ -251,7 +303,10 @@ int main(string[] args) {
     map_options.scale_factor = 1.0;
     map_options.map_mode = MaplibreNative.MapMode.CONTINUOUS;
     var map = new MaplibreNative.MapHandle.with_options(runtime, map_options);
-    map.set_style_url("asset://missing-style.json");
+    map.set_style_url("https://provider-style.invalid/style.json");
+    for (int provider_spin = 0; provider_spin < 8; provider_spin++) {
+      runtime.run_once();
+    }
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
     map.add_geojson_source_url("fixture-source", "asset://fixture.geojson");
     bool source_exists = false;
@@ -365,13 +420,27 @@ int main(string[] args) {
     vulkan_borrowed_texture.default();
     MaplibreNative.TextureImageInfo texture_info = {};
     texture_info.default();
-    MaplibreNative.MetalOwnedTextureFrameHandle? metal_frame = null;
-    if (metal_frame != null) {
-      inspect_metal_owned_texture_frame(metal_frame);
+    var metal_frame_object = GLib.Object.new(typeof(MaplibreNative.MetalOwnedTextureFrameHandle));
+    var metal_frame = (MaplibreNative.MetalOwnedTextureFrameHandle) metal_frame_object;
+    metal_frame.close();
+    metal_frame.close();
+    bool metal_frame_closed_error_seen = false;
+    try {
+      uint32 closed_frame_width;
+      metal_frame.get_width(out closed_frame_width);
+    } catch (GLib.Error error) {
+      metal_frame_closed_error_seen = true;
     }
-    MaplibreNative.VulkanOwnedTextureFrameHandle? vulkan_frame = null;
-    if (vulkan_frame != null) {
-      inspect_vulkan_owned_texture_frame(vulkan_frame);
+    var vulkan_frame_object = GLib.Object.new(typeof(MaplibreNative.VulkanOwnedTextureFrameHandle));
+    var vulkan_frame = (MaplibreNative.VulkanOwnedTextureFrameHandle) vulkan_frame_object;
+    vulkan_frame.close();
+    vulkan_frame.close();
+    bool vulkan_frame_closed_error_seen = false;
+    try {
+      uint32 closed_frame_width;
+      vulkan_frame.get_width(out closed_frame_width);
+    } catch (GLib.Error error) {
+      vulkan_frame_closed_error_seen = true;
     }
     map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);
     MaplibreNative.MapDebugOptions debug_options;
@@ -440,6 +509,10 @@ int main(string[] args) {
 
     bool loaded = false;
     map.is_fully_loaded(out loaded);
+    var wrong_thread = new GLib.Thread<bool>("wrong-thread", () => {
+      return probe_wrong_thread(map);
+    });
+    bool wrong_thread_error_seen = wrong_thread.join();
     map.dump_debug_logs();
 
     var projection = new MaplibreNative.MapProjectionHandle(map);
@@ -455,6 +528,8 @@ int main(string[] args) {
     unowned MaplibreNative.Geometry? bindability_geometry = null;
     unowned MaplibreNative.JsonValue? bindability_json = null;
     MaplibreNative.RenderSessionHandle? bindability_session = null;
+    MaplibreNative.MetalOwnedTextureFrameHandle? bindability_metal_frame = null;
+    MaplibreNative.VulkanOwnedTextureFrameHandle? bindability_vulkan_frame = null;
     if (args.length < 0 && bindability_geometry != null && bindability_json != null && bindability_session != null) {
       exercise_offline_operations(runtime);
       exercise_json_style(map, bindability_json);
@@ -464,6 +539,12 @@ int main(string[] args) {
       exercise_geometry_camera(map, projection, bindability_geometry);
       MaplibreNative.Feature bindability_feature = {};
       exercise_feature_extensions(bindability_session, bindability_feature, bindability_json);
+      if (bindability_metal_frame != null) {
+        inspect_metal_owned_texture_frame(bindability_metal_frame);
+      }
+      if (bindability_vulkan_frame != null) {
+        inspect_vulkan_owned_texture_frame(bindability_vulkan_frame);
+      }
     }
 
     projection.close();
@@ -473,8 +554,10 @@ int main(string[] args) {
     runtime.clear_resource_transform();
     runtime.close();
     runtime.close();
+    MaplibreNative.log_clear_callback();
 
-    if (backends == 0 || pointer_bits != 0x1234) {
+    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || log_first_count != 0 || log_second_count == 0 || !metal_frame_closed_error_seen || !vulkan_frame_closed_error_seen) {
+      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), provider_cancel_checked.to_string(), provider_second_complete_failed.to_string(), provider_call_count, log_first_count, log_second_count, metal_frame_closed_error_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
       return 1;
     }
   } catch (GLib.Error error) {

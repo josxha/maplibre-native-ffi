@@ -3,11 +3,11 @@ use maplibre_native_sys as sys;
 
 const DIAGNOSTIC_CAPACITY: usize = 512;
 
-/// Status-and-value result used by the scaffold's C-callable proof slice.
+/// Status-and-value result used by Rust tests for status/diagnostic mapping.
 ///
-/// Final GObject entry points will translate failures into `GError`. This
-/// temporary shape keeps tests allocation-free and records the same diagnostic
-/// that a future `GError` message will carry.
+/// Public GObject entry points translate failures into `GError`. This helper
+/// keeps tests allocation-free and records the same diagnostic mapping that the
+/// GLib error adapter uses.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StatusResult {
