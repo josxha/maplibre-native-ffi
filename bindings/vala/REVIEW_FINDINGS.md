@@ -726,3 +726,29 @@ Review artifacts:
 - `mise run test`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
 - `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`
+
+## Round 19
+
+Review artifacts:
+
+- `review-loop/round19-api-surface.md`
+- `review-loop/round19-lifecycle-validation.md`
+
+### Applied findings
+
+- None. Reviewers found no remaining actionable API-surface,
+  lifecycle/ownership, generated-surface, validation, or review-log blockers.
+
+### Rejected or deferred findings
+
+- None.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- Reviewers rechecked generated-surface gates for both sanitized GIR and
+  typelib-derived GIR.
+- Reviewers verified the branch was clean and pushed at `5062c2a`.
