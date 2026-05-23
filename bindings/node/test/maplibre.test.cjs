@@ -9,6 +9,7 @@ const {
   MapHandle,
   latLngForProjectedMeters,
   MaplibreStatus,
+  NativePointer,
   networkStatus,
   projectedMetersForLatLng,
   restoreDefaultAsyncLogSeverities,
@@ -58,6 +59,21 @@ test("async log severities map string values and reject unknown values", () => {
 
   assert.throws(
     () => setAsyncLogSeverities([/** @type {any} */ ("debug")]),
+    InvalidArgumentError,
+  );
+});
+
+test("native pointer is a borrowed opaque address value", () => {
+  const pointer = NativePointer.unsafeFromAddress(0x1234n);
+
+  assert.equal(pointer.address, 0x1234n);
+  assert.equal(pointer.isNull, false);
+  assert.equal(pointer.equals(NativePointer.unsafeFromAddress(0x1234n)), true);
+  assert.equal(pointer.equals(NativePointer.null), false);
+  assert.equal(NativePointer.null.isNull, true);
+  assert.equal(pointer.toString(), "NativePointer[address=0x1234]");
+  assert.throws(
+    () => NativePointer.unsafeFromAddress(-1n),
     InvalidArgumentError,
   );
 });

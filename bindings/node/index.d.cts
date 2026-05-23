@@ -98,6 +98,16 @@ export interface MapOptions {
   mapMode?: "continuous" | "static" | "tile" | null;
 }
 
+export declare class NativePointer {
+  static readonly null: NativePointer;
+  static unsafeFromAddress(address: bigint): NativePointer;
+  private constructor(address: bigint);
+  readonly address: bigint;
+  readonly isNull: boolean;
+  equals(other: unknown): boolean;
+  toString(): string;
+}
+
 export declare class RuntimeHandle {
   constructor(options?: RuntimeOptions | null);
   readonly closed: boolean;

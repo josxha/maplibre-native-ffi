@@ -125,6 +125,43 @@ function restoreDefaultAsyncLogSeverities() {
   );
 }
 
+class NativePointer {
+  static null = new NativePointer(0n);
+
+  static unsafeFromAddress(address) {
+    return new NativePointer(address);
+  }
+
+  constructor(address) {
+    if (typeof address !== "bigint") {
+      throw new InvalidArgumentError(
+        null,
+        "native pointer address must be a bigint",
+      );
+    }
+    if (address < 0n) {
+      throw new InvalidArgumentError(
+        null,
+        "native pointer address must be non-negative",
+      );
+    }
+    this.address = address;
+    Object.freeze(this);
+  }
+
+  get isNull() {
+    return this.address === 0n;
+  }
+
+  equals(other) {
+    return other instanceof NativePointer && this.address === other.address;
+  }
+
+  toString() {
+    return `NativePointer[address=0x${this.address.toString(16)}]`;
+  }
+}
+
 class RuntimeHandle {
   constructor(options) {
     this.native = translateNativeErrors(() =>
@@ -296,6 +333,7 @@ module.exports = {
   MaplibreStatus,
   RuntimeHandle,
   MapHandle,
+  NativePointer,
   cVersion,
   supportedRenderBackends,
   networkStatus,
