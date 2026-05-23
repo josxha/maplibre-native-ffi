@@ -231,6 +231,28 @@ final class MaplibreNativeCApi {
   /// Destroys a map handle.
   int mapDestroy(Pointer<raw.mln_map> map) => _raw.mln_map_destroy(map).value;
 
+  /// Requests a continuous-map repaint.
+  int mapRequestRepaint(Pointer<raw.mln_map> map) =>
+      _raw.mln_map_request_repaint(map).value;
+
+  /// Requests one still image for static or tile maps.
+  int mapRequestStillImage(Pointer<raw.mln_map> map) =>
+      _raw.mln_map_request_still_image(map).value;
+
+  /// Sets debug overlay options.
+  int mapSetDebugOptions(Pointer<raw.mln_map> map, int options) =>
+      _raw.mln_map_set_debug_options(map, options).value;
+
+  /// Copies debug overlay options.
+  int mapGetDebugOptions(
+    Pointer<raw.mln_map> map,
+    Pointer<Uint32> outOptions,
+  ) => _raw.mln_map_get_debug_options(map, outOptions).value;
+
+  /// Dumps map debug logs through native logging.
+  int mapDumpDebugLogs(Pointer<raw.mln_map> map) =>
+      _raw.mln_map_dump_debug_logs(map).value;
+
   /// Sets the map style URL.
   int mapSetStyleUrl(Pointer<raw.mln_map> map, Pointer<Char> url) =>
       _raw.mln_map_set_style_url(map, url).value;

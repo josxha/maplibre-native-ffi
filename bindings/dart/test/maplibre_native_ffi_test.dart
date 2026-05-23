@@ -90,6 +90,12 @@ void main() {
       final map = runtime.createMap();
       expect(map.isClosed, isFalse);
       map.setStyleJson(_emptyStyleJson);
+      map.requestRepaint();
+      expect(() => map.requestStillImage(), throwsA(isA<MaplibreException>()));
+      map.setDebugOptions(MapDebugOptions.tileBorders);
+      expect(map.debugOptions().contains(MapDebugOptions.tileBorders), isTrue);
+      map.setDebugOptions(MapDebugOptions.none);
+      map.dumpDebugLogs();
       runtime.runOnce();
       runtime.drainEvents();
       map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 1));

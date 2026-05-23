@@ -1,1 +1,2 @@
-export '../runtime/runtime.dart' show MapHandle, MapMode, MapOptions;
+export '../runtime/runtime.dart'
+    show MapDebugOptions, MapHandle, MapMode, MapOptions;

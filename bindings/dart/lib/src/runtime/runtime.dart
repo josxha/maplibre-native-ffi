@@ -546,6 +546,46 @@ final class MapMode {
   final String name;
 }
 
+/// Map debug overlay option mask.
+final class MapDebugOptions {
+  /// Creates a debug option mask from raw bits.
+  const MapDebugOptions(this.bits);
+
+  /// No debug overlays.
+  static const none = MapDebugOptions(0);
+
+  /// Tile border overlay.
+  static const tileBorders = MapDebugOptions(1 << 1);
+
+  /// Parse status overlay.
+  static const parseStatus = MapDebugOptions(1 << 2);
+
+  /// Timestamp overlay.
+  static const timestamps = MapDebugOptions(1 << 3);
+
+  /// Collision overlay.
+  static const collision = MapDebugOptions(1 << 4);
+
+  /// Overdraw overlay.
+  static const overdraw = MapDebugOptions(1 << 5);
+
+  /// Stencil clip overlay.
+  static const stencilClip = MapDebugOptions(1 << 6);
+
+  /// Depth buffer overlay.
+  static const depthBuffer = MapDebugOptions(1 << 7);
+
+  /// Raw debug overlay bits.
+  final int bits;
+
+  /// Returns a mask containing bits from this mask and [other].
+  MapDebugOptions union(MapDebugOptions other) =>
+      MapDebugOptions(bits | other.bits);
+
+  /// Returns true when all [option] bits are present.
+  bool contains(MapDebugOptions option) => (bits & option.bits) == option.bits;
+}
+
 /// Map creation options.
 final class MapOptions {
   /// Creates map options.
@@ -622,6 +662,35 @@ final class MapHandle {
       _check(_c.mapSetStyleJson(_pointer, nativeJson.pointer.cast<Char>()));
     });
     _clearCustomGeometryCallbacks();
+  }
+
+  /// Requests a repaint for a continuous map.
+  void requestRepaint() {
+    _check(_c.mapRequestRepaint(_pointer));
+  }
+
+  /// Requests one still image for a static or tile map.
+  void requestStillImage() {
+    _check(_c.mapRequestStillImage(_pointer));
+  }
+
+  /// Applies MapLibre debug overlay options.
+  void setDebugOptions(MapDebugOptions options) {
+    _check(_c.mapSetDebugOptions(_pointer, options.bits));
+  }
+
+  /// Copies current MapLibre debug overlay options.
+  MapDebugOptions debugOptions() {
+    return withNativeArena((arena) {
+      final outOptions = arena<Uint32>();
+      _check(_c.mapGetDebugOptions(_pointer, outOptions));
+      return MapDebugOptions(outOptions.value);
+    });
+  }
+
+  /// Dumps map debug logs through MapLibre Native logging.
+  void dumpDebugLogs() {
+    _check(_c.mapDumpDebugLogs(_pointer));
   }
 
   /// Attaches a Metal native surface render target.
