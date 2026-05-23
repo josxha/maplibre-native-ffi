@@ -2585,6 +2585,50 @@ gboolean mln_vala_map_projection_handle_close(
 );
 
 /**
+ * mln_vala_map_projection_handle_get_camera:
+ * @self: a projection handle.
+ * @out_camera: (out): return location for camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_projection_handle_get_camera(
+  MlnValaMapProjectionHandle* self, MlnValaCameraOptions* out_camera,
+  GError** error
+);
+
+/**
+ * mln_vala_map_projection_handle_set_camera:
+ * @self: a projection handle.
+ * @camera: (not nullable): camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_projection_handle_set_camera(
+  MlnValaMapProjectionHandle* self, const MlnValaCameraOptions* camera,
+  GError** error
+);
+
+/**
+ * mln_vala_map_projection_handle_set_visible_coordinates:
+ * @self: a projection handle.
+ * @coordinates: (array length=coordinate_count): visible coordinates.
+ * @coordinate_count: number of coordinates.
+ * @padding: (not nullable): edge padding.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_projection_handle_set_visible_coordinates(
+  MlnValaMapProjectionHandle* self, const MlnValaLatLng* coordinates,
+  size_t coordinate_count, const MlnValaEdgeInsets* padding, GError** error
+);
+
+/**
  * mln_vala_map_projection_handle_pixel_for_lat_lng:
  * @self: a projection handle.
  * @coordinate: (not nullable): geographic coordinate in degrees.

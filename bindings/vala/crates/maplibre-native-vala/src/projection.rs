@@ -50,6 +50,53 @@ pub extern "C" fn mln_vala_map_projection_handle_close(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_projection_handle_get_camera(
+    handle: *mut MapProjectionHandle,
+    out_camera: *mut sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_camera(handle, out_camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_projection_handle_set_camera(
+    handle: *mut MapProjectionHandle,
+    camera: *const sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_camera(handle, camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_projection_handle_set_visible_coordinates(
+    handle: *mut MapProjectionHandle,
+    coordinates: *const LatLng,
+    coordinate_count: usize,
+    padding: *const sys::mln_edge_insets,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_visible_coordinates(handle, coordinates, coordinate_count, padding) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_projection_handle_pixel_for_lat_lng(
     handle: *mut MapProjectionHandle,
     coordinate: *const LatLng,
@@ -135,6 +182,61 @@ fn projection_native(
     Ok(native)
 }
 
+fn get_camera(
+    handle: *mut MapProjectionHandle,
+    out_camera: *mut sys::mln_camera_options,
+) -> error::Result<()> {
+    if out_camera.is_null() {
+        return Err(Error::invalid_argument("camera output pointer is null"));
+    }
+    let projection = projection_native(handle)?;
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut camera = unsafe { sys::mln_camera_options_default() };
+    // SAFETY: `projection` is live and `camera` is writable output storage.
+    error::check(unsafe { sys::mln_map_projection_get_camera(projection, &mut camera) })?;
+    glib::clear_optional_out_pointer(out_camera, camera)
+}
+
+fn set_camera(
+    handle: *mut MapProjectionHandle,
+    camera: *const sys::mln_camera_options,
+) -> error::Result<()> {
+    if camera.is_null() {
+        return Err(Error::invalid_argument("camera options are null"));
+    }
+    let projection = projection_native(handle)?;
+    // SAFETY: `projection` is live and `camera` points to a borrowed descriptor
+    // for this call.
+    error::check(unsafe { sys::mln_map_projection_set_camera(projection, camera) })
+}
+
+fn set_visible_coordinates(
+    handle: *mut MapProjectionHandle,
+    coordinates: *const LatLng,
+    coordinate_count: usize,
+    padding: *const sys::mln_edge_insets,
+) -> error::Result<()> {
+    if coordinates.is_null() {
+        return Err(Error::invalid_argument("visible coordinates are null"));
+    }
+    if padding.is_null() {
+        return Err(Error::invalid_argument(
+            "visible coordinate padding is null",
+        ));
+    }
+    let projection = projection_native(handle)?;
+    // SAFETY: `LatLng` is repr-compatible with `mln_lat_lng`; all pointers are
+    // borrowed for this call and validated by the C API.
+    error::check(unsafe {
+        sys::mln_map_projection_set_visible_coordinates(
+            projection,
+            coordinates.cast::<sys::mln_lat_lng>(),
+            coordinate_count,
+            *padding,
+        )
+    })
+}
+
 fn pixel_for_lat_lng(
     handle: *mut MapProjectionHandle,
     coordinate: *const LatLng,
@@ -193,10 +295,42 @@ mod tests {
         let projection = mln_vala_map_projection_handle_new(map, ptr::null_mut());
         assert!(!projection.is_null());
 
+        // SAFETY: Zeroed storage is immediately initialized by default helper.
+        let mut camera: sys::mln_camera_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            crate::handles::mln_vala_camera_options_default(&mut camera, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_projection_handle_get_camera(projection, &mut camera, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_projection_handle_set_camera(projection, &camera, ptr::null_mut()),
+            GTRUE
+        );
+
         let coordinate = LatLng {
             latitude: 0.0,
             longitude: 0.0,
         };
+        let visible_coordinates = [coordinate];
+        let padding = sys::mln_edge_insets {
+            top: 0.0,
+            left: 0.0,
+            bottom: 0.0,
+            right: 0.0,
+        };
+        assert_eq!(
+            mln_vala_map_projection_handle_set_visible_coordinates(
+                projection,
+                visible_coordinates.as_ptr(),
+                visible_coordinates.len(),
+                &padding,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
         let mut point = ScreenPoint { x: 0.0, y: 0.0 };
         assert_eq!(
             mln_vala_map_projection_handle_pixel_for_lat_lng(

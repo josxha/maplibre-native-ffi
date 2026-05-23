@@ -270,6 +270,11 @@ int main(string[] args) {
     map.dump_debug_logs();
 
     var projection = new MaplibreNative.MapProjectionHandle(map);
+    projection.get_camera(out camera);
+    projection.set_camera(camera);
+    MaplibreNative.EdgeInsets projection_padding = { 0.0, 0.0, 0.0, 0.0 };
+    MaplibreNative.LatLng[] visible_coordinates = { coordinate, round_trip };
+    projection.set_visible_coordinates(visible_coordinates, projection_padding);
     MaplibreNative.ScreenPoint point;
     projection.pixel_for_lat_lng(coordinate, out point);
     projection.lat_lng_for_pixel(point, out round_trip);

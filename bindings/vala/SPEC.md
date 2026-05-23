@@ -103,7 +103,8 @@ The scaffold implements one proof slice in Rust:
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with
-  close-once lifecycle and coordinate conversion methods.
+  close-once lifecycle, camera, visible-coordinate fitting, and coordinate
+  conversion methods.
 - `RenderSessionHandle` is registered as a GObject class with descriptor
   defaults, render-target attach methods, readback helpers, texture frame
   handles, and basic session lifecycle methods.
