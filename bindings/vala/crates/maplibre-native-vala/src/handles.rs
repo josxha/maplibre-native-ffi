@@ -5218,6 +5218,34 @@ mod tests {
     }
 
     #[test]
+    fn map_owner_thread_errors_propagate_as_gerror() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 128, 128, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        let map_bits = map as usize;
+        let wrong_thread_failed = std::thread::spawn(move || {
+            let map = map_bits as *mut MapHandle;
+            let mut loaded = GFALSE;
+            let mut error = ptr::null_mut();
+            let ok = mln_vala_map_handle_is_fully_loaded(map, &mut loaded, &mut error);
+            ok == GFALSE && !error.is_null()
+        })
+        .join()
+        .expect("wrong-thread probe should not panic");
+        assert!(wrong_thread_failed);
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
     fn resource_transform_replacement_and_clear_run_destroy_notify() {
         let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
         assert!(!runtime.is_null());
