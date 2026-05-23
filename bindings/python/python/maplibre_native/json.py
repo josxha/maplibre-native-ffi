@@ -67,6 +67,16 @@ class JsonObject:
 
 JsonScalar: TypeAlias = None | bool | str | JsonUInt | JsonInt | JsonDouble
 JsonValue: TypeAlias = JsonScalar | JsonArray | JsonObject
+JsonLike: TypeAlias = (
+    JsonScalar
+    | int
+    | float
+    | JsonArray
+    | JsonObject
+    | list["JsonLike"]
+    | tuple["JsonLike", ...]
+    | dict[object, "JsonLike"]
+)
 
 
 def json_uint(value: int) -> JsonUInt:
@@ -211,6 +221,7 @@ __all__ = [
     "JsonArray",
     "JsonDouble",
     "JsonInt",
+    "JsonLike",
     "JsonMember",
     "JsonObject",
     "JsonScalar",

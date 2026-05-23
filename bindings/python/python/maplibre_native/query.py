@@ -8,7 +8,7 @@ from typing import Any
 
 from .camera import ScreenPoint
 from .geo import Feature
-from .json import JsonValue
+from .json import JsonLike, JsonValue
 from .json import _from_native_wire as _json_from_native_wire
 from .json import _to_native_wire as _json_to_native_wire
 
@@ -82,7 +82,7 @@ class RenderedFeatureQueryOptions:
     """Options for rendered feature queries."""
 
     layer_ids: tuple[str, ...] | None = None
-    filter: JsonValue | None = None
+    filter: JsonLike | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +90,7 @@ class SourceFeatureQueryOptions:
     """Options for source feature queries."""
 
     source_layer_ids: tuple[str, ...] | None = None
-    filter: JsonValue | None = None
+    filter: JsonLike | None = None
 
 
 @dataclass(frozen=True, slots=True)

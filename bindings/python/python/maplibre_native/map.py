@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         ScreenPoint,
     )
     from .geo import GeoJson, Geometry, LatLng, LatLngBounds
-    from .json import JsonValue
+    from .json import JsonLike
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -546,7 +546,7 @@ class MapHandle:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
 
-    def add_style_source_json(self, source_id: str, source_json: JsonValue) -> None:
+    def add_style_source_json(self, source_id: str, source_json: JsonLike) -> None:
         """Add one style source from a style-spec source JSON object."""
         from .json import _to_native_wire as _json_to_native_wire
 

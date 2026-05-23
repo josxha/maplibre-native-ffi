@@ -141,3 +141,43 @@ state/validation audit after Round 1 commits.
   `uv run ruff format --check bindings/python`,
   `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
   (58 Python tests, wheel build, and metadata/`_native` import check) passed.
+
+## Round 3
+
+Review fanout: final-final public Python API/tests/SPEC review after Round 2.
+
+### Applied findings
+
+- Align public JSON input type hints with runtime JSON-like input behavior.
+  - Evidence: final review found `_to_native_wire()` accepts plain finite
+    numbers, lists/tuples, and dicts, but some public `py.typed` annotations
+    still named only explicit `JsonValue`/`JsonObject` wrappers.
+  - Resolution: added public `JsonLike` and widened JSON-input annotations for
+    style source JSON, rendered/source query filters, feature-extension
+    arguments, and feature state setters while preserving `JsonValue` for copied
+    outputs.
+  - Coverage: updated public API smoke tests to pass plain dict/list values
+    through style source JSON, query filters, feature-extension arguments, and
+    feature state setters.
+
+### Rejected or deferred findings
+
+- No new rejected or deferred findings in this round. Previously deferred items
+  remain unchanged: broad private callback simulators, backend-specific render
+  readback/frame hardening, packaging/distribution/CI-matrix expansion, and
+  broad enum deduplication.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused JSON-like input regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_style_source_url_metadata_and_removal_public_api
+  tests/test_package.py::test_render_session_query_public_api_uses_query_and_geojson_wire_values
+  tests/test_package.py::test_render_session_feature_state_public_api_uses_json_wire_values`
+- Repository fix/check task: `mise run fix`
+- Full Python binding CI: `mise run //bindings/python:ci` (58 Python tests,
+  wheel build, and metadata/`_native` import check)

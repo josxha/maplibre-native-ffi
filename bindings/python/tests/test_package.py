@@ -240,15 +240,13 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
             map_handle.add_style_source_json(
                 "style-json-points",
-                json.from_python(
-                    {
-                        "type": "geojson",
-                        "data": {
-                            "type": "FeatureCollection",
-                            "features": [],
-                        },
-                    }
-                ),
+                {
+                    "type": "geojson",
+                    "data": {
+                        "type": "FeatureCollection",
+                        "features": [],
+                    },
+                },
             )
             map_handle.add_geojson_source_url(
                 "points", "https://example.test/points.geojson"
@@ -888,11 +886,11 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     geometry = query.RenderedQueryGeometry.point_geometry(camera.ScreenPoint(1.0, 2.0))
     rendered_options = query.RenderedFeatureQueryOptions(
         layer_ids=("circle",),
-        filter=json.from_python(["==", ["get", "kind"], "park"]),
+        filter=["==", ["get", "kind"], "park"],
     )
     source_options = query.SourceFeatureQueryOptions(
         source_layer_ids=("landuse",),
-        filter=json.from_python(["==", ["get", "kind"], "park"]),
+        filter=["==", ["get", "kind"], "park"],
     )
     feature = geo.Feature(
         geometry=geo.point(1.0, 2.0),
@@ -907,7 +905,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         feature,
         "supercluster",
         "leaves",
-        json.JsonObject.from_pairs([("limit", json.JsonUInt(10))]),
+        {"limit": 10},
     )
 
     assert fake_native.rendered_call == (
@@ -935,7 +933,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         },
         "supercluster",
         "leaves",
-        {"type": "object", "members": [("limit", {"type": "uint", "value": 10})]},
+        {"type": "object", "members": [("limit", {"type": "int", "value": 10})]},
     )
     assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
 
@@ -1000,7 +998,7 @@ def test_render_session_feature_state_public_api_uses_json_wire_values() -> None
         feature_id="feature-1",
         state_key="hover",
     )
-    state = json.JsonObject.from_pairs([("hover", True)])
+    state = {"hover": True}
 
     session.set_feature_state(selector, state)
     returned = session.get_feature_state(selector)
@@ -1013,7 +1011,7 @@ def test_render_session_feature_state_public_api_uses_json_wire_values() -> None
         "hover",
         {"type": "object", "members": [("hover", True)]},
     )
-    assert returned == state
+    assert json.to_python(returned) == [("hover", True)]
     assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
 
 

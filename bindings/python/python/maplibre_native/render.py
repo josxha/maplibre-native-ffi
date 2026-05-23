@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .geo import Feature
-    from .json import JsonObject, JsonValue
+    from .json import JsonLike, JsonValue
     from .map import MapHandle
     from .query import (
         FeatureExtensionResult,
@@ -370,7 +370,7 @@ class RenderSessionHandle:
         feature: Feature,
         extension: str,
         extension_field: str,
-        arguments: JsonObject | None = None,
+        arguments: JsonLike | None = None,
     ) -> FeatureExtensionResult:
         """Query a feature extension from the latest render session state."""
         from .geo import _feature_to_native_wire
@@ -389,7 +389,7 @@ class RenderSessionHandle:
     def set_feature_state(
         self,
         selector: FeatureStateSelector,
-        state: JsonValue,
+        state: JsonLike,
     ) -> None:
         """Set per-feature state on a render source for this render session."""
         from .json import _to_native_wire as _json_to_native_wire
