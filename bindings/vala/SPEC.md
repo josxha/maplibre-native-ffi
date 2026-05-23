@@ -64,6 +64,7 @@ bindings/vala/
     include/maplibre-native-vala/maplibre-native-vala.h
     build.rs
     src/glib.rs
+    src/handles.rs
     src/lib.rs
     src/native_pointer.rs
     src/status.rs
@@ -78,6 +79,8 @@ The scaffold implements one proof slice in Rust:
   `mln_supported_render_backend_mask()`.
 - `mln_vala_network_status_get()` and `mln_vala_network_status_set()` cross the
   real C ABI and expose failure through GLib `GError`.
+- `RuntimeHandle` and `MapHandle` are registered as GObject classes with
+  deterministic close methods and a minimal lifecycle slice.
 - `NativePointer` records the borrowed opaque-address value semantics planned
   for the public boxed type.
 - `metadata/api.toml` seeds the generator model for namespace, error domain, and

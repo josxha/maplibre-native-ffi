@@ -5,6 +5,14 @@ int main(string[] args) {
   try {
     MaplibreNative.network_status_get(out status);
     MaplibreNative.network_status_set(status);
+
+    var runtime = new MaplibreNative.RuntimeHandle();
+    runtime.run_once();
+
+    var map = new MaplibreNative.MapHandle(runtime, 512, 512, 1.0);
+    map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    map.close();
+    runtime.close();
   } catch (GLib.Error error) {
     return 1;
   }

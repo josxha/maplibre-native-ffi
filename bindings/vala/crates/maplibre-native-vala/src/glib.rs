@@ -1,14 +1,42 @@
-use std::ffi::{CStr, CString, c_char, c_int, c_uint};
+use std::ffi::{CStr, CString, c_char, c_int, c_uint, c_void};
+use std::mem;
 use std::ptr;
+use std::sync::OnceLock;
 
 use maplibre_native_core::error::{Error, ErrorKind};
 use maplibre_native_sys as sys;
 
 pub type GBoolean = c_int;
 pub type GQuark = c_uint;
+pub type GType = usize;
 
 pub const GTRUE: GBoolean = 1;
 pub const GFALSE: GBoolean = 0;
+
+#[repr(C)]
+pub struct GTypeClass {
+    _private: [u8; 0],
+}
+
+#[repr(C)]
+pub struct GTypeInstance {
+    pub g_class: *mut GTypeClass,
+}
+
+#[repr(C)]
+pub struct GObject {
+    pub g_type_instance: GTypeInstance,
+    pub ref_count: c_uint,
+    pub qdata: *mut c_void,
+}
+
+#[repr(C)]
+struct GTypeQuery {
+    type_: GType,
+    type_name: *const c_char,
+    class_size: c_uint,
+    instance_size: c_uint,
+}
 
 #[repr(C)]
 pub struct GError {
@@ -20,6 +48,25 @@ pub struct GError {
 unsafe extern "C" {
     fn g_quark_from_static_string(string: *const c_char) -> GQuark;
     fn g_error_new_literal(domain: GQuark, code: c_int, message: *const c_char) -> *mut GError;
+    fn g_object_get_type() -> GType;
+    fn g_object_new_with_properties(
+        object_type: GType,
+        n_properties: c_uint,
+        names: *const *const c_char,
+        values: *const c_void,
+    ) -> *mut GObject;
+    fn g_object_ref(object: *mut GObject) -> *mut GObject;
+    fn g_object_unref(object: *mut GObject);
+    fn g_type_query(type_: GType, query: *mut GTypeQuery);
+    fn g_type_register_static_simple(
+        parent_type: GType,
+        type_name: *const c_char,
+        class_size: c_uint,
+        class_init: Option<unsafe extern "C" fn(*mut c_void, *mut c_void)>,
+        instance_size: c_uint,
+        instance_init: Option<unsafe extern "C" fn(*mut c_void, *mut c_void)>,
+        flags: c_uint,
+    ) -> GType;
 }
 
 const ERROR_DOMAIN: &CStr = c"maplibre-native-error-quark";
@@ -95,6 +142,72 @@ impl ErrorCode {
     fn code(self) -> c_int {
         self as c_int
     }
+}
+
+pub fn register_object_type<T>(type_name: &'static CStr) -> GType {
+    static TYPE_REGISTRY: OnceLock<std::sync::Mutex<Vec<(&'static CStr, GType)>>> = OnceLock::new();
+    let registry = TYPE_REGISTRY.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    let mut registry = registry
+        .lock()
+        .expect("GObject type registry lock poisoned");
+
+    if let Some((_, gtype)) = registry.iter().find(|(name, _)| *name == type_name) {
+        return *gtype;
+    }
+
+    // SAFETY: `g_object_get_type` returns the registered GObject base type, and
+    // `g_type_query` initializes the query struct for that type.
+    let parent_type = unsafe { g_object_get_type() };
+    let mut parent_query = GTypeQuery {
+        type_: 0,
+        type_name: ptr::null(),
+        class_size: 0,
+        instance_size: 0,
+    };
+    // SAFETY: `parent_query` points to writable storage for one query result.
+    unsafe { g_type_query(parent_type, &mut parent_query) };
+
+    // SAFETY: The type name is static and NUL-terminated. The instance type `T`
+    // starts with `GObject` and has a stable `repr(C)` layout. No class or
+    // instance init hooks are needed for these data-only handle wrappers.
+    let gtype = unsafe {
+        g_type_register_static_simple(
+            parent_type,
+            type_name.as_ptr(),
+            parent_query.class_size,
+            None,
+            mem::size_of::<T>() as c_uint,
+            None,
+            0,
+        )
+    };
+    registry.push((type_name, gtype));
+    gtype
+}
+
+pub fn new_object<T>(gtype: GType) -> *mut T {
+    // SAFETY: `gtype` is a registered `GObject` subtype with instance size
+    // matching `T`. No construct properties are supplied.
+    unsafe { g_object_new_with_properties(gtype, 0, ptr::null(), ptr::null()) as *mut T }
+}
+
+pub fn ref_object<T>(object: *mut T) -> *mut T {
+    if object.is_null() {
+        return ptr::null_mut();
+    }
+
+    // SAFETY: The caller supplied a live GObject instance pointer.
+    unsafe { g_object_ref(object.cast::<GObject>()).cast::<T>() }
+}
+
+pub fn unref_object<T>(object: *mut T) {
+    if object.is_null() {
+        return;
+    }
+
+    // SAFETY: The caller supplied a live GObject instance pointer and releases
+    // one reference.
+    unsafe { g_object_unref(object.cast::<GObject>()) }
 }
 
 pub(crate) fn clear_optional_out_pointer<T>(out: *mut T, value: T) -> Result<(), Error> {

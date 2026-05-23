@@ -5,6 +5,7 @@
 //! generated GIR/VAPI layer can grow from real C ABI behavior.
 
 pub mod glib;
+pub mod handles;
 pub mod native_pointer;
 pub mod status;
 
