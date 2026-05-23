@@ -108,6 +108,46 @@ impl NativeMapHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "moveBy")]
+    pub fn move_by(&self, delta_x: f64, delta_y: f64) -> Result<()> {
+        core::check(unsafe { sys::mln_map_move_by(self.state.as_ptr(), delta_x, delta_y) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "scaleBy")]
+    pub fn scale_by(&self, scale: f64, anchor: Option<ScreenPoint>) -> Result<()> {
+        let anchor = anchor.map(ScreenPoint::into_native);
+        let anchor_ptr = anchor.as_ref().map_or(std::ptr::null(), |anchor| {
+            anchor as *const sys::mln_screen_point
+        });
+        core::check(unsafe { sys::mln_map_scale_by(self.state.as_ptr(), scale, anchor_ptr) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "rotateBy")]
+    pub fn rotate_by(&self, first: ScreenPoint, second: ScreenPoint) -> Result<()> {
+        core::check(unsafe {
+            sys::mln_map_rotate_by(
+                self.state.as_ptr(),
+                first.into_native(),
+                second.into_native(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "pitchBy")]
+    pub fn pitch_by(&self, pitch: f64) -> Result<()> {
+        core::check(unsafe { sys::mln_map_pitch_by(self.state.as_ptr(), pitch) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "cancelTransitions")]
+    pub fn cancel_transitions(&self) -> Result<()> {
+        core::check(unsafe { sys::mln_map_cancel_transitions(self.state.as_ptr()) })
+            .map_err(error::from_core)
+    }
+
     #[napi(js_name = "getCamera")]
     pub fn get_camera(&self) -> Result<CameraOptions> {
         let mut raw = unsafe { sys::mln_camera_options_default() };

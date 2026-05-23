@@ -180,6 +180,23 @@ test("map camera commands copy descriptor values", () => {
   }
 });
 
+test("map camera movement commands adapt point descriptors", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 256, height: 256 });
+
+  try {
+    map.moveBy(1, 2);
+    map.scaleBy(1.1, { x: 10, y: 10 });
+    map.scaleBy(1.0);
+    map.rotateBy({ x: 10, y: 10 }, { x: 12, y: 12 });
+    map.pitchBy(1);
+    map.cancelTransitions();
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map projection handle snapshots projection state", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 256, height: 256 });

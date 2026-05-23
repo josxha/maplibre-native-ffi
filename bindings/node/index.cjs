@@ -371,6 +371,26 @@ class MapHandle {
     return translateNativeErrors(() => this.native.setDebugOptionsRaw(mask));
   }
 
+  moveBy(deltaX, deltaY) {
+    return translateNativeErrors(() => this.native.moveBy(deltaX, deltaY));
+  }
+
+  scaleBy(scale, anchor = null) {
+    return translateNativeErrors(() => this.native.scaleBy(scale, anchor));
+  }
+
+  rotateBy(first, second) {
+    return translateNativeErrors(() => this.native.rotateBy(first, second));
+  }
+
+  pitchBy(pitch) {
+    return translateNativeErrors(() => this.native.pitchBy(pitch));
+  }
+
+  cancelTransitions() {
+    return translateNativeErrors(() => this.native.cancelTransitions());
+  }
+
   getCamera() {
     return translateNativeErrors(() => this.native.getCamera());
   }

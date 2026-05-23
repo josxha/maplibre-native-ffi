@@ -167,6 +167,11 @@ export declare class MapHandle {
   dumpDebugLogs(): void;
   getDebugOptions(): MapDebugOption[];
   setDebugOptions(options: Iterable<MapDebugOption>): void;
+  moveBy(deltaX: number, deltaY: number): void;
+  scaleBy(scale: number, anchor?: ScreenPoint | null): void;
+  rotateBy(first: ScreenPoint, second: ScreenPoint): void;
+  pitchBy(pitch: number): void;
+  cancelTransitions(): void;
   getCamera(): CameraOptions;
   jumpTo(camera: CameraOptions): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
