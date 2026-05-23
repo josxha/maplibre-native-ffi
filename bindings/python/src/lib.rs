@@ -1215,6 +1215,119 @@ impl MapHandle {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn set_style_image(
+        &self,
+        image_id: String,
+        width: u32,
+        height: u32,
+        stride: u32,
+        pixels: Vec<u8>,
+        pixel_ratio: Option<f32>,
+        sdf: Option<bool>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let image_id = maplibre_core::string::string_view(&image_id);
+        let mut image = unsafe { sys::mln_premultiplied_rgba8_image_default() };
+        image.width = width;
+        image.height = height;
+        image.stride = stride;
+        image.pixels = pixels.as_ptr();
+        image.byte_length = pixels.len();
+        let options = style_image_options_from_parts(pixel_ratio, sdf);
+        // SAFETY: The C API validates the map pointer, image ID, image descriptor,
+        // options, and pixel storage. pixels is retained for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_image(state.as_ptr(), image_id.raw(), &image, &options)
+        })
+        .map_err(map_error)
+    }
+
+    fn remove_style_image(&self, image_id: String) -> PyResult<bool> {
+        let state = self.state();
+        let image_id = maplibre_core::string::string_view(&image_id);
+        let mut removed = false;
+        // SAFETY: The C API validates the map pointer, image ID view, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_remove_style_image(state.as_ptr(), image_id.raw(), &mut removed)
+        })
+        .map_err(map_error)?;
+        Ok(removed)
+    }
+
+    fn style_image_exists(&self, image_id: String) -> PyResult<bool> {
+        let state = self.state();
+        let image_id = maplibre_core::string::string_view(&image_id);
+        let mut exists = false;
+        // SAFETY: The C API validates the map pointer, image ID view, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_style_image_exists(state.as_ptr(), image_id.raw(), &mut exists)
+        })
+        .map_err(map_error)?;
+        Ok(exists)
+    }
+
+    fn get_style_image_info(
+        &self,
+        py: Python<'_>,
+        image_id: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let image_id = maplibre_core::string::string_view(&image_id);
+        let mut info = maplibre_core::style::empty_style_image_info();
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer, image ID view, info, and found pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_image_info(state.as_ptr(), image_id.raw(), &mut info, &mut found)
+        })
+        .map_err(map_error)?;
+        if found {
+            style_image_info_to_py(py, &info).map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn copy_style_image_premultiplied_rgba8(
+        &self,
+        py: Python<'_>,
+        image_id: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let image_id = maplibre_core::string::string_view(&image_id);
+        let mut info = maplibre_core::style::empty_style_image_info();
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer, image ID view, info, and found pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_image_info(state.as_ptr(), image_id.raw(), &mut info, &mut found)
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+        let mut pixels = vec![0u8; info.byte_length];
+        let mut byte_length = 0;
+        let mut copy_found = false;
+        // SAFETY: pixels is writable for its length and retained for this call.
+        // The C API validates all pointers and capacity.
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_image_premultiplied_rgba8(
+                state.as_ptr(),
+                image_id.raw(),
+                pixels.as_mut_ptr(),
+                pixels.len(),
+                &mut byte_length,
+                &mut copy_found,
+            )
+        })
+        .map_err(map_error)?;
+        if !copy_found {
+            return Ok(None);
+        }
+        pixels.truncate(byte_length);
+        style_image_to_py(py, &info, &pixels).map(Some)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn add_custom_geometry_source(
         &self,
         source_id: String,
@@ -2396,6 +2509,45 @@ fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResul
     dict.set_item("source_type", info.raw_source_type)?;
     dict.set_item("is_volatile", info.is_volatile)?;
     dict.set_item("attribution", info.attribution)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn style_image_options_from_parts(
+    pixel_ratio: Option<f32>,
+    sdf: Option<bool>,
+) -> sys::mln_style_image_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut options = unsafe { sys::mln_style_image_options_default() };
+    if let Some(pixel_ratio) = pixel_ratio {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+        options.pixel_ratio = pixel_ratio;
+    }
+    if let Some(sdf) = sdf {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+        options.sdf = sdf;
+    }
+    options
+}
+
+fn style_image_info_to_py(py: Python<'_>, info: &sys::mln_style_image_info) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("width", info.width)?;
+    dict.set_item("height", info.height)?;
+    dict.set_item("stride", info.stride)?;
+    dict.set_item("byte_length", info.byte_length)?;
+    dict.set_item("pixel_ratio", info.pixel_ratio)?;
+    dict.set_item("sdf", info.sdf)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn style_image_to_py(
+    py: Python<'_>,
+    info: &sys::mln_style_image_info,
+    pixels: &[u8],
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("info", style_image_info_to_py(py, info)?)?;
+    dict.set_item("data", PyBytes::new(py, pixels))?;
     Ok(dict.into_any().unbind())
 }
 

@@ -206,6 +206,43 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert "points" not in map_handle.list_style_source_ids()
 
 
+def test_style_image_metadata_copy_and_removal_public_api() -> None:
+    image = render.PremultipliedRgba8Image(
+        info=render.TextureImageInfo(width=1, height=1, stride=4, byte_length=4),
+        data=bytes([255, 0, 0, 255]),
+    )
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            map_handle.set_style_image(
+                "marker",
+                image,
+                style.StyleImageOptions(pixel_ratio=2.0, sdf=True),
+            )
+
+            assert map_handle.style_image_exists("marker") is True
+            assert map_handle.style_image_exists("missing") is False
+            info = map_handle.get_style_image_info("marker")
+            assert info is not None
+            assert info.width == 1
+            assert info.height == 1
+            assert info.stride == 4
+            assert info.byte_length == 4
+            assert info.pixel_ratio == pytest.approx(2.0)
+            assert info.sdf is True
+            assert map_handle.get_style_image_info("missing") is None
+
+            copied = map_handle.copy_style_image_premultiplied_rgba8("marker")
+            assert copied is not None
+            assert copied.image == image
+            assert copied.pixel_ratio == pytest.approx(2.0)
+            assert copied.sdf is True
+            assert map_handle.copy_style_image_premultiplied_rgba8("missing") is None
+
+            assert map_handle.remove_style_image("marker") is True
+            assert map_handle.remove_style_image("marker") is False
+
+
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
     style_json = """
     {

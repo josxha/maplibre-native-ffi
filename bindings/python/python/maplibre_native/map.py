@@ -26,6 +26,9 @@ if TYPE_CHECKING:
     from .style import (
         CustomGeometrySourceHandle,
         CustomGeometrySourceOptions,
+        StyleImage,
+        StyleImageInfo,
+        StyleImageOptions,
         StyleSourceInfo,
         StyleSourceType,
     )
@@ -454,6 +457,52 @@ class MapHandle:
     ) -> None:
         """Move one style layer before another layer or to the top."""
         self._native.move_style_layer(layer_id, before_layer_id)
+
+    def set_style_image(
+        self,
+        image_id: str,
+        image: object,
+        options: StyleImageOptions | None = None,
+    ) -> None:
+        """Add or replace one runtime style image."""
+        from .render import PremultipliedRgba8Image
+        from .style import StyleImageOptions
+
+        options = options or StyleImageOptions()
+        if not isinstance(image, PremultipliedRgba8Image):
+            msg = "image must be a PremultipliedRgba8Image"
+            raise TypeError(msg)
+        self._native.set_style_image(
+            image_id,
+            image.info.width,
+            image.info.height,
+            image.info.stride,
+            image.data,
+            options.pixel_ratio,
+            options.sdf,
+        )
+
+    def remove_style_image(self, image_id: str) -> bool:
+        """Remove a runtime style image by ID and report whether it existed."""
+        return self._native.remove_style_image(image_id)
+
+    def style_image_exists(self, image_id: str) -> bool:
+        """Return whether a runtime style image ID exists."""
+        return self._native.style_image_exists(image_id)
+
+    def get_style_image_info(self, image_id: str) -> StyleImageInfo | None:
+        """Return fixed metadata for one runtime style image."""
+        from .style import StyleImageInfo
+
+        raw = self._native.get_style_image_info(image_id)
+        return StyleImageInfo.from_native(raw) if raw is not None else None
+
+    def copy_style_image_premultiplied_rgba8(self, image_id: str) -> StyleImage | None:
+        """Copy one runtime style image as premultiplied RGBA8 pixels."""
+        from .style import StyleImage
+
+        raw = self._native.copy_style_image_premultiplied_rgba8(image_id)
+        return StyleImage.from_native(raw) if raw is not None else None
 
     def create_projection(self) -> MapProjectionHandle:
         """Create a standalone projection helper from the current map transform."""

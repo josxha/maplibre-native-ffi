@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
 
+from .render import PremultipliedRgba8Image, TextureImageInfo
+
 
 class StyleSourceType(IntEnum):
     """Style source type values returned by MapLibre Native."""
@@ -50,6 +52,65 @@ class StyleSourceInfo:
             source_type=StyleSourceType(raw["source_type"]),
             is_volatile=raw["is_volatile"],
             attribution=raw["attribution"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StyleImageOptions:
+    """Options for adding or replacing a runtime style image."""
+
+    pixel_ratio: float | None = None
+    sdf: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StyleImageInfo:
+    """Fixed metadata for one runtime style image."""
+
+    width: int
+    height: int
+    stride: int
+    byte_length: int
+    pixel_ratio: float
+    sdf: bool
+
+    @classmethod
+    def from_native(cls, raw: dict[str, Any]) -> "StyleImageInfo":
+        """Build style image metadata from private native bridge values."""
+        return cls(
+            width=raw["width"],
+            height=raw["height"],
+            stride=raw["stride"],
+            byte_length=raw["byte_length"],
+            pixel_ratio=raw["pixel_ratio"],
+            sdf=raw["sdf"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StyleImage:
+    """Copied runtime style image pixels with style-specific metadata."""
+
+    image: PremultipliedRgba8Image
+    pixel_ratio: float
+    sdf: bool
+
+    @classmethod
+    def from_native(cls, raw: dict[str, Any]) -> "StyleImage":
+        """Build a copied style image from private native bridge values."""
+        info = StyleImageInfo.from_native(raw["info"])
+        return cls(
+            image=PremultipliedRgba8Image(
+                TextureImageInfo(
+                    width=info.width,
+                    height=info.height,
+                    stride=info.stride,
+                    byte_length=info.byte_length,
+                ),
+                raw["data"],
+            ),
+            pixel_ratio=info.pixel_ratio,
+            sdf=info.sdf,
         )
 
 
@@ -130,6 +191,9 @@ __all__ = [
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "StyleImage",
+    "StyleImageInfo",
+    "StyleImageOptions",
     "StyleSourceInfo",
     "StyleSourceType",
 ]
