@@ -986,6 +986,412 @@ pub extern "C" fn mln_vala_style_image_info_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_options_set_maximum_cache_size(
+    options: *mut sys::mln_runtime_options,
+    maximum_cache_size: u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_runtime_maximum_cache_size(options, maximum_cache_size) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+macro_rules! export_bool_setter {
+    ($name:ident, $helper:ident, $options:ty, $value:ty, $arg:ident) => {
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $name(
+            options: *mut $options,
+            $arg: $value,
+            error_out: *mut *mut GError,
+        ) -> GBoolean {
+            match $helper(options, $arg) {
+                Ok(()) => GTRUE,
+                Err(error) => {
+                    glib::set_error(error_out, error);
+                    GFALSE
+                }
+            }
+        }
+    };
+}
+
+export_bool_setter!(
+    mln_vala_camera_options_set_center,
+    set_camera_center,
+    sys::mln_camera_options,
+    *const sys::mln_lat_lng,
+    center
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_zoom,
+    set_camera_zoom,
+    sys::mln_camera_options,
+    f64,
+    zoom
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_bearing,
+    set_camera_bearing,
+    sys::mln_camera_options,
+    f64,
+    bearing
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_pitch,
+    set_camera_pitch,
+    sys::mln_camera_options,
+    f64,
+    pitch
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_center_altitude,
+    set_camera_center_altitude,
+    sys::mln_camera_options,
+    f64,
+    center_altitude
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_padding,
+    set_camera_padding,
+    sys::mln_camera_options,
+    *const sys::mln_edge_insets,
+    padding
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_anchor,
+    set_camera_anchor,
+    sys::mln_camera_options,
+    *const sys::mln_screen_point,
+    anchor
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_roll,
+    set_camera_roll,
+    sys::mln_camera_options,
+    f64,
+    roll
+);
+export_bool_setter!(
+    mln_vala_camera_options_set_field_of_view,
+    set_camera_field_of_view,
+    sys::mln_camera_options,
+    f64,
+    field_of_view
+);
+export_bool_setter!(
+    mln_vala_animation_options_set_duration_ms,
+    set_animation_duration_ms,
+    sys::mln_animation_options,
+    f64,
+    duration_ms
+);
+export_bool_setter!(
+    mln_vala_animation_options_set_velocity,
+    set_animation_velocity,
+    sys::mln_animation_options,
+    f64,
+    velocity
+);
+export_bool_setter!(
+    mln_vala_animation_options_set_min_zoom,
+    set_animation_min_zoom,
+    sys::mln_animation_options,
+    f64,
+    min_zoom
+);
+export_bool_setter!(
+    mln_vala_animation_options_set_easing,
+    set_animation_easing,
+    sys::mln_animation_options,
+    *const sys::mln_unit_bezier,
+    easing
+);
+export_bool_setter!(
+    mln_vala_camera_fit_options_set_padding,
+    set_camera_fit_padding,
+    sys::mln_camera_fit_options,
+    *const sys::mln_edge_insets,
+    padding
+);
+export_bool_setter!(
+    mln_vala_camera_fit_options_set_bearing,
+    set_camera_fit_bearing,
+    sys::mln_camera_fit_options,
+    f64,
+    bearing
+);
+export_bool_setter!(
+    mln_vala_camera_fit_options_set_pitch,
+    set_camera_fit_pitch,
+    sys::mln_camera_fit_options,
+    f64,
+    pitch
+);
+export_bool_setter!(
+    mln_vala_bound_options_set_bounds,
+    set_bound_bounds,
+    sys::mln_bound_options,
+    *const sys::mln_lat_lng_bounds,
+    bounds
+);
+export_bool_setter!(
+    mln_vala_bound_options_set_min_zoom,
+    set_bound_min_zoom,
+    sys::mln_bound_options,
+    f64,
+    min_zoom
+);
+export_bool_setter!(
+    mln_vala_bound_options_set_max_zoom,
+    set_bound_max_zoom,
+    sys::mln_bound_options,
+    f64,
+    max_zoom
+);
+export_bool_setter!(
+    mln_vala_bound_options_set_min_pitch,
+    set_bound_min_pitch,
+    sys::mln_bound_options,
+    f64,
+    min_pitch
+);
+export_bool_setter!(
+    mln_vala_bound_options_set_max_pitch,
+    set_bound_max_pitch,
+    sys::mln_bound_options,
+    f64,
+    max_pitch
+);
+export_bool_setter!(
+    mln_vala_free_camera_options_set_position,
+    set_free_camera_position,
+    sys::mln_free_camera_options,
+    *const sys::mln_vec3,
+    position
+);
+export_bool_setter!(
+    mln_vala_free_camera_options_set_orientation,
+    set_free_camera_orientation,
+    sys::mln_free_camera_options,
+    *const sys::mln_quaternion,
+    orientation
+);
+export_bool_setter!(
+    mln_vala_projection_mode_set_axonometric,
+    set_projection_axonometric,
+    sys::mln_projection_mode,
+    bool,
+    axonometric
+);
+export_bool_setter!(
+    mln_vala_projection_mode_set_x_skew,
+    set_projection_x_skew,
+    sys::mln_projection_mode,
+    f64,
+    x_skew
+);
+export_bool_setter!(
+    mln_vala_projection_mode_set_y_skew,
+    set_projection_y_skew,
+    sys::mln_projection_mode,
+    f64,
+    y_skew
+);
+export_bool_setter!(
+    mln_vala_map_viewport_options_set_north_orientation,
+    set_viewport_north_orientation,
+    sys::mln_map_viewport_options,
+    u32,
+    north_orientation
+);
+export_bool_setter!(
+    mln_vala_map_viewport_options_set_constrain_mode,
+    set_viewport_constrain_mode,
+    sys::mln_map_viewport_options,
+    u32,
+    constrain_mode
+);
+export_bool_setter!(
+    mln_vala_map_viewport_options_set_viewport_mode,
+    set_viewport_viewport_mode,
+    sys::mln_map_viewport_options,
+    u32,
+    viewport_mode
+);
+export_bool_setter!(
+    mln_vala_map_viewport_options_set_frustum_offset,
+    set_viewport_frustum_offset,
+    sys::mln_map_viewport_options,
+    *const sys::mln_edge_insets,
+    frustum_offset
+);
+export_bool_setter!(
+    mln_vala_map_tile_options_set_prefetch_zoom_delta,
+    set_tile_prefetch_zoom_delta,
+    sys::mln_map_tile_options,
+    u32,
+    prefetch_zoom_delta
+);
+export_bool_setter!(
+    mln_vala_map_tile_options_set_lod_min_radius,
+    set_tile_lod_min_radius,
+    sys::mln_map_tile_options,
+    f64,
+    lod_min_radius
+);
+export_bool_setter!(
+    mln_vala_map_tile_options_set_lod_scale,
+    set_tile_lod_scale,
+    sys::mln_map_tile_options,
+    f64,
+    lod_scale
+);
+export_bool_setter!(
+    mln_vala_map_tile_options_set_lod_pitch_threshold,
+    set_tile_lod_pitch_threshold,
+    sys::mln_map_tile_options,
+    f64,
+    lod_pitch_threshold
+);
+export_bool_setter!(
+    mln_vala_map_tile_options_set_lod_zoom_shift,
+    set_tile_lod_zoom_shift,
+    sys::mln_map_tile_options,
+    f64,
+    lod_zoom_shift
+);
+export_bool_setter!(
+    mln_vala_map_tile_options_set_lod_mode,
+    set_tile_lod_mode,
+    sys::mln_map_tile_options,
+    u32,
+    lod_mode
+);
+export_bool_setter!(
+    mln_vala_style_tile_source_options_set_scheme,
+    set_style_tile_scheme,
+    sys::mln_style_tile_source_options,
+    u32,
+    scheme
+);
+export_bool_setter!(
+    mln_vala_style_tile_source_options_set_bounds,
+    set_style_tile_bounds,
+    sys::mln_style_tile_source_options,
+    *const sys::mln_lat_lng_bounds,
+    bounds
+);
+export_bool_setter!(
+    mln_vala_style_tile_source_options_set_vector_encoding,
+    set_style_tile_vector_encoding,
+    sys::mln_style_tile_source_options,
+    u32,
+    vector_encoding
+);
+export_bool_setter!(
+    mln_vala_style_tile_source_options_set_raster_encoding,
+    set_style_tile_raster_encoding,
+    sys::mln_style_tile_source_options,
+    u32,
+    raster_encoding
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_min_zoom,
+    set_custom_geometry_min_zoom,
+    sys::mln_custom_geometry_source_options,
+    f64,
+    min_zoom
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_max_zoom,
+    set_custom_geometry_max_zoom,
+    sys::mln_custom_geometry_source_options,
+    f64,
+    max_zoom
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_tolerance,
+    set_custom_geometry_tolerance,
+    sys::mln_custom_geometry_source_options,
+    f64,
+    tolerance
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_tile_size,
+    set_custom_geometry_tile_size,
+    sys::mln_custom_geometry_source_options,
+    u32,
+    tile_size
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_buffer,
+    set_custom_geometry_buffer,
+    sys::mln_custom_geometry_source_options,
+    u32,
+    buffer
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_clip,
+    set_custom_geometry_clip,
+    sys::mln_custom_geometry_source_options,
+    bool,
+    clip
+);
+export_bool_setter!(
+    mln_vala_custom_geometry_source_options_set_wrap,
+    set_custom_geometry_wrap,
+    sys::mln_custom_geometry_source_options,
+    bool,
+    wrap
+);
+export_bool_setter!(
+    mln_vala_style_image_options_set_pixel_ratio,
+    set_style_image_pixel_ratio,
+    sys::mln_style_image_options,
+    f32,
+    pixel_ratio
+);
+export_bool_setter!(
+    mln_vala_style_image_options_set_sdf,
+    set_style_image_sdf,
+    sys::mln_style_image_options,
+    bool,
+    sdf
+);
+export_bool_setter!(
+    mln_vala_feature_state_selector_set_source_id,
+    set_feature_state_source_id,
+    sys::mln_feature_state_selector,
+    *const c_char,
+    source_id
+);
+export_bool_setter!(
+    mln_vala_feature_state_selector_set_source_layer_id,
+    set_feature_state_source_layer_id,
+    sys::mln_feature_state_selector,
+    *const c_char,
+    source_layer_id
+);
+export_bool_setter!(
+    mln_vala_feature_state_selector_set_feature_id,
+    set_feature_state_feature_id,
+    sys::mln_feature_state_selector,
+    *const c_char,
+    feature_id
+);
+export_bool_setter!(
+    mln_vala_feature_state_selector_set_state_key,
+    set_feature_state_state_key,
+    sys::mln_feature_state_selector,
+    *const c_char,
+    state_key
+);
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_new(
     runtime: *mut RuntimeHandle,
     width: u32,
@@ -2957,6 +3363,546 @@ fn set_style_tile_attribution(
     let view = string_view_from_c(attribution, "style tile attribution")?;
     options.attribution = view;
     options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+    Ok(())
+}
+
+fn mut_struct<T>(ptr: *mut T, name: &str) -> error::Result<&'static mut T> {
+    if ptr.is_null() {
+        return Err(Error::invalid_argument(format!("{name} is null")));
+    }
+    // SAFETY: The caller supplies writable struct storage for this call.
+    Ok(unsafe { &mut *ptr })
+}
+
+fn copy_struct<T: Copy>(ptr: *const T, name: &str) -> error::Result<T> {
+    if ptr.is_null() {
+        return Err(Error::invalid_argument(format!("{name} is null")));
+    }
+    // SAFETY: The caller supplies readable struct storage for this call.
+    Ok(unsafe { *ptr })
+}
+
+fn set_runtime_maximum_cache_size(
+    options: *mut sys::mln_runtime_options,
+    maximum_cache_size: u64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "runtime options")?;
+    options.maximum_cache_size = maximum_cache_size;
+    options.flags |= sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
+    Ok(())
+}
+
+fn set_camera_center(
+    options: *mut sys::mln_camera_options,
+    center: *const sys::mln_lat_lng,
+) -> error::Result<()> {
+    let center = copy_struct(center, "camera center")?;
+    let options = mut_struct(options, "camera options")?;
+    options.latitude = center.latitude;
+    options.longitude = center.longitude;
+    options.fields |= sys::MLN_CAMERA_OPTION_CENTER;
+    Ok(())
+}
+
+fn set_camera_zoom(options: *mut sys::mln_camera_options, zoom: f64) -> error::Result<()> {
+    let options = mut_struct(options, "camera options")?;
+    options.zoom = zoom;
+    options.fields |= sys::MLN_CAMERA_OPTION_ZOOM;
+    Ok(())
+}
+
+fn set_camera_bearing(options: *mut sys::mln_camera_options, bearing: f64) -> error::Result<()> {
+    let options = mut_struct(options, "camera options")?;
+    options.bearing = bearing;
+    options.fields |= sys::MLN_CAMERA_OPTION_BEARING;
+    Ok(())
+}
+
+fn set_camera_pitch(options: *mut sys::mln_camera_options, pitch: f64) -> error::Result<()> {
+    let options = mut_struct(options, "camera options")?;
+    options.pitch = pitch;
+    options.fields |= sys::MLN_CAMERA_OPTION_PITCH;
+    Ok(())
+}
+
+fn set_camera_center_altitude(
+    options: *mut sys::mln_camera_options,
+    center_altitude: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "camera options")?;
+    options.center_altitude = center_altitude;
+    options.fields |= sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+    Ok(())
+}
+
+fn set_camera_padding(
+    options: *mut sys::mln_camera_options,
+    padding: *const sys::mln_edge_insets,
+) -> error::Result<()> {
+    let padding = copy_struct(padding, "camera padding")?;
+    let options = mut_struct(options, "camera options")?;
+    options.padding = padding;
+    options.fields |= sys::MLN_CAMERA_OPTION_PADDING;
+    Ok(())
+}
+
+fn set_camera_anchor(
+    options: *mut sys::mln_camera_options,
+    anchor: *const sys::mln_screen_point,
+) -> error::Result<()> {
+    let anchor = copy_struct(anchor, "camera anchor")?;
+    let options = mut_struct(options, "camera options")?;
+    options.anchor = anchor;
+    options.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
+    Ok(())
+}
+
+fn set_camera_roll(options: *mut sys::mln_camera_options, roll: f64) -> error::Result<()> {
+    let options = mut_struct(options, "camera options")?;
+    options.roll = roll;
+    options.fields |= sys::MLN_CAMERA_OPTION_ROLL;
+    Ok(())
+}
+
+fn set_camera_field_of_view(
+    options: *mut sys::mln_camera_options,
+    field_of_view: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "camera options")?;
+    options.field_of_view = field_of_view;
+    options.fields |= sys::MLN_CAMERA_OPTION_FOV;
+    Ok(())
+}
+
+fn set_animation_duration_ms(
+    options: *mut sys::mln_animation_options,
+    duration_ms: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "animation options")?;
+    options.duration_ms = duration_ms;
+    options.fields |= sys::MLN_ANIMATION_OPTION_DURATION;
+    Ok(())
+}
+
+fn set_animation_velocity(
+    options: *mut sys::mln_animation_options,
+    velocity: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "animation options")?;
+    options.velocity = velocity;
+    options.fields |= sys::MLN_ANIMATION_OPTION_VELOCITY;
+    Ok(())
+}
+
+fn set_animation_min_zoom(
+    options: *mut sys::mln_animation_options,
+    min_zoom: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "animation options")?;
+    options.min_zoom = min_zoom;
+    options.fields |= sys::MLN_ANIMATION_OPTION_MIN_ZOOM;
+    Ok(())
+}
+
+fn set_animation_easing(
+    options: *mut sys::mln_animation_options,
+    easing: *const sys::mln_unit_bezier,
+) -> error::Result<()> {
+    let easing = copy_struct(easing, "animation easing")?;
+    let options = mut_struct(options, "animation options")?;
+    options.easing = easing;
+    options.fields |= sys::MLN_ANIMATION_OPTION_EASING;
+    Ok(())
+}
+
+fn set_camera_fit_padding(
+    options: *mut sys::mln_camera_fit_options,
+    padding: *const sys::mln_edge_insets,
+) -> error::Result<()> {
+    let padding = copy_struct(padding, "camera fit padding")?;
+    let options = mut_struct(options, "camera fit options")?;
+    options.padding = padding;
+    options.fields |= sys::MLN_CAMERA_FIT_OPTION_PADDING;
+    Ok(())
+}
+
+fn set_camera_fit_bearing(
+    options: *mut sys::mln_camera_fit_options,
+    bearing: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "camera fit options")?;
+    options.bearing = bearing;
+    options.fields |= sys::MLN_CAMERA_FIT_OPTION_BEARING;
+    Ok(())
+}
+
+fn set_camera_fit_pitch(
+    options: *mut sys::mln_camera_fit_options,
+    pitch: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "camera fit options")?;
+    options.pitch = pitch;
+    options.fields |= sys::MLN_CAMERA_FIT_OPTION_PITCH;
+    Ok(())
+}
+
+fn set_bound_bounds(
+    options: *mut sys::mln_bound_options,
+    bounds: *const sys::mln_lat_lng_bounds,
+) -> error::Result<()> {
+    let bounds = copy_struct(bounds, "bound options bounds")?;
+    let options = mut_struct(options, "bound options")?;
+    options.bounds = bounds;
+    options.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
+    Ok(())
+}
+
+fn set_bound_min_zoom(options: *mut sys::mln_bound_options, min_zoom: f64) -> error::Result<()> {
+    let options = mut_struct(options, "bound options")?;
+    options.min_zoom = min_zoom;
+    options.fields |= sys::MLN_BOUND_OPTION_MIN_ZOOM;
+    Ok(())
+}
+
+fn set_bound_max_zoom(options: *mut sys::mln_bound_options, max_zoom: f64) -> error::Result<()> {
+    let options = mut_struct(options, "bound options")?;
+    options.max_zoom = max_zoom;
+    options.fields |= sys::MLN_BOUND_OPTION_MAX_ZOOM;
+    Ok(())
+}
+
+fn set_bound_min_pitch(options: *mut sys::mln_bound_options, min_pitch: f64) -> error::Result<()> {
+    let options = mut_struct(options, "bound options")?;
+    options.min_pitch = min_pitch;
+    options.fields |= sys::MLN_BOUND_OPTION_MIN_PITCH;
+    Ok(())
+}
+
+fn set_bound_max_pitch(options: *mut sys::mln_bound_options, max_pitch: f64) -> error::Result<()> {
+    let options = mut_struct(options, "bound options")?;
+    options.max_pitch = max_pitch;
+    options.fields |= sys::MLN_BOUND_OPTION_MAX_PITCH;
+    Ok(())
+}
+
+fn set_free_camera_position(
+    options: *mut sys::mln_free_camera_options,
+    position: *const sys::mln_vec3,
+) -> error::Result<()> {
+    let position = copy_struct(position, "free camera position")?;
+    let options = mut_struct(options, "free camera options")?;
+    options.position = position;
+    options.fields |= sys::MLN_FREE_CAMERA_OPTION_POSITION;
+    Ok(())
+}
+
+fn set_free_camera_orientation(
+    options: *mut sys::mln_free_camera_options,
+    orientation: *const sys::mln_quaternion,
+) -> error::Result<()> {
+    let orientation = copy_struct(orientation, "free camera orientation")?;
+    let options = mut_struct(options, "free camera options")?;
+    options.orientation = orientation;
+    options.fields |= sys::MLN_FREE_CAMERA_OPTION_ORIENTATION;
+    Ok(())
+}
+
+fn set_projection_axonometric(
+    mode: *mut sys::mln_projection_mode,
+    axonometric: bool,
+) -> error::Result<()> {
+    let mode = mut_struct(mode, "projection mode")?;
+    mode.axonometric = axonometric;
+    mode.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
+    Ok(())
+}
+
+fn set_projection_x_skew(mode: *mut sys::mln_projection_mode, x_skew: f64) -> error::Result<()> {
+    let mode = mut_struct(mode, "projection mode")?;
+    mode.x_skew = x_skew;
+    mode.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
+    Ok(())
+}
+
+fn set_projection_y_skew(mode: *mut sys::mln_projection_mode, y_skew: f64) -> error::Result<()> {
+    let mode = mut_struct(mode, "projection mode")?;
+    mode.y_skew = y_skew;
+    mode.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
+    Ok(())
+}
+
+fn set_viewport_north_orientation(
+    options: *mut sys::mln_map_viewport_options,
+    north_orientation: u32,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map viewport options")?;
+    options.north_orientation = north_orientation;
+    options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+    Ok(())
+}
+
+fn set_viewport_constrain_mode(
+    options: *mut sys::mln_map_viewport_options,
+    constrain_mode: u32,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map viewport options")?;
+    options.constrain_mode = constrain_mode;
+    options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+    Ok(())
+}
+
+fn set_viewport_viewport_mode(
+    options: *mut sys::mln_map_viewport_options,
+    viewport_mode: u32,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map viewport options")?;
+    options.viewport_mode = viewport_mode;
+    options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+    Ok(())
+}
+
+fn set_viewport_frustum_offset(
+    options: *mut sys::mln_map_viewport_options,
+    frustum_offset: *const sys::mln_edge_insets,
+) -> error::Result<()> {
+    let frustum_offset = copy_struct(frustum_offset, "viewport frustum offset")?;
+    let options = mut_struct(options, "map viewport options")?;
+    options.frustum_offset = frustum_offset;
+    options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+    Ok(())
+}
+
+fn set_tile_prefetch_zoom_delta(
+    options: *mut sys::mln_map_tile_options,
+    prefetch_zoom_delta: u32,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map tile options")?;
+    options.prefetch_zoom_delta = prefetch_zoom_delta;
+    options.fields |= sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+    Ok(())
+}
+
+fn set_tile_lod_min_radius(
+    options: *mut sys::mln_map_tile_options,
+    lod_min_radius: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map tile options")?;
+    options.lod_min_radius = lod_min_radius;
+    options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+    Ok(())
+}
+
+fn set_tile_lod_scale(
+    options: *mut sys::mln_map_tile_options,
+    lod_scale: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map tile options")?;
+    options.lod_scale = lod_scale;
+    options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_SCALE;
+    Ok(())
+}
+
+fn set_tile_lod_pitch_threshold(
+    options: *mut sys::mln_map_tile_options,
+    lod_pitch_threshold: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map tile options")?;
+    options.lod_pitch_threshold = lod_pitch_threshold;
+    options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+    Ok(())
+}
+
+fn set_tile_lod_zoom_shift(
+    options: *mut sys::mln_map_tile_options,
+    lod_zoom_shift: f64,
+) -> error::Result<()> {
+    let options = mut_struct(options, "map tile options")?;
+    options.lod_zoom_shift = lod_zoom_shift;
+    options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+    Ok(())
+}
+
+fn set_tile_lod_mode(options: *mut sys::mln_map_tile_options, lod_mode: u32) -> error::Result<()> {
+    let options = mut_struct(options, "map tile options")?;
+    options.lod_mode = lod_mode;
+    options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MODE;
+    Ok(())
+}
+
+fn set_style_tile_scheme(
+    options: *mut sys::mln_style_tile_source_options,
+    scheme: u32,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    options.scheme = scheme;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+    Ok(())
+}
+
+fn set_style_tile_bounds(
+    options: *mut sys::mln_style_tile_source_options,
+    bounds: *const sys::mln_lat_lng_bounds,
+) -> error::Result<()> {
+    let bounds = copy_struct(bounds, "style tile bounds")?;
+    let options = style_tile_options_mut(options)?;
+    options.bounds = bounds;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
+    Ok(())
+}
+
+fn set_style_tile_vector_encoding(
+    options: *mut sys::mln_style_tile_source_options,
+    vector_encoding: u32,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    options.vector_encoding = vector_encoding;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+    Ok(())
+}
+
+fn set_style_tile_raster_encoding(
+    options: *mut sys::mln_style_tile_source_options,
+    raster_encoding: u32,
+) -> error::Result<()> {
+    let options = style_tile_options_mut(options)?;
+    options.raster_encoding = raster_encoding;
+    options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+    Ok(())
+}
+
+fn custom_geometry_options_mut(
+    options: *mut sys::mln_custom_geometry_source_options,
+) -> error::Result<&'static mut sys::mln_custom_geometry_source_options> {
+    mut_struct(options, "custom geometry source options")
+}
+
+fn set_custom_geometry_min_zoom(
+    options: *mut sys::mln_custom_geometry_source_options,
+    min_zoom: f64,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.min_zoom = min_zoom;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+    Ok(())
+}
+
+fn set_custom_geometry_max_zoom(
+    options: *mut sys::mln_custom_geometry_source_options,
+    max_zoom: f64,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.max_zoom = max_zoom;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+    Ok(())
+}
+
+fn set_custom_geometry_tolerance(
+    options: *mut sys::mln_custom_geometry_source_options,
+    tolerance: f64,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.tolerance = tolerance;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+    Ok(())
+}
+
+fn set_custom_geometry_tile_size(
+    options: *mut sys::mln_custom_geometry_source_options,
+    tile_size: u32,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.tile_size = tile_size;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+    Ok(())
+}
+
+fn set_custom_geometry_buffer(
+    options: *mut sys::mln_custom_geometry_source_options,
+    buffer: u32,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.buffer = buffer;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+    Ok(())
+}
+
+fn set_custom_geometry_clip(
+    options: *mut sys::mln_custom_geometry_source_options,
+    clip: bool,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.clip = clip;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+    Ok(())
+}
+
+fn set_custom_geometry_wrap(
+    options: *mut sys::mln_custom_geometry_source_options,
+    wrap: bool,
+) -> error::Result<()> {
+    let options = custom_geometry_options_mut(options)?;
+    options.wrap = wrap;
+    options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+    Ok(())
+}
+
+fn set_style_image_pixel_ratio(
+    options: *mut sys::mln_style_image_options,
+    pixel_ratio: f32,
+) -> error::Result<()> {
+    let options = mut_struct(options, "style image options")?;
+    options.pixel_ratio = pixel_ratio;
+    options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+    Ok(())
+}
+
+fn set_style_image_sdf(options: *mut sys::mln_style_image_options, sdf: bool) -> error::Result<()> {
+    let options = mut_struct(options, "style image options")?;
+    options.sdf = sdf;
+    options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+    Ok(())
+}
+
+fn set_feature_state_source_id(
+    selector: *mut sys::mln_feature_state_selector,
+    source_id: *const c_char,
+) -> error::Result<()> {
+    let source_id = string_view_from_c(source_id, "feature-state source ID")?;
+    let selector = mut_struct(selector, "feature-state selector")?;
+    selector.source_id = source_id;
+    Ok(())
+}
+
+fn set_feature_state_source_layer_id(
+    selector: *mut sys::mln_feature_state_selector,
+    source_layer_id: *const c_char,
+) -> error::Result<()> {
+    let source_layer_id = string_view_from_c(source_layer_id, "feature-state source layer ID")?;
+    let selector = mut_struct(selector, "feature-state selector")?;
+    selector.source_layer_id = source_layer_id;
+    selector.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+    Ok(())
+}
+
+fn set_feature_state_feature_id(
+    selector: *mut sys::mln_feature_state_selector,
+    feature_id: *const c_char,
+) -> error::Result<()> {
+    let feature_id = string_view_from_c(feature_id, "feature-state feature ID")?;
+    let selector = mut_struct(selector, "feature-state selector")?;
+    selector.feature_id = feature_id;
+    selector.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+    Ok(())
+}
+
+fn set_feature_state_state_key(
+    selector: *mut sys::mln_feature_state_selector,
+    state_key: *const c_char,
+) -> error::Result<()> {
+    let state_key = string_view_from_c(state_key, "feature-state state key")?;
+    let selector = mut_struct(selector, "feature-state selector")?;
+    selector.state_key = state_key;
+    selector.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
     Ok(())
 }
 

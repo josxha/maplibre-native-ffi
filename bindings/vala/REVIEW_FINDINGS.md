@@ -289,3 +289,31 @@ Review artifacts:
 ### User-input-needed findings
 
 - None.
+
+## Round 7
+
+Review artifacts:
+
+- Completion-audit finding for descriptor field-mask setters.
+
+### Applied findings
+
+- Added Vala-visible semantic setters for field-mask-backed descriptor structs:
+  runtime options, camera options, animation options, camera-fit options, bound
+  options, free-camera options, projection mode, map viewport options, map tile
+  options, style tile source options, custom geometry source options, style
+  image options, and feature-state selectors.
+- Hid the corresponding semantic fields from generated VAPI metadata so Vala
+  callers set these descriptors through methods that update native field masks.
+- Updated the Vala compile fixture to exercise the new setters and to avoid
+  direct field assignment on field-mask-backed descriptors.
+- Confirmed local `mise run //bindings/vala:ci`, `mise run fix`, and
+  `mise run test` pass on macOS arm64 Metal after regeneration.
+
+### Rejected or deferred findings
+
+- None.
+
+### User-input-needed findings
+
+- None.

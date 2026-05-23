@@ -1010,6 +1010,136 @@ typedef struct {
   size_t byte_length;
 } MlnValaTextureImageInfo;
 
+gboolean mln_vala_runtime_options_set_maximum_cache_size(
+  MlnValaRuntimeOptions* options, uint64_t maximum_cache_size, GError** error
+);
+
+gboolean mln_vala_camera_options_set_center(
+  MlnValaCameraOptions* options, const MlnValaLatLng* center, GError** error
+);
+gboolean mln_vala_camera_options_set_zoom(
+  MlnValaCameraOptions* options, double zoom, GError** error
+);
+gboolean mln_vala_camera_options_set_bearing(
+  MlnValaCameraOptions* options, double bearing, GError** error
+);
+gboolean mln_vala_camera_options_set_pitch(
+  MlnValaCameraOptions* options, double pitch, GError** error
+);
+gboolean mln_vala_camera_options_set_center_altitude(
+  MlnValaCameraOptions* options, double center_altitude, GError** error
+);
+gboolean mln_vala_camera_options_set_padding(
+  MlnValaCameraOptions* options, const MlnValaEdgeInsets* padding,
+  GError** error
+);
+gboolean mln_vala_camera_options_set_anchor(
+  MlnValaCameraOptions* options, const MlnValaScreenPoint* anchor,
+  GError** error
+);
+gboolean mln_vala_camera_options_set_roll(
+  MlnValaCameraOptions* options, double roll, GError** error
+);
+gboolean mln_vala_camera_options_set_field_of_view(
+  MlnValaCameraOptions* options, double field_of_view, GError** error
+);
+
+gboolean mln_vala_animation_options_set_duration_ms(
+  MlnValaAnimationOptions* options, double duration_ms, GError** error
+);
+gboolean mln_vala_animation_options_set_velocity(
+  MlnValaAnimationOptions* options, double velocity, GError** error
+);
+gboolean mln_vala_animation_options_set_min_zoom(
+  MlnValaAnimationOptions* options, double min_zoom, GError** error
+);
+gboolean mln_vala_animation_options_set_easing(
+  MlnValaAnimationOptions* options, const MlnValaUnitBezier* easing,
+  GError** error
+);
+
+gboolean mln_vala_camera_fit_options_set_padding(
+  MlnValaCameraFitOptions* options, const MlnValaEdgeInsets* padding,
+  GError** error
+);
+gboolean mln_vala_camera_fit_options_set_bearing(
+  MlnValaCameraFitOptions* options, double bearing, GError** error
+);
+gboolean mln_vala_camera_fit_options_set_pitch(
+  MlnValaCameraFitOptions* options, double pitch, GError** error
+);
+
+gboolean mln_vala_bound_options_set_bounds(
+  MlnValaBoundOptions* options, const MlnValaLatLngBounds* bounds,
+  GError** error
+);
+gboolean mln_vala_bound_options_set_min_zoom(
+  MlnValaBoundOptions* options, double min_zoom, GError** error
+);
+gboolean mln_vala_bound_options_set_max_zoom(
+  MlnValaBoundOptions* options, double max_zoom, GError** error
+);
+gboolean mln_vala_bound_options_set_min_pitch(
+  MlnValaBoundOptions* options, double min_pitch, GError** error
+);
+gboolean mln_vala_bound_options_set_max_pitch(
+  MlnValaBoundOptions* options, double max_pitch, GError** error
+);
+
+gboolean mln_vala_free_camera_options_set_position(
+  MlnValaFreeCameraOptions* options, const MlnValaVec3* position, GError** error
+);
+gboolean mln_vala_free_camera_options_set_orientation(
+  MlnValaFreeCameraOptions* options, const MlnValaQuaternion* orientation,
+  GError** error
+);
+
+gboolean mln_vala_projection_mode_set_axonometric(
+  MlnValaProjectionMode* mode, bool axonometric, GError** error
+);
+gboolean mln_vala_projection_mode_set_x_skew(
+  MlnValaProjectionMode* mode, double x_skew, GError** error
+);
+gboolean mln_vala_projection_mode_set_y_skew(
+  MlnValaProjectionMode* mode, double y_skew, GError** error
+);
+
+gboolean mln_vala_map_viewport_options_set_north_orientation(
+  MlnValaMapViewportOptions* options, MlnValaNorthOrientation north_orientation,
+  GError** error
+);
+gboolean mln_vala_map_viewport_options_set_constrain_mode(
+  MlnValaMapViewportOptions* options, MlnValaConstrainMode constrain_mode,
+  GError** error
+);
+gboolean mln_vala_map_viewport_options_set_viewport_mode(
+  MlnValaMapViewportOptions* options, MlnValaViewportMode viewport_mode,
+  GError** error
+);
+gboolean mln_vala_map_viewport_options_set_frustum_offset(
+  MlnValaMapViewportOptions* options, const MlnValaEdgeInsets* frustum_offset,
+  GError** error
+);
+
+gboolean mln_vala_map_tile_options_set_prefetch_zoom_delta(
+  MlnValaMapTileOptions* options, uint32_t prefetch_zoom_delta, GError** error
+);
+gboolean mln_vala_map_tile_options_set_lod_min_radius(
+  MlnValaMapTileOptions* options, double lod_min_radius, GError** error
+);
+gboolean mln_vala_map_tile_options_set_lod_scale(
+  MlnValaMapTileOptions* options, double lod_scale, GError** error
+);
+gboolean mln_vala_map_tile_options_set_lod_pitch_threshold(
+  MlnValaMapTileOptions* options, double lod_pitch_threshold, GError** error
+);
+gboolean mln_vala_map_tile_options_set_lod_zoom_shift(
+  MlnValaMapTileOptions* options, double lod_zoom_shift, GError** error
+);
+gboolean mln_vala_map_tile_options_set_lod_mode(
+  MlnValaMapTileOptions* options, MlnValaTileLodMode lod_mode, GError** error
+);
+
 /**
  * mln_vala_camera_options_default:
  * @out_options: (out): return location for initialized camera options.
@@ -1094,6 +1224,68 @@ gboolean mln_vala_premultiplied_rgba8_image_init(
   uint32_t stride, const uint8_t* pixels, size_t pixel_byte_count,
   GError** error
 );
+
+gboolean mln_vala_style_tile_source_options_set_scheme(
+  MlnValaStyleTileSourceOptions* options, MlnValaStyleTileScheme scheme,
+  GError** error
+);
+gboolean mln_vala_style_tile_source_options_set_bounds(
+  MlnValaStyleTileSourceOptions* options, const MlnValaLatLngBounds* bounds,
+  GError** error
+);
+gboolean mln_vala_style_tile_source_options_set_vector_encoding(
+  MlnValaStyleTileSourceOptions* options,
+  MlnValaStyleVectorTileEncoding vector_encoding, GError** error
+);
+gboolean mln_vala_style_tile_source_options_set_raster_encoding(
+  MlnValaStyleTileSourceOptions* options,
+  MlnValaStyleRasterDemEncoding raster_encoding, GError** error
+);
+
+gboolean mln_vala_custom_geometry_source_options_set_min_zoom(
+  MlnValaCustomGeometrySourceOptions* options, double min_zoom, GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_set_max_zoom(
+  MlnValaCustomGeometrySourceOptions* options, double max_zoom, GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_set_tolerance(
+  MlnValaCustomGeometrySourceOptions* options, double tolerance, GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_set_tile_size(
+  MlnValaCustomGeometrySourceOptions* options, uint32_t tile_size,
+  GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_set_buffer(
+  MlnValaCustomGeometrySourceOptions* options, uint32_t buffer, GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_set_clip(
+  MlnValaCustomGeometrySourceOptions* options, bool clip, GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_set_wrap(
+  MlnValaCustomGeometrySourceOptions* options, bool wrap, GError** error
+);
+
+gboolean mln_vala_style_image_options_set_pixel_ratio(
+  MlnValaStyleImageOptions* options, float pixel_ratio, GError** error
+);
+gboolean mln_vala_style_image_options_set_sdf(
+  MlnValaStyleImageOptions* options, bool sdf, GError** error
+);
+
+gboolean mln_vala_feature_state_selector_set_source_id(
+  MlnValaFeatureStateSelector* selector, const char* source_id, GError** error
+);
+gboolean mln_vala_feature_state_selector_set_source_layer_id(
+  MlnValaFeatureStateSelector* selector, const char* source_layer_id,
+  GError** error
+);
+gboolean mln_vala_feature_state_selector_set_feature_id(
+  MlnValaFeatureStateSelector* selector, const char* feature_id, GError** error
+);
+gboolean mln_vala_feature_state_selector_set_state_key(
+  MlnValaFeatureStateSelector* selector, const char* state_key, GError** error
+);
+
 gboolean mln_vala_style_image_options_default(
   MlnValaStyleImageOptions* out_options, GError** error
 );

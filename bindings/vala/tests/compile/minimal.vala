@@ -201,6 +201,111 @@ bool probe_wrong_thread(MaplibreNative.MapHandle map) {
   }
 }
 
+void exercise_option_setters(MaplibreNative.LatLng coordinate) throws GLib.Error {
+  MaplibreNative.EdgeInsets insets = { 1.0, 2.0, 3.0, 4.0 };
+  MaplibreNative.ScreenPoint anchor = { 5.0, 6.0 };
+  MaplibreNative.UnitBezier easing = { 0.0, 0.0, 1.0, 1.0 };
+  MaplibreNative.LatLngBounds bounds = { { -1.0, -1.0 }, { 1.0, 1.0 } };
+  MaplibreNative.Vec3 position = { 1.0, 2.0, 3.0 };
+  MaplibreNative.Quaternion orientation = { 0.0, 0.0, 0.0, 1.0 };
+
+  MaplibreNative.RuntimeOptions runtime_options = {};
+  runtime_options.default();
+  runtime_options.set_maximum_cache_size(1024 * 1024);
+
+  MaplibreNative.CameraOptions camera = {};
+  camera.default();
+  camera.set_center(coordinate);
+  camera.set_zoom(1.0);
+  camera.set_bearing(2.0);
+  camera.set_pitch(3.0);
+  camera.set_center_altitude(4.0);
+  camera.set_padding(insets);
+  camera.set_anchor(anchor);
+  camera.set_roll(5.0);
+  camera.set_field_of_view(45.0);
+
+  MaplibreNative.AnimationOptions animation = {};
+  animation.default();
+  animation.set_duration_ms(100.0);
+  animation.set_velocity(1.0);
+  animation.set_min_zoom(0.0);
+  animation.set_easing(easing);
+
+  MaplibreNative.CameraFitOptions fit = {};
+  fit.default();
+  fit.set_padding(insets);
+  fit.set_bearing(0.0);
+  fit.set_pitch(0.0);
+
+  MaplibreNative.BoundOptions bound_options = {};
+  bound_options.default();
+  bound_options.set_bounds(bounds);
+  bound_options.set_min_zoom(0.0);
+  bound_options.set_max_zoom(22.0);
+  bound_options.set_min_pitch(0.0);
+  bound_options.set_max_pitch(60.0);
+
+  MaplibreNative.FreeCameraOptions free_camera = {};
+  free_camera.default();
+  free_camera.set_position(position);
+  free_camera.set_orientation(orientation);
+
+  MaplibreNative.ProjectionMode projection = {};
+  projection.default();
+  projection.set_axonometric(false);
+  projection.set_x_skew(0.0);
+  projection.set_y_skew(0.0);
+
+  MaplibreNative.MapViewportOptions viewport = {};
+  viewport.default();
+  viewport.set_north_orientation(MaplibreNative.NorthOrientation.UP);
+  viewport.set_constrain_mode(MaplibreNative.ConstrainMode.HEIGHT_ONLY);
+  viewport.set_viewport_mode(MaplibreNative.ViewportMode.DEFAULT);
+  viewport.set_frustum_offset(insets);
+
+  MaplibreNative.MapTileOptions tile = {};
+  tile.default();
+  tile.set_prefetch_zoom_delta(1);
+  tile.set_lod_min_radius(0.0);
+  tile.set_lod_scale(1.0);
+  tile.set_lod_pitch_threshold(0.0);
+  tile.set_lod_zoom_shift(0.0);
+  tile.set_lod_mode(MaplibreNative.TileLodMode.DEFAULT);
+
+  MaplibreNative.StyleTileSourceOptions source = {};
+  source.default();
+  source.set_min_zoom(0.0);
+  source.set_max_zoom(22.0);
+  source.set_attribution("© fixture");
+  source.set_scheme(MaplibreNative.StyleTileScheme.XYZ);
+  source.set_bounds(bounds);
+  source.set_tile_size(512);
+  source.set_vector_encoding(MaplibreNative.StyleVectorTileEncoding.MVT);
+  source.set_raster_encoding(MaplibreNative.StyleRasterDemEncoding.MAPBOX);
+
+  MaplibreNative.CustomGeometrySourceOptions custom = {};
+  custom.default();
+  custom.set_min_zoom(0.0);
+  custom.set_max_zoom(22.0);
+  custom.set_tolerance(0.375);
+  custom.set_tile_size(512);
+  custom.set_buffer(128);
+  custom.set_clip(true);
+  custom.set_wrap(true);
+
+  MaplibreNative.StyleImageOptions image = {};
+  image.default();
+  image.set_pixel_ratio(1.0f);
+  image.set_sdf(false);
+
+  MaplibreNative.FeatureStateSelector selector = {};
+  selector.set_source_id("source");
+  selector.set_source_layer_id("layer");
+  selector.set_feature_id("feature");
+  selector.set_state_key("state");
+}
+
 void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GLib.Error {
   uint64 operation_id;
   MaplibreNative.OfflineRegionDefinition definition = {};
@@ -291,11 +396,9 @@ void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Ge
 }
 
 void exercise_feature_state(MaplibreNative.RenderSessionHandle session, MaplibreNative.JsonValue state) throws GLib.Error {
-  string source_id = "fixture-source";
-  string feature_id = "feature-1";
   MaplibreNative.FeatureStateSelector selector = {};
-  selector.source_id = { source_id, source_id.length };
-  selector.feature_id = { feature_id, feature_id.length };
+  selector.set_source_id("fixture-source");
+  selector.set_feature_id("feature-1");
   session.set_feature_state(selector, state);
   var snapshot = session.get_feature_state(selector);
   snapshot.close();
@@ -426,9 +529,11 @@ int main(string[] args) {
     MaplibreNative.LatLng round_trip;
     MaplibreNative.LatLng.for_projected_meters(meters, out round_trip);
 
+    exercise_option_setters(coordinate);
+
     MaplibreNative.RuntimeOptions runtime_options = {};
     runtime_options.default();
-    runtime_options.maximum_cache_size = 1024 * 1024;
+    runtime_options.set_maximum_cache_size(1024 * 1024);
     var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
     runtime.set_resource_provider(provide_resource);
     runtime.set_resource_transform(transform_resource);
