@@ -591,13 +591,38 @@ class RenderSessionHandle {
   }
 
   static attachMetalOwnedTexture(map, descriptor) {
-    if (!(map instanceof MapHandle)) {
-      throw new InvalidArgumentError(null, "map must be a MapHandle");
-    }
-    return new RenderSessionHandle(
-      translateNativeErrors(() =>
-        native.createMetalOwnedTextureRenderSession(map.native, descriptor),
-      ),
+    return attachRenderSession(map, () =>
+      native.createMetalOwnedTextureRenderSession(map.native, descriptor),
+    );
+  }
+
+  static attachMetalBorrowedTexture(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createMetalBorrowedTextureRenderSession(map.native, descriptor),
+    );
+  }
+
+  static attachMetalSurface(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createMetalSurfaceRenderSession(map.native, descriptor),
+    );
+  }
+
+  static attachVulkanOwnedTexture(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createVulkanOwnedTextureRenderSession(map.native, descriptor),
+    );
+  }
+
+  static attachVulkanBorrowedTexture(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createVulkanBorrowedTextureRenderSession(map.native, descriptor),
+    );
+  }
+
+  static attachVulkanSurface(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createVulkanSurfaceRenderSession(map.native, descriptor),
     );
   }
 
@@ -644,6 +669,13 @@ class RenderSessionHandle {
   }
 }
 
+function attachRenderSession(map, attach) {
+  if (!(map instanceof MapHandle)) {
+    throw new InvalidArgumentError(null, "map must be a MapHandle");
+  }
+  return new RenderSessionHandle(translateNativeErrors(attach));
+}
+
 class MapHandle {
   constructor(runtime, options) {
     if (!(runtime instanceof RuntimeHandle)) {
@@ -669,6 +701,26 @@ class MapHandle {
 
   attachMetalOwnedTexture(descriptor) {
     return RenderSessionHandle.attachMetalOwnedTexture(this, descriptor);
+  }
+
+  attachMetalBorrowedTexture(descriptor) {
+    return RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor);
+  }
+
+  attachMetalSurface(descriptor) {
+    return RenderSessionHandle.attachMetalSurface(this, descriptor);
+  }
+
+  attachVulkanOwnedTexture(descriptor) {
+    return RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor);
+  }
+
+  attachVulkanBorrowedTexture(descriptor) {
+    return RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor);
+  }
+
+  attachVulkanSurface(descriptor) {
+    return RenderSessionHandle.attachVulkanSurface(this, descriptor);
   }
 
   requestRepaint() {

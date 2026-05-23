@@ -434,6 +434,46 @@ export interface MetalOwnedTextureDescriptor {
   context: MetalContextDescriptor;
 }
 
+export interface MetalBorrowedTextureDescriptor {
+  extent: RenderTargetExtent;
+  textureAddress: bigint;
+}
+
+export interface MetalSurfaceDescriptor {
+  extent: RenderTargetExtent;
+  context: MetalContextDescriptor;
+  layerAddress: bigint;
+}
+
+export interface VulkanContextDescriptor {
+  instanceAddress: bigint;
+  physicalDeviceAddress: bigint;
+  deviceAddress: bigint;
+  graphicsQueueAddress: bigint;
+  graphicsQueueFamilyIndex: number;
+}
+
+export interface VulkanOwnedTextureDescriptor {
+  extent: RenderTargetExtent;
+  context: VulkanContextDescriptor;
+}
+
+export interface VulkanBorrowedTextureDescriptor {
+  extent: RenderTargetExtent;
+  context: VulkanContextDescriptor;
+  imageAddress: bigint;
+  imageViewAddress: bigint;
+  format: number;
+  initialLayout: number;
+  finalLayout: number;
+}
+
+export interface VulkanSurfaceDescriptor {
+  extent: RenderTargetExtent;
+  context: VulkanContextDescriptor;
+  surfaceAddress: bigint;
+}
+
 export interface TextureImageInfo {
   width: number;
   height: number;
@@ -451,6 +491,26 @@ export declare class RenderSessionHandle {
   static attachMetalOwnedTexture(
     map: MapHandle,
     descriptor: MetalOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  static attachMetalBorrowedTexture(
+    map: MapHandle,
+    descriptor: MetalBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  static attachMetalSurface(
+    map: MapHandle,
+    descriptor: MetalSurfaceDescriptor,
+  ): RenderSessionHandle;
+  static attachVulkanOwnedTexture(
+    map: MapHandle,
+    descriptor: VulkanOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  static attachVulkanBorrowedTexture(
+    map: MapHandle,
+    descriptor: VulkanBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  static attachVulkanSurface(
+    map: MapHandle,
+    descriptor: VulkanSurfaceDescriptor,
   ): RenderSessionHandle;
   readonly closed: boolean;
   close(): void;
@@ -486,6 +546,17 @@ export declare class MapHandle {
   attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
   ): RenderSessionHandle;
+  attachMetalBorrowedTexture(
+    descriptor: MetalBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle;
+  attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle;
   requestRepaint(): void;
   requestStillImage(): void;
   isFullyLoaded(): boolean;

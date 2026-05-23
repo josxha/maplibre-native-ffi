@@ -26,6 +26,52 @@ pub struct MetalOwnedTextureDescriptor {
 }
 
 #[napi(object)]
+pub struct MetalBorrowedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub texture_address: BigInt,
+}
+
+#[napi(object)]
+pub struct MetalSurfaceDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: MetalContextDescriptor,
+    pub layer_address: BigInt,
+}
+
+#[napi(object)]
+pub struct VulkanContextDescriptor {
+    pub instance_address: BigInt,
+    pub physical_device_address: BigInt,
+    pub device_address: BigInt,
+    pub graphics_queue_address: BigInt,
+    pub graphics_queue_family_index: u32,
+}
+
+#[napi(object)]
+pub struct VulkanOwnedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: VulkanContextDescriptor,
+}
+
+#[napi(object)]
+pub struct VulkanBorrowedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: VulkanContextDescriptor,
+    pub image_address: BigInt,
+    pub image_view_address: BigInt,
+    pub format: u32,
+    pub initial_layout: u32,
+    pub final_layout: u32,
+}
+
+#[napi(object)]
+pub struct VulkanSurfaceDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: VulkanContextDescriptor,
+    pub surface_address: BigInt,
+}
+
+#[napi(object)]
 pub struct TextureImageInfo {
     pub width: u32,
     pub height: u32,
@@ -52,14 +98,81 @@ pub fn create_metal_owned_texture_render_session(
     let mut raw_descriptor = unsafe { sys::mln_metal_owned_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context.device = descriptor.context.device_ptr()?;
-    let mut session = std::ptr::null_mut();
-    core::check(unsafe {
-        sys::mln_metal_owned_texture_attach(map.as_ptr(), &raw_descriptor, &mut session)
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_metal_owned_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
     })
-    .map_err(error::from_core)?;
-    let state = unsafe { NativeHandleState::from_raw_ptr(session, "RenderSessionHandle") }
-        .map_err(error::from_core)?;
-    Ok(NativeRenderSessionHandle { state })
+}
+
+#[napi(js_name = "createMetalBorrowedTextureRenderSession")]
+pub fn create_metal_borrowed_texture_render_session(
+    map: &NativeMapHandle,
+    descriptor: MetalBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.texture = bigint_to_ptr(&descriptor.texture_address, "textureAddress")?;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_metal_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createMetalSurfaceRenderSession")]
+pub fn create_metal_surface_render_session(
+    map: &NativeMapHandle,
+    descriptor: MetalSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_metal_surface_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context.device = descriptor.context.device_ptr()?;
+    raw_descriptor.layer = bigint_to_ptr(&descriptor.layer_address, "layerAddress")?;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_metal_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createVulkanOwnedTextureRenderSession")]
+pub fn create_vulkan_owned_texture_render_session(
+    map: &NativeMapHandle,
+    descriptor: VulkanOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context = descriptor.context.into_native()?;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_vulkan_owned_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createVulkanBorrowedTextureRenderSession")]
+pub fn create_vulkan_borrowed_texture_render_session(
+    map: &NativeMapHandle,
+    descriptor: VulkanBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context = descriptor.context.into_native()?;
+    raw_descriptor.image = bigint_to_ptr(&descriptor.image_address, "imageAddress")?;
+    raw_descriptor.image_view = bigint_to_ptr(&descriptor.image_view_address, "imageViewAddress")?;
+    raw_descriptor.format = descriptor.format;
+    raw_descriptor.initial_layout = descriptor.initial_layout;
+    raw_descriptor.final_layout = descriptor.final_layout;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_vulkan_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createVulkanSurfaceRenderSession")]
+pub fn create_vulkan_surface_render_session(
+    map: &NativeMapHandle,
+    descriptor: VulkanSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_vulkan_surface_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context = descriptor.context.into_native()?;
+    raw_descriptor.surface = bigint_to_ptr(&descriptor.surface_address, "surfaceAddress")?;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_vulkan_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
 }
 
 #[napi]
@@ -155,6 +268,19 @@ impl RenderTargetExtent {
     }
 }
 
+impl VulkanContextDescriptor {
+    fn into_native(self) -> Result<sys::mln_vulkan_context_descriptor> {
+        Ok(sys::mln_vulkan_context_descriptor {
+            size: std::mem::size_of::<sys::mln_vulkan_context_descriptor>() as u32,
+            instance: bigint_to_ptr(&self.instance_address, "instanceAddress")?,
+            physical_device: bigint_to_ptr(&self.physical_device_address, "physicalDeviceAddress")?,
+            device: bigint_to_ptr(&self.device_address, "deviceAddress")?,
+            graphics_queue: bigint_to_ptr(&self.graphics_queue_address, "graphicsQueueAddress")?,
+            graphics_queue_family_index: self.graphics_queue_family_index,
+        })
+    }
+}
+
 impl MetalContextDescriptor {
     fn device_ptr(&self) -> Result<*mut c_void> {
         self.device_address
@@ -174,6 +300,18 @@ impl TextureImageInfo {
             byte_length: raw.byte_length as i64,
         }
     }
+}
+
+fn attach_render_session(
+    map: &NativeMapHandle,
+    attach: impl FnOnce(*mut *mut sys::mln_render_session) -> sys::mln_status,
+) -> Result<NativeRenderSessionHandle> {
+    let mut session = std::ptr::null_mut();
+    core::check(attach(&mut session)).map_err(error::from_core)?;
+    let state = unsafe { NativeHandleState::from_raw_ptr(session, "RenderSessionHandle") }
+        .map_err(error::from_core)?;
+    let _ = map;
+    Ok(NativeRenderSessionHandle { state })
 }
 
 fn bigint_to_ptr(value: &BigInt, field_name: &str) -> Result<*mut c_void> {
