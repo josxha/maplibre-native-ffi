@@ -107,6 +107,35 @@ export interface CameraOptions {
   pitch?: number | null;
 }
 
+export interface EdgeInsets {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}
+
+export interface MapViewportOptions {
+  northOrientation?: "up" | "right" | "down" | "left" | "unknown" | null;
+  constrainMode?:
+    | "none"
+    | "heightOnly"
+    | "widthAndHeight"
+    | "screen"
+    | "unknown"
+    | null;
+  viewportMode?: "default" | "flippedY" | "unknown" | null;
+  frustumOffset?: EdgeInsets | null;
+}
+
+export interface MapTileOptions {
+  prefetchZoomDelta?: number | null;
+  lodMinRadius?: number | null;
+  lodScale?: number | null;
+  lodPitchThreshold?: number | null;
+  lodZoomShift?: number | null;
+  lodMode?: "default" | "distance" | "unknown" | null;
+}
+
 export interface MapOptions {
   width?: number | null;
   height?: number | null;
@@ -167,6 +196,10 @@ export declare class MapHandle {
   dumpDebugLogs(): void;
   getDebugOptions(): MapDebugOption[];
   setDebugOptions(options: Iterable<MapDebugOption>): void;
+  getViewportOptions(): MapViewportOptions;
+  setViewportOptions(options: MapViewportOptions): void;
+  getTileOptions(): MapTileOptions;
+  setTileOptions(options: MapTileOptions): void;
   moveBy(deltaX: number, deltaY: number): void;
   scaleBy(scale: number, anchor?: ScreenPoint | null): void;
   rotateBy(first: ScreenPoint, second: ScreenPoint): void;

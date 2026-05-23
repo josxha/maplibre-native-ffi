@@ -28,6 +28,32 @@ pub struct CameraOptions {
 }
 
 #[napi(object)]
+pub struct EdgeInsets {
+    pub top: f64,
+    pub left: f64,
+    pub bottom: f64,
+    pub right: f64,
+}
+
+#[napi(object)]
+pub struct MapViewportOptions {
+    pub north_orientation: Option<String>,
+    pub constrain_mode: Option<String>,
+    pub viewport_mode: Option<String>,
+    pub frustum_offset: Option<EdgeInsets>,
+}
+
+#[napi(object)]
+pub struct MapTileOptions {
+    pub prefetch_zoom_delta: Option<u32>,
+    pub lod_min_radius: Option<f64>,
+    pub lod_scale: Option<f64>,
+    pub lod_pitch_threshold: Option<f64>,
+    pub lod_zoom_shift: Option<f64>,
+    pub lod_mode: Option<String>,
+}
+
+#[napi(object)]
 pub struct StyleSourceInfo {
     pub source_type: String,
     pub raw_type: u32,
@@ -156,6 +182,40 @@ impl NativeMapHandle {
     #[napi(js_name = "cancelTransitions")]
     pub fn cancel_transitions(&self) -> Result<()> {
         core::check(unsafe { sys::mln_map_cancel_transitions(self.state.as_ptr()) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getViewportOptions")]
+    pub fn get_viewport_options(&self) -> Result<MapViewportOptions> {
+        let mut raw = unsafe { sys::mln_map_viewport_options_default() };
+        core::check(unsafe { sys::mln_map_get_viewport_options(self.state.as_ptr(), &mut raw) })
+            .map_err(error::from_core)?;
+        Ok(MapViewportOptions::from_core(
+            core::options::map_viewport_options_from_native(raw),
+        ))
+    }
+
+    #[napi(js_name = "setViewportOptions")]
+    pub fn set_viewport_options(&self, options: MapViewportOptions) -> Result<()> {
+        let options = core::options::map_viewport_options_to_native(&options.into_core()?);
+        core::check(unsafe { sys::mln_map_set_viewport_options(self.state.as_ptr(), &options) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getTileOptions")]
+    pub fn get_tile_options(&self) -> Result<MapTileOptions> {
+        let mut raw = unsafe { sys::mln_map_tile_options_default() };
+        core::check(unsafe { sys::mln_map_get_tile_options(self.state.as_ptr(), &mut raw) })
+            .map_err(error::from_core)?;
+        Ok(MapTileOptions::from_core(
+            core::options::map_tile_options_from_native(raw),
+        ))
+    }
+
+    #[napi(js_name = "setTileOptions")]
+    pub fn set_tile_options(&self, options: MapTileOptions) -> Result<()> {
+        let options = core::options::map_tile_options_to_native(&options.into_core()?);
+        core::check(unsafe { sys::mln_map_set_tile_options(self.state.as_ptr(), &options) })
             .map_err(error::from_core)
     }
 
@@ -744,6 +804,85 @@ impl Default for MapOptions {
     }
 }
 
+impl EdgeInsets {
+    fn into_core(self) -> core::EdgeInsets {
+        core::EdgeInsets::new(self.top, self.left, self.bottom, self.right)
+    }
+
+    fn from_core(value: core::EdgeInsets) -> Self {
+        Self {
+            top: value.top,
+            left: value.left,
+            bottom: value.bottom,
+            right: value.right,
+        }
+    }
+}
+
+impl MapViewportOptions {
+    fn into_core(self) -> Result<core::MapViewportOptions> {
+        let mut options = core::MapViewportOptions::new();
+        if let Some(value) = self.north_orientation {
+            options = options.with_north_orientation(north_orientation_from_string(&value)?);
+        }
+        if let Some(value) = self.constrain_mode {
+            options = options.with_constrain_mode(constrain_mode_from_string(&value)?);
+        }
+        if let Some(value) = self.viewport_mode {
+            options = options.with_viewport_mode(viewport_mode_from_string(&value)?);
+        }
+        if let Some(value) = self.frustum_offset {
+            options = options.with_frustum_offset(value.into_core());
+        }
+        Ok(options)
+    }
+
+    fn from_core(options: core::MapViewportOptions) -> Self {
+        Self {
+            north_orientation: options.north_orientation.map(north_orientation_name),
+            constrain_mode: options.constrain_mode.map(constrain_mode_name),
+            viewport_mode: options.viewport_mode.map(viewport_mode_name),
+            frustum_offset: options.frustum_offset.map(EdgeInsets::from_core),
+        }
+    }
+}
+
+impl MapTileOptions {
+    fn into_core(self) -> Result<core::MapTileOptions> {
+        let mut options = core::MapTileOptions::new();
+        if let Some(value) = self.prefetch_zoom_delta {
+            options = options.with_prefetch_zoom_delta(value);
+        }
+        if let Some(value) = self.lod_min_radius {
+            options = options.with_lod_min_radius(value);
+        }
+        if let Some(value) = self.lod_scale {
+            options = options.with_lod_scale(value);
+        }
+        if let Some(value) = self.lod_pitch_threshold {
+            options = options.with_lod_pitch_threshold(value);
+        }
+        if let Some(value) = self.lod_zoom_shift {
+            options = options.with_lod_zoom_shift(value);
+        }
+        if let Some(value) = self.lod_mode {
+            options = options.with_lod_mode(tile_lod_mode_from_string(&value)?);
+        }
+        Ok(options)
+    }
+
+    fn from_core(options: core::MapTileOptions) -> Self {
+        Self {
+            prefetch_zoom_delta: options.prefetch_zoom_delta,
+            lod_min_radius: options.lod_min_radius,
+            lod_scale: options.lod_scale,
+            lod_pitch_threshold: options.lod_pitch_threshold,
+            lod_zoom_shift: options.lod_zoom_shift,
+            lod_mode: options.lod_mode.map(tile_lod_mode_name),
+        }
+    }
+}
+
 impl CameraOptions {
     pub(crate) fn into_core(self) -> core::CameraOptions {
         let mut camera = core::CameraOptions::new();
@@ -785,6 +924,94 @@ impl MapOptions {
         }
         Ok(options)
     }
+}
+
+fn north_orientation_from_string(value: &str) -> Result<core::NorthOrientation> {
+    match value {
+        "up" => Ok(core::NorthOrientation::Up),
+        "right" => Ok(core::NorthOrientation::Right),
+        "down" => Ok(core::NorthOrientation::Down),
+        "left" => Ok(core::NorthOrientation::Left),
+        other => Err(error::invalid_argument(format!(
+            "northOrientation must be 'up', 'right', 'down', or 'left', got '{other}'"
+        ))),
+    }
+}
+
+fn north_orientation_name(value: core::NorthOrientation) -> String {
+    match value {
+        core::NorthOrientation::Up => "up",
+        core::NorthOrientation::Right => "right",
+        core::NorthOrientation::Down => "down",
+        core::NorthOrientation::Left => "left",
+        core::NorthOrientation::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+    .to_owned()
+}
+
+fn constrain_mode_from_string(value: &str) -> Result<core::ConstrainMode> {
+    match value {
+        "none" => Ok(core::ConstrainMode::None),
+        "heightOnly" => Ok(core::ConstrainMode::HeightOnly),
+        "widthAndHeight" => Ok(core::ConstrainMode::WidthAndHeight),
+        "screen" => Ok(core::ConstrainMode::Screen),
+        other => Err(error::invalid_argument(format!(
+            "constrainMode must be 'none', 'heightOnly', 'widthAndHeight', or 'screen', got '{other}'"
+        ))),
+    }
+}
+
+fn constrain_mode_name(value: core::ConstrainMode) -> String {
+    match value {
+        core::ConstrainMode::None => "none",
+        core::ConstrainMode::HeightOnly => "heightOnly",
+        core::ConstrainMode::WidthAndHeight => "widthAndHeight",
+        core::ConstrainMode::Screen => "screen",
+        core::ConstrainMode::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+    .to_owned()
+}
+
+fn viewport_mode_from_string(value: &str) -> Result<core::ViewportMode> {
+    match value {
+        "default" => Ok(core::ViewportMode::Default),
+        "flippedY" => Ok(core::ViewportMode::FlippedY),
+        other => Err(error::invalid_argument(format!(
+            "viewportMode must be 'default' or 'flippedY', got '{other}'"
+        ))),
+    }
+}
+
+fn viewport_mode_name(value: core::ViewportMode) -> String {
+    match value {
+        core::ViewportMode::Default => "default",
+        core::ViewportMode::FlippedY => "flippedY",
+        core::ViewportMode::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+    .to_owned()
+}
+
+fn tile_lod_mode_from_string(value: &str) -> Result<core::TileLodMode> {
+    match value {
+        "default" => Ok(core::TileLodMode::Default),
+        "distance" => Ok(core::TileLodMode::Distance),
+        other => Err(error::invalid_argument(format!(
+            "lodMode must be 'default' or 'distance', got '{other}'"
+        ))),
+    }
+}
+
+fn tile_lod_mode_name(value: core::TileLodMode) -> String {
+    match value {
+        core::TileLodMode::Default => "default",
+        core::TileLodMode::Distance => "distance",
+        core::TileLodMode::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+    .to_owned()
 }
 
 fn map_mode_from_string(map_mode: &str) -> Result<core::MapMode> {

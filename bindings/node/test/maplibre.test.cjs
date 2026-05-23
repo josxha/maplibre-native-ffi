@@ -224,6 +224,56 @@ test("map utility methods expose copied booleans and native commands", () => {
   }
 });
 
+test("map viewport and tile options map descriptor fields", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setViewportOptions({
+      northOrientation: "right",
+      constrainMode: "screen",
+      viewportMode: "flippedY",
+      frustumOffset: { top: 1, left: 2, bottom: 3, right: 4 },
+    });
+    const viewport = map.getViewportOptions();
+    assert.equal(viewport.northOrientation, "right");
+    assert.equal(viewport.constrainMode, "screen");
+    assert.equal(viewport.viewportMode, "flippedY");
+    assert.deepEqual(viewport.frustumOffset, {
+      top: 1,
+      left: 2,
+      bottom: 3,
+      right: 4,
+    });
+
+    map.setTileOptions({
+      prefetchZoomDelta: 2,
+      lodMinRadius: 1,
+      lodScale: 1.5,
+      lodPitchThreshold: 20,
+      lodZoomShift: 0.5,
+      lodMode: "distance",
+    });
+    const tile = map.getTileOptions();
+    assert.equal(tile.prefetchZoomDelta, 2);
+    assert.equal(tile.lodMode, "distance");
+    assert.throws(
+      () =>
+        map.setViewportOptions({
+          northOrientation: /** @type {any} */ ("north"),
+        }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () => map.setTileOptions({ lodMode: /** @type {any} */ ("nearest") }),
+      InvalidArgumentError,
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map camera commands copy descriptor values", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });

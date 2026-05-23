@@ -409,6 +409,22 @@ class MapHandle {
     return translateNativeErrors(() => this.native.cancelTransitions());
   }
 
+  getViewportOptions() {
+    return translateNativeErrors(() => this.native.getViewportOptions());
+  }
+
+  setViewportOptions(options) {
+    return translateNativeErrors(() => this.native.setViewportOptions(options));
+  }
+
+  getTileOptions() {
+    return translateNativeErrors(() => this.native.getTileOptions());
+  }
+
+  setTileOptions(options) {
+    return translateNativeErrors(() => this.native.setTileOptions(options));
+  }
+
   getCamera() {
     return translateNativeErrors(() => this.native.getCamera());
   }
