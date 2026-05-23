@@ -4,6 +4,7 @@ import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
+import 'package:maplibre_native_ffi/src/internal/struct/geometry.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/json.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/struct.dart';
 import 'package:test/test.dart';
@@ -76,6 +77,82 @@ void main() {
     expect(native.duration_ms, 100);
     expect(native.easing.y2, 1);
   });
+
+  test('geometry values materialize and copy native descriptor trees', () {
+    withNativeArena((arena) {
+      final native = nativeGeometry(
+        const GeometryCollection([
+          PointGeometry(LatLng(1, 2)),
+          LineStringGeometry([LatLng(3, 4), LatLng(5, 6)]),
+        ]),
+        arena,
+      );
+
+      expect(
+        native.pointer.ref.type,
+        raw.mln_geometry_type.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.value,
+      );
+      final collection = native.pointer.ref.data.geometry_collection;
+      expect(collection.geometry_count, 2);
+      expect(collection.geometries[0].data.point.longitude, 2);
+      expect(collection.geometries[1].data.line_string.coordinate_count, 2);
+
+      final copied = geometryFromNative(native.pointer.ref);
+      expect(copied, isA<GeometryCollection>());
+      final copiedCollection = copied as GeometryCollection;
+      final copiedPoint = copiedCollection.geometries[0] as PointGeometry;
+      expect(copiedPoint.coordinate, const LatLng(1, 2));
+    });
+  });
+
+  test(
+    'GeoJSON feature descriptors materialize properties and identifiers',
+    () {
+      withNativeArena((arena) {
+        final native = nativeGeoJson(
+          const FeatureGeoJson(
+            geometry: PointGeometry(LatLng(7, 8)),
+            properties: [JsonMember('rank', JsonUInt(4))],
+            identifier: StringFeatureIdentifier('feature-1'),
+          ),
+          arena,
+        );
+
+        expect(
+          native.pointer.ref.type,
+          raw.mln_geojson_type.MLN_GEOJSON_TYPE_FEATURE.value,
+        );
+        final feature = native.pointer.ref.data.feature.ref;
+        expect(feature.property_count, 1);
+        expect(feature.identifier_type, 4);
+        expect(feature.geometry.ref.data.point.latitude, 7);
+
+        final copied = geoJsonFromNative(native.pointer.ref);
+        expect(copied, isA<FeatureGeoJson>());
+        final copiedFeature = copied as FeatureGeoJson;
+        expect(copiedFeature.properties.single.key, 'rank');
+        expect(copiedFeature.identifier, isA<StringFeatureIdentifier>());
+      });
+    },
+  );
+
+  test(
+    'GeoJSON identifiers reject non-finite double values before C calls',
+    () {
+      expect(
+        () => withNativeArena(
+          (arena) => nativeGeoJson(
+            const FeatureGeoJson(
+              geometry: EmptyGeometry(),
+              identifier: DoubleFeatureIdentifier(double.infinity),
+            ),
+            arena,
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    },
+  );
 
   test('JSON values materialize and copy native descriptor trees', () {
     withNativeArena((arena) {

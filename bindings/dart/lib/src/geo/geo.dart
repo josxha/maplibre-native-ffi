@@ -1,6 +1,8 @@
 /// Geographic, geometry, tile, and feature value types.
 library;
 
+import '../json/json.dart';
+
 /// Geographic coordinate in degrees.
 final class LatLng {
   /// Creates a geographic coordinate.
@@ -301,4 +303,93 @@ final class GeometryCollection extends Geometry {
 
   /// Child geometries.
   final List<Geometry> geometries;
+}
+
+/// Feature identifier used by GeoJSON feature descriptors.
+sealed class FeatureIdentifier {
+  const FeatureIdentifier();
+}
+
+/// Feature without an identifier.
+final class NullFeatureIdentifier extends FeatureIdentifier {
+  /// Creates a null feature identifier.
+  const NullFeatureIdentifier();
+}
+
+/// Unsigned integer feature identifier.
+final class UIntFeatureIdentifier extends FeatureIdentifier {
+  /// Creates an unsigned integer feature identifier.
+  const UIntFeatureIdentifier(this.value);
+
+  /// Identifier value.
+  final int value;
+}
+
+/// Signed integer feature identifier.
+final class IntFeatureIdentifier extends FeatureIdentifier {
+  /// Creates a signed integer feature identifier.
+  const IntFeatureIdentifier(this.value);
+
+  /// Identifier value.
+  final int value;
+}
+
+/// Floating-point feature identifier.
+final class DoubleFeatureIdentifier extends FeatureIdentifier {
+  /// Creates a floating-point feature identifier.
+  const DoubleFeatureIdentifier(this.value);
+
+  /// Identifier value.
+  final double value;
+}
+
+/// String feature identifier.
+final class StringFeatureIdentifier extends FeatureIdentifier {
+  /// Creates a string feature identifier.
+  const StringFeatureIdentifier(this.value);
+
+  /// Identifier value.
+  final String value;
+}
+
+/// Owned GeoJSON descriptor.
+sealed class GeoJson {
+  const GeoJson();
+}
+
+/// GeoJSON geometry descriptor.
+final class GeometryGeoJson extends GeoJson {
+  /// Creates a geometry GeoJSON descriptor.
+  const GeometryGeoJson(this.geometry);
+
+  /// Geometry value.
+  final Geometry geometry;
+}
+
+/// GeoJSON feature descriptor.
+final class FeatureGeoJson extends GeoJson {
+  /// Creates a feature GeoJSON descriptor.
+  const FeatureGeoJson({
+    required this.geometry,
+    this.properties = const [],
+    this.identifier = const NullFeatureIdentifier(),
+  });
+
+  /// Feature geometry.
+  final Geometry geometry;
+
+  /// Feature properties.
+  final List<JsonMember> properties;
+
+  /// Optional feature identifier.
+  final FeatureIdentifier identifier;
+}
+
+/// GeoJSON feature collection descriptor.
+final class FeatureCollectionGeoJson extends GeoJson {
+  /// Creates a feature collection GeoJSON descriptor.
+  const FeatureCollectionGeoJson(this.features);
+
+  /// Feature entries.
+  final List<FeatureGeoJson> features;
 }
