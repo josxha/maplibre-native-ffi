@@ -402,6 +402,47 @@ impl NativeMapHandle {
         }
     }
 
+    #[napi(js_name = "getStyleLayerJson")]
+    pub fn get_style_layer_json(&self, layer_id: String) -> Result<Option<String>> {
+        let layer_id = core::string::string_view(&layer_id);
+        let mut snapshot = std::ptr::null_mut();
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_get_style_layer_json(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                &mut snapshot,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if !found {
+            return Ok(None);
+        }
+        let value = unsafe { core::json::copy_json_snapshot(std::ptr::NonNull::new(snapshot)) }
+            .map_err(error::from_core)?;
+        value.map(json_value_to_string).transpose()
+    }
+
+    #[napi(js_name = "moveStyleLayer")]
+    pub fn move_style_layer(
+        &self,
+        layer_id: String,
+        before_layer_id: Option<String>,
+    ) -> Result<()> {
+        let layer_id = core::string::string_view(&layer_id);
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = core::string::string_view(&before_layer_id);
+        core::check(unsafe {
+            sys::mln_map_move_style_layer(
+                self.state.as_ptr(),
+                layer_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "setStyleJson")]
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;
@@ -577,6 +618,37 @@ fn parse_json_value(value: String) -> Result<core::JsonValue> {
         error::invalid_argument(format!("JSON input is invalid: {parse_error}"))
     })?;
     json_value_from_serde(value)
+}
+
+fn json_value_to_string(value: core::JsonValue) -> Result<String> {
+    serde_json::to_string(&json_value_to_serde(value)).map_err(|serialize_error| {
+        error::invalid_argument(format!(
+            "JSON value could not be serialized: {serialize_error}"
+        ))
+    })
+}
+
+fn json_value_to_serde(value: core::JsonValue) -> serde_json::Value {
+    match value {
+        core::JsonValue::Null => serde_json::Value::Null,
+        core::JsonValue::Bool(value) => serde_json::Value::Bool(value),
+        core::JsonValue::UInt(value) => serde_json::Value::Number(value.into()),
+        core::JsonValue::Int(value) => serde_json::Value::Number(value.into()),
+        core::JsonValue::Double(value) => serde_json::Number::from_f64(value)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        core::JsonValue::String(value) => serde_json::Value::String(value),
+        core::JsonValue::Array(values) => {
+            serde_json::Value::Array(values.into_iter().map(json_value_to_serde).collect())
+        }
+        core::JsonValue::Object(members) => serde_json::Value::Object(
+            members
+                .into_iter()
+                .map(|member| (member.key, json_value_to_serde(member.value)))
+                .collect(),
+        ),
+        _ => serde_json::Value::Null,
+    }
 }
 
 fn json_value_from_serde(value: serde_json::Value) -> Result<core::JsonValue> {

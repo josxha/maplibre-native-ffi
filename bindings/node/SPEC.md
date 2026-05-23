@@ -154,7 +154,7 @@ index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, log callback bridge, async log severity controls, and root exports
 src/runtime.rs    runtime handle, runtime option materialization, and event polling proof slice
-src/map.rs        map handle, map option materialization, style-loading/probes, style ID lists, style metadata, camera commands, repaint, debug-option, and utility proof slices
+src/map.rs        map handle, map option materialization, style-loading/probes, style ID lists, style metadata/layer JSON, camera commands, repaint, debug-option, and utility proof slices
 src/projection.rs standalone map projection handle proof slice
 src/values.rs     copied coordinate and screen point values plus projection helper proof slices
 ```
@@ -550,8 +550,8 @@ area instead of retesting all native C validation rules.
    remains.)_
 8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
    descriptor, camera movement commands, standalone projection handle, screen
-   projection helper, style JSON/list/metadata helpers, and style probe proof
-   slices complete.)_
+   projection helper, style JSON/list/metadata/layer helpers, and style probe
+   proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result

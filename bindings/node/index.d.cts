@@ -187,6 +187,8 @@ export declare class MapHandle {
   removeStyleLayer(layerId: string): boolean;
   listStyleLayerIds(): string[];
   getStyleLayerType(layerId: string): string | null;
+  getStyleLayerJson(layerId: string): JsonValue | null;
+  moveStyleLayer(layerId: string, beforeLayerId?: string | null): void;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;

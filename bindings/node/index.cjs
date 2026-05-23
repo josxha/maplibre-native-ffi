@@ -487,6 +487,19 @@ class MapHandle {
     return translateNativeErrors(() => this.native.getStyleLayerType(layerId));
   }
 
+  getStyleLayerJson(layerId) {
+    const json = translateNativeErrors(() =>
+      this.native.getStyleLayerJson(layerId),
+    );
+    return json === null ? null : JSON.parse(json);
+  }
+
+  moveStyleLayer(layerId, beforeLayerId = null) {
+    return translateNativeErrors(() =>
+      this.native.moveStyleLayer(layerId, beforeLayerId),
+    );
+  }
+
   setStyleJson(json) {
     return translateNativeErrors(() => this.native.setStyleJson(json));
   }

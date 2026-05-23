@@ -335,10 +335,21 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       type: "background",
       paint: { "background-color": "#000000" },
     });
+    map.addStyleLayerJson({ id: "background-2", type: "background" });
+    map.moveStyleLayer("background-2", "background");
     assert.equal(map.styleLayerExists("background"), true);
     assert.equal(map.listStyleLayerIds().includes("background"), true);
     assert.equal(map.getStyleLayerType("background"), "background");
+    const backgroundLayer = map.getStyleLayerJson("background");
+    assert.ok(
+      backgroundLayer &&
+        typeof backgroundLayer === "object" &&
+        !Array.isArray(backgroundLayer),
+    );
+    assert.equal(backgroundLayer.id, "background");
     assert.equal(map.getStyleLayerType("missing-layer"), null);
+    assert.equal(map.getStyleLayerJson("missing-layer"), null);
+    assert.equal(map.removeStyleLayer("background-2"), true);
     assert.equal(map.removeStyleLayer("background"), true);
     assert.throws(
       () => map.addStyleLayerJson(/** @type {any} */ (undefined)),
