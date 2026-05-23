@@ -13,6 +13,21 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
   return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
 }
 
+void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GLib.Error {
+  uint64 operation_id;
+  runtime.offline_region_get_start(1, out operation_id);
+  runtime.offline_regions_list_start(out operation_id);
+  runtime.offline_regions_merge_database_start("offline.db", out operation_id);
+  uint8[] metadata = { 1, 2, 3 };
+  runtime.offline_region_update_metadata_start(1, metadata, out operation_id);
+  runtime.offline_region_get_status_start(1, out operation_id);
+  runtime.offline_region_set_observed_start(1, true, out operation_id);
+  runtime.offline_region_set_download_state_start(1, MaplibreNative.OfflineRegionDownloadState.INACTIVE, out operation_id);
+  runtime.offline_region_invalidate_start(1, out operation_id);
+  runtime.offline_region_delete_start(1, out operation_id);
+  runtime.offline_operation_discard(operation_id);
+}
+
 void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
   uint64 generation;
   uint32 width;

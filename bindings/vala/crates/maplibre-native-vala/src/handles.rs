@@ -238,6 +238,160 @@ pub extern "C" fn mln_vala_runtime_handle_run_ambient_cache_operation_start(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_get_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_get_start(handle, region_id, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_regions_list_start(
+    handle: *mut RuntimeHandle,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_regions_list_start(handle, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_regions_merge_database_start(
+    handle: *mut RuntimeHandle,
+    side_database_path: *const c_char,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_regions_merge_database_start(handle, side_database_path, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_update_metadata_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    metadata: *const u8,
+    metadata_size: usize,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_update_metadata_start(
+        handle,
+        region_id,
+        metadata,
+        metadata_size,
+        out_operation_id,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_get_status_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_get_status_start(handle, region_id, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_set_observed_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    observed: GBoolean,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_set_observed_start(handle, region_id, observed != GFALSE, out_operation_id)
+    {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_set_download_state_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    state: u32,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_set_download_state_start(handle, region_id, state, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_invalidate_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_invalidate_start(handle, region_id, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_runtime_handle_offline_region_delete_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_delete_start(handle, region_id, out_operation_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_runtime_handle_offline_operation_discard(
     handle: *mut RuntimeHandle,
     operation_id: u64,
@@ -3400,6 +3554,192 @@ fn run_ambient_cache_operation_start(
     })
 }
 
+fn offline_region_get_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable. The C API
+    // validates the region ID domain.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_get_start(runtime, region_id, out_operation_id)
+    })
+}
+
+fn offline_regions_list_start(
+    handle: *mut RuntimeHandle,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable.
+    error::check(unsafe { sys::mln_runtime_offline_regions_list_start(runtime, out_operation_id) })
+}
+
+fn offline_regions_merge_database_start(
+    handle: *mut RuntimeHandle,
+    side_database_path: *const c_char,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if side_database_path.is_null() {
+        return Err(Error::invalid_argument("side database path is null"));
+    }
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live, `side_database_path` is a borrowed C string,
+    // and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_regions_merge_database_start(
+            runtime,
+            side_database_path,
+            out_operation_id,
+        )
+    })
+}
+
+fn offline_region_update_metadata_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    metadata: *const u8,
+    metadata_size: usize,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if metadata.is_null() && metadata_size != 0 {
+        return Err(Error::invalid_argument(
+            "offline region metadata is null with non-zero size",
+        ));
+    }
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live, metadata is either null with zero size or
+    // borrowed for this call, and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_update_metadata_start(
+            runtime,
+            region_id,
+            metadata,
+            metadata_size,
+            out_operation_id,
+        )
+    })
+}
+
+fn offline_region_get_status_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_get_status_start(runtime, region_id, out_operation_id)
+    })
+}
+
+fn offline_region_set_observed_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    observed: bool,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_set_observed_start(
+            runtime,
+            region_id,
+            observed,
+            out_operation_id,
+        )
+    })
+}
+
+fn offline_region_set_download_state_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    state: u32,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable. The C API
+    // validates the download state enum-domain value.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_set_download_state_start(
+            runtime,
+            region_id,
+            state,
+            out_operation_id,
+        )
+    })
+}
+
+fn offline_region_invalidate_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_invalidate_start(runtime, region_id, out_operation_id)
+    })
+}
+
+fn offline_region_delete_start(
+    handle: *mut RuntimeHandle,
+    region_id: i64,
+    out_operation_id: *mut u64,
+) -> error::Result<()> {
+    let runtime = runtime_native(handle)?;
+    if out_operation_id.is_null() {
+        return Err(Error::invalid_argument(
+            "offline operation ID output pointer is null",
+        ));
+    }
+    // SAFETY: `runtime` is live and output storage is writable.
+    error::check(unsafe {
+        sys::mln_runtime_offline_region_delete_start(runtime, region_id, out_operation_id)
+    })
+}
+
 fn offline_operation_discard(handle: *mut RuntimeHandle, operation_id: u64) -> error::Result<()> {
     let runtime = runtime_native(handle)?;
     // SAFETY: `runtime` is live. The C API validates operation IDs.
@@ -3744,6 +4084,43 @@ mod tests {
             mln_vala_runtime_handle_run_ambient_cache_operation_start(
                 runtime,
                 0,
+                &mut operation_id,
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_runtime_handle_offline_regions_list_start(
+                runtime,
+                ptr::null_mut(),
+                &mut error
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_runtime_handle_offline_regions_merge_database_start(
+                runtime,
+                ptr::null(),
+                &mut operation_id,
+                &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_runtime_handle_offline_region_update_metadata_start(
+                runtime,
+                1,
+                ptr::null(),
+                1,
                 &mut operation_id,
                 &mut error,
             ),

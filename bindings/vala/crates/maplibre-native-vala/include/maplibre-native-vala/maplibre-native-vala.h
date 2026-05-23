@@ -39,6 +39,33 @@ typedef enum {
 } MlnValaAmbientCacheOperation;
 
 typedef enum {
+  MLN_VALA_OFFLINE_REGION_DOWNLOAD_STATE_INACTIVE = 0,
+  MLN_VALA_OFFLINE_REGION_DOWNLOAD_STATE_ACTIVE = 1,
+} MlnValaOfflineRegionDownloadState;
+
+typedef enum {
+  MLN_VALA_OFFLINE_OPERATION_KIND_AMBIENT_CACHE = 1,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_CREATE = 2,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_GET = 3,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGIONS_LIST = 4,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGIONS_MERGE_DATABASE = 5,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_UPDATE_METADATA = 6,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_GET_STATUS = 7,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_SET_OBSERVED = 8,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_SET_DOWNLOAD_STATE = 9,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_INVALIDATE = 10,
+  MLN_VALA_OFFLINE_OPERATION_KIND_REGION_DELETE = 11,
+} MlnValaOfflineOperationKind;
+
+typedef enum {
+  MLN_VALA_OFFLINE_OPERATION_RESULT_KIND_NONE = 0,
+  MLN_VALA_OFFLINE_OPERATION_RESULT_KIND_REGION = 1,
+  MLN_VALA_OFFLINE_OPERATION_RESULT_KIND_OPTIONAL_REGION = 2,
+  MLN_VALA_OFFLINE_OPERATION_RESULT_KIND_REGION_LIST = 3,
+  MLN_VALA_OFFLINE_OPERATION_RESULT_KIND_REGION_STATUS = 4,
+} MlnValaOfflineOperationResultKind;
+
+typedef enum {
   MLN_VALA_MAP_MODE_CONTINUOUS = 0,
   MLN_VALA_MAP_MODE_STATIC = 1,
   MLN_VALA_MAP_MODE_TILE = 2,
@@ -1182,6 +1209,144 @@ gboolean mln_vala_runtime_handle_set_resource_provider(
 gboolean mln_vala_runtime_handle_run_ambient_cache_operation_start(
   MlnValaRuntimeHandle* self, MlnValaAmbientCacheOperation operation,
   uint64_t* out_operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_get_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_get_start(
+  MlnValaRuntimeHandle* self, int64_t region_id, uint64_t* out_operation_id,
+  GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_regions_list_start:
+ * @self: a runtime handle.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_regions_list_start(
+  MlnValaRuntimeHandle* self, uint64_t* out_operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_regions_merge_database_start:
+ * @self: a runtime handle.
+ * @side_database_path: (not nullable): side database path.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_regions_merge_database_start(
+  MlnValaRuntimeHandle* self, const char* side_database_path,
+  uint64_t* out_operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_update_metadata_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @metadata: (array length=metadata_size) (nullable): metadata bytes.
+ * @metadata_size: metadata byte length.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_update_metadata_start(
+  MlnValaRuntimeHandle* self, int64_t region_id, const uint8_t* metadata,
+  size_t metadata_size, uint64_t* out_operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_get_status_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_get_status_start(
+  MlnValaRuntimeHandle* self, int64_t region_id, uint64_t* out_operation_id,
+  GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_set_observed_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @observed: observation flag.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_set_observed_start(
+  MlnValaRuntimeHandle* self, int64_t region_id, gboolean observed,
+  uint64_t* out_operation_id, GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_set_download_state_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @state: download state.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_set_download_state_start(
+  MlnValaRuntimeHandle* self, int64_t region_id,
+  MlnValaOfflineRegionDownloadState state, uint64_t* out_operation_id,
+  GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_invalidate_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_invalidate_start(
+  MlnValaRuntimeHandle* self, int64_t region_id, uint64_t* out_operation_id,
+  GError** error
+);
+
+/**
+ * mln_vala_runtime_handle_offline_region_delete_start:
+ * @self: a runtime handle.
+ * @region_id: offline region ID.
+ * @out_operation_id: (out): return location for operation ID.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_runtime_handle_offline_region_delete_start(
+  MlnValaRuntimeHandle* self, int64_t region_id, uint64_t* out_operation_id,
+  GError** error
 );
 
 /**
