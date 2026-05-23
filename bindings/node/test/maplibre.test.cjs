@@ -433,6 +433,14 @@ test("map projection handle snapshots projection state", () => {
     assert.ok(Math.abs(roundTripped.longitude - 6) < 1e-9);
     projection.setCamera({ center: { latitude: 7, longitude: 8 }, zoom: 3 });
     assert.ok(projection.getCamera().center);
+    projection.setVisibleCoordinates(
+      [
+        { latitude: -1, longitude: -2 },
+        { latitude: 1, longitude: 2 },
+      ],
+      { top: 0, left: 0, bottom: 0, right: 0 },
+    );
+    assert.equal(typeof projection.getCamera().zoom, "number");
     projection.close();
     assert.equal(projection.closed, true);
     projection.close();

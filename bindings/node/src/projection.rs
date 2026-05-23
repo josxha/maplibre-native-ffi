@@ -5,7 +5,7 @@ use napi_derive::napi;
 
 use crate::{
     error,
-    map::{CameraOptions, NativeMapHandle},
+    map::{CameraOptions, EdgeInsets, NativeMapHandle},
     values::{LatLng, ScreenPoint},
 };
 
@@ -54,6 +54,28 @@ impl NativeMapProjectionHandle {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
         core::check(unsafe { sys::mln_map_projection_set_camera(self.state.as_ptr(), &camera) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setVisibleCoordinates")]
+    pub fn set_visible_coordinates(
+        &self,
+        coordinates: Vec<LatLng>,
+        padding: EdgeInsets,
+    ) -> Result<()> {
+        let coordinates = coordinates
+            .into_iter()
+            .map(LatLng::into_native)
+            .collect::<Vec<_>>();
+        let padding = core::values::edge_insets_to_native(padding.into_core());
+        core::check(unsafe {
+            sys::mln_map_projection_set_visible_coordinates(
+                self.state.as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                padding,
+            )
+        })
+        .map_err(error::from_core)
     }
 
     #[napi(js_name = "pixelForLatLng")]

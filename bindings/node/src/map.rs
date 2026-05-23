@@ -1513,7 +1513,7 @@ impl Default for MapOptions {
 }
 
 impl EdgeInsets {
-    fn into_core(self) -> core::EdgeInsets {
+    pub(crate) fn into_core(self) -> core::EdgeInsets {
         core::EdgeInsets::new(self.top, self.left, self.bottom, self.right)
     }
 

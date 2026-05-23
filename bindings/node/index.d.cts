@@ -247,6 +247,7 @@ export declare class MapProjectionHandle {
   close(): void;
   getCamera(): CameraOptions;
   setCamera(camera: CameraOptions): void;
+  setVisibleCoordinates(coordinates: LatLng[], padding: EdgeInsets): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
   [Symbol.dispose](): void;

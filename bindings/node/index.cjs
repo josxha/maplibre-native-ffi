@@ -364,6 +364,12 @@ class MapProjectionHandle {
     return translateNativeErrors(() => this.native.setCamera(camera));
   }
 
+  setVisibleCoordinates(coordinates, padding) {
+    return translateNativeErrors(() =>
+      this.native.setVisibleCoordinates(coordinates, padding),
+    );
+  }
+
   pixelForLatLng(coordinate) {
     return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
   }
