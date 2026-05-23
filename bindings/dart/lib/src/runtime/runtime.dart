@@ -2169,6 +2169,130 @@ final class MapHandle {
     });
   }
 
+  /// Adds a hillshade layer for a raster DEM source.
+  void addHillshadeLayer(
+    String layerId,
+    String sourceId, {
+    String? beforeLayerId,
+  }) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeSourceId = nativeStringView(sourceId, arena);
+      final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
+      _check(
+        _c.mapAddHillshadeLayer(
+          _pointer,
+          nativeLayerId.value,
+          nativeSourceId.value,
+          nativeBeforeLayerId.value,
+        ),
+      );
+    });
+  }
+
+  /// Adds a color-relief layer for a raster DEM source.
+  void addColorReliefLayer(
+    String layerId,
+    String sourceId, {
+    String? beforeLayerId,
+  }) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeSourceId = nativeStringView(sourceId, arena);
+      final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
+      _check(
+        _c.mapAddColorReliefLayer(
+          _pointer,
+          nativeLayerId.value,
+          nativeSourceId.value,
+          nativeBeforeLayerId.value,
+        ),
+      );
+    });
+  }
+
+  /// Adds a source-free location indicator layer.
+  void addLocationIndicatorLayer(String layerId, {String? beforeLayerId}) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
+      _check(
+        _c.mapAddLocationIndicatorLayer(
+          _pointer,
+          nativeLayerId.value,
+          nativeBeforeLayerId.value,
+        ),
+      );
+    });
+  }
+
+  /// Sets a location indicator layer location.
+  void setLocationIndicatorLocation(
+    String layerId,
+    LatLng coordinate, {
+    double altitude = 0,
+  }) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      _check(
+        _c.mapSetLocationIndicatorLocation(
+          _pointer,
+          nativeLayerId.value,
+          native_struct.latLngToNative(coordinate),
+          altitude,
+        ),
+      );
+    });
+  }
+
+  /// Sets a location indicator layer bearing in degrees.
+  void setLocationIndicatorBearing(String layerId, double bearing) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      _check(
+        _c.mapSetLocationIndicatorBearing(
+          _pointer,
+          nativeLayerId.value,
+          bearing,
+        ),
+      );
+    });
+  }
+
+  /// Sets a location indicator layer accuracy radius in logical pixels.
+  void setLocationIndicatorAccuracyRadius(String layerId, double radius) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      _check(
+        _c.mapSetLocationIndicatorAccuracyRadius(
+          _pointer,
+          nativeLayerId.value,
+          radius,
+        ),
+      );
+    });
+  }
+
+  /// Sets one location indicator image-name property.
+  void setLocationIndicatorImageName(
+    String layerId,
+    LocationIndicatorImageKind imageKind,
+    String imageId,
+  ) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeImageId = nativeStringView(imageId, arena);
+      _check(
+        _c.mapSetLocationIndicatorImageName(
+          _pointer,
+          nativeLayerId.value,
+          imageKind.rawValue,
+          nativeImageId.value,
+        ),
+      );
+    });
+  }
+
   /// Adds one style layer from a full style-spec layer JSON object.
   void addStyleLayerJson(JsonValue layerJson, {String? beforeLayerId}) {
     withNativeArena((arena) {
@@ -2327,6 +2451,21 @@ final class MapHandle {
         return null;
       }
       return _copyStringView(outLayerType.ref);
+    });
+  }
+
+  /// Moves one style layer before another layer or to the top.
+  void moveStyleLayer(String layerId, {String? beforeLayerId}) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
+      _check(
+        _c.mapMoveStyleLayer(
+          _pointer,
+          nativeLayerId.value,
+          nativeBeforeLayerId.value,
+        ),
+      );
     });
   }
 

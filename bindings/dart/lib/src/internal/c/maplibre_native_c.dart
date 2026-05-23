@@ -1386,6 +1386,81 @@ final class MaplibreNativeCApi {
     Pointer<Pointer<raw.mln_style_id_list>> outSourceIds,
   ) => _raw.mln_map_list_style_source_ids(map, outSourceIds).value;
 
+  /// Adds a hillshade layer.
+  int mapAddHillshadeLayer(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view beforeLayerId,
+  ) => _raw
+      .mln_map_add_hillshade_layer(map, layerId, sourceId, beforeLayerId)
+      .value;
+
+  /// Adds a color-relief layer.
+  int mapAddColorReliefLayer(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view beforeLayerId,
+  ) => _raw
+      .mln_map_add_color_relief_layer(map, layerId, sourceId, beforeLayerId)
+      .value;
+
+  /// Adds a location indicator layer.
+  int mapAddLocationIndicatorLayer(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_string_view beforeLayerId,
+  ) => _raw
+      .mln_map_add_location_indicator_layer(map, layerId, beforeLayerId)
+      .value;
+
+  /// Sets a location indicator layer location.
+  int mapSetLocationIndicatorLocation(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_lat_lng coordinate,
+    double altitude,
+  ) => _raw
+      .mln_map_set_location_indicator_location(
+        map,
+        layerId,
+        coordinate,
+        altitude,
+      )
+      .value;
+
+  /// Sets a location indicator layer bearing.
+  int mapSetLocationIndicatorBearing(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    double bearing,
+  ) => _raw.mln_map_set_location_indicator_bearing(map, layerId, bearing).value;
+
+  /// Sets a location indicator layer accuracy radius.
+  int mapSetLocationIndicatorAccuracyRadius(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    double radius,
+  ) => _raw
+      .mln_map_set_location_indicator_accuracy_radius(map, layerId, radius)
+      .value;
+
+  /// Sets one location indicator image-name property.
+  int mapSetLocationIndicatorImageName(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    int imageKind,
+    raw.mln_string_view imageId,
+  ) => _raw
+      .mln_map_set_location_indicator_image_name(
+        map,
+        layerId,
+        imageKind,
+        imageId,
+      )
+      .value;
+
   /// Adds one style layer from a style-spec layer JSON object.
   int mapAddStyleLayerJson(
     Pointer<raw.mln_map> map,
@@ -1470,6 +1545,13 @@ final class MaplibreNativeCApi {
     raw.mln_string_view layerId,
     Pointer<Pointer<raw.mln_json_snapshot>> outFilter,
   ) => _raw.mln_map_get_layer_filter(map, layerId, outFilter).value;
+
+  /// Moves one style layer before another layer or to the top.
+  int mapMoveStyleLayer(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    raw.mln_string_view beforeLayerId,
+  ) => _raw.mln_map_move_style_layer(map, layerId, beforeLayerId).value;
 
   /// Removes one style layer by ID.
   int mapRemoveStyleLayer(

@@ -281,7 +281,40 @@ void main() {
         map.getStyleSourceInfo('dart-raster-dem-tiles-source')!.type,
         SourceType.rasterDem,
       );
+      map.addHillshadeLayer(
+        'dart-hillshade-layer',
+        'dart-raster-dem-tiles-source',
+      );
+      expect(map.getStyleLayerType('dart-hillshade-layer'), 'hillshade');
+      map.addColorReliefLayer(
+        'dart-color-relief-layer',
+        'dart-raster-dem-tiles-source',
+      );
+      expect(map.getStyleLayerType('dart-color-relief-layer'), 'color-relief');
+      map.moveStyleLayer(
+        'dart-color-relief-layer',
+        beforeLayerId: 'dart-hillshade-layer',
+      );
+      expect(map.removeStyleLayer('dart-color-relief-layer'), isTrue);
+      expect(map.removeStyleLayer('dart-hillshade-layer'), isTrue);
       expect(map.removeStyleSource('dart-raster-dem-tiles-source'), isTrue);
+      map.addLocationIndicatorLayer('dart-location-layer');
+      expect(
+        map.getStyleLayerType('dart-location-layer'),
+        'location-indicator',
+      );
+      map.setLocationIndicatorLocation(
+        'dart-location-layer',
+        const LatLng(0, 0),
+      );
+      map.setLocationIndicatorBearing('dart-location-layer', 0);
+      map.setLocationIndicatorAccuracyRadius('dart-location-layer', 1);
+      map.setLocationIndicatorImageName(
+        'dart-location-layer',
+        LocationIndicatorImageKind.top,
+        'dart-location-image',
+      );
+      expect(map.removeStyleLayer('dart-location-layer'), isTrue);
       const imageSourceCoordinates = [
         LatLng(1, -1),
         LatLng(1, 1),
