@@ -17,6 +17,14 @@ void main() {
       expect(Maplibre.cVersion(), greaterThanOrEqualTo(0));
       expect(Maplibre.supportedRenderBackends().bits, greaterThanOrEqualTo(0));
 
+      final meters = Maplibre.projectedMetersForLatLng(const LatLng(0, 0));
+      expect(meters.northing.isFinite, isTrue);
+      expect(meters.easting.isFinite, isTrue);
+      expect(
+        Maplibre.latLngForProjectedMeters(meters).latitude,
+        closeTo(0, 0.0001),
+      );
+
       final status = Maplibre.networkStatus();
       expect(
         status.rawValue,
@@ -97,6 +105,18 @@ void main() {
       final centerPixel = map.pixelForLatLng(const LatLng(0, 0));
       expect(centerPixel.x.isFinite, isTrue);
       expect(map.latLngForPixel(centerPixel).latitude.isFinite, isTrue);
+      final projection = map.createProjection();
+      final projectionCamera = projection.camera();
+      expect(projectionCamera.center, isNotNull);
+      expect(projection.pixelForLatLng(const LatLng(0, 0)).x.isFinite, isTrue);
+      expect(
+        projection.latLngForPixel(const ScreenPoint(0, 0)).latitude.isFinite,
+        isTrue,
+      );
+      projection.setCamera(const CameraOptions(center: LatLng(1, 1), zoom: 2));
+      expect(projection.camera().zoom, closeTo(2, 0.0001));
+      projection.close();
+      expect(projection.isClosed, isTrue);
       expect(
         () => map.attachMetalOwnedTexture(
           const MetalOwnedTextureDescriptor(

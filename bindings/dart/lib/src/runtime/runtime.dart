@@ -834,6 +834,16 @@ final class MapHandle {
     });
   }
 
+  /// Creates a standalone projection helper from the current map transform.
+  MapProjectionHandle createProjection() {
+    return withNativeArena((arena) {
+      final outProjection = arena<Pointer<raw.mln_map_projection>>();
+      outProjection.value = nullptr;
+      _check(_c.mapProjectionCreate(_pointer, outProjection));
+      return MapProjectionHandle._(outProjection.value);
+    });
+  }
+
   /// Adds one style source from a style-spec source JSON object.
   void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
     withNativeArena((arena) {
@@ -1288,6 +1298,115 @@ final class MapHandle {
       state.close();
     }
     _customGeometryCallbacks.clear();
+  }
+}
+
+/// Standalone projection helper snapshot from a map transform.
+final class MapProjectionHandle {
+  MapProjectionHandle._(Pointer<raw.mln_map_projection> pointer)
+    : _state = NativeHandleState(pointer, 'MapProjectionHandle');
+
+  final NativeHandleState<raw.mln_map_projection> _state;
+
+  /// Whether this projection helper has been closed by the Dart binding.
+  bool get isClosed => _state.isClosed;
+
+  Pointer<raw.mln_map_projection> get _pointer => _state.pointer;
+
+  /// Copies the current projection camera options.
+  CameraOptions camera() {
+    return withNativeArena((arena) {
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      _check(_c.mapProjectionGetCamera(_pointer, outCamera));
+      return native_struct.cameraOptionsFromNative(outCamera.ref);
+    });
+  }
+
+  /// Applies camera fields to the projection helper.
+  void setCamera(CameraOptions camera) {
+    withNativeArena((arena) {
+      final nativeCamera = arena<raw.mln_camera_options>();
+      nativeCamera.ref = native_struct.cameraOptionsToNative(camera);
+      _check(_c.mapProjectionSetCamera(_pointer, nativeCamera));
+    });
+  }
+
+  /// Updates the camera so coordinates are visible within [padding].
+  void setVisibleCoordinates(
+    List<LatLng> coordinates, {
+    EdgeInsets padding = const EdgeInsets(),
+  }) {
+    withNativeArena((arena) {
+      final nativeCoordinates = coordinates.isEmpty
+          ? nullptr.cast<raw.mln_lat_lng>()
+          : arena<raw.mln_lat_lng>(coordinates.length);
+      for (var index = 0; index < coordinates.length; index += 1) {
+        nativeCoordinates[index] = native_struct.latLngToNative(
+          coordinates[index],
+        );
+      }
+      _check(
+        _c.mapProjectionSetVisibleCoordinates(
+          _pointer,
+          nativeCoordinates,
+          coordinates.length,
+          native_struct.edgeInsetsToNative(padding),
+        ),
+      );
+    });
+  }
+
+  /// Updates the camera so geometry coordinates are visible within [padding].
+  void setVisibleGeometry(
+    Geometry geometry, {
+    EdgeInsets padding = const EdgeInsets(),
+  }) {
+    withNativeArena((arena) {
+      final nativeGeometry = native_geometry.nativeGeometry(geometry, arena);
+      _check(
+        _c.mapProjectionSetVisibleGeometry(
+          _pointer,
+          nativeGeometry.pointer,
+          native_struct.edgeInsetsToNative(padding),
+        ),
+      );
+    });
+  }
+
+  /// Converts a geographic world coordinate to a screen point.
+  ScreenPoint pixelForLatLng(LatLng coordinate) {
+    return withNativeArena((arena) {
+      final outPoint = arena<raw.mln_screen_point>();
+      _check(
+        _c.mapProjectionPixelForLatLng(
+          _pointer,
+          native_struct.latLngToNative(coordinate),
+          outPoint,
+        ),
+      );
+      return native_struct.screenPointFromNative(outPoint.ref);
+    });
+  }
+
+  /// Converts a screen point to a geographic world coordinate.
+  LatLng latLngForPixel(ScreenPoint point) {
+    return withNativeArena((arena) {
+      final outCoordinate = arena<raw.mln_lat_lng>();
+      _check(
+        _c.mapProjectionLatLngForPixel(
+          _pointer,
+          native_struct.screenPointToNative(point),
+          outCoordinate,
+        ),
+      );
+      return native_struct.latLngFromNative(outCoordinate.ref);
+    });
+  }
+
+  /// Explicitly destroys this projection helper.
+  void close() {
+    _state.close(_c.mapProjectionDestroy, _c.threadLastErrorMessage);
   }
 }
 

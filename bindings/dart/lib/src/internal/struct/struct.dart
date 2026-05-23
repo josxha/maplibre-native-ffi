@@ -1,6 +1,7 @@
 import 'dart:ffi';
 
 import '../../camera/camera.dart';
+import '../../geo/geo.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
 
 /// Converts a Dart coordinate to the native C value shape.
@@ -29,6 +30,18 @@ LatLngBounds latLngBoundsFromNative(raw.mln_lat_lng_bounds value) =>
       latLngFromNative(value.southwest),
       latLngFromNative(value.northeast),
     );
+
+/// Converts Dart projected meters to the native C value shape.
+raw.mln_projected_meters projectedMetersToNative(ProjectedMeters value) {
+  final result = Struct.create<raw.mln_projected_meters>();
+  result.northing = value.northing;
+  result.easting = value.easting;
+  return result;
+}
+
+/// Converts native projected meters to Dart.
+ProjectedMeters projectedMetersFromNative(raw.mln_projected_meters value) =>
+    ProjectedMeters(value.northing, value.easting);
 
 /// Converts Dart screen point to the native C value shape.
 raw.mln_screen_point screenPointToNative(ScreenPoint value) {

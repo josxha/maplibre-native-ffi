@@ -145,6 +145,82 @@ final class MaplibreNativeCApi {
   /// Returns native default map options.
   raw.mln_map_options mapOptionsDefault() => _raw.mln_map_options_default();
 
+  /// Converts geographic coordinates to projected meters.
+  int projectedMetersForLatLng(
+    raw.mln_lat_lng coordinate,
+    Pointer<raw.mln_projected_meters> outMeters,
+  ) => _raw.mln_projected_meters_for_lat_lng(coordinate, outMeters).value;
+
+  /// Converts projected meters to geographic coordinates.
+  int latLngForProjectedMeters(
+    raw.mln_projected_meters meters,
+    Pointer<raw.mln_lat_lng> outCoordinate,
+  ) => _raw.mln_lat_lng_for_projected_meters(meters, outCoordinate).value;
+
+  /// Creates a map projection helper.
+  int mapProjectionCreate(
+    Pointer<raw.mln_map> map,
+    Pointer<Pointer<raw.mln_map_projection>> outProjection,
+  ) => _raw.mln_map_projection_create(map, outProjection).value;
+
+  /// Destroys a map projection helper.
+  int mapProjectionDestroy(Pointer<raw.mln_map_projection> projection) =>
+      _raw.mln_map_projection_destroy(projection).value;
+
+  /// Copies a projection helper camera.
+  int mapProjectionGetCamera(
+    Pointer<raw.mln_map_projection> projection,
+    Pointer<raw.mln_camera_options> outCamera,
+  ) => _raw.mln_map_projection_get_camera(projection, outCamera).value;
+
+  /// Sets a projection helper camera.
+  int mapProjectionSetCamera(
+    Pointer<raw.mln_map_projection> projection,
+    Pointer<raw.mln_camera_options> camera,
+  ) => _raw.mln_map_projection_set_camera(projection, camera).value;
+
+  /// Fits visible coordinates on a projection helper.
+  int mapProjectionSetVisibleCoordinates(
+    Pointer<raw.mln_map_projection> projection,
+    Pointer<raw.mln_lat_lng> coordinates,
+    int coordinateCount,
+    raw.mln_edge_insets padding,
+  ) => _raw
+      .mln_map_projection_set_visible_coordinates(
+        projection,
+        coordinates,
+        coordinateCount,
+        padding,
+      )
+      .value;
+
+  /// Fits visible geometry on a projection helper.
+  int mapProjectionSetVisibleGeometry(
+    Pointer<raw.mln_map_projection> projection,
+    Pointer<raw.mln_geometry> geometry,
+    raw.mln_edge_insets padding,
+  ) => _raw
+      .mln_map_projection_set_visible_geometry(projection, geometry, padding)
+      .value;
+
+  /// Converts a geographic coordinate to a projection-helper screen point.
+  int mapProjectionPixelForLatLng(
+    Pointer<raw.mln_map_projection> projection,
+    raw.mln_lat_lng coordinate,
+    Pointer<raw.mln_screen_point> outPoint,
+  ) => _raw
+      .mln_map_projection_pixel_for_lat_lng(projection, coordinate, outPoint)
+      .value;
+
+  /// Converts a projection-helper screen point to a geographic coordinate.
+  int mapProjectionLatLngForPixel(
+    Pointer<raw.mln_map_projection> projection,
+    raw.mln_screen_point point,
+    Pointer<raw.mln_lat_lng> outCoordinate,
+  ) => _raw
+      .mln_map_projection_lat_lng_for_pixel(projection, point, outCoordinate)
+      .value;
+
   /// Creates a map handle.
   int mapCreate(
     Pointer<raw.mln_runtime> runtime,

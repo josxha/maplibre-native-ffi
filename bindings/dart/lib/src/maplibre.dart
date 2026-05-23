@@ -1,8 +1,11 @@
 import 'dart:ffi';
 
+import 'geo/geo.dart';
 import 'internal/c/maplibre_native_c.dart';
+import 'internal/c/maplibre_native_c.g.dart' as raw;
 import 'internal/memory/memory.dart';
 import 'internal/status/status.dart';
+import 'internal/struct/struct.dart' as native_struct;
 import 'log/log.dart';
 
 /// Process-global entry points for the Dart binding.
@@ -40,6 +43,34 @@ final class Maplibre {
   /// Sets which log severities MapLibre Native may dispatch asynchronously.
   static void setAsyncLogSeverityMask(LogSeverityMask mask) {
     _checkStatus(_c.logSetAsyncSeverityMask(mask.bits));
+  }
+
+  /// Converts a geographic coordinate to spherical Mercator projected meters.
+  static ProjectedMeters projectedMetersForLatLng(LatLng coordinate) {
+    return withNativeArena((arena) {
+      final outMeters = arena<raw.mln_projected_meters>();
+      _checkStatus(
+        _c.projectedMetersForLatLng(
+          native_struct.latLngToNative(coordinate),
+          outMeters,
+        ),
+      );
+      return native_struct.projectedMetersFromNative(outMeters.ref);
+    });
+  }
+
+  /// Converts spherical Mercator projected meters to a geographic coordinate.
+  static LatLng latLngForProjectedMeters(ProjectedMeters meters) {
+    return withNativeArena((arena) {
+      final outCoordinate = arena<raw.mln_lat_lng>();
+      _checkStatus(
+        _c.latLngForProjectedMeters(
+          native_struct.projectedMetersToNative(meters),
+          outCoordinate,
+        ),
+      );
+      return native_struct.latLngFromNative(outCoordinate.ref);
+    });
   }
 
   /// Restores MapLibre Native's default async log severity mask.
