@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum, IntFlag
 from types import TracebackType
@@ -364,10 +365,11 @@ class MapProjectionHandle:
         """Release this projection helper exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("MapProjectionHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("MapProjectionHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def get_camera(self) -> CameraOptions:
         """Return the helper's current camera snapshot."""
@@ -458,10 +460,11 @@ class MapHandle:
         """Release this map handle exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("MapHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("MapHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def request_repaint(self) -> None:
         """Request a repaint for a continuous map."""

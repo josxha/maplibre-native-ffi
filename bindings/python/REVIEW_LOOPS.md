@@ -92,3 +92,41 @@ lifecycle/callback/threading/native ownership; SPEC/docs and maintainability.
 ### Findings requiring user input
 
 - None in this round.
+
+## Round 2
+
+Review fanout: final public API/SPEC check, Rust/PyO3 bridge check, and branch
+state/validation audit after Round 1 commits.
+
+### Applied findings
+
+- Make handle finalizers quiet during interpreter shutdown.
+  - Evidence: one reviewer reproduced noisy unraisable `ImportError` from
+    `__del__` methods that imported `_lifecycle` after `sys.meta_path` had been
+    cleared during shutdown, even for already-closed handles.
+  - Resolution: modules bind `_warn_unclosed` at import time, finalizers use the
+    bound helper instead of importing during `__del__`, and finalizers suppress
+    shutdown-time exceptions. `_lifecycle.warn_unclosed()` also captures
+    `warnings.warn` at definition time and treats leak reporting as best-effort.
+  - Coverage: added a subprocess regression test that closes runtime, map, and
+    custom-geometry handles, exits the interpreter, and asserts stderr does not
+    contain shutdown finalizer noise.
+
+### Rejected or deferred findings
+
+- No new rejected or deferred findings in this round. Previously deferred items
+  remain unchanged: broad private callback simulators, backend-specific render
+  readback/frame hardening, packaging/distribution/CI-matrix expansion, and
+  broad enum deduplication.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown`
+- Full Python binding CI: `mise run //bindings/python:ci` (57 Python tests,
+  wheel build, and metadata/`_native` import check)

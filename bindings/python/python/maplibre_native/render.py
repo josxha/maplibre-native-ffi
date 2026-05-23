@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntFlag
 from types import TracebackType
@@ -231,10 +232,11 @@ class DetachedRenderSessionHandle:
         """Release this detached render session exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("DetachedRenderSessionHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("DetachedRenderSessionHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def __enter__(self) -> "DetachedRenderSessionHandle":
         return self
@@ -269,10 +271,11 @@ class RenderSessionHandle:
         """Release this render session exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("RenderSessionHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("RenderSessionHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def resize(self, width: int, height: int, scale_factor: float) -> None:
         """Resize this attached render session."""
@@ -463,10 +466,13 @@ class MetalOwnedTextureFrameHandle:
         """Release this acquired frame exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("MetalOwnedTextureFrameHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed(
+                "MetalOwnedTextureFrameHandle", getattr(self, "closed", True)
+            )
+        except BaseException:
+            return
 
     def __enter__(self) -> "MetalOwnedTextureFrameHandle":
         return self
@@ -515,10 +521,13 @@ class VulkanOwnedTextureFrameHandle:
         """Release this acquired frame exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("VulkanOwnedTextureFrameHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed(
+                "VulkanOwnedTextureFrameHandle", getattr(self, "closed", True)
+            )
+        except BaseException:
+            return
 
     def __enter__(self) -> "VulkanOwnedTextureFrameHandle":
         return self

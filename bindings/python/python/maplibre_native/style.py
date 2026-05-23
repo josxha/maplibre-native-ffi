@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any
@@ -230,10 +231,11 @@ class CustomGeometrySourceHandle:
         """Release queued callback state for this source handle."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("CustomGeometrySourceHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("CustomGeometrySourceHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def poll_event(self) -> CustomGeometrySourceEvent | None:
         """Return one queued fetch/cancel event copied into Python values."""

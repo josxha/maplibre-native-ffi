@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
@@ -146,10 +147,11 @@ class OfflineOperationHandle:
         self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
         self._closed = True
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("OfflineOperationHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("OfflineOperationHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def take_region(self) -> "OfflineRegionInfo":
         """Take a completed region snapshot result."""

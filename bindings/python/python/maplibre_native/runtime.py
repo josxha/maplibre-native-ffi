@@ -1,5 +1,6 @@
 """Runtime values and handles for the Python binding."""
 
+from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
@@ -318,10 +319,11 @@ class RuntimeHandle:
         """Release this runtime handle exactly once."""
         self._native.close()
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("RuntimeHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("RuntimeHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def run_once(self) -> None:
         """Run one pending owner-thread task for this runtime."""

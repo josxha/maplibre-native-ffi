@@ -1,5 +1,8 @@
 import math
 from pathlib import Path
+import subprocess
+import sys
+import textwrap
 import threading
 import warnings
 
@@ -83,6 +86,37 @@ def test_runtime_handle_context_manager_closes_once() -> None:
     assert runtime.closed
     runtime.close()
     assert runtime.closed
+
+
+def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
+    script = textwrap.dedent(
+        """
+        import maplibre_native as mln
+        from maplibre_native import style
+
+        runtime = mln.RuntimeHandle()
+        map_handle = runtime.create_map()
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        source = map_handle.add_custom_geometry_source(
+            "custom",
+            style.CustomGeometrySourceOptions(max_queued_events=1),
+        )
+        source.close()
+        map_handle.close()
+        runtime.close()
+        """
+    )
+
+    completed = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "Exception ignored while calling deallocator" not in completed.stderr
+    assert "sys.meta_path is None" not in completed.stderr
 
 
 def test_duplicate_runtime_reports_invalid_state() -> None:
@@ -1625,6 +1659,21 @@ def test_set_style_url_retires_custom_geometry_callback_state() -> None:
 
             map_handle.set_style_url("https://example.test/style.json")
 
+            assert source.closed
+            source._native.push_fetch_for_test(1, 2, 3)
+            assert source.poll_event() is None
+
+
+def test_remove_style_source_releases_custom_geometry_handle() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            source = map_handle.add_custom_geometry_source(
+                "custom-remove",
+                style.CustomGeometrySourceOptions(max_queued_events=1),
+            )
+
+            assert map_handle.remove_style_source("custom-remove") is True
             assert source.closed
             source._native.push_fetch_for_test(1, 2, 3)
             assert source.poll_event() is None

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from typing import Any, Callable
@@ -303,10 +304,11 @@ class ResourceRequestHandle:
         self._native.close()
         self._closed = True
 
-    def __del__(self) -> None:
-        from ._lifecycle import warn_unclosed
-
-        warn_unclosed("ResourceRequestHandle", getattr(self, "closed", True))
+    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
+        try:
+            _warn_unclosed("ResourceRequestHandle", getattr(self, "closed", True))
+        except BaseException:
+            return
 
     def __enter__(self) -> "ResourceRequestHandle":
         return self
