@@ -948,6 +948,43 @@ class MapHandle:
         """Apply axonometric rendering option fields to the map."""
         self._native.set_projection_mode(mode.axonometric, mode.x_skew, mode.y_skew)
 
+    def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
+        """Convert a geographic world coordinate to a screen point for this map."""
+        from .camera import ScreenPoint
+
+        raw = self._native.pixel_for_lat_lng(
+            coordinate.latitude,
+            coordinate.longitude,
+        )
+        return ScreenPoint(x=raw["x"], y=raw["y"])
+
+    def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
+        """Convert a screen point to a geographic world coordinate for this map."""
+        from .geo import LatLng
+
+        raw = self._native.lat_lng_for_pixel(point.x, point.y)
+        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def pixels_for_lat_lngs(
+        self,
+        coordinates: list[LatLng] | tuple[LatLng, ...],
+    ) -> tuple[ScreenPoint, ...]:
+        """Convert geographic world coordinates to screen points for this map."""
+        from .camera import ScreenPoint
+
+        raw = self._native.pixels_for_lat_lngs(_coordinate_parts(coordinates))
+        return tuple(ScreenPoint(x=point["x"], y=point["y"]) for point in raw)
+
+    def lat_lngs_for_pixels(
+        self,
+        points: list[ScreenPoint] | tuple[ScreenPoint, ...],
+    ) -> tuple[LatLng, ...]:
+        """Convert screen points to geographic world coordinates for this map."""
+        from .geo import LatLng
+
+        raw = self._native.lat_lngs_for_pixels([(point.x, point.y) for point in points])
+        return tuple(LatLng(**coordinate) for coordinate in raw)
+
     def add_custom_geometry_source(
         self,
         source_id: str,

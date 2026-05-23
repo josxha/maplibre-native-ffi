@@ -672,6 +672,25 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
             }
 
 
+def test_map_coordinate_conversions_round_trip_public_values() -> None:
+    coordinate = geo.LatLng(0.0, 0.0)
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
+            point = map_handle.pixel_for_lat_lng(coordinate)
+            projected = map_handle.lat_lng_for_pixel(point)
+            points = map_handle.pixels_for_lat_lngs((coordinate, geo.LatLng(1.0, 1.0)))
+            coordinates = map_handle.lat_lngs_for_pixels(points)
+
+            assert isinstance(point, camera.ScreenPoint)
+            assert math.isfinite(projected.latitude)
+            assert math.isfinite(projected.longitude)
+            assert len(points) == 2
+            assert len(coordinates) == 2
+            assert all(isinstance(item, camera.ScreenPoint) for item in points)
+            assert all(isinstance(item, geo.LatLng) for item in coordinates)
+
+
 def test_map_projection_converts_coordinates_and_closes() -> None:
     coordinate = geo.LatLng(0.0, 0.0)
     meters = map_module.projected_meters_for_lat_lng(coordinate)
