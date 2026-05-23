@@ -24,7 +24,7 @@ if TYPE_CHECKING:
         ScreenPoint,
     )
     from .geo import GeoJson, Geometry, LatLng, LatLngBounds
-    from .json import JsonLike
+    from .json import JsonLike, JsonValue
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -757,7 +757,7 @@ class MapHandle:
 
     def add_style_layer_json(
         self,
-        layer_json: object,
+        layer_json: JsonLike,
         before_layer_id: str | None = None,
     ) -> None:
         """Add one style layer from a full style-spec layer JSON object."""
@@ -765,26 +765,26 @@ class MapHandle:
 
         self._native.add_style_layer_json(_to_native_wire(layer_json), before_layer_id)
 
-    def get_style_layer_json(self, layer_id: str) -> object | None:
+    def get_style_layer_json(self, layer_id: str) -> JsonValue | None:
         """Return one style layer as a full style-spec layer JSON object."""
         from .json import _from_native_wire
 
         raw = self._native.get_style_layer_json(layer_id)
         return _from_native_wire(raw) if raw is not None else None
 
-    def set_style_light_json(self, light_json: object) -> None:
+    def set_style_light_json(self, light_json: JsonLike) -> None:
         """Set the style light from a style-spec light JSON object."""
         from .json import _to_native_wire
 
         self._native.set_style_light_json(_to_native_wire(light_json))
 
-    def set_style_light_property(self, property_name: str, value: object) -> None:
+    def set_style_light_property(self, property_name: str, value: JsonLike) -> None:
         """Set one style light property by style-spec property name."""
         from .json import _to_native_wire
 
         self._native.set_style_light_property(property_name, _to_native_wire(value))
 
-    def get_style_light_property(self, property_name: str) -> object | None:
+    def get_style_light_property(self, property_name: str) -> JsonValue | None:
         """Return one style light property as a style-spec JSON value."""
         from .json import _from_native_wire
 
@@ -795,21 +795,21 @@ class MapHandle:
         self,
         layer_id: str,
         property_name: str,
-        value: object,
+        value: JsonLike,
     ) -> None:
         """Set one layer property by style-spec property name."""
         from .json import _to_native_wire
 
         self._native.set_layer_property(layer_id, property_name, _to_native_wire(value))
 
-    def get_layer_property(self, layer_id: str, property_name: str) -> object | None:
+    def get_layer_property(self, layer_id: str, property_name: str) -> JsonValue | None:
         """Return one layer property as a style-spec JSON value."""
         from .json import _from_native_wire
 
         raw = self._native.get_layer_property(layer_id, property_name)
         return _from_native_wire(raw) if raw is not None else None
 
-    def set_layer_filter(self, layer_id: str, filter: object | None) -> None:
+    def set_layer_filter(self, layer_id: str, filter: JsonLike | None) -> None:
         """Set or clear one layer filter."""
         from .json import _to_native_wire
 
@@ -818,7 +818,7 @@ class MapHandle:
             _to_native_wire(filter) if filter is not None else None,
         )
 
-    def get_layer_filter(self, layer_id: str) -> object | None:
+    def get_layer_filter(self, layer_id: str) -> JsonValue | None:
         """Return one layer filter as a style-spec JSON value."""
         from .json import _from_native_wire
 

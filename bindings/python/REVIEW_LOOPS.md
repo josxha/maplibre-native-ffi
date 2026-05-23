@@ -181,3 +181,39 @@ Review fanout: final-final public Python API/tests/SPEC review after Round 2.
 - Repository fix/check task: `mise run fix`
 - Full Python binding CI: `mise run //bindings/python:ci` (58 Python tests,
   wheel build, and metadata/`_native` import check)
+
+## Round 4
+
+Review fanout: final completion review after Round 3 JsonLike annotation fixes.
+
+### Applied findings
+
+- Align remaining style JSON/property/filter type hints with `JsonLike` and
+  `JsonValue`.
+  - Evidence: final review found style layer, light, property, and filter APIs
+    still used `object`/`object | None` annotations despite accepting JSON-like
+    inputs and returning copied JSON values through `_to_native_wire()` and
+    `_from_native_wire()`.
+  - Resolution: widened style JSON/property/filter inputs to `JsonLike` and
+    narrowed copied JSON outputs to `JsonValue | None`.
+  - Coverage: existing style JSON/property/filter tests already pass plain dict,
+    list, string, and number values through these APIs.
+
+### Rejected or deferred findings
+
+- No new rejected or deferred findings in this round. Previously deferred items
+  remain unchanged: broad private callback simulators, backend-specific render
+  readback/frame hardening, packaging/distribution/CI-matrix expansion, and
+  broad enum deduplication.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused style JSON/property/filter regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_style_json_light_layer_property_and_filter_public_api`
+- Repository fix/check task: `mise run fix`
+- Full Python binding CI: `mise run //bindings/python:ci`
