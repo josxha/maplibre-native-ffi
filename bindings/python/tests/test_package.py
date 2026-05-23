@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 import threading
 
@@ -10,6 +11,7 @@ from maplibre_native import (
     geo,
     json,
     log,
+    map as map_module,
     offline,
     query,
     render,
@@ -248,6 +250,36 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_map_projection_converts_coordinates_and_closes() -> None:
+    coordinate = geo.LatLng(0.0, 0.0)
+    meters = map_module.projected_meters_for_lat_lng(coordinate)
+    round_tripped = map_module.lat_lng_for_projected_meters(meters)
+
+    assert isinstance(meters, map_module.ProjectedMeters)
+    assert math.isclose(round_tripped.latitude, coordinate.latitude, abs_tol=1e-6)
+    assert math.isclose(round_tripped.longitude, coordinate.longitude, abs_tol=1e-6)
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
+            with map_handle.create_projection() as projection:
+                point = projection.pixel_for_lat_lng(coordinate)
+                projected = projection.lat_lng_for_pixel(point)
+                projection.set_camera(camera.CameraOptions(center=coordinate, zoom=2.0))
+                projection.set_visible_coordinates(
+                    (geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0)),
+                    camera.EdgeInsets(),
+                )
+
+                assert not projection.closed
+                assert isinstance(projection.get_camera(), camera.CameraOptions)
+                assert isinstance(point, camera.ScreenPoint)
+                assert math.isfinite(projected.latitude)
+                assert math.isfinite(projected.longitude)
+
+            assert projection.closed
 
 
 def test_ambient_cache_operation_starts_and_discards_through_public_api(

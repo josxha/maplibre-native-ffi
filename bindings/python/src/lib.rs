@@ -88,6 +88,11 @@ struct MapHandle {
     custom_geometry_sources: Mutex<HashMap<String, Box<PyCustomGeometrySourceState>>>,
 }
 
+#[pyclass(name = "_MapProjectionHandle")]
+struct MapProjectionHandle {
+    state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_map_projection>>,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct CustomGeometryEvent {
     kind: u32,
@@ -239,6 +244,16 @@ impl MapHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clear();
+    }
+}
+
+impl MapProjectionHandle {
+    fn state(
+        &self,
+    ) -> MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_map_projection>> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 
@@ -620,6 +635,26 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn create_projection(&self) -> PyResult<MapProjectionHandle> {
+        let state = self.state();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map_projection>::new();
+        // SAFETY: The C API validates the map handle, owner-thread affinity, and
+        // output pointer. out starts null and is consumed immediately on success.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_create(state.as_ptr(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let ptr = out.into_non_null("mln_map_projection").map_err(map_error)?;
+        // SAFETY: ptr came from mln_map_projection_create and is paired with
+        // mln_map_projection_destroy in close.
+        let handle = unsafe {
+            maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_map_projection")
+        };
+        Ok(MapProjectionHandle {
+            state: Mutex::new(handle),
+        })
+    }
+
     fn set_style_json(&self, json: String) -> PyResult<()> {
         let state = self.state();
         let json = maplibre_core::string::c_string(&json).map_err(map_error)?;
@@ -725,6 +760,121 @@ impl MapHandle {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .insert(source_id, state);
         Ok(handle)
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        self.state().is_closed()
+    }
+}
+
+#[pymethods]
+impl MapProjectionHandle {
+    fn close(&self) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: state owns an mln_map_projection pointer created by
+        // mln_map_projection_create and pairs it with the matching destroy.
+        unsafe { state.close_status(sys::mln_map_projection_destroy) }.map_err(map_error)
+    }
+
+    fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: The C API validates that the projection is live and camera
+        // points to initialized writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_get_camera(state.as_ptr(), &mut camera)
+        })
+        .map_err(map_error)?;
+        camera_options_to_py(py, &camera)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn set_camera(
+        &self,
+        center: Option<(f64, f64)>,
+        zoom: Option<f64>,
+        bearing: Option<f64>,
+        pitch: Option<f64>,
+        padding: Option<(f64, f64, f64, f64)>,
+        anchor: Option<(f64, f64)>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        // SAFETY: The C API validates the projection pointer and camera fields.
+        maplibre_core::check(unsafe { sys::mln_map_projection_set_camera(state.as_ptr(), &camera) })
+            .map_err(map_error)
+    }
+
+    fn set_visible_coordinates(
+        &self,
+        coordinates: Vec<(f64, f64)>,
+        padding: (f64, f64, f64, f64),
+    ) -> PyResult<()> {
+        let state = self.state();
+        let coordinates: Vec<sys::mln_lat_lng> = coordinates
+            .into_iter()
+            .map(|(latitude, longitude)| sys::mln_lat_lng {
+                latitude,
+                longitude,
+            })
+            .collect();
+        let padding = edge_insets_from_tuple(padding);
+        // SAFETY: The C API validates the projection pointer, coordinates, and
+        // padding. coordinates is retained for the duration of this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_set_visible_coordinates(
+                state.as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                padding,
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn pixel_for_lat_lng(
+        &self,
+        py: Python<'_>,
+        latitude: f64,
+        longitude: f64,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut point = sys::mln_screen_point { x: 0.0, y: 0.0 };
+        // SAFETY: The C API validates the projection pointer, coordinate, and
+        // output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_pixel_for_lat_lng(
+                state.as_ptr(),
+                sys::mln_lat_lng {
+                    latitude,
+                    longitude,
+                },
+                &mut point,
+            )
+        })
+        .map_err(map_error)?;
+        screen_point_to_py(py, point)
+    }
+
+    fn lat_lng_for_pixel(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        // SAFETY: The C API validates the projection pointer, point, and output
+        // pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_projection_lat_lng_for_pixel(
+                state.as_ptr(),
+                sys::mln_screen_point { x, y },
+                &mut coordinate,
+            )
+        })
+        .map_err(map_error)?;
+        lat_lng_to_py(py, coordinate)
     }
 
     #[getter]
@@ -1452,6 +1602,31 @@ fn log_event_raw(event: LogEvent) -> u32 {
     }
 }
 
+fn edge_insets_from_tuple(
+    (top, left, bottom, right): (f64, f64, f64, f64),
+) -> sys::mln_edge_insets {
+    sys::mln_edge_insets {
+        top,
+        left,
+        bottom,
+        right,
+    }
+}
+
+fn lat_lng_to_py(py: Python<'_>, coordinate: sys::mln_lat_lng) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("latitude", coordinate.latitude)?;
+    dict.set_item("longitude", coordinate.longitude)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn screen_point_to_py(py: Python<'_>, point: sys::mln_screen_point) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("x", point.x)?;
+    dict.set_item("y", point.y)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn camera_options_from_parts(
     center: Option<(f64, f64)>,
     zoom: Option<f64>,
@@ -1479,14 +1654,9 @@ fn camera_options_from_parts(
         raw.fields |= sys::MLN_CAMERA_OPTION_PITCH;
         raw.pitch = pitch;
     }
-    if let Some((top, left, bottom, right)) = padding {
+    if let Some(padding) = padding {
         raw.fields |= sys::MLN_CAMERA_OPTION_PADDING;
-        raw.padding = sys::mln_edge_insets {
-            top,
-            left,
-            bottom,
-            right,
-        };
+        raw.padding = edge_insets_from_tuple(padding);
     }
     if let Some((x, y)) = anchor {
         raw.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
@@ -2094,6 +2264,54 @@ unsafe extern "C" fn log_callback_trampoline(
     })
 }
 
+#[pyfunction]
+fn projected_meters_for_lat_lng(
+    py: Python<'_>,
+    latitude: f64,
+    longitude: f64,
+) -> PyResult<Py<PyAny>> {
+    let mut meters = sys::mln_projected_meters {
+        northing: 0.0,
+        easting: 0.0,
+    };
+    // SAFETY: The C API validates the coordinate and output pointer.
+    maplibre_core::check(unsafe {
+        sys::mln_projected_meters_for_lat_lng(
+            sys::mln_lat_lng {
+                latitude,
+                longitude,
+            },
+            &mut meters,
+        )
+    })
+    .map_err(map_error)?;
+    let dict = PyDict::new(py);
+    dict.set_item("northing", meters.northing)?;
+    dict.set_item("easting", meters.easting)?;
+    Ok(dict.into_any().unbind())
+}
+
+#[pyfunction]
+fn lat_lng_for_projected_meters(
+    py: Python<'_>,
+    northing: f64,
+    easting: f64,
+) -> PyResult<Py<PyAny>> {
+    let mut coordinate = sys::mln_lat_lng {
+        latitude: 0.0,
+        longitude: 0.0,
+    };
+    // SAFETY: The C API validates the meters value and output pointer.
+    maplibre_core::check(unsafe {
+        sys::mln_lat_lng_for_projected_meters(
+            sys::mln_projected_meters { northing, easting },
+            &mut coordinate,
+        )
+    })
+    .map_err(map_error)?;
+    lat_lng_to_py(py, coordinate)
+}
+
 /// Sets the process-global network status from a raw C enum value.
 #[pyfunction]
 fn set_network_status_raw(raw_status: u32) -> PyResult<()> {
@@ -2413,6 +2631,7 @@ fn vulkan_context_fields(
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<MapHandle>()?;
+    module.add_class::<MapProjectionHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<LogReceiver>()?;
     module.add_class::<CustomGeometrySourceHandle>()?;
@@ -2424,6 +2643,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backends_raw, module)?)?;
     module.add_function(wrap_pyfunction!(network_status_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
+    module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status_raw, module)?)?;
     module.add_function(wrap_pyfunction!(set_log_callback, module)?)?;
     module.add_function(wrap_pyfunction!(clear_log_callback, module)?)?;

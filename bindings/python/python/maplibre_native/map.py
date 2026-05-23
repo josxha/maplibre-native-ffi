@@ -11,7 +11,8 @@ from . import _native
 from .runtime import RuntimeHandle
 
 if TYPE_CHECKING:
-    from .camera import CameraOptions
+    from .camera import CameraOptions, EdgeInsets, ScreenPoint
+    from .geo import LatLng
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -45,6 +46,125 @@ class MapOptions:
     height: int = 64
     scale_factor: float = 1.0
     mode: MapMode = MapMode.CONTINUOUS
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectedMeters:
+    """Spherical Mercator projected-meter coordinate."""
+
+    northing: float
+    easting: float
+
+
+def _camera_parts(
+    camera: CameraOptions,
+) -> tuple[
+    tuple[float, float] | None,
+    float | None,
+    float | None,
+    float | None,
+    tuple[float, float, float, float] | None,
+    tuple[float, float] | None,
+]:
+    center = (
+        (camera.center.latitude, camera.center.longitude)
+        if camera.center is not None
+        else None
+    )
+    padding = (
+        (
+            camera.padding.top,
+            camera.padding.left,
+            camera.padding.bottom,
+            camera.padding.right,
+        )
+        if camera.padding is not None
+        else None
+    )
+    anchor = (camera.anchor.x, camera.anchor.y) if camera.anchor is not None else None
+    return center, camera.zoom, camera.bearing, camera.pitch, padding, anchor
+
+
+def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
+    """Convert a geographic coordinate to spherical Mercator projected meters."""
+    raw = _native.projected_meters_for_lat_lng(
+        coordinate.latitude,
+        coordinate.longitude,
+    )
+    return ProjectedMeters(northing=raw["northing"], easting=raw["easting"])
+
+
+def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
+    """Convert spherical Mercator projected meters to a geographic coordinate."""
+    from .geo import LatLng
+
+    raw = _native.lat_lng_for_projected_meters(meters.northing, meters.easting)
+    return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+
+class MapProjectionHandle:
+    """Standalone projection helper snapshotted from a map transform."""
+
+    def __init__(self, native: object) -> None:
+        self._native = native
+
+    @property
+    def closed(self) -> bool:
+        """Return whether this projection helper has been closed."""
+        return bool(self._native.closed)
+
+    def close(self) -> None:
+        """Release this projection helper exactly once."""
+        self._native.close()
+
+    def get_camera(self) -> CameraOptions:
+        """Return the helper's current camera snapshot."""
+        from .camera import CameraOptions
+
+        return CameraOptions.from_native(self._native.get_camera())
+
+    def set_camera(self, camera: CameraOptions) -> None:
+        """Apply camera fields to this projection helper."""
+        self._native.set_camera(*_camera_parts(camera))
+
+    def set_visible_coordinates(
+        self,
+        coordinates: list[LatLng] | tuple[LatLng, ...],
+        padding: EdgeInsets,
+    ) -> None:
+        """Update this helper's camera so coordinates are visible."""
+        self._native.set_visible_coordinates(
+            [(coordinate.latitude, coordinate.longitude) for coordinate in coordinates],
+            (padding.top, padding.left, padding.bottom, padding.right),
+        )
+
+    def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
+        """Convert a geographic coordinate to a screen-space point."""
+        from .camera import ScreenPoint
+
+        raw = self._native.pixel_for_lat_lng(
+            coordinate.latitude,
+            coordinate.longitude,
+        )
+        return ScreenPoint(x=raw["x"], y=raw["y"])
+
+    def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
+        """Convert a screen-space point to a geographic coordinate."""
+        from .geo import LatLng
+
+        raw = self._native.lat_lng_for_pixel(point.x, point.y)
+        return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+    def __enter__(self) -> "MapProjectionHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
 
 
 class MapHandle:
@@ -89,6 +209,10 @@ class MapHandle:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
 
+    def create_projection(self) -> MapProjectionHandle:
+        """Create a standalone projection helper from the current map transform."""
+        return MapProjectionHandle(self._native.create_projection())
+
     def get_camera(self) -> CameraOptions:
         """Return the current camera snapshot."""
         from .camera import CameraOptions
@@ -97,32 +221,7 @@ class MapHandle:
 
     def jump_to(self, camera: CameraOptions) -> None:
         """Apply a camera jump command."""
-        center = (
-            (camera.center.latitude, camera.center.longitude)
-            if camera.center is not None
-            else None
-        )
-        padding = (
-            (
-                camera.padding.top,
-                camera.padding.left,
-                camera.padding.bottom,
-                camera.padding.right,
-            )
-            if camera.padding is not None
-            else None
-        )
-        anchor = (
-            (camera.anchor.x, camera.anchor.y) if camera.anchor is not None else None
-        )
-        self._native.jump_to(
-            center,
-            camera.zoom,
-            camera.bearing,
-            camera.pitch,
-            padding,
-            anchor,
-        )
+        self._native.jump_to(*_camera_parts(camera))
 
     def move_by(self, delta_x: float, delta_y: float) -> None:
         """Apply a screen-space pan command."""
