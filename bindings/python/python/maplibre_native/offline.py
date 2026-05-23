@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from .geo import Geometry, LatLngBounds
 
 if TYPE_CHECKING:
+    from .resource import ResourceErrorReason
     from .runtime import RuntimeHandle
 
 
@@ -288,6 +289,62 @@ class OfflineRegionInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class OfflineRegionStatusChanged:
+    """Offline region status-change event payload."""
+
+    region_id: int
+    status: OfflineRegionStatus
+
+    @classmethod
+    def from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "OfflineRegionStatusChanged":
+        """Build a status-change payload from RuntimeEvent.payload."""
+        return cls(
+            region_id=_payload_int(payload, "region_id"),
+            status=OfflineRegionStatus.from_native(payload["status"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineRegionResponseError:
+    """Offline region response-error event payload."""
+
+    region_id: int
+    reason: ResourceErrorReason
+
+    @classmethod
+    def from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "OfflineRegionResponseError":
+        """Build a response-error payload from RuntimeEvent.payload."""
+        from .resource import ResourceErrorReason
+
+        return cls(
+            region_id=_payload_int(payload, "region_id"),
+            reason=ResourceErrorReason(_payload_int(payload, "reason")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineRegionTileCountLimitExceeded:
+    """Offline region tile-count-limit event payload."""
+
+    region_id: int
+    limit: int
+
+    @classmethod
+    def from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "OfflineRegionTileCountLimitExceeded":
+        """Build a tile-count-limit payload from RuntimeEvent.payload."""
+        return cls(
+            region_id=_payload_int(payload, "region_id"),
+            limit=_payload_int(payload, "limit"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class OfflineOperationCompleted:
     """Offline operation completion event payload."""
 
@@ -417,6 +474,9 @@ __all__ = [
     "OfflineRegionDefinitionType",
     "OfflineRegionDownloadState",
     "OfflineRegionInfo",
+    "OfflineRegionResponseError",
     "OfflineRegionStatus",
+    "OfflineRegionStatusChanged",
+    "OfflineRegionTileCountLimitExceeded",
     "OfflineTilePyramidRegionDefinition",
 ]

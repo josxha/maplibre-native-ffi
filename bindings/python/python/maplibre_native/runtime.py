@@ -99,6 +99,163 @@ class RuntimeEventSourceType(IntEnum):
         return unknown
 
 
+class RenderMode(IntEnum):
+    """Render modes reported by runtime render events."""
+
+    PARTIAL = 0
+    FULL = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> "RenderMode | None":
+        if not isinstance(value, int) or value < 0:
+            return None
+        unknown = int.__new__(cls, value)
+        unknown._name_ = f"UNKNOWN_{value}"
+        unknown._value_ = value
+        return unknown
+
+    @property
+    def native_code(self) -> int:
+        """Return the C enum value for this render mode."""
+        return int(self)
+
+
+class TileOperation(IntEnum):
+    """Tile operations reported by runtime tile events."""
+
+    REQUESTED_FROM_CACHE = 0
+    REQUESTED_FROM_NETWORK = 1
+    LOAD_FROM_NETWORK = 2
+    LOAD_FROM_CACHE = 3
+    START_PARSE = 4
+    END_PARSE = 5
+    ERROR = 6
+    CANCELLED = 7
+    NULL = 8
+
+    @classmethod
+    def _missing_(cls, value: object) -> "TileOperation | None":
+        if not isinstance(value, int) or value < 0:
+            return None
+        unknown = int.__new__(cls, value)
+        unknown._name_ = f"UNKNOWN_{value}"
+        unknown._value_ = value
+        return unknown
+
+    @property
+    def native_code(self) -> int:
+        """Return the C enum value for this tile operation."""
+        return int(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RenderingStats:
+    """Rendering statistics copied from a render-frame event."""
+
+    encoding_time: float
+    rendering_time: float
+    frame_count: int
+    draw_call_count: int
+    total_draw_call_count: int
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "RenderingStats":
+        """Build rendering statistics from private native bridge values."""
+        return cls(
+            encoding_time=raw["encoding_time"],
+            rendering_time=raw["rendering_time"],
+            frame_count=raw["frame_count"],
+            draw_call_count=raw["draw_call_count"],
+            total_draw_call_count=raw["total_draw_call_count"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RenderFramePayload:
+    """Runtime render-frame event payload."""
+
+    mode: RenderMode
+    needs_repaint: bool
+    placement_changed: bool
+    stats: RenderingStats
+
+    @classmethod
+    def from_runtime_payload(cls, payload: dict[str, object]) -> "RenderFramePayload":
+        """Build a render-frame payload from RuntimeEvent.payload."""
+        return cls(
+            mode=RenderMode(payload["mode"]),
+            needs_repaint=payload["needs_repaint"],
+            placement_changed=payload["placement_changed"],
+            stats=RenderingStats.from_native(payload["stats"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RenderMapPayload:
+    """Runtime render-map event payload."""
+
+    mode: RenderMode
+
+    @classmethod
+    def from_runtime_payload(cls, payload: dict[str, object]) -> "RenderMapPayload":
+        """Build a render-map payload from RuntimeEvent.payload."""
+        return cls(mode=RenderMode(payload["mode"]))
+
+
+@dataclass(frozen=True, slots=True)
+class StyleImageMissingPayload:
+    """Runtime style-image-missing event payload."""
+
+    image_id: str
+
+    @classmethod
+    def from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "StyleImageMissingPayload":
+        """Build a style-image-missing payload from RuntimeEvent.payload."""
+        return cls(image_id=payload["image_id"])
+
+
+@dataclass(frozen=True, slots=True)
+class TileId:
+    """Overscaled tile identity copied from a tile-action event."""
+
+    overscaled_z: int
+    wrap: int
+    canonical_z: int
+    canonical_x: int
+    canonical_y: int
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "TileId":
+        """Build a tile identity from private native bridge values."""
+        return cls(
+            overscaled_z=raw["overscaled_z"],
+            wrap=raw["wrap"],
+            canonical_z=raw["canonical_z"],
+            canonical_x=raw["canonical_x"],
+            canonical_y=raw["canonical_y"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TileActionPayload:
+    """Runtime tile-action event payload."""
+
+    operation: TileOperation
+    tile_id: TileId
+    source_id: str
+
+    @classmethod
+    def from_runtime_payload(cls, payload: dict[str, object]) -> "TileActionPayload":
+        """Build a tile-action payload from RuntimeEvent.payload."""
+        return cls(
+            operation=TileOperation(payload["operation"]),
+            tile_id=TileId.from_native(payload["tile_id"]),
+            source_id=payload["source_id"],
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class RuntimeEventSource:
     """Copied runtime event source metadata."""

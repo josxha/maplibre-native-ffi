@@ -130,7 +130,8 @@ The current implementation includes these completed slices:
 - `MapHandle` exposes image source URL/inline-image insertion, URL/image
   updates, coordinate updates, and coordinate copying.
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
-  values.
+  values, including nested render-frame statistics, tile identifiers, and
+  offline-region status snapshots.
 - `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes
   camera snapshot, jump, ease, fly, pan, scale, rotate, pitch, fit, bounds,
   free-camera, projection-mode, coordinate conversion, and transition-cancel
@@ -140,8 +141,9 @@ The current implementation includes these completed slices:
 - `maplibre_native.query` provides rendered/source query descriptors, feature
   state selectors, copied query result value shapes, and `RenderSessionHandle`
   rendered/source/extension query and feature-state APIs.
-- `maplibre_native.offline` provides offline operation, region definition,
-  region status, and runtime event payload value shapes.
+- `maplibre_native.runtime` and `maplibre_native.offline` provide runtime event
+  payload value shapes for render, tile, style-image, offline-region, and
+  offline-operation events.
 - `RuntimeHandle` starts native ambient cache and offline region
   create/get/list, merge, metadata, status, observation, download-state,
   invalidation, and delete operations; `OfflineOperationHandle` values take

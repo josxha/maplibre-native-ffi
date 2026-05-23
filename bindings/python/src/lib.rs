@@ -3727,6 +3727,7 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
             dict.set_item("mode", render_mode_raw(payload.mode))?;
             dict.set_item("needs_repaint", payload.needs_repaint)?;
             dict.set_item("placement_changed", payload.placement_changed)?;
+            dict.set_item("stats", rendering_stats_to_py(py, &payload.stats)?)?;
         }
         RuntimeEventPayload::RenderMap(payload) => {
             dict.set_item("kind", "render_map")?;
@@ -3739,11 +3740,16 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
         RuntimeEventPayload::TileAction(payload) => {
             dict.set_item("kind", "tile_action")?;
             dict.set_item("operation", tile_operation_raw(payload.operation))?;
+            dict.set_item("tile_id", tile_id_to_py(py, &payload.tile_id)?)?;
             dict.set_item("source_id", payload.source_id)?;
         }
         RuntimeEventPayload::OfflineRegionStatus(payload) => {
             dict.set_item("kind", "offline_region_status")?;
             dict.set_item("region_id", payload.region_id)?;
+            dict.set_item(
+                "status",
+                copied_offline_region_status_to_py(py, &payload.status)?,
+            )?;
         }
         RuntimeEventPayload::OfflineRegionResponseError(payload) => {
             dict.set_item("kind", "offline_region_response_error")?;
@@ -3775,6 +3781,52 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
     Ok(dict.into_any().unbind())
 }
 
+fn rendering_stats_to_py(
+    py: Python<'_>,
+    stats: &maplibre_core::RenderingStats,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("encoding_time", stats.encoding_time)?;
+    dict.set_item("rendering_time", stats.rendering_time)?;
+    dict.set_item("frame_count", stats.frame_count)?;
+    dict.set_item("draw_call_count", stats.draw_call_count)?;
+    dict.set_item("total_draw_call_count", stats.total_draw_call_count)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn tile_id_to_py(py: Python<'_>, tile_id: &maplibre_core::TileId) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("overscaled_z", tile_id.overscaled_z)?;
+    dict.set_item("wrap", tile_id.wrap)?;
+    dict.set_item("canonical_z", tile_id.canonical_z)?;
+    dict.set_item("canonical_x", tile_id.canonical_x)?;
+    dict.set_item("canonical_y", tile_id.canonical_y)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn copied_offline_region_status_to_py(
+    py: Python<'_>,
+    status: &maplibre_core::OfflineRegionStatus,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "download_state",
+        offline_region_download_state_raw(status.download_state),
+    )?;
+    dict.set_item("completed_resource_count", status.completed_resource_count)?;
+    dict.set_item("completed_resource_size", status.completed_resource_size)?;
+    dict.set_item("completed_tile_count", status.completed_tile_count)?;
+    dict.set_item("required_tile_count", status.required_tile_count)?;
+    dict.set_item("completed_tile_size", status.completed_tile_size)?;
+    dict.set_item("required_resource_count", status.required_resource_count)?;
+    dict.set_item(
+        "required_resource_count_is_precise",
+        status.required_resource_count_is_precise,
+    )?;
+    dict.set_item("complete", status.complete)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn render_mode_raw(mode: RenderMode) -> u32 {
     match mode {
         RenderMode::Partial => sys::MLN_RENDER_MODE_PARTIAL,
@@ -3796,6 +3848,19 @@ fn tile_operation_raw(operation: TileOperation) -> u32 {
         TileOperation::Cancelled => sys::MLN_TILE_OPERATION_CANCELLED,
         TileOperation::Null => sys::MLN_TILE_OPERATION_NULL,
         TileOperation::Unknown(raw) => raw,
+        _ => 0,
+    }
+}
+
+fn offline_region_download_state_raw(state: maplibre_core::OfflineRegionDownloadState) -> u32 {
+    match state {
+        maplibre_core::OfflineRegionDownloadState::Inactive => {
+            sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE
+        }
+        maplibre_core::OfflineRegionDownloadState::Active => {
+            sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE
+        }
+        maplibre_core::OfflineRegionDownloadState::Unknown(raw) => raw,
         _ => 0,
     }
 }
@@ -5823,6 +5888,110 @@ fn set_network_status_raw_unchecked_for_test(raw_status: u32) -> PyResult<()> {
     maplibre_core::set_network_status_raw(raw_status).map_err(map_error)
 }
 
+/// Test helper that exercises private runtime event payload wire conversion.
+#[pyfunction]
+fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    fn event_to_test_py(py: Python<'_>, raw: &sys::mln_runtime_event) -> PyResult<Py<PyAny>> {
+        // SAFETY: The raw event and its payload pointers are built in this
+        // function and remain live for the duration of the copy.
+        let event =
+            unsafe { maplibre_core::events::runtime_event_from_native(raw) }.map_err(map_error)?;
+        event_to_py(py, event)
+    }
+
+    let out = PyDict::new(py);
+
+    let render_frame_payload = sys::mln_runtime_event_render_frame {
+        size: std::mem::size_of::<sys::mln_runtime_event_render_frame>() as u32,
+        mode: sys::MLN_RENDER_MODE_FULL,
+        needs_repaint: true,
+        placement_changed: false,
+        stats: sys::mln_rendering_stats {
+            size: std::mem::size_of::<sys::mln_rendering_stats>() as u32,
+            encoding_time: 1.25,
+            rendering_time: 2.5,
+            frame_count: 3,
+            draw_call_count: 4,
+            total_draw_call_count: 5,
+        },
+    };
+    let render_frame = sys::mln_runtime_event {
+        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
+        type_: sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
+        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+        source: ptr::null_mut(),
+        code: 0,
+        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
+        payload: ptr::addr_of!(render_frame_payload).cast(),
+        payload_size: std::mem::size_of_val(&render_frame_payload),
+        message: ptr::null(),
+        message_size: 0,
+    };
+    out.set_item("render_frame", event_to_test_py(py, &render_frame)?)?;
+
+    let source_id = b"source-a";
+    let tile_action_payload = sys::mln_runtime_event_tile_action {
+        size: std::mem::size_of::<sys::mln_runtime_event_tile_action>() as u32,
+        operation: sys::MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
+        tile_id: sys::mln_tile_id {
+            overscaled_z: 6,
+            wrap: -1,
+            canonical_z: 5,
+            canonical_x: 12,
+            canonical_y: 34,
+        },
+        source_id: source_id.as_ptr().cast(),
+        source_id_size: source_id.len(),
+    };
+    let tile_action = sys::mln_runtime_event {
+        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
+        type_: sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
+        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+        source: ptr::null_mut(),
+        code: 0,
+        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
+        payload: ptr::addr_of!(tile_action_payload).cast(),
+        payload_size: std::mem::size_of_val(&tile_action_payload),
+        message: ptr::null(),
+        message_size: 0,
+    };
+    out.set_item("tile_action", event_to_test_py(py, &tile_action)?)?;
+
+    let mut status = empty_offline_region_status();
+    status.download_state = sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE;
+    status.completed_resource_count = 7;
+    status.completed_resource_size = 8;
+    status.completed_tile_count = 9;
+    status.required_tile_count = 10;
+    status.completed_tile_size = 11;
+    status.required_resource_count = 12;
+    status.required_resource_count_is_precise = true;
+    status.complete = false;
+    let offline_status_payload = sys::mln_runtime_event_offline_region_status {
+        size: std::mem::size_of::<sys::mln_runtime_event_offline_region_status>() as u32,
+        region_id: 42,
+        status,
+    };
+    let offline_status = sys::mln_runtime_event {
+        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
+        type_: sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
+        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+        source: ptr::null_mut(),
+        code: 0,
+        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
+        payload: ptr::addr_of!(offline_status_payload).cast(),
+        payload_size: std::mem::size_of_val(&offline_status_payload),
+        message: ptr::null(),
+        message_size: 0,
+    };
+    out.set_item(
+        "offline_region_status",
+        event_to_test_py(py, &offline_status)?,
+    )?;
+
+    Ok(out.into_any().unbind())
+}
+
 /// Creates a runtime handle on the current thread.
 #[pyfunction]
 fn create_runtime(
@@ -6150,6 +6319,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(set_async_log_severity_mask, module)?)?;
     module.add_function(wrap_pyfunction!(
         set_network_status_raw_unchecked_for_test,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        runtime_event_payload_wire_shapes_for_test,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(create_runtime, module)?)?;

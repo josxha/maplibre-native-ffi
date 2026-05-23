@@ -724,6 +724,49 @@ def test_poll_event_returns_copied_map_event() -> None:
             assert loading_failed.message
 
 
+def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
+    events = _native.runtime_event_payload_wire_shapes_for_test()
+
+    render_frame_payload = events["render_frame"]["payload"]
+    render_frame = mln.RenderFramePayload.from_runtime_payload(render_frame_payload)
+    assert render_frame.mode == mln.RenderMode.FULL
+    assert render_frame.needs_repaint is True
+    assert render_frame.placement_changed is False
+    assert render_frame.stats.encoding_time == pytest.approx(1.25)
+    assert render_frame.stats.rendering_time == pytest.approx(2.5)
+    assert render_frame.stats.frame_count == 3
+    assert render_frame.stats.draw_call_count == 4
+    assert render_frame.stats.total_draw_call_count == 5
+
+    tile_action_payload = events["tile_action"]["payload"]
+    tile_action = mln.TileActionPayload.from_runtime_payload(tile_action_payload)
+    assert tile_action.operation == mln.TileOperation.LOAD_FROM_NETWORK
+    assert tile_action.tile_id.overscaled_z == 6
+    assert tile_action.tile_id.wrap == -1
+    assert tile_action.tile_id.canonical_z == 5
+    assert tile_action.tile_id.canonical_x == 12
+    assert tile_action.tile_id.canonical_y == 34
+    assert tile_action.source_id == "source-a"
+
+    offline_status_payload = events["offline_region_status"]["payload"]
+    status_changed = offline.OfflineRegionStatusChanged.from_runtime_payload(
+        offline_status_payload
+    )
+    assert status_changed.region_id == 42
+    assert (
+        status_changed.status.download_state
+        == offline.OfflineRegionDownloadState.ACTIVE
+    )
+    assert status_changed.status.completed_resource_count == 7
+    assert status_changed.status.completed_resource_size == 8
+    assert status_changed.status.completed_tile_count == 9
+    assert status_changed.status.required_tile_count == 10
+    assert status_changed.status.completed_tile_size == 11
+    assert status_changed.status.required_resource_count == 12
+    assert status_changed.status.required_resource_count_is_precise is True
+    assert status_changed.status.complete is False
+
+
 def test_render_descriptors_are_public_python_values() -> None:
     extent = render.RenderTargetExtent(width=320, height=240, scale_factor=2.0)
     pointer = render.NativePointer(0x1234)
@@ -1193,6 +1236,18 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
             "found": True,
         }
     )
+    response_error = offline.OfflineRegionResponseError.from_runtime_payload(
+        {
+            "region_id": 8,
+            "reason": resource.ResourceErrorReason.NOT_FOUND.native_code,
+        }
+    )
+    tile_limit = offline.OfflineRegionTileCountLimitExceeded.from_runtime_payload(
+        {
+            "region_id": 9,
+            "limit": 10,
+        }
+    )
 
     assert (
         definition.definition_type == offline.OfflineRegionDefinitionType.TILE_PYRAMID
@@ -1200,6 +1255,10 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
     assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
     assert completed.operation_kind == offline.OfflineOperationKind.REGION_CREATE
     assert completed.result_kind == offline.OfflineOperationResultKind.REGION
+    assert response_error.region_id == 8
+    assert response_error.reason == resource.ResourceErrorReason.NOT_FOUND
+    assert tile_limit.region_id == 9
+    assert tile_limit.limit == 10
 
 
 def test_query_descriptors_and_results_preserve_public_shape() -> None:
