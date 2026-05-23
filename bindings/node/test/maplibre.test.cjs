@@ -356,6 +356,14 @@ test("map camera fitting helpers copy camera and bounds values", () => {
       bounds.northeast,
     ]);
     assert.equal(typeof cameraFromCoordinates.zoom, "number");
+    const cameraFromGeometry = map.cameraForGeometry({
+      type: "LineString",
+      coordinates: [
+        [-2, -1],
+        [2, 1],
+      ],
+    });
+    assert.equal(typeof cameraFromGeometry.zoom, "number");
     const visibleBounds = map.latLngBoundsForCamera(camera);
     const unwrappedBounds = map.latLngBoundsForCameraUnwrapped(camera);
     assert.equal(typeof visibleBounds.southwest.latitude, "number");
@@ -438,6 +446,16 @@ test("map projection handle snapshots projection state", () => {
         { latitude: -1, longitude: -2 },
         { latitude: 1, longitude: 2 },
       ],
+      { top: 0, left: 0, bottom: 0, right: 0 },
+    );
+    projection.setVisibleGeometry(
+      {
+        type: "LineString",
+        coordinates: [
+          [-2, -1],
+          [2, 1],
+        ],
+      },
       { top: 0, left: 0, bottom: 0, right: 0 },
     );
     assert.equal(typeof projection.getCamera().zoom, "number");

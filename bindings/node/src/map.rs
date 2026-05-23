@@ -524,6 +524,26 @@ impl NativeMapHandle {
         ))
     }
 
+    #[napi(js_name = "cameraForGeometry")]
+    pub fn camera_for_geometry(&self, geometry: String) -> Result<CameraOptions> {
+        let geometry = parse_geometry(geometry)?;
+        let native_geometry =
+            core::geometry::geometry_try_to_native(&geometry).map_err(error::from_core)?;
+        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
+        core::check(unsafe {
+            sys::mln_map_camera_for_geometry(
+                self.state.as_ptr(),
+                native_geometry.as_ref(),
+                std::ptr::null(),
+                &mut raw_camera,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(CameraOptions::from_core(
+            core::camera::camera_options_from_native(raw_camera),
+        ))
+    }
+
     #[napi(js_name = "latLngBoundsForCamera")]
     pub fn lat_lng_bounds_for_camera(&self, camera: CameraOptions) -> Result<LatLngBounds> {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
@@ -2077,6 +2097,13 @@ fn parse_json_value(value: String) -> Result<core::JsonValue> {
         error::invalid_argument(format!("JSON input is invalid: {parse_error}"))
     })?;
     json_value_from_serde(value)
+}
+
+pub(crate) fn parse_geometry(value: String) -> Result<core::Geometry> {
+    let value: serde_json::Value = serde_json::from_str(&value).map_err(|parse_error| {
+        error::invalid_argument(format!("GeoJSON geometry input is invalid: {parse_error}"))
+    })?;
+    geometry_from_serde(&value)
 }
 
 fn parse_geojson(value: String) -> Result<core::GeoJson> {

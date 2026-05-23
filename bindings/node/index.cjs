@@ -370,6 +370,12 @@ class MapProjectionHandle {
     );
   }
 
+  setVisibleGeometry(geometry, padding) {
+    return translateNativeErrors(() =>
+      this.native.setVisibleGeometry(stringifyJson(geometry), padding),
+    );
+  }
+
   pixelForLatLng(coordinate) {
     return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
   }
@@ -548,6 +554,12 @@ class MapHandle {
   cameraForLatLngs(coordinates) {
     return translateNativeErrors(() =>
       this.native.cameraForLatLngs(coordinates),
+    );
+  }
+
+  cameraForGeometry(geometry) {
+    return translateNativeErrors(() =>
+      this.native.cameraForGeometry(stringifyJson(geometry)),
     );
   }
 

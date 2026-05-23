@@ -248,6 +248,7 @@ export declare class MapProjectionHandle {
   getCamera(): CameraOptions;
   setCamera(camera: CameraOptions): void;
   setVisibleCoordinates(coordinates: LatLng[], padding: EdgeInsets): void;
+  setVisibleGeometry(geometry: JsonValue, padding: EdgeInsets): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
   [Symbol.dispose](): void;
@@ -302,6 +303,7 @@ export declare class MapHandle {
   flyTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
   cameraForLatLngBounds(bounds: LatLngBounds): CameraOptions;
   cameraForLatLngs(coordinates: LatLng[]): CameraOptions;
+  cameraForGeometry(geometry: JsonValue): CameraOptions;
   latLngBoundsForCamera(camera: CameraOptions): LatLngBounds;
   latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;

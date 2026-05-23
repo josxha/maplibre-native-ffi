@@ -5,7 +5,7 @@ use napi_derive::napi;
 
 use crate::{
     error,
-    map::{CameraOptions, EdgeInsets, NativeMapHandle},
+    map::{CameraOptions, EdgeInsets, NativeMapHandle, parse_geometry},
     values::{LatLng, ScreenPoint},
 };
 
@@ -72,6 +72,22 @@ impl NativeMapProjectionHandle {
                 self.state.as_ptr(),
                 coordinates.as_ptr(),
                 coordinates.len(),
+                padding,
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setVisibleGeometry")]
+    pub fn set_visible_geometry(&self, geometry: String, padding: EdgeInsets) -> Result<()> {
+        let geometry = parse_geometry(geometry)?;
+        let native_geometry =
+            core::geometry::geometry_try_to_native(&geometry).map_err(error::from_core)?;
+        let padding = core::values::edge_insets_to_native(padding.into_core());
+        core::check(unsafe {
+            sys::mln_map_projection_set_visible_geometry(
+                self.state.as_ptr(),
+                native_geometry.as_ref(),
                 padding,
             )
         })
