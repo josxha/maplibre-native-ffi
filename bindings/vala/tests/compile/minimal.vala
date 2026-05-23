@@ -7,6 +7,10 @@ int main(string[] args) {
     MaplibreNative.NetworkStatus.get(out status);
     status.set();
 
+    MaplibreNative.NativePointer native_pointer;
+    MaplibreNative.NativePointer.@new(0x1234, out native_pointer);
+    size_t pointer_bits = native_pointer.get_bits();
+
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ProjectedMeters meters;
     MaplibreNative.ProjectedMeters.for_lat_lng(coordinate, out meters);
@@ -30,7 +34,7 @@ int main(string[] args) {
     map.close();
     runtime.close();
 
-    if (backends == 0) {
+    if (backends == 0 || pointer_bits != 0x1234) {
       return 1;
     }
   } catch (GLib.Error error) {

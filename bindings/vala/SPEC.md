@@ -87,6 +87,8 @@ The scaffold implements one proof slice in Rust:
   `RuntimeEvent` value.
 - `RenderBackendFlags` and `NetworkStatus` expose typed Vala enum surfaces
   instead of raw integer masks/statuses.
+- `NativePointer` is a public boxed value that rejects null addresses and
+  exposes only opaque address bits.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with

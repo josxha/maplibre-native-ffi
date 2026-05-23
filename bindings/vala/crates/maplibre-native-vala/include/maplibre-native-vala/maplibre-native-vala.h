@@ -43,6 +43,38 @@ typedef struct {
   double y;
 } MlnValaScreenPoint;
 
+#define MLN_VALA_TYPE_NATIVE_POINTER (mln_vala_native_pointer_get_type())
+typedef struct _MlnValaNativePointer MlnValaNativePointer;
+
+GType mln_vala_native_pointer_get_type(void);
+
+/**
+ * mln_vala_native_pointer_new:
+ * @bits: non-zero opaque native address bits.
+ * @out_pointer: (out) (transfer full): return location for a boxed native
+ * pointer.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_native_pointer_new(
+  size_t bits, MlnValaNativePointer** out_pointer, GError** error
+);
+
+/**
+ * mln_vala_native_pointer_get_bits:
+ * @pointer: a native pointer value.
+ *
+ * Returns: opaque native address bits, or zero when @pointer is `NULL`.
+ */
+size_t mln_vala_native_pointer_get_bits(const MlnValaNativePointer* pointer);
+
+MlnValaNativePointer* mln_vala_native_pointer_copy(
+  const MlnValaNativePointer* pointer
+);
+void mln_vala_native_pointer_free(MlnValaNativePointer* pointer);
+
 #define MLN_VALA_TYPE_RUNTIME_EVENT (mln_vala_runtime_event_get_type())
 typedef struct _MlnValaRuntimeEvent MlnValaRuntimeEvent;
 
