@@ -92,6 +92,20 @@ impl NativeMapHandle {
         .map_err(error::from_core)
     }
 
+    #[napi(js_name = "getDebugOptionsRaw")]
+    pub fn get_debug_options_raw(&self) -> Result<u32> {
+        let mut options = 0;
+        core::check(unsafe { sys::mln_map_get_debug_options(self.state.as_ptr(), &mut options) })
+            .map_err(error::from_core)?;
+        Ok(options)
+    }
+
+    #[napi(js_name = "setDebugOptionsRaw")]
+    pub fn set_debug_options_raw(&self, options: u32) -> Result<()> {
+        core::check(unsafe { sys::mln_map_set_debug_options(self.state.as_ptr(), options) })
+            .map_err(error::from_core)
+    }
+
     #[napi(js_name = "setStyleJson")]
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;
@@ -146,6 +160,22 @@ fn map_mode_from_string(map_mode: &str) -> Result<core::MapMode> {
         "tile" => Ok(core::MapMode::Tile),
         other => Err(error::invalid_argument(format!(
             "mapMode must be 'continuous', 'static', or 'tile', got '{other}'"
+        ))),
+    }
+}
+
+#[napi(js_name = "nativeMapDebugOptionMaskBit")]
+pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
+    match option.as_str() {
+        "tileBorders" => Ok(sys::MLN_MAP_DEBUG_TILE_BORDERS),
+        "parseStatus" => Ok(sys::MLN_MAP_DEBUG_PARSE_STATUS),
+        "timestamps" => Ok(sys::MLN_MAP_DEBUG_TIMESTAMPS),
+        "collision" => Ok(sys::MLN_MAP_DEBUG_COLLISION),
+        "overdraw" => Ok(sys::MLN_MAP_DEBUG_OVERDRAW),
+        "stencilClip" => Ok(sys::MLN_MAP_DEBUG_STENCIL_CLIP),
+        "depthBuffer" => Ok(sys::MLN_MAP_DEBUG_DEPTH_BUFFER),
+        other => Err(error::invalid_argument(format!(
+            "debug option must be a known MapDebugOption, got '{other}'"
         ))),
     }
 }

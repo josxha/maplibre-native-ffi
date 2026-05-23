@@ -132,6 +132,25 @@ test("map utility methods expose copied booleans and native commands", () => {
   }
 });
 
+test("map debug options map stable strings to native bitmasks", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setDebugOptions(["tileBorders", "collision"]);
+    assert.deepEqual(map.getDebugOptions(), ["tileBorders", "collision"]);
+    map.setDebugOptions([]);
+    assert.deepEqual(map.getDebugOptions(), []);
+    assert.throws(
+      () => map.setDebugOptions([/** @type {any} */ ("wireframe")]),
+      InvalidArgumentError,
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map options reject unknown map modes", () => {
   const runtime = new RuntimeHandle();
   assert.throws(

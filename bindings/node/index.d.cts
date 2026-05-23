@@ -91,6 +91,15 @@ export interface RuntimeEvent {
   payloadKind: string;
 }
 
+export type MapDebugOption =
+  | "tileBorders"
+  | "parseStatus"
+  | "timestamps"
+  | "collision"
+  | "overdraw"
+  | "stencilClip"
+  | "depthBuffer";
+
 export interface MapOptions {
   width?: number | null;
   height?: number | null;
@@ -127,6 +136,8 @@ export declare class MapHandle {
   requestStillImage(): void;
   isFullyLoaded(): boolean;
   dumpDebugLogs(): void;
+  getDebugOptions(): MapDebugOption[];
+  setDebugOptions(options: Iterable<MapDebugOption>): void;
   setStyleJson(json: string): void;
   setStyleUrl(url: string): void;
   [Symbol.dispose](): void;

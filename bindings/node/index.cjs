@@ -125,6 +125,22 @@ function restoreDefaultAsyncLogSeverities() {
   );
 }
 
+const MAP_DEBUG_OPTIONS = Object.freeze([
+  "tileBorders",
+  "parseStatus",
+  "timestamps",
+  "collision",
+  "overdraw",
+  "stencilClip",
+  "depthBuffer",
+]);
+
+function mapDebugOptionMaskBit(option) {
+  return translateNativeErrors(() =>
+    native.nativeMapDebugOptionMaskBit(option),
+  );
+}
+
 class NativePointer {
   static null = new NativePointer(0n);
 
@@ -227,6 +243,21 @@ class MapHandle {
 
   dumpDebugLogs() {
     return translateNativeErrors(() => this.native.dumpDebugLogs());
+  }
+
+  getDebugOptions() {
+    const mask = translateNativeErrors(() => this.native.getDebugOptionsRaw());
+    return MAP_DEBUG_OPTIONS.filter((option) =>
+      Boolean(mask & mapDebugOptionMaskBit(option)),
+    );
+  }
+
+  setDebugOptions(options) {
+    let mask = 0;
+    for (const option of options) {
+      mask |= mapDebugOptionMaskBit(option);
+    }
+    return translateNativeErrors(() => this.native.setDebugOptionsRaw(mask));
   }
 
   get renderingStatsViewEnabled() {
