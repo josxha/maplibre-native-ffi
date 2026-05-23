@@ -93,6 +93,30 @@ function setNetworkStatus(status) {
   return translateNativeErrors(() => native.setNetworkStatus(status));
 }
 
+class RuntimeHandle {
+  constructor(options) {
+    this.native = translateNativeErrors(() =>
+      native.createNativeRuntimeHandle(options ?? {}),
+    );
+  }
+
+  close() {
+    return translateNativeErrors(() => this.native.close());
+  }
+
+  get closed() {
+    return this.native.closed;
+  }
+
+  runOnce() {
+    return translateNativeErrors(() => this.native.runOnce());
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
 function translateNativeErrors(callback) {
   try {
     return callback();
@@ -194,6 +218,7 @@ module.exports = {
   UnsupportedFeatureError,
   NativeError,
   MaplibreStatus,
+  RuntimeHandle,
   cVersion,
   supportedRenderBackends,
   networkStatus,

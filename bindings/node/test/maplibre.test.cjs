@@ -7,6 +7,7 @@ const {
   MaplibreError,
   MaplibreStatus,
   networkStatus,
+  RuntimeHandle,
   setNetworkStatus,
   supportedRenderBackends,
 } = require("..");
@@ -31,6 +32,31 @@ test("process-global proof slice crosses the native add-on", () => {
   if (original.kind === "online" || original.kind === "offline") {
     setNetworkStatus(original.kind);
   }
+});
+
+test("runtime handle supports options, explicit close, and idempotent disposal", () => {
+  const runtime = new RuntimeHandle({ maximumCacheSize: 1n });
+
+  assert.equal(runtime.closed, false);
+  runtime.runOnce();
+  runtime.close();
+  assert.equal(runtime.closed, true);
+  runtime.close();
+  runtime[Symbol.dispose]();
+});
+
+test("runtime options reject invalid bigint values", () => {
+  assert.throws(
+    () => new RuntimeHandle({ maximumCacheSize: -1n }),
+    (error) => {
+      if (!(error instanceof InvalidArgumentError)) {
+        return false;
+      }
+      assert.equal(error.nativeStatusCode, null);
+      assert.match(error.diagnostic, /maximumCacheSize/);
+      return true;
+    },
+  );
 });
 
 test("binding-owned validation rejects unknown network status strings", () => {

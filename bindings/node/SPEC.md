@@ -153,12 +153,12 @@ index.cjs          public JavaScript wrapper and error classes
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice and root exports
+src/runtime.rs    runtime handle proof slice and runtime option materialization
 ```
 
 Planned internal Rust modules own implementation roles:
 
 ```text
-src/runtime.rs    runtime handles, events, resource callbacks, offline operations
 src/map.rs        map handles, camera, style loading, and map-owned callbacks
 src/render.rs     render sessions, targets, readback, and frame scopes
 src/resource.rs   resource request/response conversion and one-shot handles
@@ -531,7 +531,8 @@ area instead of retesting all native C validation rules.
 2. Add `MaplibreError` subclasses, status conversion, raw status, and copied
    diagnostic properties. _(Initial proof-slice wrapper complete.)_
 3. Add environment ownership, cleanup hooks, close-once handle state, leak
-   reporting, `close()`, and `Symbol.dispose`.
+   reporting, `close()`, and `Symbol.dispose`. _(Initial `RuntimeHandle`
+   close-once proof slice complete.)_
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
    polling.
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent

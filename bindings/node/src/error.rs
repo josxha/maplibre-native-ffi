@@ -26,7 +26,7 @@ pub(crate) fn from_core(error: maplibre_native_core::Error) -> NapiError {
 }
 
 pub(crate) fn invalid_argument(message: impl Into<String>) -> NapiError {
-    NapiError::new(Status::InvalidArg, message.into())
+    from_core(maplibre_native_core::Error::invalid_argument(message))
 }
 
 fn json_string(value: &str) -> String {

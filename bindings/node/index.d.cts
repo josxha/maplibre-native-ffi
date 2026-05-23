@@ -74,6 +74,20 @@ export interface NetworkStatusValue {
   raw: number;
 }
 
+export interface RuntimeOptions {
+  assetPath?: string | null;
+  cachePath?: string | null;
+  maximumCacheSize?: bigint | null;
+}
+
+export declare class RuntimeHandle {
+  constructor(options?: RuntimeOptions | null);
+  readonly closed: boolean;
+  close(): void;
+  runOnce(): void;
+  [Symbol.dispose](): void;
+}
+
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;
 export declare function networkStatus(): NetworkStatusValue;

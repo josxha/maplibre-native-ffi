@@ -8,5 +8,7 @@
 
 mod error;
 mod maplibre;
+mod runtime;
 
 pub use maplibre::*;
+pub use runtime::*;
