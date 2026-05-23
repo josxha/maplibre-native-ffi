@@ -625,6 +625,49 @@ def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
             assert snapshot.y_skew == pytest.approx(0.2)
 
 
+def test_camera_fit_bounds_and_constraints_public_api() -> None:
+    bounds = geo.LatLngBounds(
+        southwest=geo.LatLng(-1.0, -1.0),
+        northeast=geo.LatLng(1.0, 1.0),
+    )
+    fit = camera.CameraFitOptions(
+        padding=camera.EdgeInsets(1.0, 2.0, 3.0, 4.0),
+        bearing=0.0,
+        pitch=0.0,
+    )
+    target = camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=1.0)
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_bounds(
+                camera.BoundOptions(bounds=bounds, min_zoom=0.0, max_zoom=10.0)
+            )
+            constraints = map_handle.get_bounds()
+            fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
+            fit_coordinates = map_handle.camera_for_lat_lngs(
+                (bounds.southwest, bounds.northeast),
+                fit,
+            )
+            fit_geometry = map_handle.camera_for_geometry(
+                geo.line_string((bounds.southwest, bounds.northeast)),
+                fit,
+            )
+            visible_bounds = map_handle.lat_lng_bounds_for_camera(target)
+            unwrapped_bounds = map_handle.lat_lng_bounds_for_camera(
+                target,
+                unwrapped=True,
+            )
+
+            assert constraints.bounds == bounds
+            assert constraints.min_zoom == pytest.approx(0.0)
+            assert constraints.max_zoom == pytest.approx(10.0)
+            assert isinstance(fit_bounds, camera.CameraOptions)
+            assert isinstance(fit_coordinates, camera.CameraOptions)
+            assert isinstance(fit_geometry, camera.CameraOptions)
+            assert isinstance(visible_bounds, geo.LatLngBounds)
+            assert isinstance(unwrapped_bounds, geo.LatLngBounds)
+
+
 def test_camera_transition_commands_accept_public_values() -> None:
     animation = camera.AnimationOptions(
         duration_ms=0.0,

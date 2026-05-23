@@ -14,13 +14,15 @@ from .runtime import RuntimeHandle
 if TYPE_CHECKING:
     from .camera import (
         AnimationOptions,
+        BoundOptions,
+        CameraFitOptions,
         CameraOptions,
         EdgeInsets,
         FreeCameraOptions,
         ProjectionMode,
         ScreenPoint,
     )
-    from .geo import GeoJson, LatLng, LatLngBounds
+    from .geo import GeoJson, Geometry, LatLng, LatLngBounds
     from .json import JsonValue
     from .render import (
         MetalBorrowedTextureDescriptor,
@@ -184,8 +186,11 @@ def _camera_parts(
     float | None,
     float | None,
     float | None,
+    float | None,
     tuple[float, float, float, float] | None,
     tuple[float, float] | None,
+    float | None,
+    float | None,
 ]:
     center = (
         (camera.center.latitude, camera.center.longitude)
@@ -203,7 +208,56 @@ def _camera_parts(
         else None
     )
     anchor = (camera.anchor.x, camera.anchor.y) if camera.anchor is not None else None
-    return center, camera.zoom, camera.bearing, camera.pitch, padding, anchor
+    return (
+        center,
+        camera.zoom,
+        camera.bearing,
+        camera.pitch,
+        camera.center_altitude,
+        padding,
+        anchor,
+        camera.roll,
+        camera.field_of_view,
+    )
+
+
+def _fit_parts(
+    fit: CameraFitOptions | None,
+) -> tuple[tuple[float, float, float, float] | None, float | None, float | None]:
+    if fit is None:
+        return None, None, None
+    padding = (
+        (fit.padding.top, fit.padding.left, fit.padding.bottom, fit.padding.right)
+        if fit.padding is not None
+        else None
+    )
+    return padding, fit.bearing, fit.pitch
+
+
+def _bounds_parts(
+    bounds: BoundOptions,
+) -> tuple[
+    tuple[tuple[float, float], tuple[float, float]] | None,
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+]:
+    raw_bounds = (
+        (
+            (bounds.bounds.southwest.latitude, bounds.bounds.southwest.longitude),
+            (bounds.bounds.northeast.latitude, bounds.bounds.northeast.longitude),
+        )
+        if bounds.bounds is not None
+        else None
+    )
+    return (
+        raw_bounds,
+        bounds.min_zoom,
+        bounds.max_zoom,
+        bounds.min_pitch,
+        bounds.max_pitch,
+    )
 
 
 def _animation_parts(
@@ -879,6 +933,75 @@ class MapHandle:
     ) -> None:
         """Apply a camera fly transition command."""
         self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
+
+    def camera_for_lat_lng_bounds(
+        self,
+        bounds: LatLngBounds,
+        fit: CameraFitOptions | None = None,
+    ) -> CameraOptions:
+        """Compute a camera that fits geographic bounds in the current viewport."""
+        from .camera import CameraOptions
+
+        raw = self._native.camera_for_lat_lng_bounds(
+            (bounds.southwest.latitude, bounds.southwest.longitude),
+            (bounds.northeast.latitude, bounds.northeast.longitude),
+            *_fit_parts(fit),
+        )
+        return CameraOptions.from_native(raw)
+
+    def camera_for_lat_lngs(
+        self,
+        coordinates: list[LatLng] | tuple[LatLng, ...],
+        fit: CameraFitOptions | None = None,
+    ) -> CameraOptions:
+        """Compute a camera that fits geographic coordinates in the current viewport."""
+        from .camera import CameraOptions
+
+        raw = self._native.camera_for_lat_lngs(
+            _coordinate_parts(coordinates),
+            *_fit_parts(fit),
+        )
+        return CameraOptions.from_native(raw)
+
+    def camera_for_geometry(
+        self,
+        geometry: Geometry,
+        fit: CameraFitOptions | None = None,
+    ) -> CameraOptions:
+        """Compute a camera that fits a geometry in the current viewport."""
+        from .camera import CameraOptions
+        from .geo import _geometry_to_native_wire
+
+        raw = self._native.camera_for_geometry(
+            _geometry_to_native_wire(geometry),
+            *_fit_parts(fit),
+        )
+        return CameraOptions.from_native(raw)
+
+    def lat_lng_bounds_for_camera(
+        self,
+        camera: CameraOptions,
+        *,
+        unwrapped: bool = False,
+    ) -> LatLngBounds:
+        """Compute geographic bounds for a camera in the current viewport."""
+        from .geo import LatLng, LatLngBounds
+
+        raw = self._native.lat_lng_bounds_for_camera(*_camera_parts(camera), unwrapped)
+        return LatLngBounds(
+            southwest=LatLng(**raw["southwest"]),
+            northeast=LatLng(**raw["northeast"]),
+        )
+
+    def get_bounds(self) -> BoundOptions:
+        """Return map camera constraint options."""
+        from .camera import BoundOptions
+
+        return BoundOptions.from_native(self._native.get_bounds())
+
+    def set_bounds(self, bounds: BoundOptions) -> None:
+        """Apply selected map camera constraint options."""
+        self._native.set_bounds(*_bounds_parts(bounds))
 
     def move_by(self, delta_x: float, delta_y: float) -> None:
         """Apply a screen-space pan command."""

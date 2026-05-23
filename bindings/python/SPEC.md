@@ -133,8 +133,9 @@ The current implementation includes these completed slices:
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
 - `maplibre_native.camera` provides camera descriptors, and `MapHandle` exposes
-  camera snapshot, jump, ease, fly, pan, scale, rotate, pitch, free-camera,
-  projection-mode, coordinate conversion, and transition-cancel operations.
+  camera snapshot, jump, ease, fly, pan, scale, rotate, pitch, fit, bounds,
+  free-camera, projection-mode, coordinate conversion, and transition-cancel
+  operations.
 - `maplibre_native.log` provides process-global logging callback configuration,
   bounded copied-record queues, async severity masks, and copied log records.
 - `maplibre_native.query` provides rendered/source query descriptors, feature

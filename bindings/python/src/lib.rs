@@ -817,11 +817,24 @@ impl MapHandle {
         zoom: Option<f64>,
         bearing: Option<f64>,
         pitch: Option<f64>,
+        center_altitude: Option<f64>,
         padding: Option<(f64, f64, f64, f64)>,
         anchor: Option<(f64, f64)>,
+        roll: Option<f64>,
+        field_of_view: Option<f64>,
     ) -> PyResult<()> {
         let state = self.state();
-        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        let camera = camera_options_from_parts(
+            center,
+            zoom,
+            bearing,
+            pitch,
+            center_altitude,
+            padding,
+            anchor,
+            roll,
+            field_of_view,
+        );
         // SAFETY: The C API validates the map pointer and camera fields.
         maplibre_core::check(unsafe { sys::mln_map_jump_to(state.as_ptr(), &camera) })
             .map_err(map_error)
@@ -834,8 +847,11 @@ impl MapHandle {
         zoom: Option<f64>,
         bearing: Option<f64>,
         pitch: Option<f64>,
+        center_altitude: Option<f64>,
         padding: Option<(f64, f64, f64, f64)>,
         anchor: Option<(f64, f64)>,
+        roll: Option<f64>,
+        field_of_view: Option<f64>,
         animation: Option<(
             Option<f64>,
             Option<f64>,
@@ -844,7 +860,17 @@ impl MapHandle {
         )>,
     ) -> PyResult<()> {
         let state = self.state();
-        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        let camera = camera_options_from_parts(
+            center,
+            zoom,
+            bearing,
+            pitch,
+            center_altitude,
+            padding,
+            anchor,
+            roll,
+            field_of_view,
+        );
         let animation = animation.map(animation_options_from_parts);
         // SAFETY: The C API validates the map pointer, camera fields, and
         // optional animation fields.
@@ -865,8 +891,11 @@ impl MapHandle {
         zoom: Option<f64>,
         bearing: Option<f64>,
         pitch: Option<f64>,
+        center_altitude: Option<f64>,
         padding: Option<(f64, f64, f64, f64)>,
         anchor: Option<(f64, f64)>,
+        roll: Option<f64>,
+        field_of_view: Option<f64>,
         animation: Option<(
             Option<f64>,
             Option<f64>,
@@ -875,7 +904,17 @@ impl MapHandle {
         )>,
     ) -> PyResult<()> {
         let state = self.state();
-        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        let camera = camera_options_from_parts(
+            center,
+            zoom,
+            bearing,
+            pitch,
+            center_altitude,
+            padding,
+            anchor,
+            roll,
+            field_of_view,
+        );
         let animation = animation.map(animation_options_from_parts);
         // SAFETY: The C API validates the map pointer, camera fields, and
         // optional animation fields.
@@ -887,6 +926,148 @@ impl MapHandle {
             )
         })
         .map_err(map_error)
+    }
+
+    fn camera_for_lat_lng_bounds(
+        &self,
+        py: Python<'_>,
+        southwest: (f64, f64),
+        northeast: (f64, f64),
+        fit_padding: Option<(f64, f64, f64, f64)>,
+        fit_bearing: Option<f64>,
+        fit_pitch: Option<f64>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let bounds = lat_lng_bounds_from_tuple((southwest, northeast));
+        let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: The C API validates the map pointer, bounds, fit options, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_camera_for_lat_lng_bounds(state.as_ptr(), bounds, &fit, &mut camera)
+        })
+        .map_err(map_error)?;
+        camera_options_to_py(py, &camera)
+    }
+
+    fn camera_for_lat_lngs(
+        &self,
+        py: Python<'_>,
+        coordinates: Vec<(f64, f64)>,
+        fit_padding: Option<(f64, f64, f64, f64)>,
+        fit_bearing: Option<f64>,
+        fit_pitch: Option<f64>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let coordinates = lat_lngs_from_tuples(coordinates);
+        let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: The C API validates the map pointer, coordinate slice, fit options, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_camera_for_lat_lngs(
+                state.as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                &fit,
+                &mut camera,
+            )
+        })
+        .map_err(map_error)?;
+        camera_options_to_py(py, &camera)
+    }
+
+    fn camera_for_geometry(
+        &self,
+        py: Python<'_>,
+        geometry: &Bound<'_, PyAny>,
+        fit_padding: Option<(f64, f64, f64, f64)>,
+        fit_bearing: Option<f64>,
+        fit_pitch: Option<f64>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let geometry = geometry_from_wire(geometry)?;
+        let geometry =
+            maplibre_core::geometry::geometry_try_to_native(&geometry).map_err(map_error)?;
+        let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: The C API validates the map pointer, geometry, fit options, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_camera_for_geometry(state.as_ptr(), geometry.as_ptr(), &fit, &mut camera)
+        })
+        .map_err(map_error)?;
+        camera_options_to_py(py, &camera)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn lat_lng_bounds_for_camera(
+        &self,
+        py: Python<'_>,
+        center: Option<(f64, f64)>,
+        zoom: Option<f64>,
+        bearing: Option<f64>,
+        pitch: Option<f64>,
+        center_altitude: Option<f64>,
+        padding: Option<(f64, f64, f64, f64)>,
+        anchor: Option<(f64, f64)>,
+        roll: Option<f64>,
+        field_of_view: Option<f64>,
+        unwrapped: bool,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let camera = camera_options_from_parts(
+            center,
+            zoom,
+            bearing,
+            pitch,
+            center_altitude,
+            padding,
+            anchor,
+            roll,
+            field_of_view,
+        );
+        let mut bounds = empty_lat_lng_bounds();
+        let status = if unwrapped {
+            // SAFETY: The C API validates the map pointer, camera options, and output pointer.
+            unsafe {
+                sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
+                    state.as_ptr(),
+                    &camera,
+                    &mut bounds,
+                )
+            }
+        } else {
+            // SAFETY: The C API validates the map pointer, camera options, and output pointer.
+            unsafe { sys::mln_map_lat_lng_bounds_for_camera(state.as_ptr(), &camera, &mut bounds) }
+        };
+        maplibre_core::check(status).map_err(map_error)?;
+        lat_lng_bounds_to_py(py, bounds)
+    }
+
+    fn get_bounds(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut bounds = unsafe { sys::mln_bound_options_default() };
+        // SAFETY: The C API validates the map pointer and output pointer.
+        maplibre_core::check(unsafe { sys::mln_map_get_bounds(state.as_ptr(), &mut bounds) })
+            .map_err(map_error)?;
+        bound_options_to_py(py, &bounds)
+    }
+
+    fn set_bounds(
+        &self,
+        bounds: Option<((f64, f64), (f64, f64))>,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        min_pitch: Option<f64>,
+        max_pitch: Option<f64>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let bounds = bound_options_from_parts(bounds, min_zoom, max_zoom, min_pitch, max_pitch);
+        // SAFETY: The C API validates the map pointer and bounds fields.
+        maplibre_core::check(unsafe { sys::mln_map_set_bounds(state.as_ptr(), &bounds) })
+            .map_err(map_error)
     }
 
     fn move_by(&self, delta_x: f64, delta_y: f64) -> PyResult<()> {
@@ -2414,11 +2595,24 @@ impl MapProjectionHandle {
         zoom: Option<f64>,
         bearing: Option<f64>,
         pitch: Option<f64>,
+        center_altitude: Option<f64>,
         padding: Option<(f64, f64, f64, f64)>,
         anchor: Option<(f64, f64)>,
+        roll: Option<f64>,
+        field_of_view: Option<f64>,
     ) -> PyResult<()> {
         let state = self.state();
-        let camera = camera_options_from_parts(center, zoom, bearing, pitch, padding, anchor);
+        let camera = camera_options_from_parts(
+            center,
+            zoom,
+            bearing,
+            pitch,
+            center_altitude,
+            padding,
+            anchor,
+            roll,
+            field_of_view,
+        );
         // SAFETY: The C API validates the projection pointer and camera fields.
         maplibre_core::check(unsafe { sys::mln_map_projection_set_camera(state.as_ptr(), &camera) })
             .map_err(map_error)
@@ -3495,10 +3689,30 @@ fn lat_lng_bounds_from_tuple(
     }
 }
 
+fn empty_lat_lng_bounds() -> sys::mln_lat_lng_bounds {
+    sys::mln_lat_lng_bounds {
+        southwest: sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        },
+        northeast: sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        },
+    }
+}
+
 fn lat_lng_to_py(py: Python<'_>, coordinate: sys::mln_lat_lng) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("latitude", coordinate.latitude)?;
     dict.set_item("longitude", coordinate.longitude)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn lat_lng_bounds_to_py(py: Python<'_>, bounds: sys::mln_lat_lng_bounds) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("southwest", lat_lng_to_py(py, bounds.southwest)?)?;
+    dict.set_item("northeast", lat_lng_to_py(py, bounds.northeast)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -3757,8 +3971,11 @@ fn camera_options_from_parts(
     zoom: Option<f64>,
     bearing: Option<f64>,
     pitch: Option<f64>,
+    center_altitude: Option<f64>,
     padding: Option<(f64, f64, f64, f64)>,
     anchor: Option<(f64, f64)>,
+    roll: Option<f64>,
+    field_of_view: Option<f64>,
 ) -> sys::mln_camera_options {
     // SAFETY: Default constructor takes no arguments and initializes size.
     let mut raw = unsafe { sys::mln_camera_options_default() };
@@ -3779,6 +3996,10 @@ fn camera_options_from_parts(
         raw.fields |= sys::MLN_CAMERA_OPTION_PITCH;
         raw.pitch = pitch;
     }
+    if let Some(center_altitude) = center_altitude {
+        raw.fields |= sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+        raw.center_altitude = center_altitude;
+    }
     if let Some(padding) = padding {
         raw.fields |= sys::MLN_CAMERA_OPTION_PADDING;
         raw.padding = edge_insets_from_tuple(padding);
@@ -3786,6 +4007,68 @@ fn camera_options_from_parts(
     if let Some(anchor) = anchor {
         raw.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
         raw.anchor = screen_point_from_tuple(anchor);
+    }
+    if let Some(roll) = roll {
+        raw.fields |= sys::MLN_CAMERA_OPTION_ROLL;
+        raw.roll = roll;
+    }
+    if let Some(field_of_view) = field_of_view {
+        raw.fields |= sys::MLN_CAMERA_OPTION_FOV;
+        raw.field_of_view = field_of_view;
+    }
+    raw
+}
+
+fn camera_fit_options_from_parts(
+    padding: Option<(f64, f64, f64, f64)>,
+    bearing: Option<f64>,
+    pitch: Option<f64>,
+) -> sys::mln_camera_fit_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_camera_fit_options_default() };
+    if let Some(padding) = padding {
+        raw.fields |= sys::MLN_CAMERA_FIT_OPTION_PADDING;
+        raw.padding = edge_insets_from_tuple(padding);
+    }
+    if let Some(bearing) = bearing {
+        raw.fields |= sys::MLN_CAMERA_FIT_OPTION_BEARING;
+        raw.bearing = bearing;
+    }
+    if let Some(pitch) = pitch {
+        raw.fields |= sys::MLN_CAMERA_FIT_OPTION_PITCH;
+        raw.pitch = pitch;
+    }
+    raw
+}
+
+fn bound_options_from_parts(
+    bounds: Option<((f64, f64), (f64, f64))>,
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    min_pitch: Option<f64>,
+    max_pitch: Option<f64>,
+) -> sys::mln_bound_options {
+    // SAFETY: Default constructor takes no arguments and initializes size.
+    let mut raw = unsafe { sys::mln_bound_options_default() };
+    if let Some(bounds) = bounds {
+        raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
+        raw.bounds = lat_lng_bounds_from_tuple(bounds);
+    }
+    if let Some(min_zoom) = min_zoom {
+        raw.fields |= sys::MLN_BOUND_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if let Some(max_zoom) = max_zoom {
+        raw.fields |= sys::MLN_BOUND_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    if let Some(min_pitch) = min_pitch {
+        raw.fields |= sys::MLN_BOUND_OPTION_MIN_PITCH;
+        raw.min_pitch = min_pitch;
+    }
+    if let Some(max_pitch) = max_pitch {
+        raw.fields |= sys::MLN_BOUND_OPTION_MAX_PITCH;
+        raw.max_pitch = max_pitch;
     }
     raw
 }
@@ -3883,6 +4166,32 @@ fn free_camera_options_to_py(
     Ok(dict.into_any().unbind())
 }
 
+fn bound_options_to_py(py: Python<'_>, options: &sys::mln_bound_options) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    if options.fields & sys::MLN_BOUND_OPTION_BOUNDS != 0 {
+        dict.set_item("bounds", lat_lng_bounds_to_py(py, options.bounds)?)?;
+    } else {
+        dict.set_item("bounds", py.None())?;
+    }
+    dict.set_item(
+        "min_zoom",
+        (options.fields & sys::MLN_BOUND_OPTION_MIN_ZOOM != 0).then_some(options.min_zoom),
+    )?;
+    dict.set_item(
+        "max_zoom",
+        (options.fields & sys::MLN_BOUND_OPTION_MAX_ZOOM != 0).then_some(options.max_zoom),
+    )?;
+    dict.set_item(
+        "min_pitch",
+        (options.fields & sys::MLN_BOUND_OPTION_MIN_PITCH != 0).then_some(options.min_pitch),
+    )?;
+    dict.set_item(
+        "max_pitch",
+        (options.fields & sys::MLN_BOUND_OPTION_MAX_PITCH != 0).then_some(options.max_pitch),
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn projection_mode_to_py(py: Python<'_>, mode: &sys::mln_projection_mode) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item(
@@ -3922,6 +4231,11 @@ fn camera_options_to_py(py: Python<'_>, camera: &sys::mln_camera_options) -> PyR
         "pitch",
         (camera.fields & sys::MLN_CAMERA_OPTION_PITCH != 0).then_some(camera.pitch),
     )?;
+    dict.set_item(
+        "center_altitude",
+        (camera.fields & sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0)
+            .then_some(camera.center_altitude),
+    )?;
     if camera.fields & sys::MLN_CAMERA_OPTION_PADDING != 0 {
         let padding = PyDict::new(py);
         padding.set_item("top", camera.padding.top)?;
@@ -3940,6 +4254,14 @@ fn camera_options_to_py(py: Python<'_>, camera: &sys::mln_camera_options) -> PyR
     } else {
         dict.set_item("anchor", py.None())?;
     }
+    dict.set_item(
+        "roll",
+        (camera.fields & sys::MLN_CAMERA_OPTION_ROLL != 0).then_some(camera.roll),
+    )?;
+    dict.set_item(
+        "field_of_view",
+        (camera.fields & sys::MLN_CAMERA_OPTION_FOV != 0).then_some(camera.field_of_view),
+    )?;
     Ok(dict.into_any().unbind())
 }
 

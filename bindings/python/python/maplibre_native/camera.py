@@ -62,8 +62,11 @@ class CameraOptions:
     zoom: float | None = None
     bearing: float | None = None
     pitch: float | None = None
+    center_altitude: float | None = None
     padding: EdgeInsets | None = None
     anchor: ScreenPoint | None = None
+    roll: float | None = None
+    field_of_view: float | None = None
 
     @classmethod
     def from_native(cls, raw: dict[str, object]) -> "CameraOptions":
@@ -76,8 +79,11 @@ class CameraOptions:
             zoom=raw["zoom"],
             bearing=raw["bearing"],
             pitch=raw["pitch"],
+            center_altitude=raw["center_altitude"],
             padding=EdgeInsets(**padding) if isinstance(padding, dict) else None,
             anchor=ScreenPoint(**anchor) if isinstance(anchor, dict) else None,
+            roll=raw["roll"],
+            field_of_view=raw["field_of_view"],
         )
 
 
@@ -109,6 +115,25 @@ class BoundOptions:
     max_zoom: float | None = None
     min_pitch: float | None = None
     max_pitch: float | None = None
+
+    @classmethod
+    def from_native(cls, raw: dict[str, object]) -> "BoundOptions":
+        """Build bound options from private native bridge values."""
+        bounds = raw["bounds"]
+        if isinstance(bounds, dict):
+            bounds = LatLngBounds(
+                southwest=LatLng(**bounds["southwest"]),
+                northeast=LatLng(**bounds["northeast"]),
+            )
+        else:
+            bounds = None
+        return cls(
+            bounds=bounds,
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            min_pitch=raw["min_pitch"],
+            max_pitch=raw["max_pitch"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
