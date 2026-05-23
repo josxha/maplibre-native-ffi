@@ -86,6 +86,30 @@ final class MaplibreNativeCApi {
     Pointer<Bool> outHasEvent,
   ) => _raw.mln_runtime_poll_event(runtime, outEvent, outHasEvent).value;
 
+  /// Sets a runtime-scoped network resource provider.
+  int runtimeSetResourceProvider(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<raw.mln_resource_provider> provider,
+  ) => _raw.mln_runtime_set_resource_provider(runtime, provider).value;
+
+  /// Native Dart-shim callback for exact URL resource providers.
+  Pointer<NativeFunction<raw.mln_resource_provider_callbackFunction>>
+  dartResourceProviderRulesCallback() =>
+      library.lookup('mln_dart_resource_provider_rules_callback');
+
+  /// Native Dart-shim callback for exact URL resource transforms.
+  Pointer<NativeFunction<raw.mln_resource_transform_callbackFunction>>
+  dartResourceTransformRewriteCallback() =>
+      library.lookup('mln_dart_resource_transform_rewrite_callback');
+
+  /// Address of mln_resource_request_complete.
+  int resourceRequestCompleteAddress() =>
+      library.lookup('mln_resource_request_complete').address;
+
+  /// Address of mln_resource_request_release.
+  int resourceRequestReleaseAddress() =>
+      library.lookup('mln_resource_request_release').address;
+
   /// Registers or updates a runtime-scoped URL transform.
   int runtimeSetResourceTransform(
     Pointer<raw.mln_runtime> runtime,

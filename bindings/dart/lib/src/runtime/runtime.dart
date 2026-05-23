@@ -30,6 +30,7 @@ final class RuntimeHandle {
 
   final NativeHandleState<raw.mln_runtime> _state;
   _ResourceTransformState? _resourceTransformState;
+  _ResourceProviderRulesState? _resourceProviderRulesState;
 
   /// Creates a runtime on the current native thread using native defaults.
   factory RuntimeHandle.create() {
@@ -84,7 +85,7 @@ final class RuntimeHandle {
       withNativeArena((arena) {
         final transform = arena<raw.mln_resource_transform>();
         transform.ref.size = sizeOf<raw.mln_resource_transform>();
-        transform.ref.callback = state.callback.nativeFunction;
+        transform.ref.callback = _c.dartResourceTransformRewriteCallback();
         transform.ref.user_data = state.pointer.cast<Void>();
         _check(_c.runtimeSetResourceTransform(_pointer, transform));
       });
@@ -101,6 +102,27 @@ final class RuntimeHandle {
     _check(_c.runtimeClearResourceTransform(_pointer));
     _resourceTransformState?.close();
     _resourceTransformState = null;
+  }
+
+  /// Registers exact native-owned response rules for network resources.
+  ///
+  /// The provider must be set before this runtime creates maps.
+  void setResourceProviderRules(List<ResourceProviderRule> rules) {
+    final state = _ResourceProviderRulesState(rules);
+    try {
+      withNativeArena((arena) {
+        final provider = arena<raw.mln_resource_provider>();
+        provider.ref.size = sizeOf<raw.mln_resource_provider>();
+        provider.ref.callback = _c.dartResourceProviderRulesCallback();
+        provider.ref.user_data = state.pointer.cast<Void>();
+        _check(_c.runtimeSetResourceProvider(_pointer, provider));
+      });
+      _resourceProviderRulesState?.close();
+      _resourceProviderRulesState = state;
+    } catch (_) {
+      state.close();
+      rethrow;
+    }
   }
 
   /// Starts an ambient cache maintenance operation.
@@ -129,6 +151,8 @@ final class RuntimeHandle {
     _state.close(_c.runtimeDestroy, _c.threadLastErrorMessage);
     _resourceTransformState?.close();
     _resourceTransformState = null;
+    _resourceProviderRulesState?.close();
+    _resourceProviderRulesState = null;
   }
 }
 
@@ -149,14 +173,7 @@ final class _NativeResourceRewriteRule extends Struct {
 }
 
 final class _ResourceTransformState {
-  _ResourceTransformState(List<ResourceUrlRewriteRule> rules)
-    : callback =
-          NativeCallable<
-            raw.mln_resource_transform_callbackFunction
-          >.isolateGroupBound(
-            _resourceTransformCallback,
-            exceptionalReturn: nativeStatusNativeError,
-          ) {
+  _ResourceTransformState(List<ResourceUrlRewriteRule> rules) {
     pointer = calloc<_NativeResourceRewriteRules>();
     pointer.ref.count = rules.length;
     pointer.ref.rules = rules.isEmpty
@@ -173,7 +190,6 @@ final class _ResourceTransformState {
   }
 
   late final Pointer<_NativeResourceRewriteRules> pointer;
-  final NativeCallable<raw.mln_resource_transform_callbackFunction> callback;
 
   void close() {
     final rules = pointer.ref.rules;
@@ -185,31 +201,56 @@ final class _ResourceTransformState {
       calloc.free(rules);
     }
     calloc.free(pointer);
-    callback.close();
   }
 }
 
-int _resourceTransformCallback(
-  Pointer<Void> userData,
-  int kind,
-  Pointer<Char> url,
-  Pointer<raw.mln_resource_transform_response> outResponse,
-) {
-  if (userData == nullptr || url == nullptr || outResponse == nullptr) {
-    return raw.mln_status.MLN_STATUS_OK.value;
-  }
-  final rules = userData.cast<_NativeResourceRewriteRules>().ref;
-  final requestedUrl = url.cast<Utf8>().toDartString();
-  for (var index = 0; index < rules.count; index += 1) {
-    final rule = rules.rules[index];
-    final ruleMatchesKind = rule.kind == 0 || rule.kind == kind;
-    if (ruleMatchesKind &&
-        rule.url.cast<Utf8>().toDartString() == requestedUrl) {
-      outResponse.ref.url = rule.replacementUrl;
-      break;
+final class _NativeResourceProviderRules extends Struct {
+  external Pointer<_NativeResourceProviderRule> rules;
+
+  @Size()
+  external int count;
+}
+
+final class _NativeResourceProviderRule extends Struct {
+  @Uint32()
+  external int kind;
+
+  external Pointer<Char> url;
+
+  external raw.mln_resource_response response;
+}
+
+final class _ResourceProviderRulesState {
+  _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
+    pointer = calloc<_NativeResourceProviderRules>();
+    pointer.ref.count = rules.length;
+    pointer.ref.rules = rules.isEmpty
+        ? nullptr.cast<_NativeResourceProviderRule>()
+        : calloc<_NativeResourceProviderRule>(rules.length);
+    for (var index = 0; index < rules.length; index += 1) {
+      final rule = rules[index];
+      pointer.ref.rules[index].kind = rule.kind?.rawValue ?? 0;
+      pointer.ref.rules[index].url = rule.url.toNativeUtf8().cast<Char>();
+      pointer.ref.rules[index].response = _resourceResponseToNative(
+        rule.response,
+        calloc,
+      );
     }
   }
-  return raw.mln_status.MLN_STATUS_OK.value;
+
+  late final Pointer<_NativeResourceProviderRules> pointer;
+
+  void close() {
+    final rules = pointer.ref.rules;
+    for (var index = 0; index < pointer.ref.count; index += 1) {
+      calloc.free(rules[index].url);
+      _freeNativeResourceResponse(rules[index].response, calloc);
+    }
+    if (rules != nullptr) {
+      calloc.free(rules);
+    }
+    calloc.free(pointer);
+  }
 }
 
 /// Runtime-owned offline operation handle.
@@ -1595,6 +1636,21 @@ raw.mln_resource_response _resourceResponseToNative(
     result.retry_after_unix_ms = retryAfterUnixMs;
   }
   return result;
+}
+
+void _freeNativeResourceResponse(
+  raw.mln_resource_response response,
+  Allocator allocator,
+) {
+  if (response.bytes != nullptr) {
+    allocator.free(response.bytes);
+  }
+  if (response.error_message != nullptr) {
+    allocator.free(response.error_message);
+  }
+  if (response.etag != nullptr) {
+    allocator.free(response.etag);
+  }
 }
 
 raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(

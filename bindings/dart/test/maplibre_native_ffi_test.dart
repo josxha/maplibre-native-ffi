@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:test/test.dart';
@@ -42,6 +43,16 @@ void main() {
         ),
       ]);
       runtime.clearResourceTransform();
+      runtime.setResourceProviderRules([
+        ResourceProviderRule(
+          kind: ResourceKind.style,
+          url: 'https://example.com/provider-style.json',
+          response: ResourceResponse(
+            status: ResourceResponseStatus.ok,
+            bytes: Uint8List.fromList([123]),
+          ),
+        ),
+      ]);
       final offlineOperation = runtime.runAmbientCacheOperation(
         AmbientCacheOperation.clear,
       );
