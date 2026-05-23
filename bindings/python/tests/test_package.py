@@ -1286,6 +1286,78 @@ def test_offline_operation_take_results_convert_public_values() -> None:
     assert status.completed_resource_count == 2
 
 
+def test_offline_operation_take_rejects_closed_handles() -> None:
+    class FakeNativeRuntime:
+        def __init__(self) -> None:
+            self.discarded: list[int] = []
+            self.status_takes = 0
+
+        def offline_operation_discard(self, operation_id: int) -> None:
+            self.discarded.append(operation_id)
+
+        def offline_region_get_status_take_result(
+            self,
+            operation_id: int,
+        ) -> dict[str, object]:
+            assert operation_id == 10
+            self.status_takes += 1
+            return {
+                "download_state": 1,
+                "completed_resource_count": 0,
+                "completed_resource_size": 0,
+                "completed_tile_count": 0,
+                "required_tile_count": 0,
+                "completed_tile_size": 0,
+                "required_resource_count": 0,
+                "required_resource_count_is_precise": True,
+                "complete": True,
+            }
+
+        def offline_region_create_take_result(self, operation_id: int) -> None:
+            raise AssertionError("closed handle called native take")
+
+        def offline_region_get_take_result(self, operation_id: int) -> None:
+            raise AssertionError("closed handle called native take")
+
+        def offline_regions_list_take_result(self, operation_id: int) -> None:
+            raise AssertionError("closed handle called native take")
+
+        def offline_regions_merge_database_take_result(self, operation_id: int) -> None:
+            raise AssertionError("closed handle called native take")
+
+        def offline_region_update_metadata_take_result(self, operation_id: int) -> None:
+            raise AssertionError("closed handle called native take")
+
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self._native = FakeNativeRuntime()
+
+    runtime = FakeRuntime()
+
+    status_handle = offline.OfflineOperationHandle(runtime, 10)
+    assert status_handle.take_status().complete is True
+    with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
+        status_handle.take_status()
+    assert runtime._native.status_takes == 1  # noqa: SLF001
+
+    closed_takes = (
+        lambda handle: handle.take_region(),
+        lambda handle: handle.take_optional_region(),
+        lambda handle: handle.take_region_list(),
+        lambda handle: handle.take_region_list(merge_result=True),
+        lambda handle: handle.take_updated_region(),
+        lambda handle: handle.take_status(),
+    )
+    for offset, take in enumerate(closed_takes, start=20):
+        handle = offline.OfflineOperationHandle(runtime, offset)
+        handle.close()
+        with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
+            take(handle)
+
+    assert runtime._native.discarded == list(range(20, 26))  # noqa: SLF001
+    assert runtime._native.status_takes == 1  # noqa: SLF001
+
+
 def test_ambient_cache_operation_starts_and_discards_through_public_api(
     tmp_path: Path,
 ) -> None:

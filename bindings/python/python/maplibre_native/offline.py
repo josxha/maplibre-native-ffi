@@ -150,6 +150,12 @@ class OfflineOperationHandle:
         self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
         self._closed = True
 
+    def _ensure_open(self) -> None:
+        if self._closed:
+            from .errors import InvalidStateError
+
+            raise InvalidStateError(None, "offline operation handle is already closed")
+
     def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
         try:
             _warn_unclosed("OfflineOperationHandle", getattr(self, "closed", True))
@@ -158,6 +164,7 @@ class OfflineOperationHandle:
 
     def take_region(self) -> "OfflineRegionInfo":
         """Take a completed region snapshot result."""
+        self._ensure_open()
         raw = self._runtime._native.offline_region_create_take_result(
             self._operation_id
         )  # noqa: SLF001
@@ -166,6 +173,7 @@ class OfflineOperationHandle:
 
     def take_optional_region(self) -> "OfflineRegionInfo | None":
         """Take a completed optional region snapshot result."""
+        self._ensure_open()
         raw = self._runtime._native.offline_region_get_take_result(self._operation_id)  # noqa: SLF001
         self._closed = True
         return OfflineRegionInfo.from_native(raw) if raw is not None else None
@@ -176,6 +184,7 @@ class OfflineOperationHandle:
         merge_result: bool = False,
     ) -> tuple["OfflineRegionInfo", ...]:
         """Take a completed region-list result."""
+        self._ensure_open()
         if merge_result:
             raw = self._runtime._native.offline_regions_merge_database_take_result(
                 self._operation_id
@@ -189,6 +198,7 @@ class OfflineOperationHandle:
 
     def take_updated_region(self) -> "OfflineRegionInfo":
         """Take a completed updated region snapshot result."""
+        self._ensure_open()
         raw = self._runtime._native.offline_region_update_metadata_take_result(
             self._operation_id
         )  # noqa: SLF001
@@ -197,6 +207,7 @@ class OfflineOperationHandle:
 
     def take_status(self) -> "OfflineRegionStatus":
         """Take a completed offline region status result."""
+        self._ensure_open()
         raw = self._runtime._native.offline_region_get_status_take_result(
             self._operation_id
         )  # noqa: SLF001

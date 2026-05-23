@@ -530,3 +530,50 @@ audit.
   `uv run ty check --error-on-warning .mise`, and
   `mise run //bindings/python:ci` (59 Python tests, wheel build, and
   metadata/`_native` import check) passed.
+
+## Round 11
+
+Review fanout: final post-Round-10 lifecycle, typing/API, and review-record
+audit.
+
+### Applied findings
+
+- Reject offline operation result takes after the operation handle is closed.
+  - Evidence: lifecycle review found `OfflineOperationHandle.take_region()`,
+    `take_optional_region()`, `take_region_list()`, `take_updated_region()`, and
+    `take_status()` called native even after `close()` or a prior successful
+    take, bypassing Python-side closed-handle validation.
+  - Resolution: added a shared `_ensure_open()` guard that raises
+    `InvalidStateError` before native calls on closed offline operation handles.
+    Added regression coverage for double-take and take-after-close paths,
+    including a fake native backend that would fail if called after closure.
+
+### Rejected or deferred findings
+
+- Broader runtime-close coordination with still-live offline-operation wrappers
+  remains deferred as ownership-policy work outside this narrow closed-handle
+  guard.
+- Remaining `Any` fallbacks are tied to real import cycles: `render.MapHandle`,
+  `runtime.MapHandle`/`MapOptions`, and `offline.RuntimeHandle`. Static
+  `TYPE_CHECKING` imports keep type-checker behavior precise.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, broad enum deduplication, and
+  broader root export expansion.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused offline lifecycle regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_offline_operation_take_rejects_closed_handles
+  tests/test_package.py::test_offline_operation_take_results_convert_public_values`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`,
+  `uv run ty check --error-on-warning .mise`, and
+  `mise run //bindings/python:ci` (60 Python tests, wheel build, and
+  metadata/`_native` import check) passed.
