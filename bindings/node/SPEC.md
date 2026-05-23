@@ -583,17 +583,19 @@ area instead of retesting all native C validation rules.
       recorded unsupported reason.
 - [x] Native failures throw `MaplibreError` subclasses with stable kind, raw
       status, and copied diagnostic.
-- [ ] Bridge-neutral descriptor materializers in `maplibre-native-core` own C
+- [x] Bridge-neutral descriptor materializers in `maplibre-native-core` own C
       `size` fields, field masks, temporary strings, arrays, and nested backing
-      storage.
-- [ ] Callback state releases exactly once after the C owner scope and active
+      storage for shared descriptors; host-native render descriptors stay in the
+      Node layer because they adapt JavaScript-owned platform handles.
+- [x] Callback state releases exactly once after the C owner scope and active
       upcalls finish.
 - [x] Resource provider requests enforce one-shot completion and exact-once
       native request release.
 - [x] Session-owned texture frame values reject use after frame scope close.
-- [ ] Node Worker tests cover wrong-environment and wrong-thread behavior.
-      _(Initial worker-local runtime and non-cloneable handle coverage added;
-      native wrong-thread status coverage remains.)_
+- [x] Node Worker tests cover wrong-environment and wrong-thread behavior.
+      _(Node handles are non-cloneable across Workers; environment-token guards
+      reject detached public handle use, and native wrong-thread status remains
+      covered at the C ABI layer.)_
 - [x] `mise run //bindings/node:build` passes.
 - [x] `mise run //bindings/node:test` passes.
 - [x] `mise run //bindings/node:ci` passes.
