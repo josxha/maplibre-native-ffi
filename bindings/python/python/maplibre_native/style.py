@@ -226,12 +226,27 @@ class CustomGeometrySourceHandle:
         """Return how many callback events were dropped because the queue was full."""
         return self._native.dropped_event_count
 
+    def close(self) -> None:
+        """Release queued callback state for this source handle."""
+        self._native.close()
+
     def poll_event(self) -> CustomGeometrySourceEvent | None:
         """Return one queued fetch/cancel event copied into Python values."""
         event = self._native.poll_event()
         if event is None:
             return None
         return CustomGeometrySourceEvent.from_native(event)
+
+    def __enter__(self) -> "CustomGeometrySourceHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object | None,
+    ) -> None:
+        self.close()
 
 
 __all__ = [

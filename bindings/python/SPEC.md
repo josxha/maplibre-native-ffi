@@ -119,8 +119,8 @@ The current implementation includes these completed slices:
   insertion and update plus vector, raster, and raster DEM style source
   URL/inline-tile insertion, source removal, existence checks, type/info lookup,
   attribution copying, and source ID listing.
-- `MapHandle` exposes custom geometry source callback queues, tile data updates,
-  and tile/region invalidation.
+- `MapHandle` exposes closeable custom geometry source callback queues, tile
+  data updates, and tile/region invalidation.
 - `MapHandle` exposes built-in hillshade, color-relief, and location-indicator
   layer insertion, JSON style layer insertion/copying, style light JSON/property
   APIs, layer property/filter APIs, location-indicator property setters, style
@@ -192,11 +192,11 @@ the native library exists before maturin invokes Cargo.
 `_native` is private. The current scaffold exposes proof-slice bridge functions,
 status-converting network status entry points, runtime/map/render-session handle
 state, copied event adapters, render target descriptor materialization, texture
-readback, texture frame guards, resource callback trampolines, one-shot resource
-request handles, and queued custom geometry source callbacks needed by the
-Python package. As coverage grows, `_native` owns PyO3-specific conversion, GIL
-handling, Python exception construction, buffer guards, callback queues, and
-free-threaded synchronization.
+readback, texture frame guards, resource callback trampolines, closeable
+one-shot resource request handles, and queued custom geometry source callbacks
+needed by the Python package. As coverage grows, `_native` owns PyO3-specific
+conversion, GIL handling, Python exception construction, buffer guards, callback
+queues, and free-threaded synchronization.
 
 `_native` may call `maplibre-native-sys` directly only for the initial proof
 slice or host-runtime trampoline code. Repeated C ABI adaptation moves into

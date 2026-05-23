@@ -3440,6 +3440,10 @@ impl LogReceiver {
 
 #[pymethods]
 impl CustomGeometrySourceHandle {
+    fn close(&self) {
+        self.shared.close();
+    }
+
     fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         let mut queue = self
             .shared

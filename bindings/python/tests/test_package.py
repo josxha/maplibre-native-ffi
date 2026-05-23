@@ -1355,6 +1355,37 @@ def test_resource_values_preserve_native_shape() -> None:
     )
 
 
+def test_resource_request_handle_close_context_and_completion_state() -> None:
+    class FakeNativeRequest:
+        def __init__(self) -> None:
+            self.completed = None
+            self.closed = False
+
+        def complete(self, response: dict[str, object]) -> None:
+            self.completed = response
+
+        def is_cancelled(self) -> bool:
+            return False
+
+        def close(self) -> None:
+            self.closed = True
+
+    native = FakeNativeRequest()
+    handle = resource.ResourceRequestHandle(native)
+
+    assert handle.closed is False
+    assert handle.is_cancelled() is False
+    handle.complete(resource.ResourceResponse.no_content())
+    assert handle.closed is True
+    assert native.completed["status"] == resource.ResourceResponseStatus.NO_CONTENT
+
+    second_native = FakeNativeRequest()
+    with resource.ResourceRequestHandle(second_native) as second:
+        assert second.closed is False
+    assert second.closed is True
+    assert second_native.closed is True
+
+
 def test_resource_transform_registers_and_clears() -> None:
     seen: list[resource.ResourceTransformRequest] = []
 
@@ -1419,6 +1450,8 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
             map_handle.set_custom_geometry_source_tile_data("custom", tile, data)
             map_handle.invalidate_custom_geometry_source_tile("custom", tile)
             map_handle.invalidate_custom_geometry_source_region("custom", bounds)
+            source.close()
+            assert source.closed
 
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
             assert source.closed

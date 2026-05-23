@@ -269,10 +269,17 @@ class ResourceRequestHandle:
 
     def __init__(self, native: Any) -> None:
         self._native = native
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        """Return whether this request handle has been completed or released."""
+        return self._closed
 
     def complete(self, response: ResourceResponse) -> None:
         """Complete this request with a copied response."""
         self._native.complete(response.to_native())
+        self._closed = True
 
     def is_cancelled(self) -> bool:
         """Return whether native code has cancelled the request."""
@@ -280,7 +287,21 @@ class ResourceRequestHandle:
 
     def close(self) -> None:
         """Release this request handle without completing it."""
+        if self._closed:
+            return
         self._native.close()
+        self._closed = True
+
+    def __enter__(self) -> "ResourceRequestHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object | None,
+    ) -> None:
+        self.close()
 
 
 ResourceTransformCallback = Callable[[ResourceTransformRequest], str | None]
