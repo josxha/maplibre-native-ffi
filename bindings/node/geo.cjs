@@ -2,7 +2,5 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  projectedMetersForLatLng: root.projectedMetersForLatLng,
-  latLngForProjectedMeters: root.latLngForProjectedMeters,
-};
+exports.projectedMetersForLatLng = root.projectedMetersForLatLng;
+exports.latLngForProjectedMeters = root.latLngForProjectedMeters;

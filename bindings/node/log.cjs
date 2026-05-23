@@ -2,9 +2,8 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  setLogCallback: root.setLogCallback,
-  clearLogCallback: root.clearLogCallback,
-  setAsyncLogSeverities: root.setAsyncLogSeverities,
-  restoreDefaultAsyncLogSeverities: root.restoreDefaultAsyncLogSeverities,
-};
+exports.setLogCallback = root.setLogCallback;
+exports.clearLogCallback = root.clearLogCallback;
+exports.setAsyncLogSeverities = root.setAsyncLogSeverities;
+exports.restoreDefaultAsyncLogSeverities =
+  root.restoreDefaultAsyncLogSeverities;

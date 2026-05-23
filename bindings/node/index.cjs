@@ -172,7 +172,7 @@ class NativePointer {
     return new NativePointer(CONSTRUCTION_TOKEN, address);
   }
 
-  constructor(token, address) {
+  constructor(token, address, isValid = () => true) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
         null,
@@ -191,8 +191,16 @@ class NativePointer {
         "native pointer address must be non-negative",
       );
     }
-    this.address = address;
+    Object.defineProperties(this, {
+      _address: { value: address },
+      _isValid: { value: isValid },
+    });
     Object.freeze(this);
+  }
+
+  get address() {
+    this.#assertValid();
+    return this._address;
   }
 
   get isNull() {
@@ -205,6 +213,12 @@ class NativePointer {
 
   toString() {
     return `NativePointer[address=0x${this.address.toString(16)}]`;
+  }
+
+  #assertValid() {
+    if (!this._isValid()) {
+      throw new InvalidStateError(null, "native pointer scope is closed");
+    }
   }
 }
 
@@ -329,11 +343,19 @@ class MetalOwnedTextureFrame {
   }
 
   get texture() {
-    return NativePointer.unsafeFromAddress(this.#read("textureAddress"));
+    return new NativePointer(
+      CONSTRUCTION_TOKEN,
+      this.#read("textureAddress"),
+      () => this.#active,
+    );
   }
 
   get device() {
-    return NativePointer.unsafeFromAddress(this.#read("deviceAddress"));
+    return new NativePointer(
+      CONSTRUCTION_TOKEN,
+      this.#read("deviceAddress"),
+      () => this.#active,
+    );
   }
 
   get pixelFormat() {
@@ -392,15 +414,27 @@ class VulkanOwnedTextureFrame {
   }
 
   get image() {
-    return NativePointer.unsafeFromAddress(this.#read("imageAddress"));
+    return new NativePointer(
+      CONSTRUCTION_TOKEN,
+      this.#read("imageAddress"),
+      () => this.#active,
+    );
   }
 
   get imageView() {
-    return NativePointer.unsafeFromAddress(this.#read("imageViewAddress"));
+    return new NativePointer(
+      CONSTRUCTION_TOKEN,
+      this.#read("imageViewAddress"),
+      () => this.#active,
+    );
   }
 
   get device() {
-    return NativePointer.unsafeFromAddress(this.#read("deviceAddress"));
+    return new NativePointer(
+      CONSTRUCTION_TOKEN,
+      this.#read("deviceAddress"),
+      () => this.#active,
+    );
   }
 
   get format() {
@@ -1814,3 +1848,33 @@ module.exports = {
   setAsyncLogSeverities,
   restoreDefaultAsyncLogSeverities,
 };
+
+module.exports.MaplibreError = MaplibreError;
+module.exports.InvalidArgumentError = InvalidArgumentError;
+module.exports.InvalidStateError = InvalidStateError;
+module.exports.WrongThreadError = WrongThreadError;
+module.exports.UnsupportedFeatureError = UnsupportedFeatureError;
+module.exports.NativeError = NativeError;
+module.exports.MaplibreStatus = MaplibreStatus;
+module.exports.RuntimeHandle = RuntimeHandle;
+module.exports.ResourceRequestHandle = ResourceRequestHandle;
+module.exports.OfflineOperationHandle = OfflineOperationHandle;
+module.exports.MapHandle = MapHandle;
+module.exports.MapProjectionHandle = MapProjectionHandle;
+module.exports.RenderSessionHandle = RenderSessionHandle;
+module.exports.MetalOwnedTextureFrame = MetalOwnedTextureFrame;
+module.exports.VulkanOwnedTextureFrame = VulkanOwnedTextureFrame;
+module.exports.NativePointer = NativePointer;
+module.exports.NativeBuffer = NativeBuffer;
+module.exports.cVersion = cVersion;
+module.exports.supportedRenderBackends = supportedRenderBackends;
+module.exports.threadLastErrorMessage = threadLastErrorMessage;
+module.exports.networkStatus = networkStatus;
+module.exports.setNetworkStatus = setNetworkStatus;
+module.exports.projectedMetersForLatLng = projectedMetersForLatLng;
+module.exports.latLngForProjectedMeters = latLngForProjectedMeters;
+module.exports.setLogCallback = setLogCallback;
+module.exports.clearLogCallback = clearLogCallback;
+module.exports.setAsyncLogSeverities = setAsyncLogSeverities;
+module.exports.restoreDefaultAsyncLogSeverities =
+  restoreDefaultAsyncLogSeverities;

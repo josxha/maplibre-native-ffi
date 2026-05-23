@@ -2,10 +2,8 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  RenderSessionHandle: root.RenderSessionHandle,
-  MetalOwnedTextureFrame: root.MetalOwnedTextureFrame,
-  VulkanOwnedTextureFrame: root.VulkanOwnedTextureFrame,
-  NativePointer: root.NativePointer,
-  NativeBuffer: root.NativeBuffer,
-};
+exports.RenderSessionHandle = root.RenderSessionHandle;
+exports.MetalOwnedTextureFrame = root.MetalOwnedTextureFrame;
+exports.VulkanOwnedTextureFrame = root.VulkanOwnedTextureFrame;
+exports.NativePointer = root.NativePointer;
+exports.NativeBuffer = root.NativeBuffer;

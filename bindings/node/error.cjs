@@ -2,12 +2,10 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  MaplibreError: root.MaplibreError,
-  InvalidArgumentError: root.InvalidArgumentError,
-  InvalidStateError: root.InvalidStateError,
-  WrongThreadError: root.WrongThreadError,
-  UnsupportedFeatureError: root.UnsupportedFeatureError,
-  NativeError: root.NativeError,
-  MaplibreStatus: root.MaplibreStatus,
-};
+exports.MaplibreError = root.MaplibreError;
+exports.InvalidArgumentError = root.InvalidArgumentError;
+exports.InvalidStateError = root.InvalidStateError;
+exports.WrongThreadError = root.WrongThreadError;
+exports.UnsupportedFeatureError = root.UnsupportedFeatureError;
+exports.NativeError = root.NativeError;
+exports.MaplibreStatus = root.MaplibreStatus;

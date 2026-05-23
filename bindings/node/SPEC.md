@@ -94,6 +94,7 @@ bindings/node/
     values.rs
   test/
     maplibre.test.cjs
+    esm-smoke.mjs
     subpath-types.test.cts
 ```
 
@@ -597,10 +598,10 @@ policy.
 - [x] Resource provider requests enforce one-shot completion and exact-once
       native request release.
 - [x] Session-owned texture frame values reject use after frame scope close.
-- [x] Node Worker tests cover wrong-environment and wrong-thread behavior.
-      _(Node handles are non-cloneable across Workers; environment-token guards
-      reject detached public handle use, and native wrong-thread status remains
-      covered at the C ABI layer.)_
+- [x] Node Worker tests cover worker-local runtime creation and detached public
+      handle guards. _(Node handles are non-cloneable across Workers;
+      environment-token guards reject detached public handle use, and native
+      wrong-thread status remains covered at the C ABI layer.)_
 - [x] `mise run //bindings/node:build` passes.
 - [x] `mise run //bindings/node:test` passes.
 - [x] `mise run //bindings/node:ci` passes.

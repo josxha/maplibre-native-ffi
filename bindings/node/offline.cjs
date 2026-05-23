@@ -2,6 +2,4 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  OfflineOperationHandle: root.OfflineOperationHandle,
-};
+exports.OfflineOperationHandle = root.OfflineOperationHandle;

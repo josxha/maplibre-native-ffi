@@ -2,11 +2,9 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  RuntimeHandle: root.RuntimeHandle,
-  cVersion: root.cVersion,
-  supportedRenderBackends: root.supportedRenderBackends,
-  threadLastErrorMessage: root.threadLastErrorMessage,
-  networkStatus: root.networkStatus,
-  setNetworkStatus: root.setNetworkStatus,
-};
+exports.RuntimeHandle = root.RuntimeHandle;
+exports.cVersion = root.cVersion;
+exports.supportedRenderBackends = root.supportedRenderBackends;
+exports.threadLastErrorMessage = root.threadLastErrorMessage;
+exports.networkStatus = root.networkStatus;
+exports.setNetworkStatus = root.setNetworkStatus;

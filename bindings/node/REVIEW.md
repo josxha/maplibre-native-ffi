@@ -63,6 +63,8 @@ Review evidence:
   - JavaScript/TypeScript API surface review.
   - SPEC/REVIEW/test adequacy review.
 - The FFI/lifetime reviewer reported no remaining actionable findings.
+- Applied accepted findings in this round and validated with `mise run fix` plus
+  `mise run //bindings/node:ci`.
 
 Applied findings:
 
@@ -76,6 +78,47 @@ Applied findings:
      through the package export map for type resolution.
 3. `SPEC.md` current-file block omitted the review log.
    - Action: `SPEC.md` now includes `REVIEW.md` and the subpath type fixture.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.
+
+## Round 3
+
+Review evidence:
+
+- Ran three independent review agents after the Round 2 fixes:
+  - FFI/lifetime review.
+  - JavaScript/TypeScript API surface review.
+  - SPEC/REVIEW/test adequacy review.
+
+Applied findings:
+
+1. Retired custom-geometry callback state could be freed while native worker
+   callbacks still hold `user_data`.
+   - Action: removed/replaced custom-geometry callback state is retained in a
+     retired list until map close; leaked native maps leak active and retired
+     callback state together.
+2. Owned-texture frame pointers could escape the active frame scope as reusable
+   `NativePointer` values.
+   - Action: frame-derived `NativePointer` instances now share the frame
+     validity predicate and throw after frame scope close.
+3. ESM named imports type-checked but failed at runtime for CommonJS exports.
+   - Action: root and value-bearing subpath CommonJS modules now use analyzable
+     named `module.exports.*` / `exports.*` assignments, with
+     `test/esm-smoke.mjs` covering ESM named imports.
+4. Published declarations depended on `Symbol.dispose` without loading the
+   disposable lib.
+   - Action: `index.d.cts` now references `esnext.disposable`.
+5. Round 2 validation was not recorded in this review log.
+   - Action: this log now records validation evidence for Round 2.
+6. The subpath type fixture omitted the camera subpath.
+   - Action: `test/subpath-types.test.cts` now imports and uses `CameraOptions`
+     from `@maplibre/native-ffi-node/camera`.
+7. The SPEC Worker checklist overstated native wrong-thread coverage.
+   - Action: the checklist now says the Node tests cover worker-local runtime
+     creation and detached public-handle guards, while native wrong-thread
+     status remains covered at the C ABI layer.
 
 Recorded limitations / not applied: none.
 

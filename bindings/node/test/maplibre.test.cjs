@@ -160,6 +160,8 @@ test("texture frame scopes expose borrowed pointers only while active", () => {
   let released = false;
   /** @type {import("..").MetalOwnedTextureFrame | undefined} */
   let scopedFrame;
+  /** @type {import("..").NativePointer | undefined} */
+  let scopedTexture;
   const result = RenderSessionHandle.prototype.withMetalOwnedTextureFrame.call(
     {
       native: {
@@ -186,7 +188,8 @@ test("texture frame scopes expose borrowed pointers only while active", () => {
       scopedFrame = frame;
       assert.equal(frame instanceof MetalOwnedTextureFrame, true);
       assert.equal(frame.width, 2);
-      assert.equal(frame.texture.address, 0x10n);
+      scopedTexture = frame.texture;
+      assert.equal(scopedTexture.address, 0x10n);
       assert.equal(frame.device.address, 0x20n);
       assert.equal(frame.pixelFormat, 80n);
       return "ok";
@@ -198,6 +201,9 @@ test("texture frame scopes expose borrowed pointers only while active", () => {
   const frameAfterScope = scopedFrame;
   assert.ok(frameAfterScope);
   assert.throws(() => frameAfterScope.width, InvalidStateError);
+  const textureAfterScope = scopedTexture;
+  assert.ok(textureAfterScope);
+  assert.throws(() => textureAfterScope.address, InvalidStateError);
 
   assert.equal(typeof VulkanOwnedTextureFrame, "function");
   assert.throws(

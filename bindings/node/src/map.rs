@@ -187,6 +187,7 @@ pub struct StyleImage {
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
     custom_geometry_sources: Mutex<HashMap<String, Box<CustomGeometrySourceState>>>,
+    retired_custom_geometry_sources: Mutex<Vec<CustomGeometrySourceStateBox>>,
 }
 
 #[napi(js_name = "createNativeMapHandle")]
@@ -205,6 +206,7 @@ pub fn create_native_map_handle(
     Ok(NativeMapHandle {
         state,
         custom_geometry_sources: Mutex::new(HashMap::new()),
+        retired_custom_geometry_sources: Mutex::new(Vec::new()),
     })
 }
 
@@ -216,7 +218,14 @@ impl NativeMapHandle {
 
     #[napi]
     pub fn close(&self) -> Result<()> {
-        unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)
+        unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)?;
+        if let Ok(mut sources) = self.custom_geometry_sources.lock() {
+            sources.clear();
+        }
+        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
+            retired_sources.clear();
+        }
+        Ok(())
     }
 
     #[napi(getter)]
@@ -742,10 +751,14 @@ impl NativeMapHandle {
         })
         .map_err(error::from_core)?;
         if removed {
-            self.custom_geometry_sources
+            let removed_source = self
+                .custom_geometry_sources
                 .lock()
                 .expect("custom geometry source mutex poisoned")
                 .remove(&source_id_string);
+            if let Some(source) = removed_source {
+                self.retire_custom_geometry_source(source);
+            }
         }
         Ok(removed)
     }
@@ -982,10 +995,14 @@ impl NativeMapHandle {
         })
         .map_err(error::from_core)?;
         if let Some(state) = state {
-            self.custom_geometry_sources
+            let replaced = self
+                .custom_geometry_sources
                 .lock()
                 .expect("custom geometry source mutex poisoned")
                 .insert(source_id, state);
+            if let Some(replaced) = replaced {
+                self.retire_custom_geometry_source(replaced);
+            }
         }
         Ok(())
     }
@@ -1666,11 +1683,16 @@ impl NativeMapHandle {
 
 impl Drop for NativeMapHandle {
     fn drop(&mut self) {
-        if self.state.leak_for_report().is_some()
-            && let Ok(mut sources) = self.custom_geometry_sources.lock()
-        {
-            for (_, source) in sources.drain() {
-                Box::leak(source);
+        if self.state.leak_for_report().is_some() {
+            if let Ok(mut sources) = self.custom_geometry_sources.lock() {
+                for (_, source) in sources.drain() {
+                    Box::leak(source);
+                }
+            }
+            if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
+                for source in retired_sources.drain(..) {
+                    Box::leak(source);
+                }
             }
         }
     }
@@ -2143,9 +2165,21 @@ fn location_indicator_image_kind_from_string(kind: &str) -> Result<u32> {
     }
 }
 
+type CustomGeometrySourceStateBox = Box<CustomGeometrySourceState>;
+
 struct CustomGeometrySourceState {
     fetch_tile: Arc<ThreadsafeFunction<CanonicalTileId>>,
     cancel_tile: Option<Arc<ThreadsafeFunction<CanonicalTileId>>>,
+}
+
+impl NativeMapHandle {
+    fn retire_custom_geometry_source(&self, source: CustomGeometrySourceStateBox) {
+        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
+            retired_sources.push(source);
+        } else {
+            Box::leak(source);
+        }
+    }
 }
 
 impl CustomGeometrySourceState {

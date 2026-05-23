@@ -2,6 +2,4 @@
 
 const root = require("./index.cjs");
 
-module.exports = {
-  ResourceRequestHandle: root.ResourceRequestHandle,
-};
+exports.ResourceRequestHandle = root.ResourceRequestHandle;

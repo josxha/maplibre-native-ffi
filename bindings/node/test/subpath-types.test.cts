@@ -1,3 +1,4 @@
+import { type CameraOptions } from "@maplibre/native-ffi-node/camera";
 import { InvalidArgumentError } from "@maplibre/native-ffi-node/error";
 import {
   projectedMetersForLatLng,
@@ -24,6 +25,7 @@ import {
 } from "@maplibre/native-ffi-node/runtime";
 import { type StyleImageInput } from "@maplibre/native-ffi-node/style";
 
+const camera: CameraOptions = { center: { latitude: 1, longitude: 2 } };
 const coordinate: LatLng = { latitude: 1, longitude: 2 };
 projectedMetersForLatLng(coordinate);
 setLogCallback((record: LogRecord) => {
@@ -52,6 +54,7 @@ const image: StyleImageInput = {
   pixels: new Uint8Array(4),
 };
 const json: JsonValue = { ok: true };
+void camera;
 void descriptor;
 void geometry;
 void response;

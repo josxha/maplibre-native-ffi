@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" />
 export declare const MaplibreStatus: Readonly<{
   invalidArgument: "invalid-argument";
   invalidState: "invalid-state";
