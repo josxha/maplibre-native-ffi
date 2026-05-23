@@ -581,6 +581,8 @@ area instead of retesting all native C validation rules.
       native request release.
 - [ ] Session-owned texture frame values reject use after frame scope close.
 - [ ] Node Worker tests cover wrong-environment and wrong-thread behavior.
+      _(Initial worker-local runtime and non-cloneable handle coverage added;
+      native wrong-thread status coverage remains.)_
 - [ ] `mise run //bindings/node:build` passes.
 - [ ] `mise run //bindings/node:test` passes.
 - [ ] `mise run //bindings/node:ci` passes.

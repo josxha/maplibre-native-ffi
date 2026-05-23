@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
+const path = require("node:path");
 const test = require("node:test");
+const { Worker } = require("node:worker_threads");
 
 const {
   cVersion,
@@ -100,6 +102,50 @@ test("native buffer owns byte storage for render interop", () => {
     () => NativeBuffer.from(/** @type {any} */ ("bytes")),
     InvalidArgumentError,
   );
+});
+
+test("handles stay local while workers create their own runtime", async () => {
+  const worker = new Worker(
+    `
+      const { parentPort, workerData } = require("node:worker_threads");
+      const { RuntimeHandle } = require(workerData.packageRoot);
+      try {
+        const runtime = new RuntimeHandle();
+        runtime.close();
+        parentPort.postMessage({ ok: true });
+      } catch (error) {
+        parentPort.postMessage({
+          ok: false,
+          name: error?.name,
+          message: error?.message,
+        });
+      }
+    `,
+    {
+      eval: true,
+      workerData: { packageRoot: path.join(__dirname, "..") },
+    },
+  );
+  const runtime = new RuntimeHandle();
+
+  try {
+    const clone = structuredClone(runtime);
+    assert.equal(clone instanceof RuntimeHandle, false);
+    assert.equal(typeof clone.close, "undefined");
+  } finally {
+    runtime.close();
+  }
+
+  const result = await new Promise((resolve, reject) => {
+    worker.once("message", resolve);
+    worker.once("error", reject);
+    worker.once("exit", (code) => {
+      if (code !== 0) {
+        reject(new Error(`worker exited with code ${code}`));
+      }
+    });
+  });
+  assert.deepEqual(result, { ok: true });
 });
 
 test("runtime handle supports options, explicit close, and idempotent disposal", () => {
