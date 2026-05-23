@@ -144,11 +144,23 @@ export declare class RuntimeHandle {
   [Symbol.dispose](): void;
 }
 
+export declare class MapProjectionHandle {
+  constructor(map: MapHandle);
+  readonly closed: boolean;
+  close(): void;
+  getCamera(): CameraOptions;
+  setCamera(camera: CameraOptions): void;
+  pixelForLatLng(coordinate: LatLng): ScreenPoint;
+  latLngForPixel(point: ScreenPoint): LatLng;
+  [Symbol.dispose](): void;
+}
+
 export declare class MapHandle {
   constructor(runtime: RuntimeHandle, options?: MapOptions | null);
   readonly closed: boolean;
   renderingStatsViewEnabled: boolean;
   close(): void;
+  createProjection(): MapProjectionHandle;
   requestRepaint(): void;
   requestStillImage(): void;
   isFullyLoaded(): boolean;

@@ -50,6 +50,10 @@ pub fn create_native_map_handle(
 
 #[napi]
 impl NativeMapHandle {
+    pub(crate) fn as_ptr(&self) -> *mut sys::mln_map {
+        self.state.as_ptr()
+    }
+
     #[napi]
     pub fn close(&self) -> Result<()> {
         unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)
@@ -280,7 +284,7 @@ impl Default for MapOptions {
 }
 
 impl CameraOptions {
-    fn into_core(self) -> core::CameraOptions {
+    pub(crate) fn into_core(self) -> core::CameraOptions {
         let mut camera = core::CameraOptions::new();
         if let Some(center) = self.center {
             camera = camera.with_center(center.into_core());
@@ -297,7 +301,7 @@ impl CameraOptions {
         camera
     }
 
-    fn from_core(camera: core::CameraOptions) -> Self {
+    pub(crate) fn from_core(camera: core::CameraOptions) -> Self {
         Self {
             center: camera.center.map(LatLng::from_core),
             zoom: camera.zoom,

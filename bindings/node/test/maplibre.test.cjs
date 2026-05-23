@@ -7,6 +7,7 @@ const {
   InvalidStateError,
   MaplibreError,
   MapHandle,
+  MapProjectionHandle,
   latLngForProjectedMeters,
   MaplibreStatus,
   NativeBuffer,
@@ -174,6 +175,31 @@ test("map camera commands copy descriptor values", () => {
     assert.equal(camera.bearing, 10);
     assert.equal(camera.pitch, 20);
   } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
+test("map projection handle snapshots projection state", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 256, height: 256 });
+  let projection;
+
+  try {
+    map.jumpTo({ center: { latitude: 5, longitude: 6 }, zoom: 2 });
+    projection = map.createProjection();
+    assert.equal(projection instanceof MapProjectionHandle, true);
+    const point = projection.pixelForLatLng({ latitude: 5, longitude: 6 });
+    const roundTripped = projection.latLngForPixel(point);
+    assert.ok(Math.abs(roundTripped.latitude - 5) < 1e-9);
+    assert.ok(Math.abs(roundTripped.longitude - 6) < 1e-9);
+    projection.setCamera({ center: { latitude: 7, longitude: 8 }, zoom: 3 });
+    assert.ok(projection.getCamera().center);
+    projection.close();
+    assert.equal(projection.closed, true);
+    projection.close();
+  } finally {
+    projection?.close();
     map.close();
     runtime.close();
   }

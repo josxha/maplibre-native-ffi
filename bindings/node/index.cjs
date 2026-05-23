@@ -278,6 +278,45 @@ class RuntimeHandle {
   }
 }
 
+class MapProjectionHandle {
+  constructor(map) {
+    if (!(map instanceof MapHandle)) {
+      throw new InvalidArgumentError(null, "map must be a MapHandle");
+    }
+    this.native = translateNativeErrors(() =>
+      native.createNativeMapProjectionHandle(map.native),
+    );
+  }
+
+  close() {
+    return translateNativeErrors(() => this.native.close());
+  }
+
+  get closed() {
+    return this.native.closed;
+  }
+
+  getCamera() {
+    return translateNativeErrors(() => this.native.getCamera());
+  }
+
+  setCamera(camera) {
+    return translateNativeErrors(() => this.native.setCamera(camera));
+  }
+
+  pixelForLatLng(coordinate) {
+    return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
+  }
+
+  latLngForPixel(point) {
+    return translateNativeErrors(() => this.native.latLngForPixel(point));
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
 class MapHandle {
   constructor(runtime, options) {
     if (!(runtime instanceof RuntimeHandle)) {
@@ -295,6 +334,10 @@ class MapHandle {
 
   get closed() {
     return this.native.closed;
+  }
+
+  createProjection() {
+    return new MapProjectionHandle(this);
   }
 
   requestRepaint() {
@@ -509,6 +552,7 @@ module.exports = {
   MaplibreStatus,
   RuntimeHandle,
   MapHandle,
+  MapProjectionHandle,
   NativePointer,
   NativeBuffer,
   cVersion,
