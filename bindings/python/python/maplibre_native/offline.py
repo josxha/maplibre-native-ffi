@@ -132,6 +132,7 @@ class OfflineOperationHandle:
         self._runtime = runtime
         self._operation_id = operation_id
         self._closed = False
+        runtime._register_offline_operation(self)  # noqa: SLF001
 
     @property
     def operation_id(self) -> int:
@@ -148,7 +149,16 @@ class OfflineOperationHandle:
         if self._closed:
             return
         self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
+        self._mark_closed()
+
+    def _mark_closed(self) -> None:
+        if self._closed:
+            return
         self._closed = True
+        self._runtime._unregister_offline_operation(self)  # noqa: SLF001
+
+    def _mark_runtime_closed(self) -> None:
+        self._mark_closed()
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -168,14 +178,14 @@ class OfflineOperationHandle:
         raw = self._runtime._native.offline_region_create_take_result(
             self._operation_id
         )  # noqa: SLF001
-        self._closed = True
+        self._mark_closed()
         return OfflineRegionInfo.from_native(raw)
 
     def take_optional_region(self) -> "OfflineRegionInfo | None":
         """Take a completed optional region snapshot result."""
         self._ensure_open()
         raw = self._runtime._native.offline_region_get_take_result(self._operation_id)  # noqa: SLF001
-        self._closed = True
+        self._mark_closed()
         return OfflineRegionInfo.from_native(raw) if raw is not None else None
 
     def take_region_list(
@@ -193,7 +203,7 @@ class OfflineOperationHandle:
             raw = self._runtime._native.offline_regions_list_take_result(
                 self._operation_id
             )  # noqa: SLF001
-        self._closed = True
+        self._mark_closed()
         return tuple(OfflineRegionInfo.from_native(region) for region in raw)
 
     def take_updated_region(self) -> "OfflineRegionInfo":
@@ -202,7 +212,7 @@ class OfflineOperationHandle:
         raw = self._runtime._native.offline_region_update_metadata_take_result(
             self._operation_id
         )  # noqa: SLF001
-        self._closed = True
+        self._mark_closed()
         return OfflineRegionInfo.from_native(raw)
 
     def take_status(self) -> "OfflineRegionStatus":
@@ -211,7 +221,7 @@ class OfflineOperationHandle:
         raw = self._runtime._native.offline_region_get_status_take_result(
             self._operation_id
         )  # noqa: SLF001
-        self._closed = True
+        self._mark_closed()
         return OfflineRegionStatus.from_native(raw)
 
     def __enter__(self) -> "OfflineOperationHandle":

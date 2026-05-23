@@ -1244,6 +1244,17 @@ def test_offline_operation_take_results_convert_public_values() -> None:
     class FakeRuntime:
         def __init__(self) -> None:
             self._native = FakeNativeRuntime()
+            self.operations: set[offline.OfflineOperationHandle] = set()
+
+        def _register_offline_operation(
+            self, operation: offline.OfflineOperationHandle
+        ) -> None:
+            self.operations.add(operation)
+
+        def _unregister_offline_operation(
+            self, operation: offline.OfflineOperationHandle
+        ) -> None:
+            self.operations.discard(operation)
 
     def region_wire(metadata: bytes) -> dict[str, object]:
         return {
@@ -1284,6 +1295,7 @@ def test_offline_operation_take_results_convert_public_values() -> None:
     assert updated.metadata == b"updated"
     assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
     assert status.completed_resource_count == 2
+    assert runtime.operations == set()
 
 
 def test_offline_operation_take_rejects_closed_handles() -> None:
@@ -1331,6 +1343,17 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
     class FakeRuntime:
         def __init__(self) -> None:
             self._native = FakeNativeRuntime()
+            self.operations: set[offline.OfflineOperationHandle] = set()
+
+        def _register_offline_operation(
+            self, operation: offline.OfflineOperationHandle
+        ) -> None:
+            self.operations.add(operation)
+
+        def _unregister_offline_operation(
+            self, operation: offline.OfflineOperationHandle
+        ) -> None:
+            self.operations.discard(operation)
 
     runtime = FakeRuntime()
 
@@ -1356,6 +1379,21 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
 
     assert runtime._native.discarded == list(range(20, 26))  # noqa: SLF001
     assert runtime._native.status_takes == 1  # noqa: SLF001
+    assert runtime.operations == set()
+
+
+def test_runtime_close_marks_live_offline_operations_closed(tmp_path: Path) -> None:
+    runtime = mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path)))
+    operation = runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
+
+    assert not operation.closed
+    runtime.close()
+
+    assert runtime.closed
+    assert operation.closed
+    operation.close()
+    with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
+        operation.take_status()
 
 
 def test_ambient_cache_operation_starts_and_discards_through_public_api(

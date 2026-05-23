@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
+import weakref
 
 from . import _native
 from .offline import (
@@ -325,6 +326,9 @@ class RuntimeHandle:
             options.cache_path,
             options.maximum_cache_size,
         )
+        self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
+            weakref.WeakSet()
+        )
 
     @property
     def closed(self) -> bool:
@@ -334,6 +338,17 @@ class RuntimeHandle:
     def close(self) -> None:
         """Release this runtime handle exactly once."""
         self._native.close()
+        self._close_offline_operations()
+
+    def _register_offline_operation(self, operation: OfflineOperationHandle) -> None:
+        self._offline_operations.add(operation)
+
+    def _unregister_offline_operation(self, operation: OfflineOperationHandle) -> None:
+        self._offline_operations.discard(operation)
+
+    def _close_offline_operations(self) -> None:
+        for operation in tuple(self._offline_operations):
+            operation._mark_runtime_closed()  # noqa: SLF001
 
     def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
         try:
