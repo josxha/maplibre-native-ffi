@@ -1095,7 +1095,11 @@ final class MapHandle {
   }
 
   /// Adds a vector source with a TileJSON URL.
-  void addVectorSourceUrl(String sourceId, String url) {
+  void addVectorSourceUrl(
+    String sourceId,
+    String url, {
+    TileSourceOptions options = const TileSourceOptions(),
+  }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
@@ -1104,14 +1108,38 @@ final class MapHandle {
           _pointer,
           nativeId.value,
           nativeUrl.value,
-          nullptr,
+          _nativeTileSourceOptions(options, arena),
+        ),
+      );
+    });
+  }
+
+  /// Adds a vector source with inline tile URL templates.
+  void addVectorSourceTiles(
+    String sourceId,
+    List<String> tiles, {
+    TileSourceOptions options = const TileSourceOptions(),
+  }) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        _c.mapAddVectorSourceTiles(
+          _pointer,
+          nativeId.value,
+          _stringViewArray(tiles, arena),
+          tiles.length,
+          _nativeTileSourceOptions(options, arena),
         ),
       );
     });
   }
 
   /// Adds a raster source with a TileJSON URL.
-  void addRasterSourceUrl(String sourceId, String url) {
+  void addRasterSourceUrl(
+    String sourceId,
+    String url, {
+    TileSourceOptions options = const TileSourceOptions(),
+  }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
@@ -1120,14 +1148,38 @@ final class MapHandle {
           _pointer,
           nativeId.value,
           nativeUrl.value,
-          nullptr,
+          _nativeTileSourceOptions(options, arena),
+        ),
+      );
+    });
+  }
+
+  /// Adds a raster source with inline tile URL templates.
+  void addRasterSourceTiles(
+    String sourceId,
+    List<String> tiles, {
+    TileSourceOptions options = const TileSourceOptions(),
+  }) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        _c.mapAddRasterSourceTiles(
+          _pointer,
+          nativeId.value,
+          _stringViewArray(tiles, arena),
+          tiles.length,
+          _nativeTileSourceOptions(options, arena),
         ),
       );
     });
   }
 
   /// Adds a raster DEM source with a TileJSON URL.
-  void addRasterDemSourceUrl(String sourceId, String url) {
+  void addRasterDemSourceUrl(
+    String sourceId,
+    String url, {
+    TileSourceOptions options = const TileSourceOptions(),
+  }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
@@ -1136,9 +1188,134 @@ final class MapHandle {
           _pointer,
           nativeId.value,
           nativeUrl.value,
-          nullptr,
+          _nativeTileSourceOptions(options, arena),
         ),
       );
+    });
+  }
+
+  /// Adds a raster DEM source with inline tile URL templates.
+  void addRasterDemSourceTiles(
+    String sourceId,
+    List<String> tiles, {
+    TileSourceOptions options = const TileSourceOptions(),
+  }) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        _c.mapAddRasterDemSourceTiles(
+          _pointer,
+          nativeId.value,
+          _stringViewArray(tiles, arena),
+          tiles.length,
+          _nativeTileSourceOptions(options, arena),
+        ),
+      );
+    });
+  }
+
+  /// Adds an image source that loads its image from [url].
+  void addImageSourceUrl(
+    String sourceId,
+    List<LatLng> coordinates,
+    String url,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapAddImageSourceUrl(
+          _pointer,
+          nativeId.value,
+          _latLngArray(coordinates, arena),
+          coordinates.length,
+          nativeUrl.value,
+        ),
+      );
+    });
+  }
+
+  /// Adds an image source with inline image pixels.
+  void addImageSourceImage(
+    String sourceId,
+    List<LatLng> coordinates,
+    PremultipliedRgba8Image image,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
+      nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
+      _check(
+        _c.mapAddImageSourceImage(
+          _pointer,
+          nativeId.value,
+          _latLngArray(coordinates, arena),
+          coordinates.length,
+          nativeImage,
+        ),
+      );
+    });
+  }
+
+  /// Updates an image source to load from [url].
+  void setImageSourceUrl(String sourceId, String url) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeUrl = nativeStringView(url, arena);
+      _check(
+        _c.mapSetImageSourceUrl(_pointer, nativeId.value, nativeUrl.value),
+      );
+    });
+  }
+
+  /// Updates an image source with inline image pixels.
+  void setImageSourceImage(String sourceId, PremultipliedRgba8Image image) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
+      nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
+      _check(_c.mapSetImageSourceImage(_pointer, nativeId.value, nativeImage));
+    });
+  }
+
+  /// Updates image source coordinates.
+  void setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        _c.mapSetImageSourceCoordinates(
+          _pointer,
+          nativeId.value,
+          _latLngArray(coordinates, arena),
+          coordinates.length,
+        ),
+      );
+    });
+  }
+
+  /// Copies image source coordinates, or null when the source is missing.
+  List<LatLng>? getImageSourceCoordinates(String sourceId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final outCoordinates = arena<raw.mln_lat_lng>(4);
+      final outCount = arena<Size>();
+      final outFound = arena<Bool>();
+      _check(
+        _c.mapGetImageSourceCoordinates(
+          _pointer,
+          nativeId.value,
+          outCoordinates,
+          4,
+          outCount,
+          outFound,
+        ),
+      );
+      return outFound.value
+          ? [
+              for (var index = 0; index < outCount.value; index += 1)
+                native_struct.latLngFromNative(outCoordinates[index]),
+            ]
+          : null;
     });
   }
 
@@ -2306,6 +2483,96 @@ _sourceFeatureQueryOptionsToNative(
         .pointer;
   }
   return nativeOptions;
+}
+
+Pointer<raw.mln_style_tile_source_options> _nativeTileSourceOptions(
+  TileSourceOptions options,
+  Allocator allocator,
+) {
+  final nativeOptions = allocator<raw.mln_style_tile_source_options>();
+  nativeOptions.ref = _c.styleTileSourceOptionsDefault();
+  final minZoom = options.minZoom;
+  if (minZoom != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
+        .value;
+    nativeOptions.ref.min_zoom = minZoom;
+  }
+  final maxZoom = options.maxZoom;
+  if (maxZoom != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
+        .value;
+    nativeOptions.ref.max_zoom = maxZoom;
+  }
+  final attribution = options.attribution;
+  if (attribution != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
+        .value;
+    nativeOptions.ref.attribution = nativeStringView(
+      attribution,
+      allocator,
+    ).value;
+  }
+  final scheme = options.scheme;
+  if (scheme != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
+        .value;
+    nativeOptions.ref.scheme = scheme.rawValue;
+  }
+  final bounds = options.bounds;
+  if (bounds != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
+        .value;
+    nativeOptions.ref.bounds = native_struct.latLngBoundsToNative(bounds);
+  }
+  final tileSize = options.tileSize;
+  if (tileSize != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
+        .value;
+    nativeOptions.ref.tile_size = tileSize;
+  }
+  final vectorEncoding = options.vectorEncoding;
+  if (vectorEncoding != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+        .value;
+    nativeOptions.ref.vector_encoding = vectorEncoding.rawValue;
+  }
+  final rasterDemEncoding = options.rasterDemEncoding;
+  if (rasterDemEncoding != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_style_tile_source_option_field
+        .MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
+        .value;
+    nativeOptions.ref.raster_encoding = rasterDemEncoding.rawValue;
+  }
+  return nativeOptions;
+}
+
+Pointer<raw.mln_lat_lng> _latLngArray(
+  List<LatLng> coordinates,
+  Allocator allocator,
+) {
+  if (coordinates.isEmpty) {
+    return nullptr.cast<raw.mln_lat_lng>();
+  }
+  final nativeCoordinates = allocator<raw.mln_lat_lng>(coordinates.length);
+  for (var index = 0; index < coordinates.length; index += 1) {
+    nativeCoordinates[index] = native_struct.latLngToNative(coordinates[index]);
+  }
+  return nativeCoordinates;
 }
 
 Pointer<raw.mln_string_view> _stringViewArray(

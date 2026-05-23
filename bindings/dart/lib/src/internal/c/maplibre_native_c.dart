@@ -661,6 +661,17 @@ final class MaplibreNativeCApi {
     Pointer<raw.mln_style_tile_source_options> options,
   ) => _raw.mln_map_add_vector_source_url(map, sourceId, url, options).value;
 
+  /// Adds a vector source with inline tile URLs.
+  int mapAddVectorSourceTiles(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_string_view> tiles,
+    int tileCount,
+    Pointer<raw.mln_style_tile_source_options> options,
+  ) => _raw
+      .mln_map_add_vector_source_tiles(map, sourceId, tiles, tileCount, options)
+      .value;
+
   /// Adds a raster source with a TileJSON URL.
   int mapAddRasterSourceUrl(
     Pointer<raw.mln_map> map,
@@ -668,6 +679,17 @@ final class MaplibreNativeCApi {
     raw.mln_string_view url,
     Pointer<raw.mln_style_tile_source_options> options,
   ) => _raw.mln_map_add_raster_source_url(map, sourceId, url, options).value;
+
+  /// Adds a raster source with inline tile URLs.
+  int mapAddRasterSourceTiles(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_string_view> tiles,
+    int tileCount,
+    Pointer<raw.mln_style_tile_source_options> options,
+  ) => _raw
+      .mln_map_add_raster_source_tiles(map, sourceId, tiles, tileCount, options)
+      .value;
 
   /// Adds a raster DEM source with a TileJSON URL.
   int mapAddRasterDemSourceUrl(
@@ -677,6 +699,109 @@ final class MaplibreNativeCApi {
     Pointer<raw.mln_style_tile_source_options> options,
   ) =>
       _raw.mln_map_add_raster_dem_source_url(map, sourceId, url, options).value;
+
+  /// Adds a raster DEM source with inline tile URLs.
+  int mapAddRasterDemSourceTiles(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_string_view> tiles,
+    int tileCount,
+    Pointer<raw.mln_style_tile_source_options> options,
+  ) => _raw
+      .mln_map_add_raster_dem_source_tiles(
+        map,
+        sourceId,
+        tiles,
+        tileCount,
+        options,
+      )
+      .value;
+
+  /// Adds an image source that loads from a URL.
+  int mapAddImageSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_lat_lng> coordinates,
+    int coordinateCount,
+    raw.mln_string_view url,
+  ) => _raw
+      .mln_map_add_image_source_url(
+        map,
+        sourceId,
+        coordinates,
+        coordinateCount,
+        url,
+      )
+      .value;
+
+  /// Adds an image source with inline image pixels.
+  int mapAddImageSourceImage(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_lat_lng> coordinates,
+    int coordinateCount,
+    Pointer<raw.mln_premultiplied_rgba8_image> image,
+  ) => _raw
+      .mln_map_add_image_source_image(
+        map,
+        sourceId,
+        coordinates,
+        coordinateCount,
+        image,
+      )
+      .value;
+
+  /// Updates an image source to load from a URL.
+  int mapSetImageSourceUrl(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    raw.mln_string_view url,
+  ) => _raw.mln_map_set_image_source_url(map, sourceId, url).value;
+
+  /// Updates an image source with inline image pixels.
+  int mapSetImageSourceImage(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_premultiplied_rgba8_image> image,
+  ) => _raw.mln_map_set_image_source_image(map, sourceId, image).value;
+
+  /// Updates image source coordinates.
+  int mapSetImageSourceCoordinates(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_lat_lng> coordinates,
+    int coordinateCount,
+  ) => _raw
+      .mln_map_set_image_source_coordinates(
+        map,
+        sourceId,
+        coordinates,
+        coordinateCount,
+      )
+      .value;
+
+  /// Copies image source coordinates.
+  int mapGetImageSourceCoordinates(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_lat_lng> outCoordinates,
+    int coordinateCapacity,
+    Pointer<Size> outCoordinateCount,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_map_get_image_source_coordinates(
+        map,
+        sourceId,
+        outCoordinates,
+        coordinateCapacity,
+        outCoordinateCount,
+        outFound,
+      )
+      .value;
+
+  /// Returns default tile source options.
+  raw.mln_style_tile_source_options styleTileSourceOptionsDefault() =>
+      _raw.mln_style_tile_source_options_default();
 
   /// Returns default custom geometry source options.
   raw.mln_custom_geometry_source_options customGeometrySourceOptionsDefault() =>

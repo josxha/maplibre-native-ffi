@@ -198,6 +198,74 @@ void main() {
         SourceType.vector,
       );
       expect(map.removeStyleSource('dart-vector-source'), isTrue);
+      map.addVectorSourceTiles(
+        'dart-vector-tiles-source',
+        const ['https://example.com/{z}/{x}/{y}.mvt'],
+        options: const TileSourceOptions(minZoom: 0, maxZoom: 14),
+      );
+      expect(
+        map.getStyleSourceInfo('dart-vector-tiles-source')!.type,
+        SourceType.vector,
+      );
+      expect(map.removeStyleSource('dart-vector-tiles-source'), isTrue);
+      map.addRasterSourceTiles('dart-raster-tiles-source', const [
+        'https://example.com/{z}/{x}/{y}.png',
+      ], options: const TileSourceOptions(tileSize: 256));
+      expect(
+        map.getStyleSourceInfo('dart-raster-tiles-source')!.type,
+        SourceType.raster,
+      );
+      expect(map.removeStyleSource('dart-raster-tiles-source'), isTrue);
+      map.addRasterDemSourceTiles(
+        'dart-raster-dem-tiles-source',
+        const ['https://example.com/{z}/{x}/{y}.png'],
+        options: const TileSourceOptions(
+          tileSize: 256,
+          rasterDemEncoding: RasterDemEncoding.terrarium,
+        ),
+      );
+      expect(
+        map.getStyleSourceInfo('dart-raster-dem-tiles-source')!.type,
+        SourceType.rasterDem,
+      );
+      expect(map.removeStyleSource('dart-raster-dem-tiles-source'), isTrue);
+      const imageSourceCoordinates = [
+        LatLng(1, -1),
+        LatLng(1, 1),
+        LatLng(-1, 1),
+        LatLng(-1, -1),
+      ];
+      map.addImageSourceImage(
+        'dart-image-source',
+        imageSourceCoordinates,
+        PremultipliedRgba8Image(
+          width: 1,
+          height: 1,
+          stride: 4,
+          bytes: Uint8List.fromList([0, 255, 0, 255]),
+        ),
+      );
+      expect(
+        map.getStyleSourceInfo('dart-image-source')!.type,
+        SourceType.image,
+      );
+      expect(
+        map.getImageSourceCoordinates('dart-image-source'),
+        imageSourceCoordinates,
+      );
+      map.setImageSourceUrl(
+        'dart-image-source',
+        'https://example.com/image.png',
+      );
+      map.setImageSourceCoordinates(
+        'dart-image-source',
+        imageSourceCoordinates.reversed.toList(),
+      );
+      expect(
+        map.getImageSourceCoordinates('dart-image-source'),
+        imageSourceCoordinates.reversed.toList(),
+      );
+      expect(map.removeStyleSource('dart-image-source'), isTrue);
 
       final fetchedTiles = <CanonicalTileId>[];
       map.addCustomGeometrySource(
