@@ -8,9 +8,10 @@ from enum import IntFlag
 from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
+from .json import JsonLike, JsonObjectLike, JsonValue
+
 if TYPE_CHECKING:
     from .geo import Feature
-    from .json import JsonLike, JsonObjectLike, JsonValue
     from .map import MapHandle
     from .query import (
         FeatureExtensionResult,
@@ -23,9 +24,6 @@ if TYPE_CHECKING:
 
 else:
     Feature = Any
-    JsonLike = Any
-    JsonObjectLike = Any
-    JsonValue = Any
     MapHandle = Any
     FeatureExtensionResult = Any
     FeatureStateSelector = Any

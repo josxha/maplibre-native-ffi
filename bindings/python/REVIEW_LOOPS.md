@@ -372,3 +372,60 @@ after Round 6 runtime wait fix.
   `uv run ty check --error-on-warning .mise`, and
   `mise run //bindings/python:ci` (59 Python tests, wheel build, and
   metadata/`_native` import check) passed.
+
+## Round 8
+
+Review fanout: final post-Round-7 check for lifecycle/threading, public
+typing/API correctness, and review-record accuracy.
+
+### Applied findings
+
+- Prevent concurrent runtime close from reporting false success while teardown
+  is in flight.
+  - Evidence: lifecycle review found `RuntimeHandle.close()` checked the native
+    address before entering the operation gate. A concurrent close could observe
+    the first close's temporary `None` address while native destroy was detached
+    and return success, even if the first close later failed and restored the
+    address.
+  - Resolution: `RuntimeOperationGate` now tracks terminal closed state.
+    `close()` enters the gate before any closed fast path, reports
+    `runtime is closing` to concurrent close callers, marks terminal closed only
+    after successful native destroy, and resets the gate after failed destroy so
+    retry semantics remain intact.
+- Preserve precise runtime JSON type hints where imports are acyclic.
+  - Evidence: public API review found `typing.get_type_hints()` resolved JSON
+    aliases in `map.py` and `render.py` to `Any` because the aliases were
+    imported only under `TYPE_CHECKING` and replaced by runtime fallbacks.
+  - Resolution: import `JsonLike`, `JsonObjectLike`, and `JsonValue`
+    unconditionally in `map.py` and `render.py`, keep `Any` fallbacks only for
+    cyclic annotation dependencies, and strengthen the smoke test to assert
+    representative JSON hints stay non-`Any` and JSON-shaped.
+
+### Rejected or deferred findings
+
+- Cyclic public annotation fallbacks remain `Any` at runtime where importing the
+  real type would create module cycles. Static `TYPE_CHECKING` imports keep the
+  source/type-checker surface precise.
+- Existing deferred items remain unchanged: broad private callback simulators,
+  backend-specific render readback/frame hardening,
+  packaging/distribution/CI-matrix expansion, broad enum deduplication, and
+  broader root export expansion.
+
+### Findings requiring user input
+
+- None in this round.
+
+### Validation
+
+- Focused regression:
+  `mise run //bindings/python:test --
+  tests/test_package.py::test_public_type_hints_are_resolvable
+  tests/test_package.py::test_runtime_close_from_wrong_thread_reports_wrong_thread
+  tests/test_package.py::test_runtime_handle_context_manager_closes_once
+  tests/test_package.py::test_resource_transform_registers_and_clears`
+- Round validation: `uv run ruff check bindings/python`,
+  `uv run ruff format --check bindings/python`,
+  `cargo check -p maplibre-native-python`,
+  `uv run ty check --error-on-warning .mise`, and
+  `mise run //bindings/python:ci` (59 Python tests, wheel build, and
+  metadata/`_native` import check) passed.

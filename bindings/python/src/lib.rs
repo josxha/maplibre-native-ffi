@@ -43,6 +43,7 @@ struct RuntimeOperationGate {
 struct RuntimeOperationGateState {
     active_detached_operation: bool,
     closing: bool,
+    closed: bool,
 }
 
 struct RuntimeDetachedOperationGuard<'a> {
@@ -238,6 +239,9 @@ impl RuntimeOperationGate {
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.closed {
+            return Err(invalid_state_error("runtime handle is closed"));
+        }
         if state.closing {
             return Err(invalid_state_error("runtime is closing"));
         }
@@ -250,11 +254,14 @@ impl RuntimeOperationGate {
         Ok(RuntimeDetachedOperationGuard { gate: self })
     }
 
-    fn begin_close(&self) -> PyResult<()> {
+    fn begin_close(&self) -> PyResult<bool> {
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.closed {
+            return Ok(false);
+        }
         if state.active_detached_operation {
             return Err(invalid_state_error(
                 "runtime has an active native operation",
@@ -264,7 +271,16 @@ impl RuntimeOperationGate {
             return Err(invalid_state_error("runtime is closing"));
         }
         state.closing = true;
-        Ok(())
+        Ok(true)
+    }
+
+    fn finish_successful_close(&self) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.closing = false;
+        state.closed = true;
     }
 
     fn finish_failed_close(&self) {
@@ -621,14 +637,13 @@ impl RenderSessionState {
 #[pymethods]
 impl RuntimeHandle {
     fn close(&self, py: Python<'_>) -> PyResult<()> {
-        if self.state().address().is_none() {
+        if !self.operation_gate.begin_close()? {
             return Ok(());
         }
-        self.operation_gate.begin_close()?;
         let runtime_address = {
             let state = self.state();
             let Some(runtime_address) = state.address() else {
-                self.operation_gate.finish_failed_close();
+                self.operation_gate.finish_successful_close();
                 return Ok(());
             };
             state.mark_closed();
@@ -654,6 +669,7 @@ impl RuntimeHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
+        self.operation_gate.finish_successful_close();
         Ok(())
     }
 

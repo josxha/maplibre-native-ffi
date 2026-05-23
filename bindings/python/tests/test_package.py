@@ -100,6 +100,24 @@ def test_public_type_hints_are_resolvable() -> None:
     for target in targets:
         assert isinstance(typing.get_type_hints(target), dict)
 
+    map_hints = typing.get_type_hints(map_module.MapHandle.add_style_source_json)
+    assert map_hints["source_json"] != typing.Any
+    assert "maplibre_native.json.JsonObject" in repr(map_hints["source_json"])
+
+    layer_hints = typing.get_type_hints(map_module.MapHandle.set_layer_property)
+    assert layer_hints["value"] != typing.Any
+    assert "maplibre_native.json.JsonUInt" in repr(layer_hints["value"])
+
+    style_hints = typing.get_type_hints(map_module.MapHandle.get_style_layer_json)
+    assert style_hints["return"] != typing.Any
+    assert "maplibre_native.json.JsonObject" in repr(style_hints["return"])
+
+    extension_hints = typing.get_type_hints(
+        render.RenderSessionHandle.query_feature_extensions
+    )
+    assert extension_hints["arguments"] != typing.Any
+    assert "maplibre_native.json.JsonObject" in repr(extension_hints["arguments"])
+
 
 def test_runtime_handle_context_manager_closes_once() -> None:
     with mln.RuntimeHandle() as runtime:

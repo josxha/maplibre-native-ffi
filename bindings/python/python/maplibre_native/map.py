@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from . import _native
 from .camera import EdgeInsets
+from .json import JsonLike, JsonObjectLike, JsonValue
 
 if TYPE_CHECKING:
     from .runtime import RuntimeHandle
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
         ScreenPoint,
     )
     from .geo import GeoJson, Geometry, LatLng, LatLngBounds
-    from .json import JsonLike, JsonObjectLike, JsonValue
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -60,9 +60,6 @@ else:
     Geometry = Any
     LatLng = Any
     LatLngBounds = Any
-    JsonLike = Any
-    JsonObjectLike = Any
-    JsonValue = Any
     MetalBorrowedTextureDescriptor = Any
     MetalOwnedTextureDescriptor = Any
     MetalSurfaceDescriptor = Any
