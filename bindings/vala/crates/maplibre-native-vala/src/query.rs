@@ -1,14 +1,11 @@
-use std::collections::HashMap;
 use std::ffi::{CStr, c_char};
 use std::ptr;
-use std::sync::{Mutex, OnceLock};
 
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
 
 use crate::glib::{self, GBoolean, GError, GFALSE, GObject, GTRUE, GType};
 use crate::render::{self, RenderSessionHandle};
-use crate::string_list::{self, StringList};
 use crate::values::{self, JsonValue};
 
 const FEATURE_QUERY_RESULT_TYPE_NAME: &CStr = c"MlnValaFeatureQueryResultHandle";
@@ -68,36 +65,6 @@ pub extern "C" fn mln_vala_source_feature_query_options_default(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match default_source_feature_query_options(out_options) {
-        Ok(()) => GTRUE,
-        Err(error) => {
-            glib::set_error(error_out, error);
-            GFALSE
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_rendered_feature_query_options_set_layer_ids(
-    options: *mut sys::mln_rendered_feature_query_options,
-    layer_ids: *const StringList,
-    error_out: *mut *mut GError,
-) -> GBoolean {
-    match set_rendered_feature_layer_ids(options, layer_ids) {
-        Ok(()) => GTRUE,
-        Err(error) => {
-            glib::set_error(error_out, error);
-            GFALSE
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_source_feature_query_options_set_source_layer_ids(
-    options: *mut sys::mln_source_feature_query_options,
-    source_layer_ids: *const StringList,
-    error_out: *mut *mut GError,
-) -> GBoolean {
-    match set_source_feature_layer_ids(options, source_layer_ids) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -284,94 +251,6 @@ fn default_source_feature_query_options(
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_source_feature_query_options_default() };
     glib::clear_optional_out_pointer(out_options, options)
-}
-
-fn rendered_layer_id_storage() -> &'static Mutex<HashMap<usize, StringList>> {
-    static STORAGE: OnceLock<Mutex<HashMap<usize, StringList>>> = OnceLock::new();
-    STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn source_layer_id_storage() -> &'static Mutex<HashMap<usize, StringList>> {
-    static STORAGE: OnceLock<Mutex<HashMap<usize, StringList>>> = OnceLock::new();
-    STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn set_rendered_feature_layer_ids(
-    options: *mut sys::mln_rendered_feature_query_options,
-    layer_ids: *const StringList,
-) -> error::Result<()> {
-    if options.is_null() {
-        return Err(Error::invalid_argument(
-            "rendered feature query options are null",
-        ));
-    }
-    let Some(layer_ids) = string_list::copy_optional_list(layer_ids) else {
-        rendered_layer_id_storage()
-            .lock()
-            .expect("rendered query option storage lock poisoned")
-            .remove(&(options as usize));
-        unsafe {
-            (*options).layer_ids = ptr::null();
-            (*options).layer_id_count = 0;
-            (*options).fields &= !sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
-        }
-        return Ok(());
-    };
-    let layer_id_ptr = layer_ids.as_ptr();
-    let layer_id_count = layer_ids.len();
-    rendered_layer_id_storage()
-        .lock()
-        .expect("rendered query option storage lock poisoned")
-        .insert(options as usize, layer_ids);
-    unsafe {
-        (*options).layer_ids = layer_id_ptr;
-        (*options).layer_id_count = layer_id_count;
-        if layer_id_count == 0 {
-            (*options).fields &= !sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
-        } else {
-            (*options).fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
-        }
-    }
-    Ok(())
-}
-
-fn set_source_feature_layer_ids(
-    options: *mut sys::mln_source_feature_query_options,
-    source_layer_ids: *const StringList,
-) -> error::Result<()> {
-    if options.is_null() {
-        return Err(Error::invalid_argument(
-            "source feature query options are null",
-        ));
-    }
-    let Some(source_layer_ids) = string_list::copy_optional_list(source_layer_ids) else {
-        source_layer_id_storage()
-            .lock()
-            .expect("source query option storage lock poisoned")
-            .remove(&(options as usize));
-        unsafe {
-            (*options).source_layer_ids = ptr::null();
-            (*options).source_layer_id_count = 0;
-            (*options).fields &= !sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
-        }
-        return Ok(());
-    };
-    let source_layer_id_ptr = source_layer_ids.as_ptr();
-    let source_layer_id_count = source_layer_ids.len();
-    source_layer_id_storage()
-        .lock()
-        .expect("source query option storage lock poisoned")
-        .insert(options as usize, source_layer_ids);
-    unsafe {
-        (*options).source_layer_ids = source_layer_id_ptr;
-        (*options).source_layer_id_count = source_layer_id_count;
-        if source_layer_id_count == 0 {
-            (*options).fields &= !sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
-        } else {
-            (*options).fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
-        }
-    }
-    Ok(())
 }
 
 fn rendered_query_geometry_point(

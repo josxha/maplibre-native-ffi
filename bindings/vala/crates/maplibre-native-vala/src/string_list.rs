@@ -139,7 +139,3 @@ pub(crate) fn string_list_ref(list: *const StringList) -> Option<&'static String
     // they explicitly copy it into descriptor-owned storage.
     Some(unsafe { &*list })
 }
-
-pub(crate) fn copy_optional_list(list: *const StringList) -> Option<StringList> {
-    string_list_ref(list).cloned()
-}

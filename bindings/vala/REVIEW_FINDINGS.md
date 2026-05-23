@@ -653,3 +653,45 @@ Review artifacts:
 - `mise run //bindings/vala:ci`
 - `mise run fix`
 - `mise run test`
+
+## Round 17
+
+Review artifacts:
+
+- `review-loop/round17-api-surface.md`
+- `review-loop/round17-lifecycle.md`
+- `review-loop/round17-validation-docs.md`
+
+### Applied findings
+
+- Hid runtime-event raw diagnostic payload fields from generated Vala, GIR, and
+  typelib-derived GIR surfaces while preserving typed event fields and existing
+  `RuntimeEvent` raw getter methods.
+- Removed scanner-header and metadata entries for sidecar-backed descriptor
+  setters that had been hidden from Vala, including feature-state selector
+  string setters, query option string-list setters, and style tile source
+  attribution.
+- Removed the now-unused global sidecar storage implementations for those hidden
+  setters from the Rust adapter.
+- Extended `check_generated_surfaces.py` to reject runtime-event raw payload
+  fields and the removed sidecar-backed descriptor setters in future generated
+  VAPI/GIR artifacts.
+
+### Rejected or deferred findings
+
+- The map-close custom-geometry in-flight test suggestion remains optional for
+  now because the lower-level in-flight state teardown invariant and the public
+  map-close callback release path are both covered; no reviewer classified it as
+  a blocker.
+
+### User-input-needed findings
+
+- None new.
+
+### Validation
+
+- `mise run //bindings/vala:ci`
+- `mise run fix`
+- `mise run test`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.gir`
+- `python bindings/vala/tools/check_generated_surfaces.py bindings/vala/build/vapi/maplibre-native.vapi bindings/vala/build/gir/MaplibreNative-0.1.typelib.gir`

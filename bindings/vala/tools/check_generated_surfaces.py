@@ -21,6 +21,7 @@ VAPI_FORBIDDEN_PATTERNS = {
     r"\b[A-Za-z]+OptionFields\b": "raw field-mask enum",
     r"\b(?:FeatureExtensionResultHandle|FeatureQueryResultHandle|JsonSnapshotHandle|OfflineRegionListHandle|OfflineRegionSnapshotHandle|StyleIdListHandle)(?:Class)?\b": "native result/list/snapshot handle",
     r"\bpublic\s+weak\s+string\b": "public weak string field",
+    r"\bset_(?:source_id|source_layer_id|feature_id|state_key|layer_ids|source_layer_ids|attribution)\b": "sidecar-backed descriptor setter",
 }
 
 VAPI_DESCRIPTOR_RECORDS = {
@@ -79,6 +80,18 @@ GIR_TOP_LEVEL_FORBIDDEN = {
     "StyleTileSourceOptionFields",
 }
 
+GIR_FORBIDDEN_METHODS = {
+    "FeatureStateSelector": {
+        "set_source_id",
+        "set_source_layer_id",
+        "set_feature_id",
+        "set_state_key",
+    },
+    "RenderedFeatureQueryOptions": {"set_layer_ids"},
+    "SourceFeatureQueryOptions": {"set_source_layer_ids"},
+    "StyleTileSourceOptions": {"set_attribution"},
+}
+
 GIR_FORBIDDEN_FIELDS = {
     "AnimationOptions": {"size", "fields"},
     "BoundOptions": {"size", "fields"},
@@ -116,6 +129,11 @@ GIR_FORBIDDEN_FIELDS = {
     "RenderedQueryGeometry": {"size", "data"},
     "ResourceRequest": {"size", "url", "prior_etag", "prior_data", "prior_data_size"},
     "ResourceResponse": {"size", "bytes", "byte_count", "error_message", "etag"},
+    "RuntimeEventOfflineOperationCompleted": {"raw_operation_kind", "raw_result_kind"},
+    "RuntimeEventOfflineRegionResponseError": {"raw_reason"},
+    "RuntimeEventRenderFrame": {"raw_mode"},
+    "RuntimeEventRenderMap": {"raw_mode"},
+    "RuntimeEventTileAction": {"raw_operation"},
     "RuntimeOptions": {"size", "flags", "asset_path", "cache_path"},
     "SourceFeatureQueryOptions": {
         "size",
@@ -189,12 +207,16 @@ def check_gir(path: Path) -> list[str]:
         if child_name in GIR_TOP_LEVEL_FORBIDDEN:
             errors.append(f"{path}: exposes top-level raw type {child_name}")
         forbidden_fields = GIR_FORBIDDEN_FIELDS.get(child_name, set())
+        forbidden_methods = GIR_FORBIDDEN_METHODS.get(child_name, set())
         for descendant in child.iter():
-            if local_name(descendant) != "field":
-                continue
-            field_name = descendant.attrib.get("name", "")
-            if field_name in forbidden_fields:
-                errors.append(f"{path}: exposes {child_name}.{field_name}")
+            descendant_name = descendant.attrib.get("name", "")
+            match local_name(descendant):
+                case "field":
+                    if descendant_name in forbidden_fields:
+                        errors.append(f"{path}: exposes {child_name}.{descendant_name}")
+                case "method" | "function":
+                    if descendant_name in forbidden_methods:
+                        errors.append(f"{path}: exposes {child_name}.{descendant_name}")
     return errors
 
 

@@ -1311,10 +1311,6 @@ gboolean mln_vala_style_tile_source_options_set_max_zoom(
 gboolean mln_vala_style_tile_source_options_set_tile_size(
   MlnValaStyleTileSourceOptions* options, uint32_t tile_size, GError** error
 );
-gboolean mln_vala_style_tile_source_options_set_attribution(
-  MlnValaStyleTileSourceOptions* options, const char* attribution,
-  GError** error
-);
 gboolean mln_vala_custom_geometry_source_options_default(
   MlnValaCustomGeometrySourceOptions* out_options, GError** error
 );
@@ -1389,20 +1385,6 @@ gboolean mln_vala_style_image_options_set_sdf(
   MlnValaStyleImageOptions* options, bool sdf, GError** error
 );
 
-gboolean mln_vala_feature_state_selector_set_source_id(
-  MlnValaFeatureStateSelector* selector, const char* source_id, GError** error
-);
-gboolean mln_vala_feature_state_selector_set_source_layer_id(
-  MlnValaFeatureStateSelector* selector, const char* source_layer_id,
-  GError** error
-);
-gboolean mln_vala_feature_state_selector_set_feature_id(
-  MlnValaFeatureStateSelector* selector, const char* feature_id, GError** error
-);
-gboolean mln_vala_feature_state_selector_set_state_key(
-  MlnValaFeatureStateSelector* selector, const char* state_key, GError** error
-);
-
 gboolean mln_vala_style_image_options_default(
   MlnValaStyleImageOptions* out_options, GError** error
 );
@@ -1412,36 +1394,9 @@ gboolean mln_vala_style_image_info_default(
 gboolean mln_vala_rendered_feature_query_options_default(
   MlnValaRenderedFeatureQueryOptions* out_options, GError** error
 );
-/**
- * mln_vala_rendered_feature_query_options_set_layer_ids:
- * @options: query options.
- * @layer_ids: (nullable): copied layer IDs; pass `NULL` to clear.
- * @error: return location for a `GError`, or `NULL`.
- *
- * Returns: `TRUE` on success; `FALSE` with @error set on failure.
- * Throws: MlnValaError
- */
-gboolean mln_vala_rendered_feature_query_options_set_layer_ids(
-  MlnValaRenderedFeatureQueryOptions* options,
-  const MlnValaStringList* layer_ids, GError** error
-);
 gboolean mln_vala_source_feature_query_options_default(
   MlnValaSourceFeatureQueryOptions* out_options, GError** error
 );
-/**
- * mln_vala_source_feature_query_options_set_source_layer_ids:
- * @options: query options.
- * @source_layer_ids: (nullable): copied source-layer IDs; pass `NULL` to clear.
- * @error: return location for a `GError`, or `NULL`.
- *
- * Returns: `TRUE` on success; `FALSE` with @error set on failure.
- * Throws: MlnValaError
- */
-gboolean mln_vala_source_feature_query_options_set_source_layer_ids(
-  MlnValaSourceFeatureQueryOptions* options,
-  const MlnValaStringList* source_layer_ids, GError** error
-);
-
 /**
  * mln_vala_rendered_query_geometry_point:
  * @point: (not nullable): screen point.

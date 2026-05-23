@@ -1,8 +1,8 @@
-use std::collections::{HashMap, hash_map::DefaultHasher};
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::hash::{Hash, Hasher};
 use std::ptr;
-use std::sync::{Condvar, Mutex, OnceLock};
+use std::sync::{Condvar, Mutex};
 
 use maplibre_native_core::error::{self, Error};
 use maplibre_native_sys as sys;
@@ -898,21 +898,6 @@ pub extern "C" fn mln_vala_style_tile_source_options_set_tile_size(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_style_tile_source_options_set_attribution(
-    options: *mut sys::mln_style_tile_source_options,
-    attribution: *const c_char,
-    error_out: *mut *mut GError,
-) -> GBoolean {
-    match set_style_tile_attribution(options, attribution) {
-        Ok(()) => GTRUE,
-        Err(error) => {
-            glib::set_error(error_out, error);
-            GFALSE
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_custom_geometry_source_options_default(
     out_options: *mut sys::mln_custom_geometry_source_options,
     error_out: *mut *mut GError,
@@ -1364,35 +1349,6 @@ export_bool_setter!(
     bool,
     sdf
 );
-export_bool_setter!(
-    mln_vala_feature_state_selector_set_source_id,
-    set_feature_state_source_id,
-    sys::mln_feature_state_selector,
-    *const c_char,
-    source_id
-);
-export_bool_setter!(
-    mln_vala_feature_state_selector_set_source_layer_id,
-    set_feature_state_source_layer_id,
-    sys::mln_feature_state_selector,
-    *const c_char,
-    source_layer_id
-);
-export_bool_setter!(
-    mln_vala_feature_state_selector_set_feature_id,
-    set_feature_state_feature_id,
-    sys::mln_feature_state_selector,
-    *const c_char,
-    feature_id
-);
-export_bool_setter!(
-    mln_vala_feature_state_selector_set_state_key,
-    set_feature_state_state_key,
-    sys::mln_feature_state_selector,
-    *const c_char,
-    state_key
-);
-
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_new(
     runtime: *mut RuntimeHandle,
@@ -3333,26 +3289,6 @@ fn set_style_tile_tile_size(
     Ok(())
 }
 
-fn style_tile_attribution_storage() -> &'static Mutex<HashMap<usize, CString>> {
-    static STORAGE: OnceLock<Mutex<HashMap<usize, CString>>> = OnceLock::new();
-    STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn set_style_tile_attribution(
-    options: *mut sys::mln_style_tile_source_options,
-    attribution: *const c_char,
-) -> error::Result<()> {
-    let options_ref = style_tile_options_mut(options)?;
-    let (owned, view) = owned_string_view(attribution, "style tile attribution")?;
-    style_tile_attribution_storage()
-        .lock()
-        .expect("style tile attribution storage lock poisoned")
-        .insert(options as usize, owned);
-    options_ref.attribution = view;
-    options_ref.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-    Ok(())
-}
-
 fn mut_struct<T>(ptr: *mut T, name: &str) -> error::Result<&'static mut T> {
     if ptr.is_null() {
         return Err(Error::invalid_argument(format!("{name} is null")));
@@ -3847,113 +3783,6 @@ fn set_style_image_sdf(options: *mut sys::mln_style_image_options, sdf: bool) ->
     let options = mut_struct(options, "style image options")?;
     options.sdf = sdf;
     options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
-    Ok(())
-}
-
-#[derive(Default)]
-struct FeatureStateSelectorStringStorage {
-    source_id: Option<CString>,
-    source_layer_id: Option<CString>,
-    feature_id: Option<CString>,
-    state_key: Option<CString>,
-}
-
-fn feature_state_selector_storage()
--> &'static Mutex<HashMap<usize, FeatureStateSelectorStringStorage>> {
-    static STORAGE: OnceLock<Mutex<HashMap<usize, FeatureStateSelectorStringStorage>>> =
-        OnceLock::new();
-    STORAGE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn initialize_feature_state_selector(selector: &mut sys::mln_feature_state_selector) {
-    selector.size = std::mem::size_of::<sys::mln_feature_state_selector>() as u32;
-}
-
-fn owned_string_view(
-    value: *const c_char,
-    label: &str,
-) -> error::Result<(CString, sys::mln_string_view)> {
-    if value.is_null() {
-        return Err(Error::invalid_argument(format!("{label} is null")));
-    }
-    let bytes = unsafe { CStr::from_ptr(value) }.to_bytes();
-    let owned = CString::new(bytes)
-        .map_err(|_| Error::invalid_argument(format!("{label} contains embedded NUL")))?;
-    let view = sys::mln_string_view {
-        data: owned.as_ptr(),
-        size: owned.as_bytes().len(),
-    };
-    Ok((owned, view))
-}
-
-fn set_feature_state_source_id(
-    selector: *mut sys::mln_feature_state_selector,
-    source_id: *const c_char,
-) -> error::Result<()> {
-    let (owned, view) = owned_string_view(source_id, "feature-state source ID")?;
-    let selector_ref = mut_struct(selector, "feature-state selector")?;
-    initialize_feature_state_selector(selector_ref);
-    feature_state_selector_storage()
-        .lock()
-        .expect("feature-state selector storage lock poisoned")
-        .entry(selector as usize)
-        .or_default()
-        .source_id = Some(owned);
-    selector_ref.source_id = view;
-    Ok(())
-}
-
-fn set_feature_state_source_layer_id(
-    selector: *mut sys::mln_feature_state_selector,
-    source_layer_id: *const c_char,
-) -> error::Result<()> {
-    let (owned, view) = owned_string_view(source_layer_id, "feature-state source layer ID")?;
-    let selector_ref = mut_struct(selector, "feature-state selector")?;
-    initialize_feature_state_selector(selector_ref);
-    feature_state_selector_storage()
-        .lock()
-        .expect("feature-state selector storage lock poisoned")
-        .entry(selector as usize)
-        .or_default()
-        .source_layer_id = Some(owned);
-    selector_ref.source_layer_id = view;
-    selector_ref.fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-    Ok(())
-}
-
-fn set_feature_state_feature_id(
-    selector: *mut sys::mln_feature_state_selector,
-    feature_id: *const c_char,
-) -> error::Result<()> {
-    let (owned, view) = owned_string_view(feature_id, "feature-state feature ID")?;
-    let selector_ref = mut_struct(selector, "feature-state selector")?;
-    initialize_feature_state_selector(selector_ref);
-    feature_state_selector_storage()
-        .lock()
-        .expect("feature-state selector storage lock poisoned")
-        .entry(selector as usize)
-        .or_default()
-        .feature_id = Some(owned);
-    selector_ref.feature_id = view;
-    selector_ref.fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-    Ok(())
-}
-
-fn set_feature_state_state_key(
-    selector: *mut sys::mln_feature_state_selector,
-    state_key: *const c_char,
-) -> error::Result<()> {
-    let (owned, view) = owned_string_view(state_key, "feature-state state key")?;
-    let selector_ref = mut_struct(selector, "feature-state selector")?;
-    initialize_feature_state_selector(selector_ref);
-    feature_state_selector_storage()
-        .lock()
-        .expect("feature-state selector storage lock poisoned")
-        .entry(selector as usize)
-        .or_default()
-        .state_key = Some(owned);
-    selector_ref.state_key = view;
-    selector_ref.fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
     Ok(())
 }
 
@@ -7111,73 +6940,6 @@ mod tests {
 
         glib::unref_object(map);
         glib::unref_object(runtime);
-    }
-
-    #[test]
-    fn feature_state_selector_setters_initialize_hidden_size() {
-        let expected_size = std::mem::size_of::<sys::mln_feature_state_selector>() as u32;
-
-        // SAFETY: Zeroed storage is initialized by the semantic setter.
-        let mut source_selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
-        assert_eq!(
-            mln_vala_feature_state_selector_set_source_id(
-                &mut source_selector,
-                c"source".as_ptr(),
-                ptr::null_mut(),
-            ),
-            GTRUE
-        );
-        assert_eq!(source_selector.size, expected_size);
-        assert!(!source_selector.source_id.data.is_null());
-
-        // SAFETY: Zeroed storage is initialized by the semantic setter.
-        let mut source_layer_selector: sys::mln_feature_state_selector =
-            unsafe { std::mem::zeroed() };
-        assert_eq!(
-            mln_vala_feature_state_selector_set_source_layer_id(
-                &mut source_layer_selector,
-                c"source-layer".as_ptr(),
-                ptr::null_mut(),
-            ),
-            GTRUE
-        );
-        assert_eq!(source_layer_selector.size, expected_size);
-        assert_ne!(
-            source_layer_selector.fields & sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
-            0
-        );
-
-        // SAFETY: Zeroed storage is initialized by the semantic setter.
-        let mut feature_selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
-        assert_eq!(
-            mln_vala_feature_state_selector_set_feature_id(
-                &mut feature_selector,
-                c"feature".as_ptr(),
-                ptr::null_mut(),
-            ),
-            GTRUE
-        );
-        assert_eq!(feature_selector.size, expected_size);
-        assert_ne!(
-            feature_selector.fields & sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-            0
-        );
-
-        // SAFETY: Zeroed storage is initialized by the semantic setter.
-        let mut state_key_selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
-        assert_eq!(
-            mln_vala_feature_state_selector_set_state_key(
-                &mut state_key_selector,
-                c"state-key".as_ptr(),
-                ptr::null_mut(),
-            ),
-            GTRUE
-        );
-        assert_eq!(state_key_selector.size, expected_size);
-        assert_ne!(
-            state_key_selector.fields & sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY,
-            0
-        );
     }
 
     #[test]
