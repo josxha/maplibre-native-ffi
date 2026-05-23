@@ -678,6 +678,123 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert vulkan.format == 44
 
 
+def test_render_session_query_public_api_uses_query_and_geojson_wire_values() -> None:
+    class FakeNativeRenderSession:
+        closed = False
+        detached = False
+
+        def __init__(self) -> None:
+            self.rendered_call = None
+            self.source_call = None
+            self.extension_call = None
+
+        def query_rendered_features(
+            self,
+            geometry: object,
+            layer_ids: tuple[str, ...] | None,
+            filter_: object,
+        ) -> list[dict[str, object]]:
+            self.rendered_call = (geometry, layer_ids, filter_)
+            return [queried_feature_wire()]
+
+        def query_source_features(
+            self,
+            source_id: str,
+            source_layer_ids: tuple[str, ...] | None,
+            filter_: object,
+        ) -> list[dict[str, object]]:
+            self.source_call = (source_id, source_layer_ids, filter_)
+            return [queried_feature_wire()]
+
+        def query_feature_extensions(
+            self,
+            source_id: str,
+            feature: object,
+            extension: str,
+            extension_field: str,
+            arguments: object,
+        ) -> dict[str, object]:
+            self.extension_call = (
+                source_id,
+                feature,
+                extension,
+                extension_field,
+                arguments,
+            )
+            return {"type": 1, "value": {"type": "uint", "value": 7}}
+
+    def queried_feature_wire() -> dict[str, object]:
+        return {
+            "feature": {
+                "geometry": {
+                    "type": "point",
+                    "coordinate": {"latitude": 1.0, "longitude": 2.0},
+                },
+                "properties": [("name", "one")],
+                "identifier": {"type": "string", "value": "feature-1"},
+            },
+            "source_id": "points",
+            "source_layer_id": None,
+            "state": {"type": "object", "members": [("hover", True)]},
+        }
+
+    fake_native = FakeNativeRenderSession()
+    session = render.RenderSessionHandle(fake_native, object())
+    geometry = query.RenderedQueryGeometry.point_geometry(camera.ScreenPoint(1.0, 2.0))
+    rendered_options = query.RenderedFeatureQueryOptions(
+        layer_ids=("circle",),
+        filter=json.from_python(["==", ["get", "kind"], "park"]),
+    )
+    source_options = query.SourceFeatureQueryOptions(
+        source_layer_ids=("landuse",),
+        filter=json.from_python(["==", ["get", "kind"], "park"]),
+    )
+    feature = geo.Feature(
+        geometry=geo.point(1.0, 2.0),
+        properties=(json.JsonMember("name", "one"),),
+        identifier=geo.FeatureIdentifierString("feature-1"),
+    )
+
+    rendered = session.query_rendered_features(geometry, rendered_options)
+    source = session.query_source_features("points", source_options)
+    extension = session.query_feature_extensions(
+        "points",
+        feature,
+        "supercluster",
+        "leaves",
+        json.JsonObject.from_pairs([("limit", json.JsonUInt(10))]),
+    )
+
+    assert fake_native.rendered_call == (
+        {"type": "point", "point": (1.0, 2.0)},
+        ("circle",),
+        {
+            "type": "array",
+            "values": [
+                "==",
+                {"type": "array", "values": ["get", "kind"]},
+                "park",
+            ],
+        },
+    )
+    assert fake_native.source_call[0] == "points"
+    assert fake_native.source_call[1] == ("landuse",)
+    assert rendered[0].feature == feature
+    assert source[0].state == json.JsonObject.from_pairs([("hover", True)])
+    assert fake_native.extension_call == (
+        "points",
+        {
+            "geometry": {"type": "point", "coordinate": (1.0, 2.0)},
+            "properties": [("name", "one")],
+            "identifier": {"type": "string", "value": "feature-1"},
+        },
+        "supercluster",
+        "leaves",
+        {"type": "object", "members": [("limit", {"type": "uint", "value": 10})]},
+    )
+    assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
+
+
 def test_render_session_feature_state_public_api_uses_json_wire_values() -> None:
     class FakeNativeRenderSession:
         closed = False

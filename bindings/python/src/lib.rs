@@ -2494,6 +2494,151 @@ impl RenderSessionHandle {
             .map_err(map_error)
     }
 
+    fn query_rendered_features(
+        &self,
+        py: Python<'_>,
+        geometry: &Bound<'_, PyAny>,
+        layer_ids: Option<Vec<String>>,
+        filter: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let geometry = rendered_query_geometry_from_wire(geometry)?;
+        let geometry = maplibre_core::query::rendered_query_geometry_to_native(&geometry);
+        let filter = (!filter.is_none())
+            .then(|| json_value_from_wire(filter))
+            .transpose()?;
+        let mut options = maplibre_core::RenderedFeatureQueryOptions::new();
+        if let Some(layer_ids) = layer_ids {
+            options = options.with_layer_ids(layer_ids);
+        }
+        if let Some(filter) = filter {
+            options = options.with_filter(filter);
+        }
+        let options = maplibre_core::query::rendered_feature_query_options_to_native(&options)
+            .map_err(map_error)?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        // SAFETY: The C API validates the render-session pointer, query geometry/options, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_query_rendered_features(
+                state.as_ptr(),
+                geometry.as_ptr(),
+                options.as_ptr(),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_feature_query_result")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned feature-query result returned by the C API.
+        let features =
+            unsafe { maplibre_core::query::copy_feature_query_result(ptr) }.map_err(map_error)?;
+        queried_features_to_py(py, &features)
+    }
+
+    fn query_source_features(
+        &self,
+        py: Python<'_>,
+        source_id: String,
+        source_layer_ids: Option<Vec<String>>,
+        filter: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let filter = (!filter.is_none())
+            .then(|| json_value_from_wire(filter))
+            .transpose()?;
+        let mut options = maplibre_core::SourceFeatureQueryOptions::new();
+        if let Some(source_layer_ids) = source_layer_ids {
+            options = options.with_source_layer_ids(source_layer_ids);
+        }
+        if let Some(filter) = filter {
+            options = options.with_filter(filter);
+        }
+        let options = maplibre_core::query::source_feature_query_options_to_native(&options)
+            .map_err(map_error)?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        // SAFETY: The C API validates the render-session pointer, source ID, query options, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_query_source_features(
+                state.as_ptr(),
+                source_id.raw(),
+                options.as_ptr(),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_feature_query_result")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned feature-query result returned by the C API.
+        let features =
+            unsafe { maplibre_core::query::copy_feature_query_result(ptr) }.map_err(map_error)?;
+        queried_features_to_py(py, &features)
+    }
+
+    fn query_feature_extensions(
+        &self,
+        py: Python<'_>,
+        source_id: String,
+        feature: &Bound<'_, PyAny>,
+        extension: String,
+        extension_field: String,
+        arguments: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let feature = feature_from_wire(feature)?;
+        let feature =
+            maplibre_core::geojson::feature_try_to_native(&feature, 0).map_err(map_error)?;
+        let extension = maplibre_core::string::string_view(&extension);
+        let extension_field = maplibre_core::string::string_view(&extension_field);
+        let arguments = (!arguments.is_none())
+            .then(|| json_value_from_wire(arguments))
+            .transpose()?;
+        let arguments = arguments
+            .as_ref()
+            .map(maplibre_core::json::json_value_try_to_native)
+            .transpose()
+            .map_err(map_error)?;
+        let arguments_ptr = arguments
+            .as_ref()
+            .map_or(ptr::null(), |value| value.as_ptr());
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_extension_result>::new();
+        // SAFETY: The C API validates the render-session pointer, feature, strings, arguments, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_query_feature_extensions(
+                state.as_ptr(),
+                source_id.raw(),
+                feature.as_ptr(),
+                extension.raw(),
+                extension_field.raw(),
+                arguments_ptr,
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let ptr = out
+            .into_non_null("mln_feature_extension_result")
+            .map_err(map_error)?;
+        // SAFETY: ptr is an owned feature-extension result returned by the C API.
+        let result = unsafe { maplibre_core::query::copy_feature_extension_result(ptr) }
+            .map_err(map_error)?;
+        feature_extension_result_to_py(py, &result)
+    }
+
     fn set_feature_state(
         &self,
         source_id: String,
@@ -3696,6 +3841,41 @@ fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> Py
     Ok(dict.into_any().unbind())
 }
 
+fn rendered_query_geometry_from_wire(
+    raw: &Bound<'_, PyAny>,
+) -> PyResult<maplibre_core::RenderedQueryGeometry> {
+    let dict = raw.cast::<PyDict>()?;
+    let kind: String = required_dict_item(dict, "type")?.extract()?;
+    match kind.as_str() {
+        "point" => Ok(maplibre_core::RenderedQueryGeometry::point(
+            screen_point_core_from_wire(&required_dict_item(dict, "point")?)?,
+        )),
+        "box" => Ok(maplibre_core::RenderedQueryGeometry::box_(
+            maplibre_core::ScreenBox::new(
+                screen_point_core_from_wire(&required_dict_item(dict, "min")?)?,
+                screen_point_core_from_wire(&required_dict_item(dict, "max")?)?,
+            ),
+        )),
+        "line_string" => {
+            let points = required_dict_item(dict, "points")?;
+            let points = points.cast::<PyList>()?;
+            let mut copied = Vec::with_capacity(points.len());
+            for point in points.iter() {
+                copied.push(screen_point_core_from_wire(&point)?);
+            }
+            Ok(maplibre_core::RenderedQueryGeometry::line_string(copied))
+        }
+        _ => Err(invalid_argument_error(format!(
+            "unsupported rendered query geometry wire type: {kind}"
+        ))),
+    }
+}
+
+fn screen_point_core_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::ScreenPoint> {
+    let (x, y): (f64, f64) = raw.extract()?;
+    Ok(maplibre_core::ScreenPoint::new(x, y))
+}
+
 fn geojson_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::GeoJson> {
     let dict = raw.cast::<PyDict>()?;
     let kind: String = required_dict_item(dict, "type")?.extract()?;
@@ -3949,6 +4129,197 @@ fn json_value_to_wire(py: Python<'_>, value: &maplibre_core::JsonValue) -> PyRes
             "unsupported unknown JSON value variant",
         )),
     }
+}
+
+fn queried_features_to_py(
+    py: Python<'_>,
+    features: &[maplibre_core::query::QueriedFeature],
+) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for feature in features {
+        list.append(queried_feature_to_py(py, feature)?)?;
+    }
+    Ok(list.into_any().unbind())
+}
+
+fn queried_feature_to_py(
+    py: Python<'_>,
+    feature: &maplibre_core::query::QueriedFeature,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("feature", feature_to_py(py, &feature.feature)?)?;
+    dict.set_item("source_id", feature.source_id.as_deref())?;
+    dict.set_item("source_layer_id", feature.source_layer_id.as_deref())?;
+    dict.set_item(
+        "state",
+        feature
+            .state
+            .as_ref()
+            .map(|state| json_value_to_wire(py, state))
+            .transpose()?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn feature_extension_result_to_py(
+    py: Python<'_>,
+    result: &maplibre_core::query::FeatureExtensionResult,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    match result {
+        maplibre_core::query::FeatureExtensionResult::Value(value) => {
+            dict.set_item("type", sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE)?;
+            dict.set_item("value", json_value_to_wire(py, value)?)?;
+        }
+        maplibre_core::query::FeatureExtensionResult::FeatureCollection(features) => {
+            dict.set_item(
+                "type",
+                sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION,
+            )?;
+            let list = PyList::empty(py);
+            for feature in features {
+                list.append(feature_to_py(py, feature)?)?;
+            }
+            dict.set_item("feature_collection", list)?;
+        }
+        maplibre_core::query::FeatureExtensionResult::Unknown(raw) => {
+            dict.set_item("type", *raw)?;
+        }
+        _ => {
+            dict.set_item("type", 0)?;
+        }
+    }
+    Ok(dict.into_any().unbind())
+}
+
+fn feature_to_py(py: Python<'_>, feature: &maplibre_core::Feature) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("geometry", geometry_to_py(py, &feature.geometry)?)?;
+    let properties = PyList::empty(py);
+    for property in &feature.properties {
+        let pair = PyList::empty(py);
+        pair.append(&property.key)?;
+        pair.append(json_value_to_wire(py, &property.value)?)?;
+        properties.append(pair)?;
+    }
+    dict.set_item("properties", properties)?;
+    dict.set_item(
+        "identifier",
+        feature_identifier_to_py(py, &feature.identifier)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn feature_identifier_to_py(
+    py: Python<'_>,
+    identifier: &maplibre_core::FeatureIdentifier,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    match identifier {
+        maplibre_core::FeatureIdentifier::Null => {
+            dict.set_item("type", "null")?;
+        }
+        maplibre_core::FeatureIdentifier::UInt(value) => {
+            dict.set_item("type", "uint")?;
+            dict.set_item("value", *value)?;
+        }
+        maplibre_core::FeatureIdentifier::Int(value) => {
+            dict.set_item("type", "int")?;
+            dict.set_item("value", *value)?;
+        }
+        maplibre_core::FeatureIdentifier::Double(value) => {
+            dict.set_item("type", "double")?;
+            dict.set_item("value", *value)?;
+        }
+        maplibre_core::FeatureIdentifier::String(value) => {
+            dict.set_item("type", "string")?;
+            dict.set_item("value", value)?;
+        }
+        _ => {
+            dict.set_item("type", "null")?;
+        }
+    }
+    Ok(dict.into_any().unbind())
+}
+
+fn geometry_to_py(py: Python<'_>, geometry: &maplibre_core::Geometry) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    match geometry {
+        maplibre_core::Geometry::Empty => {
+            dict.set_item("type", "empty")?;
+        }
+        maplibre_core::Geometry::Point(coordinate) => {
+            dict.set_item("type", "point")?;
+            dict.set_item("coordinate", lat_lng_core_to_py(py, coordinate)?)?;
+        }
+        maplibre_core::Geometry::LineString(coordinates) => {
+            dict.set_item("type", "line_string")?;
+            dict.set_item("coordinates", lat_lng_core_list_to_py(py, coordinates)?)?;
+        }
+        maplibre_core::Geometry::Polygon(rings) => {
+            dict.set_item("type", "polygon")?;
+            dict.set_item("rings", lat_lng_core_rings_to_py(py, rings)?)?;
+        }
+        maplibre_core::Geometry::MultiPoint(coordinates) => {
+            dict.set_item("type", "multi_point")?;
+            dict.set_item("coordinates", lat_lng_core_list_to_py(py, coordinates)?)?;
+        }
+        maplibre_core::Geometry::MultiLineString(lines) => {
+            dict.set_item("type", "multi_line_string")?;
+            dict.set_item("lines", lat_lng_core_rings_to_py(py, lines)?)?;
+        }
+        maplibre_core::Geometry::MultiPolygon(polygons) => {
+            dict.set_item("type", "multi_polygon")?;
+            let list = PyList::empty(py);
+            for polygon in polygons {
+                list.append(lat_lng_core_rings_to_py(py, polygon)?)?;
+            }
+            dict.set_item("polygons", list)?;
+        }
+        maplibre_core::Geometry::GeometryCollection(geometries) => {
+            dict.set_item("type", "geometry_collection")?;
+            let list = PyList::empty(py);
+            for geometry in geometries {
+                list.append(geometry_to_py(py, geometry)?)?;
+            }
+            dict.set_item("geometries", list)?;
+        }
+        _ => {
+            return Err(invalid_argument_error(
+                "unsupported unknown geometry variant",
+            ));
+        }
+    }
+    Ok(dict.into_any().unbind())
+}
+
+fn lat_lng_core_to_py(py: Python<'_>, coordinate: &maplibre_core::LatLng) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("latitude", coordinate.latitude)?;
+    dict.set_item("longitude", coordinate.longitude)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn lat_lng_core_list_to_py(
+    py: Python<'_>,
+    coordinates: &[maplibre_core::LatLng],
+) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for coordinate in coordinates {
+        list.append(lat_lng_core_to_py(py, coordinate)?)?;
+    }
+    Ok(list.into_any().unbind())
+}
+
+fn lat_lng_core_rings_to_py(
+    py: Python<'_>,
+    rings: &[Vec<maplibre_core::LatLng>],
+) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for ring in rings {
+        list.append(lat_lng_core_list_to_py(py, ring)?)?;
+    }
+    Ok(list.into_any().unbind())
 }
 
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {

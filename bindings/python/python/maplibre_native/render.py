@@ -8,9 +8,17 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .json import JsonValue
+    from .geo import Feature
+    from .json import JsonObject, JsonValue
     from .map import MapHandle
-    from .query import FeatureStateSelector
+    from .query import (
+        FeatureExtensionResult,
+        FeatureStateSelector,
+        QueriedFeature,
+        RenderedFeatureQueryOptions,
+        RenderedQueryGeometry,
+        SourceFeatureQueryOptions,
+    )
 
 
 class RenderBackend(IntFlag):
@@ -307,6 +315,63 @@ class RenderSessionHandle:
         return VulkanOwnedTextureFrameHandle(
             self._native.acquire_vulkan_owned_texture_frame()
         )
+
+    def query_rendered_features(
+        self,
+        geometry: RenderedQueryGeometry,
+        options: RenderedFeatureQueryOptions | None = None,
+    ) -> tuple[QueriedFeature, ...]:
+        """Query rendered features from the latest render session state."""
+        from .query import (
+            QueriedFeature,
+            _geometry_to_native_wire,
+            _rendered_options_to_native_wire,
+        )
+
+        layer_ids, filter_ = _rendered_options_to_native_wire(options)
+        raw = self._native.query_rendered_features(
+            _geometry_to_native_wire(geometry),
+            layer_ids,
+            filter_,
+        )
+        return tuple(QueriedFeature.from_native(feature) for feature in raw)
+
+    def query_source_features(
+        self,
+        source_id: str,
+        options: SourceFeatureQueryOptions | None = None,
+    ) -> tuple[QueriedFeature, ...]:
+        """Query source features from the latest render session state."""
+        from .query import (
+            QueriedFeature,
+            _source_options_to_native_wire,
+        )
+
+        source_layer_ids, filter_ = _source_options_to_native_wire(options)
+        raw = self._native.query_source_features(source_id, source_layer_ids, filter_)
+        return tuple(QueriedFeature.from_native(feature) for feature in raw)
+
+    def query_feature_extensions(
+        self,
+        source_id: str,
+        feature: Feature,
+        extension: str,
+        extension_field: str,
+        arguments: JsonObject | None = None,
+    ) -> FeatureExtensionResult:
+        """Query a feature extension from the latest render session state."""
+        from .geo import _feature_to_native_wire
+        from .json import _to_native_wire as _json_to_native_wire
+        from .query import FeatureExtensionResult
+
+        raw = self._native.query_feature_extensions(
+            source_id,
+            _feature_to_native_wire(feature),
+            extension,
+            extension_field,
+            _json_to_native_wire(arguments) if arguments is not None else None,
+        )
+        return FeatureExtensionResult.from_native(raw)
 
     def set_feature_state(
         self,

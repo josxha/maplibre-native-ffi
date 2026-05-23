@@ -296,6 +296,76 @@ def _to_native_wire(value: GeoJson) -> dict[str, object]:
     raise TypeError(msg)
 
 
+def _coordinate_from_native_wire(raw: dict[str, object]) -> LatLng:
+    return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
+
+
+def _coordinates_from_native_wire(raw: list[dict[str, object]]) -> tuple[LatLng, ...]:
+    return tuple(_coordinate_from_native_wire(coordinate) for coordinate in raw)
+
+
+def _geometry_from_native_wire(raw: dict[str, object]) -> Geometry:
+    kind = raw["type"]
+    if kind == "empty":
+        return EmptyGeometry()
+    if kind == "point":
+        return Point(_coordinate_from_native_wire(raw["coordinate"]))
+    if kind == "line_string":
+        return LineString(_coordinates_from_native_wire(raw["coordinates"]))
+    if kind == "polygon":
+        return Polygon(
+            tuple(_coordinates_from_native_wire(ring) for ring in raw["rings"])
+        )
+    if kind == "multi_point":
+        return MultiPoint(_coordinates_from_native_wire(raw["coordinates"]))
+    if kind == "multi_line_string":
+        return MultiLineString(
+            tuple(_coordinates_from_native_wire(line) for line in raw["lines"])
+        )
+    if kind == "multi_polygon":
+        return MultiPolygon(
+            tuple(
+                tuple(_coordinates_from_native_wire(ring) for ring in polygon)
+                for polygon in raw["polygons"]
+            )
+        )
+    if kind == "geometry_collection":
+        return GeometryCollection(
+            tuple(_geometry_from_native_wire(child) for child in raw["geometries"])
+        )
+    msg = f"unsupported native geometry wire kind: {kind}"
+    raise TypeError(msg)
+
+
+def _identifier_from_native_wire(raw: dict[str, object]) -> FeatureIdentifier:
+    kind = raw["type"]
+    if kind == "null":
+        return None
+    if kind == "uint":
+        return FeatureIdentifierUInt(raw["value"])
+    if kind == "int":
+        return FeatureIdentifierInt(raw["value"])
+    if kind == "double":
+        return FeatureIdentifierDouble(raw["value"])
+    if kind == "string":
+        return FeatureIdentifierString(raw["value"])
+    msg = f"unsupported native feature identifier wire kind: {kind}"
+    raise TypeError(msg)
+
+
+def _feature_from_native_wire(raw: dict[str, object]) -> Feature:
+    from .json import _from_native_wire as _json_from_native_wire
+
+    return Feature(
+        geometry=_geometry_from_native_wire(raw["geometry"]),
+        properties=tuple(
+            JsonMember(key, _json_from_native_wire(value))
+            for key, value in raw["properties"]
+        ),
+        identifier=_identifier_from_native_wire(raw["identifier"]),
+    )
+
+
 __all__ = [
     "EmptyGeometry",
     "Feature",

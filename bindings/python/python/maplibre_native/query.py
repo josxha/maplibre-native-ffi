@@ -9,6 +9,8 @@ from typing import Any
 from .camera import ScreenPoint
 from .geo import Feature
 from .json import JsonValue
+from .json import _from_native_wire as _json_from_native_wire
+from .json import _to_native_wire as _json_to_native_wire
 
 
 class RenderedQueryGeometryType(IntEnum):
@@ -118,11 +120,14 @@ class QueriedFeature:
     @classmethod
     def from_native(cls, raw: dict[str, Any]) -> "QueriedFeature":
         """Build a queried feature from private native values."""
+        from .geo import _feature_from_native_wire
+
+        state = raw.get("state")
         return cls(
-            feature=raw["feature"],
+            feature=_feature_from_native_wire(raw["feature"]),
             source_id=raw.get("source_id"),
             source_layer_id=raw.get("source_layer_id"),
-            state=raw.get("state"),
+            state=_json_from_native_wire(state) if state is not None else None,
         )
 
 
@@ -163,6 +168,70 @@ class FeatureExtensionResult:
     def unknown_result(cls, raw_type: int) -> "FeatureExtensionResult":
         """Create a result that preserves an unknown native result type."""
         return cls(FeatureExtensionResultType.UNKNOWN, raw_type=raw_type)
+
+    @classmethod
+    def from_native(cls, raw: dict[str, Any]) -> "FeatureExtensionResult":
+        """Build a feature-extension result from private native values."""
+        from .geo import _feature_from_native_wire
+
+        result_type = FeatureExtensionResultType(raw["type"])
+        if result_type is FeatureExtensionResultType.VALUE:
+            return cls.value_result(_json_from_native_wire(raw["value"]))
+        if result_type is FeatureExtensionResultType.FEATURE_COLLECTION:
+            return cls.feature_collection_result(
+                tuple(
+                    _feature_from_native_wire(feature)
+                    for feature in raw["feature_collection"]
+                )
+            )
+        return cls.unknown_result(raw["type"])
+
+
+def _point_to_native_wire(point: ScreenPoint) -> tuple[float, float]:
+    return (point.x, point.y)
+
+
+def _geometry_to_native_wire(geometry: RenderedQueryGeometry) -> dict[str, object]:
+    if geometry.type is RenderedQueryGeometryType.POINT:
+        assert geometry.point is not None
+        return {"type": "point", "point": _point_to_native_wire(geometry.point)}
+    if geometry.type is RenderedQueryGeometryType.BOX:
+        assert geometry.box is not None
+        return {
+            "type": "box",
+            "min": _point_to_native_wire(geometry.box.min),
+            "max": _point_to_native_wire(geometry.box.max),
+        }
+    if geometry.type is RenderedQueryGeometryType.LINE_STRING:
+        assert geometry.line_string is not None
+        return {
+            "type": "line_string",
+            "points": [_point_to_native_wire(point) for point in geometry.line_string],
+        }
+    msg = f"unsupported rendered query geometry: {geometry.type}"
+    raise TypeError(msg)
+
+
+def _rendered_options_to_native_wire(
+    options: RenderedFeatureQueryOptions | None,
+) -> tuple[tuple[str, ...] | None, object]:
+    if options is None:
+        return (None, None)
+    return (
+        options.layer_ids,
+        _json_to_native_wire(options.filter) if options.filter is not None else None,
+    )
+
+
+def _source_options_to_native_wire(
+    options: SourceFeatureQueryOptions | None,
+) -> tuple[tuple[str, ...] | None, object]:
+    if options is None:
+        return (None, None)
+    return (
+        options.source_layer_ids,
+        _json_to_native_wire(options.filter) if options.filter is not None else None,
+    )
 
 
 __all__ = [
