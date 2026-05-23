@@ -44,6 +44,11 @@ typedef enum {
 } MlnValaOfflineRegionDownloadState;
 
 typedef enum {
+  MLN_VALA_OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID = 1,
+  MLN_VALA_OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY = 2,
+} MlnValaOfflineRegionDefinitionType;
+
+typedef enum {
   MLN_VALA_OFFLINE_OPERATION_KIND_AMBIENT_CACHE = 1,
   MLN_VALA_OFFLINE_OPERATION_KIND_REGION_CREATE = 2,
   MLN_VALA_OFFLINE_OPERATION_KIND_REGION_GET = 3,
@@ -565,6 +570,45 @@ typedef struct {
   MlnValaLatLng southwest;
   MlnValaLatLng northeast;
 } MlnValaLatLngBounds;
+
+typedef struct _MlnValaGeometry MlnValaGeometry;
+
+typedef struct {
+  uint32_t size;
+  const char* style_url;
+  MlnValaLatLngBounds bounds;
+  double min_zoom;
+  double max_zoom;
+  float pixel_ratio;
+  bool include_ideographs;
+} MlnValaOfflineTilePyramidRegionDefinition;
+
+typedef struct {
+  uint32_t size;
+  const char* style_url;
+  const MlnValaGeometry* geometry;
+  double min_zoom;
+  double max_zoom;
+  float pixel_ratio;
+  bool include_ideographs;
+} MlnValaOfflineGeometryRegionDefinition;
+
+typedef struct {
+  uint32_t size;
+  MlnValaOfflineRegionDefinitionType type;
+  union {
+    MlnValaOfflineTilePyramidRegionDefinition tile_pyramid;
+    MlnValaOfflineGeometryRegionDefinition geometry;
+  } data;
+} MlnValaOfflineRegionDefinition;
+
+typedef struct {
+  uint32_t size;
+  int64_t id;
+  MlnValaOfflineRegionDefinition definition;
+  const uint8_t* metadata;
+  size_t metadata_size;
+} MlnValaOfflineRegionInfo;
 
 typedef struct {
   uint32_t size;
@@ -1526,6 +1570,19 @@ gboolean mln_vala_runtime_handle_offline_region_get_status_take_result(
   MlnValaOfflineRegionStatus* out_status, GError** error
 );
 
+/**
+ * mln_vala_offline_region_snapshot_handle_get:
+ * @self: an offline region snapshot handle.
+ * @out_info: (out): return location for region info.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_offline_region_snapshot_handle_get(
+  MlnValaOfflineRegionSnapshotHandle* self, MlnValaOfflineRegionInfo* out_info,
+  GError** error
+);
 void mln_vala_offline_region_snapshot_handle_close(
   MlnValaOfflineRegionSnapshotHandle* self
 );
@@ -1541,6 +1598,21 @@ void mln_vala_offline_region_snapshot_handle_close(
  */
 gboolean mln_vala_offline_region_list_handle_count(
   MlnValaOfflineRegionListHandle* self, size_t* out_count, GError** error
+);
+
+/**
+ * mln_vala_offline_region_list_handle_get:
+ * @self: an offline region list handle.
+ * @index: region index.
+ * @out_info: (out): return location for region info.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_offline_region_list_handle_get(
+  MlnValaOfflineRegionListHandle* self, size_t index,
+  MlnValaOfflineRegionInfo* out_info, GError** error
 );
 void mln_vala_offline_region_list_handle_close(
   MlnValaOfflineRegionListHandle* self

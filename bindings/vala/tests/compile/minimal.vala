@@ -26,6 +26,8 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   MaplibreNative.OfflineRegionStatus status;
   runtime.offline_region_get_status_take_result(operation_id, out status);
   var created_region = runtime.offline_region_create_take_result(operation_id);
+  MaplibreNative.OfflineRegionInfo region_info;
+  created_region.get(out region_info);
   created_region.close();
   bool found = false;
   var optional_region = runtime.offline_region_get_take_result(operation_id, out found);
@@ -37,6 +39,7 @@ void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime) throws GL
   var region_list = runtime.offline_regions_list_take_result(operation_id);
   size_t region_count;
   region_list.count(out region_count);
+  region_list.get(0, out region_info);
   region_list.close();
   var merged_regions = runtime.offline_regions_merge_database_take_result(operation_id);
   merged_regions.close();

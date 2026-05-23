@@ -2107,6 +2107,21 @@ pub extern "C" fn mln_vala_style_id_list_handle_close(handle: *mut StyleIdListHa
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_snapshot_handle_get(
+    handle: *mut OfflineRegionSnapshotHandle,
+    out_info: *mut sys::mln_offline_region_info,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_snapshot_get(handle, out_info) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_offline_region_snapshot_handle_close(
     handle: *mut OfflineRegionSnapshotHandle,
 ) {
@@ -2120,6 +2135,22 @@ pub extern "C" fn mln_vala_offline_region_list_handle_count(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match offline_region_list_count(handle, out_count) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_offline_region_list_handle_get(
+    handle: *mut OfflineRegionListHandle,
+    index: usize,
+    out_info: *mut sys::mln_offline_region_info,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match offline_region_list_get(handle, index, out_info) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -3526,6 +3557,26 @@ fn wrap_offline_region_list(
     Ok(handle)
 }
 
+fn offline_region_snapshot_native(
+    handle: *mut OfflineRegionSnapshotHandle,
+) -> error::Result<*mut sys::mln_offline_region_snapshot> {
+    if handle.is_null() {
+        return Err(Error::invalid_argument(
+            "OfflineRegionSnapshotHandle is null",
+        ));
+    }
+    // SAFETY: `handle` is non-null and expected to point to this type.
+    let native = unsafe { (*handle).native };
+    if native.is_null() {
+        return Err(Error::new(
+            maplibre_native_core::error::ErrorKind::InvalidState,
+            None,
+            "OfflineRegionSnapshotHandle is closed",
+        ));
+    }
+    Ok(native)
+}
+
 fn offline_region_list_native(
     handle: *mut OfflineRegionListHandle,
 ) -> error::Result<*mut sys::mln_offline_region_list> {
@@ -3544,6 +3595,24 @@ fn offline_region_list_native(
     Ok(native)
 }
 
+fn offline_region_snapshot_get(
+    handle: *mut OfflineRegionSnapshotHandle,
+    out_info: *mut sys::mln_offline_region_info,
+) -> error::Result<()> {
+    let native = offline_region_snapshot_native(handle)?;
+    if out_info.is_null() {
+        return Err(Error::invalid_argument(
+            "offline region info output pointer is null",
+        ));
+    }
+    // SAFETY: `out_info` is valid output storage by the null check above.
+    unsafe {
+        (*out_info).size = std::mem::size_of::<sys::mln_offline_region_info>() as u32;
+    }
+    // SAFETY: `native` is live and output storage has the required size field.
+    error::check(unsafe { sys::mln_offline_region_snapshot_get(native, out_info) })
+}
+
 fn offline_region_list_count(
     handle: *mut OfflineRegionListHandle,
     out_count: *mut usize,
@@ -3553,6 +3622,25 @@ fn offline_region_list_count(
     // SAFETY: `native` is live and `count` is valid output storage.
     error::check(unsafe { sys::mln_offline_region_list_count(native, &mut count) })?;
     glib::clear_optional_out_pointer(out_count, count)
+}
+
+fn offline_region_list_get(
+    handle: *mut OfflineRegionListHandle,
+    index: usize,
+    out_info: *mut sys::mln_offline_region_info,
+) -> error::Result<()> {
+    let native = offline_region_list_native(handle)?;
+    if out_info.is_null() {
+        return Err(Error::invalid_argument(
+            "offline region info output pointer is null",
+        ));
+    }
+    // SAFETY: `out_info` is valid output storage by the null check above.
+    unsafe {
+        (*out_info).size = std::mem::size_of::<sys::mln_offline_region_info>() as u32;
+    }
+    // SAFETY: `native` is live and output storage has the required size field.
+    error::check(unsafe { sys::mln_offline_region_list_get(native, index, out_info) })
 }
 
 fn close_offline_region_snapshot(handle: *mut OfflineRegionSnapshotHandle) {
@@ -4501,6 +4589,29 @@ mod tests {
                 0,
                 ptr::null_mut(),
                 &mut error,
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_offline_region_snapshot_handle_get(
+                ptr::null_mut(),
+                ptr::null_mut(),
+                &mut error
+            ),
+            GFALSE
+        );
+        assert!(!error.is_null());
+
+        error = ptr::null_mut();
+        assert_eq!(
+            mln_vala_offline_region_list_handle_get(
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+                &mut error
             ),
             GFALSE
         );
