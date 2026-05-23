@@ -136,6 +136,12 @@ export interface MapTileOptions {
   lodMode?: "default" | "distance" | "unknown" | null;
 }
 
+export interface ProjectionMode {
+  axonometric?: boolean | null;
+  xSkew?: number | null;
+  ySkew?: number | null;
+}
+
 export interface MapOptions {
   width?: number | null;
   height?: number | null;
@@ -200,6 +206,8 @@ export declare class MapHandle {
   setViewportOptions(options: MapViewportOptions): void;
   getTileOptions(): MapTileOptions;
   setTileOptions(options: MapTileOptions): void;
+  getProjectionMode(): ProjectionMode;
+  setProjectionMode(mode: ProjectionMode): void;
   moveBy(deltaX: number, deltaY: number): void;
   scaleBy(scale: number, anchor?: ScreenPoint | null): void;
   rotateBy(first: ScreenPoint, second: ScreenPoint): void;

@@ -425,6 +425,14 @@ class MapHandle {
     return translateNativeErrors(() => this.native.setTileOptions(options));
   }
 
+  getProjectionMode() {
+    return translateNativeErrors(() => this.native.getProjectionMode());
+  }
+
+  setProjectionMode(mode) {
+    return translateNativeErrors(() => this.native.setProjectionMode(mode));
+  }
+
   getCamera() {
     return translateNativeErrors(() => this.native.getCamera());
   }

@@ -54,6 +54,13 @@ pub struct MapTileOptions {
 }
 
 #[napi(object)]
+pub struct ProjectionMode {
+    pub axonometric: Option<bool>,
+    pub x_skew: Option<f64>,
+    pub y_skew: Option<f64>,
+}
+
+#[napi(object)]
 pub struct StyleSourceInfo {
     pub source_type: String,
     pub raw_type: u32,
@@ -216,6 +223,23 @@ impl NativeMapHandle {
     pub fn set_tile_options(&self, options: MapTileOptions) -> Result<()> {
         let options = core::options::map_tile_options_to_native(&options.into_core()?);
         core::check(unsafe { sys::mln_map_set_tile_options(self.state.as_ptr(), &options) })
+            .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getProjectionMode")]
+    pub fn get_projection_mode(&self) -> Result<ProjectionMode> {
+        let mut raw = unsafe { sys::mln_projection_mode_default() };
+        core::check(unsafe { sys::mln_map_get_projection_mode(self.state.as_ptr(), &mut raw) })
+            .map_err(error::from_core)?;
+        Ok(ProjectionMode::from_core(
+            core::camera::projection_mode_from_native(raw),
+        ))
+    }
+
+    #[napi(js_name = "setProjectionMode")]
+    pub fn set_projection_mode(&self, mode: ProjectionMode) -> Result<()> {
+        let mode = core::camera::projection_mode_to_native(&mode.into_core());
+        core::check(unsafe { sys::mln_map_set_projection_mode(self.state.as_ptr(), &mode) })
             .map_err(error::from_core)
     }
 
@@ -879,6 +903,30 @@ impl MapTileOptions {
             lod_pitch_threshold: options.lod_pitch_threshold,
             lod_zoom_shift: options.lod_zoom_shift,
             lod_mode: options.lod_mode.map(tile_lod_mode_name),
+        }
+    }
+}
+
+impl ProjectionMode {
+    fn into_core(self) -> core::ProjectionMode {
+        let mut mode = core::ProjectionMode::new();
+        if let Some(value) = self.axonometric {
+            mode = mode.with_axonometric(value);
+        }
+        if let Some(value) = self.x_skew {
+            mode = mode.with_x_skew(value);
+        }
+        if let Some(value) = self.y_skew {
+            mode = mode.with_y_skew(value);
+        }
+        mode
+    }
+
+    fn from_core(mode: core::ProjectionMode) -> Self {
+        Self {
+            axonometric: mode.axonometric,
+            x_skew: mode.x_skew,
+            y_skew: mode.y_skew,
         }
     }
 }

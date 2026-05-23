@@ -274,6 +274,22 @@ test("map viewport and tile options map descriptor fields", () => {
   }
 });
 
+test("map projection mode maps optional descriptor fields", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setProjectionMode({ axonometric: true, xSkew: 0.2, ySkew: 0.3 });
+    const mode = map.getProjectionMode();
+    assert.equal(mode.axonometric, true);
+    assert.equal(mode.xSkew, 0.2);
+    assert.equal(mode.ySkew, 0.3);
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map camera commands copy descriptor values", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });
