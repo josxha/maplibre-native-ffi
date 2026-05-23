@@ -153,6 +153,16 @@ typedef enum {
 } MlnValaStyleTileSourceOptionFields;
 
 typedef enum {
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_MIN_ZOOM = 1u << 0u,
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_MAX_ZOOM = 1u << 1u,
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_TOLERANCE = 1u << 2u,
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_TILE_SIZE = 1u << 3u,
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_BUFFER = 1u << 4u,
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_CLIP = 1u << 5u,
+  MLN_VALA_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELDS_WRAP = 1u << 6u,
+} MlnValaCustomGeometrySourceOptionFields;
+
+typedef enum {
   MLN_VALA_STYLE_TILE_SCHEME_XYZ = 0,
   MLN_VALA_STYLE_TILE_SCHEME_TMS = 1,
 } MlnValaStyleTileScheme;
@@ -508,6 +518,22 @@ typedef struct {
   size_t feature_count;
 } MlnValaFeatureCollection;
 
+typedef enum {
+  MLN_VALA_GEOJSON_TYPE_GEOMETRY = 1,
+  MLN_VALA_GEOJSON_TYPE_FEATURE = 2,
+  MLN_VALA_GEOJSON_TYPE_FEATURE_COLLECTION = 3,
+} MlnValaGeoJsonType;
+
+typedef struct {
+  uint32_t size;
+  MlnValaGeoJsonType type;
+  union {
+    const MlnValaGeometry* geometry;
+    const MlnValaFeature* feature;
+    MlnValaFeatureCollection feature_collection;
+  } data;
+} MlnValaGeoJson;
+
 typedef struct {
   uint32_t size;
   MlnValaFeatureExtensionResultType type;
@@ -770,6 +796,31 @@ typedef struct {
 } MlnValaStyleTileSourceOptions;
 
 typedef struct {
+  uint32_t z;
+  uint32_t x;
+  uint32_t y;
+} MlnValaCanonicalTileId;
+
+typedef void (*MlnValaCustomGeometrySourceTileCallback)(
+  void* callback_data, MlnValaCanonicalTileId tile_id
+);
+
+typedef struct {
+  uint32_t size;
+  MlnValaCustomGeometrySourceOptionFields fields;
+  MlnValaCustomGeometrySourceTileCallback fetch_tile;
+  MlnValaCustomGeometrySourceTileCallback cancel_tile;
+  void* user_data;
+  double min_zoom;
+  double max_zoom;
+  double tolerance;
+  uint32_t tile_size;
+  uint32_t buffer;
+  bool clip;
+  bool wrap;
+} MlnValaCustomGeometrySourceOptions;
+
+typedef struct {
   uint32_t size;
   uint32_t width;
   uint32_t height;
@@ -911,6 +962,9 @@ gboolean mln_vala_map_tile_options_default(
 );
 gboolean mln_vala_style_tile_source_options_default(
   MlnValaStyleTileSourceOptions* out_options, GError** error
+);
+gboolean mln_vala_custom_geometry_source_options_default(
+  MlnValaCustomGeometrySourceOptions* out_options, GError** error
 );
 gboolean mln_vala_premultiplied_rgba8_image_default(
   MlnValaPremultipliedRgba8Image* out_image, GError** error
@@ -2487,6 +2541,11 @@ gboolean mln_vala_map_handle_add_geojson_source_url(
   MlnValaMapHandle* self, const char* source_id, const char* url, GError** error
 );
 
+gboolean mln_vala_map_handle_add_geojson_source_data(
+  MlnValaMapHandle* self, const char* source_id, const MlnValaGeoJson* data,
+  GError** error
+);
+
 /**
  * mln_vala_map_handle_set_geojson_source_url:
  * @self: a map handle.
@@ -2499,6 +2558,11 @@ gboolean mln_vala_map_handle_add_geojson_source_url(
  */
 gboolean mln_vala_map_handle_set_geojson_source_url(
   MlnValaMapHandle* self, const char* source_id, const char* url, GError** error
+);
+
+gboolean mln_vala_map_handle_set_geojson_source_data(
+  MlnValaMapHandle* self, const char* source_id, const MlnValaGeoJson* data,
+  GError** error
 );
 
 /**
@@ -2601,6 +2665,24 @@ gboolean mln_vala_map_handle_add_raster_dem_source_tiles(
   MlnValaMapHandle* self, const char* source_id, const MlnValaStringView* tiles,
   size_t tile_count, const MlnValaStyleTileSourceOptions* options,
   GError** error
+);
+
+gboolean mln_vala_map_handle_add_custom_geometry_source(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaCustomGeometrySourceOptions* options, GError** error
+);
+gboolean mln_vala_map_handle_set_custom_geometry_source_tile_data(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaCanonicalTileId* tile_id, const MlnValaGeoJson* data,
+  GError** error
+);
+gboolean mln_vala_map_handle_invalidate_custom_geometry_source_tile(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaCanonicalTileId* tile_id, GError** error
+);
+gboolean mln_vala_map_handle_invalidate_custom_geometry_source_region(
+  MlnValaMapHandle* self, const char* source_id,
+  const MlnValaLatLngBounds* bounds, GError** error
 );
 
 /**

@@ -78,6 +78,30 @@ void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue 
   }
 }
 
+void custom_geometry_tile_callback(void* callback_data, MaplibreNative.CanonicalTileId tile_id) {
+}
+
+void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Geometry geometry) throws GLib.Error {
+  string source_id = "fixture-source";
+  MaplibreNative.GeoJson data = {};
+  data.size = (uint32) sizeof(MaplibreNative.GeoJson);
+  data.type = MaplibreNative.GeoJsonType.GEOMETRY;
+  data.data_geometry = geometry;
+  map.add_geojson_source_data(source_id, data);
+  map.set_geojson_source_data(source_id, data);
+
+  MaplibreNative.CustomGeometrySourceOptions options = {};
+  options.default();
+  options.fetch_tile = custom_geometry_tile_callback;
+  options.cancel_tile = custom_geometry_tile_callback;
+  map.add_custom_geometry_source("custom-geometry-source", options);
+  MaplibreNative.CanonicalTileId tile_id = { 0, 0, 0 };
+  map.set_custom_geometry_source_tile_data("custom-geometry-source", tile_id, data);
+  map.invalidate_custom_geometry_source_tile("custom-geometry-source", tile_id);
+  MaplibreNative.LatLngBounds bounds = { { -1.0, -1.0 }, { 1.0, 1.0 } };
+  map.invalidate_custom_geometry_source_region("custom-geometry-source", bounds);
+}
+
 void exercise_feature_state(MaplibreNative.RenderSessionHandle session, MaplibreNative.JsonValue state) throws GLib.Error {
   string source_id = "fixture-source";
   string feature_id = "feature-1";

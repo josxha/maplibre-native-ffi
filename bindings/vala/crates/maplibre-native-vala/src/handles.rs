@@ -685,6 +685,20 @@ pub extern "C" fn mln_vala_style_tile_source_options_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_custom_geometry_source_options_default(
+    out_options: *mut sys::mln_custom_geometry_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_custom_geometry_source_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_premultiplied_rgba8_image_default(
     out_image: *mut sys::mln_premultiplied_rgba8_image,
     error_out: *mut *mut GError,
@@ -1467,6 +1481,22 @@ pub extern "C" fn mln_vala_map_handle_add_geojson_source_url(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_geojson_source_data(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    data: *const sys::mln_geojson,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_geojson_source_data(handle, source_id, data) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_set_geojson_source_url(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -1474,6 +1504,22 @@ pub extern "C" fn mln_vala_map_handle_set_geojson_source_url(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_geojson_source_url(handle, source_id, url) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_geojson_source_data(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    data: *const sys::mln_geojson,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_geojson_source_data(handle, source_id, data) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -1600,6 +1646,71 @@ pub extern "C" fn mln_vala_map_handle_add_raster_dem_source_tiles(
         options,
         TileSourceKind::RasterDem,
     ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_custom_geometry_source(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    options: *const sys::mln_custom_geometry_source_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_custom_geometry_source(handle, source_id, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_custom_geometry_source_tile_data(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tile_id: *const sys::mln_canonical_tile_id,
+    data: *const sys::mln_geojson,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_custom_geometry_source_tile_data(handle, source_id, tile_id, data) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_invalidate_custom_geometry_source_tile(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tile_id: *const sys::mln_canonical_tile_id,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match invalidate_custom_geometry_source_tile(handle, source_id, tile_id) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_invalidate_custom_geometry_source_region(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    bounds: *const sys::mln_lat_lng_bounds,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match invalidate_custom_geometry_source_region(handle, source_id, bounds) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -2514,6 +2625,14 @@ fn default_style_tile_source_options(
     glib::clear_optional_out_pointer(out_options, options)
 }
 
+fn default_custom_geometry_source_options(
+    out_options: *mut sys::mln_custom_geometry_source_options,
+) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_custom_geometry_source_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
 fn default_premultiplied_rgba8_image(
     out_image: *mut sys::mln_premultiplied_rgba8_image,
 ) -> error::Result<()> {
@@ -3094,6 +3213,21 @@ fn add_geojson_source_url(
     error::check(unsafe { sys::mln_map_add_geojson_source_url(map, source_id, url) })
 }
 
+fn add_geojson_source_data(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    data: *const sys::mln_geojson,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if data.is_null() {
+        return Err(Error::invalid_argument("GeoJSON data is null"));
+    }
+    // SAFETY: `map` is live, source ID borrows a caller string for this call,
+    // and data is borrowed for this call. The C API copies accepted data.
+    error::check(unsafe { sys::mln_map_add_geojson_source_data(map, source_id, data) })
+}
+
 fn set_geojson_source_url(
     handle: *mut MapHandle,
     source_id: *const c_char,
@@ -3105,6 +3239,21 @@ fn set_geojson_source_url(
     // SAFETY: `map` is live and string views borrow NUL-terminated caller
     // strings for this call. The C API copies accepted strings.
     error::check(unsafe { sys::mln_map_set_geojson_source_url(map, source_id, url) })
+}
+
+fn set_geojson_source_data(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    data: *const sys::mln_geojson,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if data.is_null() {
+        return Err(Error::invalid_argument("GeoJSON data is null"));
+    }
+    // SAFETY: `map` is live, source ID borrows a caller string for this call,
+    // and data is borrowed for this call. The C API copies accepted data.
+    error::check(unsafe { sys::mln_map_set_geojson_source_data(map, source_id, data) })
 }
 
 fn add_tile_source_url(
@@ -3175,6 +3324,82 @@ fn add_tile_source_tiles(
         }
     };
     error::check(status)
+}
+
+fn add_custom_geometry_source(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    options: *const sys::mln_custom_geometry_source_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if options.is_null() {
+        return Err(Error::invalid_argument(
+            "custom geometry source options are null",
+        ));
+    }
+    // SAFETY: `map` is live, source ID borrows a caller string for this call,
+    // and options points to caller-owned options borrowed for this call.
+    error::check(unsafe { sys::mln_map_add_custom_geometry_source(map, source_id, options) })
+}
+
+fn set_custom_geometry_source_tile_data(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tile_id: *const sys::mln_canonical_tile_id,
+    data: *const sys::mln_geojson,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if tile_id.is_null() {
+        return Err(Error::invalid_argument("tile ID is null"));
+    }
+    if data.is_null() {
+        return Err(Error::invalid_argument("GeoJSON data is null"));
+    }
+    // SAFETY: `map` is live, source ID borrows a caller string for this call,
+    // tile_id points to a caller-owned descriptor copied by value, and data is
+    // borrowed for this call.
+    let tile_id = unsafe { *tile_id };
+    error::check(unsafe {
+        sys::mln_map_set_custom_geometry_source_tile_data(map, source_id, tile_id, data)
+    })
+}
+
+fn invalidate_custom_geometry_source_tile(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    tile_id: *const sys::mln_canonical_tile_id,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if tile_id.is_null() {
+        return Err(Error::invalid_argument("tile ID is null"));
+    }
+    // SAFETY: `map` is live, source ID borrows a caller string for this call,
+    // and tile_id points to a caller-owned descriptor copied by value.
+    let tile_id = unsafe { *tile_id };
+    error::check(unsafe {
+        sys::mln_map_invalidate_custom_geometry_source_tile(map, source_id, tile_id)
+    })
+}
+
+fn invalidate_custom_geometry_source_region(
+    handle: *mut MapHandle,
+    source_id: *const c_char,
+    bounds: *const sys::mln_lat_lng_bounds,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let source_id = string_view_from_c(source_id, "source ID")?;
+    if bounds.is_null() {
+        return Err(Error::invalid_argument("bounds are null"));
+    }
+    // SAFETY: `map` is live, source ID borrows a caller string for this call,
+    // and bounds points to a caller-owned descriptor borrowed for this call.
+    let bounds = unsafe { *bounds };
+    error::check(unsafe {
+        sys::mln_map_invalidate_custom_geometry_source_region(map, source_id, bounds)
+    })
 }
 
 fn style_source_exists(
@@ -4919,6 +5144,25 @@ mod tests {
         PROVIDER_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 
+    unsafe extern "C" fn custom_geometry_tile_callback(
+        _user_data: *mut c_void,
+        _tile_id: sys::mln_canonical_tile_id,
+    ) {
+    }
+
+    fn point_geometry_fixture() -> sys::mln_geometry {
+        sys::mln_geometry {
+            size: std::mem::size_of::<sys::mln_geometry>() as u32,
+            type_: sys::MLN_GEOMETRY_TYPE_POINT,
+            data: sys::mln_geometry__bindgen_ty_1 {
+                point: sys::mln_lat_lng {
+                    latitude: 0.0,
+                    longitude: 0.0,
+                },
+            },
+        }
+    }
+
     #[test]
     fn runtime_handle_create_run_and_close() {
         let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
@@ -5245,6 +5489,108 @@ mod tests {
             mln_vala_map_handle_remove_style_source(
                 map,
                 c"fixture-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
+
+        let geometry = point_geometry_fixture();
+        let geojson = sys::mln_geojson {
+            size: std::mem::size_of::<sys::mln_geojson>() as u32,
+            type_: sys::MLN_GEOJSON_TYPE_GEOMETRY,
+            data: sys::mln_geojson__bindgen_ty_1 {
+                geometry: &geometry,
+            },
+        };
+        assert_eq!(
+            mln_vala_map_handle_add_geojson_source_data(
+                map,
+                c"fixture-data-source".as_ptr(),
+                &geojson,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_geojson_source_data(
+                map,
+                c"fixture-data-source".as_ptr(),
+                &geojson,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"fixture-data-source".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
+
+        let mut custom_options = unsafe { sys::mln_custom_geometry_source_options_default() };
+        assert_eq!(
+            mln_vala_custom_geometry_source_options_default(&mut custom_options, ptr::null_mut()),
+            GTRUE
+        );
+        custom_options.fetch_tile = Some(custom_geometry_tile_callback);
+        assert_eq!(
+            mln_vala_map_handle_add_custom_geometry_source(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                &custom_options,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let tile_id = sys::mln_canonical_tile_id { z: 0, x: 0, y: 0 };
+        assert_eq!(
+            mln_vala_map_handle_set_custom_geometry_source_tile_data(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                &tile_id,
+                &geojson,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_invalidate_custom_geometry_source_tile(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                &tile_id,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: -1.0,
+                longitude: -1.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 1.0,
+                longitude: 1.0,
+            },
+        };
+        assert_eq!(
+            mln_vala_map_handle_invalidate_custom_geometry_source_region(
+                map,
+                c"custom-geometry-source".as_ptr(),
+                &bounds,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_remove_style_source(
+                map,
+                c"custom-geometry-source".as_ptr(),
                 &mut removed,
                 ptr::null_mut(),
             ),

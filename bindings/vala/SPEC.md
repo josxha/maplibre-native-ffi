@@ -98,12 +98,13 @@ The scaffold implements one proof slice in Rust:
   operation create/start/status-result/snapshot/list info/discard helpers, and
   `ResourceRequestHandle` one-shot completion/cancellation/release methods are
   visible in generated Vala.
-- Basic style-source operations for GeoJSON URL sources, vector/raster/raster
-  DEM tile source URL and inline tile sources, image sources, source metadata
-  and attribution, source lifecycle, runtime style images, style ID list
-  handles, JSON snapshots, DEM helper layers, style JSON/property/light/filter
-  operations, basic style-layer lifecycle operations, and map coordinate
-  conversion helpers are exposed through `MapHandle`.
+- Basic style-source operations for GeoJSON URL and inline data sources,
+  vector/raster/raster DEM tile source URL and inline tile sources, custom
+  geometry sources, image sources, source metadata and attribution, source
+  lifecycle, runtime style images, style ID list handles, JSON snapshots, DEM
+  helper layers, style JSON/property/light/filter operations, basic style-layer
+  lifecycle operations, and map coordinate conversion helpers are exposed
+  through `MapHandle`.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with
