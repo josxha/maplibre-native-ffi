@@ -30,7 +30,6 @@ from .render import (
     VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
 )
-from .runtime import RuntimeHandle
 from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
@@ -1364,3 +1363,5 @@ __all__ = [
     "lat_lng_for_projected_meters",
     "projected_meters_for_lat_lng",
 ]
+
+from .runtime import RuntimeHandle  # noqa: E402

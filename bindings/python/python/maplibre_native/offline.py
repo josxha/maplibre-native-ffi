@@ -6,16 +6,9 @@ from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
-from typing import TYPE_CHECKING, Any
 
 from .geo import Geometry, LatLngBounds
 from .resource import ResourceErrorReason
-
-if TYPE_CHECKING:
-    from .runtime import RuntimeHandle
-
-else:
-    RuntimeHandle = Any
 
 
 class AmbientCacheOperation(IntEnum):
@@ -517,3 +510,5 @@ __all__ = [
     "OfflineRegionTileCountLimitExceeded",
     "OfflineTilePyramidRegionDefinition",
 ]
+
+from .runtime import RuntimeHandle  # noqa: E402

@@ -6,24 +6,11 @@ from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntEnum
 from types import TracebackType
-from typing import TYPE_CHECKING, Any
+from typing import Any
 import weakref
 
 from . import _native
-from .offline import (
-    AmbientCacheOperation,
-    OfflineOperationHandle,
-    OfflineRegionDefinition,
-    OfflineRegionDownloadState,
-)
 from .resource import ResourceProviderCallback, ResourceTransformCallback
-
-if TYPE_CHECKING:
-    from .map import MapHandle, MapOptions
-
-else:
-    MapHandle = Any
-    MapOptions = Any
 
 
 class NetworkStatus(IntEnum):
@@ -550,3 +537,11 @@ __all__ = [
     "TileId",
     "TileOperation",
 ]
+
+from .map import MapHandle, MapOptions  # noqa: E402
+from .offline import (  # noqa: E402
+    AmbientCacheOperation,
+    OfflineOperationHandle,
+    OfflineRegionDefinition,
+    OfflineRegionDownloadState,
+)

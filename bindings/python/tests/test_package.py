@@ -87,7 +87,9 @@ def test_public_type_hints_are_resolvable() -> None:
         map_module.MapHandle.set_style_light_property,
         map_module.MapHandle.set_layer_property,
         map_module.MapHandle.set_layer_filter,
+        map_module.MapHandle.__init__,
         map_module.MapHandle.set_style_image,
+        render.RenderSessionHandle.__init__,
         render.RenderSessionHandle.query_feature_extensions,
         render.RenderSessionHandle.query_rendered_features,
         render.RenderSessionHandle.set_feature_state,
@@ -114,8 +116,23 @@ def test_public_type_hints_are_resolvable() -> None:
     assert style_hints["return"] != typing.Any
     assert "maplibre_native.json.JsonObject" in repr(style_hints["return"])
 
+    map_init_hints = typing.get_type_hints(map_module.MapHandle.__init__)
+    assert map_init_hints["runtime"] is mln.RuntimeHandle
+
     image_hints = typing.get_type_hints(map_module.MapHandle.set_style_image)
     assert image_hints["image"] is render.PremultipliedRgba8Image
+
+    session_init_hints = typing.get_type_hints(render.RenderSessionHandle.__init__)
+    assert session_init_hints["map_handle"] is map_module.MapHandle
+
+    create_map_hints = typing.get_type_hints(mln.RuntimeHandle.create_map)
+    assert create_map_hints["options"] == map_module.MapOptions | None
+    assert create_map_hints["return"] is map_module.MapHandle
+
+    offline_handle_hints = typing.get_type_hints(
+        offline.OfflineOperationHandle.__init__
+    )
+    assert offline_handle_hints["runtime"] is mln.RuntimeHandle
 
     provider_hints = typing.get_type_hints(mln.RuntimeHandle.set_resource_provider)
     assert provider_hints["callback"] != typing.Any
@@ -141,6 +158,14 @@ def test_public_type_hints_are_resolvable() -> None:
 
     response_error_hints = typing.get_type_hints(offline.OfflineRegionResponseError)
     assert response_error_hints["reason"] is resource.ResourceErrorReason
+
+
+def test_public_modules_avoid_runtime_annotation_fallbacks() -> None:
+    package_dir = Path(mln.__file__).parent
+    for path in package_dir.glob("*.py"):
+        source = path.read_text()
+        assert "TYPE_CHECKING" not in source, path.name
+        assert " = Any" not in source, path.name
 
 
 def test_runtime_handle_context_manager_closes_once() -> None:

@@ -6,7 +6,7 @@ from ._lifecycle import warn_unclosed as _warn_unclosed
 from dataclasses import dataclass
 from enum import IntFlag
 from types import TracebackType
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .geo import Feature
 from .json import JsonLike, JsonObjectLike, JsonValue
@@ -18,12 +18,6 @@ from .query import (
     RenderedQueryGeometry,
     SourceFeatureQueryOptions,
 )
-
-if TYPE_CHECKING:
-    from .map import MapHandle
-
-else:
-    MapHandle = Any
 
 
 class RenderBackend(IntFlag):
@@ -566,3 +560,5 @@ __all__ = [
     "VulkanOwnedTextureFrameHandle",
     "VulkanSurfaceDescriptor",
 ]
+
+from .map import MapHandle  # noqa: E402

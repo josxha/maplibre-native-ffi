@@ -33,10 +33,11 @@ fallbacks indefinitely. Static `TYPE_CHECKING` imports are acceptable as a
 short-term bridge, but the desired shape is that public annotations resolve
 sensibly at runtime without module cycles.
 
-If Ruff or another project-approved lint can detect import cycles, add it to the
-Python binding checks and keep the package acyclic. If Ruff cannot cover this
-well, use a focused alternative only if it fits the existing tooling without a
-large maintenance burden.
+Ruff does not currently provide a dedicated import-cycle rule suitable for this
+package. The Python tests instead include a focused guard that rejects
+`TYPE_CHECKING`/`Any` runtime annotation fallbacks in public modules, alongside
+representative `typing.get_type_hints()` assertions for formerly cyclic public
+APIs.
 
 ## Offline operation lifecycle
 
