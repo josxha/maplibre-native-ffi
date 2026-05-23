@@ -140,4 +140,4 @@ state/validation audit after Round 1 commits.
 - Round validation: `uv run ruff check bindings/python`,
   `uv run ruff format --check bindings/python`,
   `cargo check -p maplibre-native-python`, and `mise run //bindings/python:ci`
-  (57 Python tests, wheel build, and metadata/`_native` import check) passed.
+  (58 Python tests, wheel build, and metadata/`_native` import check) passed.
