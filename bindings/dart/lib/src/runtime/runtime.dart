@@ -184,6 +184,159 @@ final class RuntimeHandle {
     });
   }
 
+  /// Starts creating an offline region.
+  OfflineOperationHandle createOfflineRegion(
+    OfflineRegionDefinition definition, {
+    Uint8List? metadata,
+  }) {
+    return withNativeArena((arena) {
+      final nativeDefinition = arena<raw.mln_offline_region_definition>();
+      nativeDefinition.ref = _offlineRegionDefinitionToNative(
+        definition,
+        arena,
+      );
+      final nativeMetadata = _nativeBytes(metadata, arena);
+      final outOperationId = arena<Uint64>();
+      _check(
+        _c.runtimeOfflineRegionCreateStart(
+          _pointer,
+          nativeDefinition,
+          nativeMetadata,
+          metadata?.length ?? 0,
+          outOperationId,
+        ),
+      );
+      return OfflineOperationHandle._(this, outOperationId.value);
+    });
+  }
+
+  /// Starts getting an offline region snapshot by ID.
+  OfflineOperationHandle getOfflineRegion(int regionId) =>
+      _startOfflineOperation((outOperationId) {
+        _check(
+          _c.runtimeOfflineRegionGetStart(_pointer, regionId, outOperationId),
+        );
+      });
+
+  /// Starts listing offline region snapshots.
+  OfflineOperationHandle listOfflineRegions() =>
+      _startOfflineOperation((outOperationId) {
+        _check(_c.runtimeOfflineRegionsListStart(_pointer, outOperationId));
+      });
+
+  /// Starts merging offline regions from another database path.
+  OfflineOperationHandle mergeOfflineRegionDatabase(String sideDatabasePath) {
+    return withNativeArena((arena) {
+      final nativePath = nativeUtf8CString(sideDatabasePath, arena);
+      final outOperationId = arena<Uint64>();
+      _check(
+        _c.runtimeOfflineRegionsMergeDatabaseStart(
+          _pointer,
+          nativePath.pointer.cast<Char>(),
+          outOperationId,
+        ),
+      );
+      return OfflineOperationHandle._(this, outOperationId.value);
+    });
+  }
+
+  /// Starts updating opaque offline region metadata.
+  OfflineOperationHandle updateOfflineRegionMetadata(
+    int regionId,
+    Uint8List metadata,
+  ) {
+    return withNativeArena((arena) {
+      final nativeMetadata = _nativeBytes(metadata, arena);
+      final outOperationId = arena<Uint64>();
+      _check(
+        _c.runtimeOfflineRegionUpdateMetadataStart(
+          _pointer,
+          regionId,
+          nativeMetadata,
+          metadata.length,
+          outOperationId,
+        ),
+      );
+      return OfflineOperationHandle._(this, outOperationId.value);
+    });
+  }
+
+  /// Starts getting the current offline region status.
+  OfflineOperationHandle getOfflineRegionStatus(int regionId) =>
+      _startOfflineOperation((outOperationId) {
+        _check(
+          _c.runtimeOfflineRegionGetStatusStart(
+            _pointer,
+            regionId,
+            outOperationId,
+          ),
+        );
+      });
+
+  /// Starts enabling or disabling offline region observation.
+  OfflineOperationHandle setOfflineRegionObserved(
+    int regionId,
+    bool observed,
+  ) => _startOfflineOperation((outOperationId) {
+    _check(
+      _c.runtimeOfflineRegionSetObservedStart(
+        _pointer,
+        regionId,
+        observed,
+        outOperationId,
+      ),
+    );
+  });
+
+  /// Starts changing an offline region's download state.
+  OfflineOperationHandle setOfflineRegionDownloadState(
+    int regionId,
+    OfflineRegionDownloadState state,
+  ) => _startOfflineOperation((outOperationId) {
+    _check(
+      _c.runtimeOfflineRegionSetDownloadStateStart(
+        _pointer,
+        regionId,
+        state.rawValue,
+        outOperationId,
+      ),
+    );
+  });
+
+  /// Starts invalidating cached resources for an offline region.
+  OfflineOperationHandle invalidateOfflineRegion(int regionId) =>
+      _startOfflineOperation((outOperationId) {
+        _check(
+          _c.runtimeOfflineRegionInvalidateStart(
+            _pointer,
+            regionId,
+            outOperationId,
+          ),
+        );
+      });
+
+  /// Starts deleting an offline region.
+  OfflineOperationHandle deleteOfflineRegion(int regionId) =>
+      _startOfflineOperation((outOperationId) {
+        _check(
+          _c.runtimeOfflineRegionDeleteStart(
+            _pointer,
+            regionId,
+            outOperationId,
+          ),
+        );
+      });
+
+  OfflineOperationHandle _startOfflineOperation(
+    void Function(Pointer<Uint64> outOperationId) start,
+  ) {
+    return withNativeArena((arena) {
+      final outOperationId = arena<Uint64>();
+      start(outOperationId);
+      return OfflineOperationHandle._(this, outOperationId.value);
+    });
+  }
+
   /// Creates a map owned by this runtime.
   MapHandle createMap({MapOptions options = const MapOptions()}) =>
       MapHandle.create(this, options: options);
@@ -475,6 +628,112 @@ final class OfflineOperationHandle {
   /// Whether this operation has been discarded by Dart.
   bool get isDiscarded => _discarded;
 
+  /// Takes a completed offline region create result.
+  OfflineRegionInfo takeCreatedRegion() {
+    return withNativeArena((arena) {
+      final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
+      outRegion.value = nullptr;
+      _check(
+        _c.runtimeOfflineRegionCreateTakeResult(
+          _runtime._pointer,
+          id,
+          outRegion,
+        ),
+      );
+      _discarded = true;
+      return _copyOfflineRegionSnapshot(outRegion.value);
+    });
+  }
+
+  /// Takes a completed optional offline region get result.
+  OfflineRegionInfo? takeOptionalRegion() {
+    return withNativeArena((arena) {
+      final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
+      outRegion.value = nullptr;
+      final outFound = arena<Bool>();
+      _check(
+        _c.runtimeOfflineRegionGetTakeResult(
+          _runtime._pointer,
+          id,
+          outRegion,
+          outFound,
+        ),
+      );
+      _discarded = true;
+      return outFound.value
+          ? _copyOfflineRegionSnapshot(outRegion.value)
+          : null;
+    });
+  }
+
+  /// Takes a completed offline regions list result.
+  List<OfflineRegionInfo> takeRegionList() {
+    return withNativeArena((arena) {
+      final outRegions = arena<Pointer<raw.mln_offline_region_list>>();
+      outRegions.value = nullptr;
+      _check(
+        _c.runtimeOfflineRegionsListTakeResult(
+          _runtime._pointer,
+          id,
+          outRegions,
+        ),
+      );
+      _discarded = true;
+      return _copyOfflineRegionList(outRegions.value);
+    });
+  }
+
+  /// Takes a completed offline regions merge result.
+  List<OfflineRegionInfo> takeMergedRegionList() {
+    return withNativeArena((arena) {
+      final outRegions = arena<Pointer<raw.mln_offline_region_list>>();
+      outRegions.value = nullptr;
+      _check(
+        _c.runtimeOfflineRegionsMergeDatabaseTakeResult(
+          _runtime._pointer,
+          id,
+          outRegions,
+        ),
+      );
+      _discarded = true;
+      return _copyOfflineRegionList(outRegions.value);
+    });
+  }
+
+  /// Takes a completed offline region metadata update result.
+  OfflineRegionInfo takeUpdatedRegionMetadata() {
+    return withNativeArena((arena) {
+      final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
+      outRegion.value = nullptr;
+      _check(
+        _c.runtimeOfflineRegionUpdateMetadataTakeResult(
+          _runtime._pointer,
+          id,
+          outRegion,
+        ),
+      );
+      _discarded = true;
+      return _copyOfflineRegionSnapshot(outRegion.value);
+    });
+  }
+
+  /// Takes a completed offline region status result.
+  OfflineRegionStatus takeRegionStatus() {
+    return withNativeArena((arena) {
+      final outStatus = arena<raw.mln_offline_region_status>();
+      outStatus.ref.size = sizeOf<raw.mln_offline_region_status>();
+      _check(
+        _c.runtimeOfflineRegionGetStatusTakeResult(
+          _runtime._pointer,
+          id,
+          outStatus,
+        ),
+      );
+      _discarded = true;
+      return _offlineRegionStatusFromNative(outStatus.ref);
+    });
+  }
+
   /// Discards runtime-owned state for this operation.
   void discard() {
     if (_discarded) {
@@ -483,6 +742,188 @@ final class OfflineOperationHandle {
     _check(_c.runtimeOfflineOperationDiscard(_runtime._pointer, id));
     _discarded = true;
   }
+}
+
+raw.mln_offline_region_definition _offlineRegionDefinitionToNative(
+  OfflineRegionDefinition definition,
+  Allocator allocator,
+) {
+  final result = Struct.create<raw.mln_offline_region_definition>();
+  result.size = sizeOf<raw.mln_offline_region_definition>();
+  switch (definition) {
+    case OfflineTilePyramidRegionDefinition():
+      result.type = raw
+          .mln_offline_region_definition_type
+          .MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+          .value;
+      result.data.tile_pyramid = _offlineTilePyramidDefinitionToNative(
+        definition,
+        allocator,
+      );
+    case OfflineGeometryRegionDefinition():
+      result.type = raw
+          .mln_offline_region_definition_type
+          .MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+          .value;
+      result.data.geometry = _offlineGeometryDefinitionToNative(
+        definition,
+        allocator,
+      );
+  }
+  return result;
+}
+
+raw.mln_offline_tile_pyramid_region_definition
+_offlineTilePyramidDefinitionToNative(
+  OfflineTilePyramidRegionDefinition definition,
+  Allocator allocator,
+) {
+  final result =
+      Struct.create<raw.mln_offline_tile_pyramid_region_definition>();
+  result.size = sizeOf<raw.mln_offline_tile_pyramid_region_definition>();
+  result.style_url = nativeUtf8CString(
+    definition.styleUrl,
+    allocator,
+  ).pointer.cast<Char>();
+  result.bounds = native_struct.latLngBoundsToNative(definition.bounds);
+  result.min_zoom = definition.minZoom;
+  result.max_zoom = definition.maxZoom;
+  result.pixel_ratio = definition.pixelRatio;
+  result.include_ideographs = definition.includeIdeographs;
+  return result;
+}
+
+raw.mln_offline_geometry_region_definition _offlineGeometryDefinitionToNative(
+  OfflineGeometryRegionDefinition definition,
+  Allocator allocator,
+) {
+  final result = Struct.create<raw.mln_offline_geometry_region_definition>();
+  result.size = sizeOf<raw.mln_offline_geometry_region_definition>();
+  result.style_url = nativeUtf8CString(
+    definition.styleUrl,
+    allocator,
+  ).pointer.cast<Char>();
+  result.geometry = native_geometry
+      .nativeGeometry(definition.geometry, allocator)
+      .pointer;
+  result.min_zoom = definition.minZoom;
+  result.max_zoom = definition.maxZoom;
+  result.pixel_ratio = definition.pixelRatio;
+  result.include_ideographs = definition.includeIdeographs;
+  return result;
+}
+
+Pointer<Uint8> _nativeBytes(Uint8List? bytes, Allocator allocator) {
+  if (bytes == null || bytes.isEmpty) {
+    return nullptr.cast<Uint8>();
+  }
+  final nativeBytes = allocator<Uint8>(bytes.length);
+  for (var index = 0; index < bytes.length; index += 1) {
+    nativeBytes[index] = bytes[index];
+  }
+  return nativeBytes;
+}
+
+OfflineRegionInfo _copyOfflineRegionSnapshot(
+  Pointer<raw.mln_offline_region_snapshot> snapshot,
+) {
+  try {
+    return withNativeArena((arena) {
+      final outInfo = arena<raw.mln_offline_region_info>();
+      outInfo.ref.size = sizeOf<raw.mln_offline_region_info>();
+      _check(_c.offlineRegionSnapshotGet(snapshot, outInfo));
+      return _offlineRegionInfoFromNative(outInfo.ref);
+    });
+  } finally {
+    _c.offlineRegionSnapshotDestroy(snapshot);
+  }
+}
+
+List<OfflineRegionInfo> _copyOfflineRegionList(
+  Pointer<raw.mln_offline_region_list> list,
+) {
+  try {
+    return withNativeArena((arena) {
+      final outCount = arena<Size>();
+      _check(_c.offlineRegionListCount(list, outCount));
+      return [
+        for (var index = 0; index < outCount.value; index += 1)
+          _copyOfflineRegionListEntry(list, index, arena),
+      ];
+    });
+  } finally {
+    _c.offlineRegionListDestroy(list);
+  }
+}
+
+OfflineRegionInfo _copyOfflineRegionListEntry(
+  Pointer<raw.mln_offline_region_list> list,
+  int index,
+  Allocator allocator,
+) {
+  final outInfo = allocator<raw.mln_offline_region_info>();
+  outInfo.ref.size = sizeOf<raw.mln_offline_region_info>();
+  _check(_c.offlineRegionListGet(list, index, outInfo));
+  return _offlineRegionInfoFromNative(outInfo.ref);
+}
+
+OfflineRegionInfo _offlineRegionInfoFromNative(
+  raw.mln_offline_region_info info,
+) {
+  return OfflineRegionInfo(
+    id: info.id,
+    definition: _offlineRegionDefinitionFromNative(info.definition),
+    metadata: info.metadata == nullptr || info.metadata_size == 0
+        ? Uint8List(0)
+        : Uint8List.fromList(info.metadata.asTypedList(info.metadata_size)),
+  );
+}
+
+OfflineRegionDefinition _offlineRegionDefinitionFromNative(
+  raw.mln_offline_region_definition definition,
+) {
+  if (definition.type ==
+      raw
+          .mln_offline_region_definition_type
+          .MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+          .value) {
+    final tilePyramid = definition.data.tile_pyramid;
+    return OfflineTilePyramidRegionDefinition(
+      styleUrl: tilePyramid.style_url.cast<Utf8>().toDartString(),
+      bounds: native_struct.latLngBoundsFromNative(tilePyramid.bounds),
+      minZoom: tilePyramid.min_zoom,
+      maxZoom: tilePyramid.max_zoom,
+      pixelRatio: tilePyramid.pixel_ratio,
+      includeIdeographs: tilePyramid.include_ideographs,
+    );
+  }
+  final geometry = definition.data.geometry;
+  return OfflineGeometryRegionDefinition(
+    styleUrl: geometry.style_url.cast<Utf8>().toDartString(),
+    geometry: native_geometry.geometryFromNative(geometry.geometry.ref),
+    minZoom: geometry.min_zoom,
+    maxZoom: geometry.max_zoom,
+    pixelRatio: geometry.pixel_ratio,
+    includeIdeographs: geometry.include_ideographs,
+  );
+}
+
+OfflineRegionStatus _offlineRegionStatusFromNative(
+  raw.mln_offline_region_status status,
+) {
+  return OfflineRegionStatus(
+    downloadState: OfflineRegionDownloadState.fromRawValue(
+      status.download_state,
+    ),
+    completedResourceCount: status.completed_resource_count,
+    completedResourceSize: status.completed_resource_size,
+    completedTileCount: status.completed_tile_count,
+    requiredTileCount: status.required_tile_count,
+    completedTileSize: status.completed_tile_size,
+    requiredResourceCount: status.required_resource_count,
+    requiredResourceCountIsPrecise: status.required_resource_count_is_precise,
+    complete: status.complete,
+  );
 }
 
 /// Copied runtime event returned by [RuntimeHandle.pollEvent].

@@ -86,6 +86,21 @@ void main() {
       expect(offlineOperation.id, isNonZero);
       offlineOperation.discard();
       expect(offlineOperation.isDiscarded, isTrue);
+      final offlineListOperation = runtime.listOfflineRegions();
+      expect(offlineListOperation.id, isNonZero);
+      offlineListOperation.discard();
+      final offlineCreateOperation = runtime.createOfflineRegion(
+        const OfflineTilePyramidRegionDefinition(
+          styleUrl: 'https://example.com/style.json',
+          bounds: LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
+          minZoom: 0,
+          maxZoom: 1,
+          pixelRatio: 1,
+        ),
+        metadata: Uint8List.fromList([1, 2, 3]),
+      );
+      expect(offlineCreateOperation.id, isNonZero);
+      offlineCreateOperation.discard();
 
       final map = runtime.createMap();
       expect(map.isClosed, isFalse);

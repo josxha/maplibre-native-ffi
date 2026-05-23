@@ -75,6 +75,250 @@ final class MaplibreNativeCApi {
     int operationId,
   ) => _raw.mln_runtime_offline_operation_discard(runtime, operationId).value;
 
+  /// Starts creating an offline region.
+  int runtimeOfflineRegionCreateStart(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<raw.mln_offline_region_definition> definition,
+    Pointer<Uint8> metadata,
+    int metadataSize,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_create_start(
+        runtime,
+        definition,
+        metadata,
+        metadataSize,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts getting an offline region by ID.
+  int runtimeOfflineRegionGetStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_get_start(runtime, regionId, outOperationId)
+      .value;
+
+  /// Starts listing offline regions.
+  int runtimeOfflineRegionsListStart(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_regions_list_start(runtime, outOperationId)
+      .value;
+
+  /// Starts merging offline regions from another database path.
+  int runtimeOfflineRegionsMergeDatabaseStart(
+    Pointer<raw.mln_runtime> runtime,
+    Pointer<Char> sideDatabasePath,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_regions_merge_database_start(
+        runtime,
+        sideDatabasePath,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts updating offline region metadata.
+  int runtimeOfflineRegionUpdateMetadataStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    Pointer<Uint8> metadata,
+    int metadataSize,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_update_metadata_start(
+        runtime,
+        regionId,
+        metadata,
+        metadataSize,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts getting offline region status.
+  int runtimeOfflineRegionGetStatusStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_get_status_start(
+        runtime,
+        regionId,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts enabling or disabling offline region observation.
+  int runtimeOfflineRegionSetObservedStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    bool observed,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_set_observed_start(
+        runtime,
+        regionId,
+        observed,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts setting offline region download state.
+  int runtimeOfflineRegionSetDownloadStateStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    int state,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_set_download_state_start(
+        runtime,
+        regionId,
+        state,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts invalidating an offline region.
+  int runtimeOfflineRegionInvalidateStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_invalidate_start(
+        runtime,
+        regionId,
+        outOperationId,
+      )
+      .value;
+
+  /// Starts deleting an offline region.
+  int runtimeOfflineRegionDeleteStart(
+    Pointer<raw.mln_runtime> runtime,
+    int regionId,
+    Pointer<Uint64> outOperationId,
+  ) => _raw
+      .mln_runtime_offline_region_delete_start(
+        runtime,
+        regionId,
+        outOperationId,
+      )
+      .value;
+
+  /// Takes an offline region create result.
+  int runtimeOfflineRegionCreateTakeResult(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+    Pointer<Pointer<raw.mln_offline_region_snapshot>> outRegion,
+  ) => _raw
+      .mln_runtime_offline_region_create_take_result(
+        runtime,
+        operationId,
+        outRegion,
+      )
+      .value;
+
+  /// Takes an offline region get result.
+  int runtimeOfflineRegionGetTakeResult(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+    Pointer<Pointer<raw.mln_offline_region_snapshot>> outRegion,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_runtime_offline_region_get_take_result(
+        runtime,
+        operationId,
+        outRegion,
+        outFound,
+      )
+      .value;
+
+  /// Takes an offline regions list result.
+  int runtimeOfflineRegionsListTakeResult(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+    Pointer<Pointer<raw.mln_offline_region_list>> outRegions,
+  ) => _raw
+      .mln_runtime_offline_regions_list_take_result(
+        runtime,
+        operationId,
+        outRegions,
+      )
+      .value;
+
+  /// Takes an offline database merge result.
+  int runtimeOfflineRegionsMergeDatabaseTakeResult(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+    Pointer<Pointer<raw.mln_offline_region_list>> outRegions,
+  ) => _raw
+      .mln_runtime_offline_regions_merge_database_take_result(
+        runtime,
+        operationId,
+        outRegions,
+      )
+      .value;
+
+  /// Takes an offline region metadata update result.
+  int runtimeOfflineRegionUpdateMetadataTakeResult(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+    Pointer<Pointer<raw.mln_offline_region_snapshot>> outRegion,
+  ) => _raw
+      .mln_runtime_offline_region_update_metadata_take_result(
+        runtime,
+        operationId,
+        outRegion,
+      )
+      .value;
+
+  /// Takes an offline region status result.
+  int runtimeOfflineRegionGetStatusTakeResult(
+    Pointer<raw.mln_runtime> runtime,
+    int operationId,
+    Pointer<raw.mln_offline_region_status> outStatus,
+  ) => _raw
+      .mln_runtime_offline_region_get_status_take_result(
+        runtime,
+        operationId,
+        outStatus,
+      )
+      .value;
+
+  /// Copies one offline region snapshot.
+  int offlineRegionSnapshotGet(
+    Pointer<raw.mln_offline_region_snapshot> snapshot,
+    Pointer<raw.mln_offline_region_info> outInfo,
+  ) => _raw.mln_offline_region_snapshot_get(snapshot, outInfo).value;
+
+  /// Destroys an offline region snapshot.
+  void offlineRegionSnapshotDestroy(
+    Pointer<raw.mln_offline_region_snapshot> snapshot,
+  ) {
+    _raw.mln_offline_region_snapshot_destroy(snapshot);
+  }
+
+  /// Counts entries in an offline region list.
+  int offlineRegionListCount(
+    Pointer<raw.mln_offline_region_list> list,
+    Pointer<Size> outCount,
+  ) => _raw.mln_offline_region_list_count(list, outCount).value;
+
+  /// Copies one offline region list entry.
+  int offlineRegionListGet(
+    Pointer<raw.mln_offline_region_list> list,
+    int index,
+    Pointer<raw.mln_offline_region_info> outInfo,
+  ) => _raw.mln_offline_region_list_get(list, index, outInfo).value;
+
+  /// Destroys an offline region list.
+  void offlineRegionListDestroy(Pointer<raw.mln_offline_region_list> list) {
+    _raw.mln_offline_region_list_destroy(list);
+  }
+
   /// Runs one pending owner-thread task for a runtime.
   int runtimeRunOnce(Pointer<raw.mln_runtime> runtime) =>
       _raw.mln_runtime_run_once(runtime).value;
