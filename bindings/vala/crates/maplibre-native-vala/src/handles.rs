@@ -319,6 +319,67 @@ pub extern "C" fn mln_vala_style_tile_source_options_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_premultiplied_rgba8_image_default(
+    out_image: *mut sys::mln_premultiplied_rgba8_image,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_premultiplied_rgba8_image(out_image) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_premultiplied_rgba8_image_init(
+    out_image: *mut sys::mln_premultiplied_rgba8_image,
+    width: u32,
+    height: u32,
+    stride: u32,
+    pixels: *const u8,
+    byte_length: usize,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match init_premultiplied_rgba8_image(out_image, width, height, stride, pixels, byte_length) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_image_options_default(
+    out_options: *mut sys::mln_style_image_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_style_image_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_style_image_info_default(
+    out_info: *mut sys::mln_style_image_info,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_style_image_info(out_info) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_new(
     runtime: *mut RuntimeHandle,
     width: u32,
@@ -1016,6 +1077,98 @@ pub extern "C" fn mln_vala_map_handle_remove_style_source(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_set_style_image(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    image: *const sys::mln_premultiplied_rgba8_image,
+    options: *const sys::mln_style_image_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match set_style_image(handle, image_id, image, options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_remove_style_image(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_removed: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match remove_style_image(handle, image_id, out_removed) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_style_image_exists(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_exists: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match style_image_exists(handle, image_id, out_exists) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_get_style_image_info(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_info: *mut sys::mln_style_image_info,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match get_style_image_info(handle, image_id, out_info, out_found) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_copy_style_image_premultiplied_rgba8(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_pixels: *mut u8,
+    pixel_capacity: usize,
+    out_byte_length: *mut usize,
+    out_found: *mut GBoolean,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match copy_style_image_premultiplied_rgba8(
+        handle,
+        image_id,
+        out_pixels,
+        pixel_capacity,
+        out_byte_length,
+        out_found,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
 fn default_runtime_options(out_options: *mut sys::mln_runtime_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_runtime_options_default() };
@@ -1127,6 +1280,50 @@ fn default_style_tile_source_options(
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_style_tile_source_options_default() };
     glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_premultiplied_rgba8_image(
+    out_image: *mut sys::mln_premultiplied_rgba8_image,
+) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let image = unsafe { sys::mln_premultiplied_rgba8_image_default() };
+    glib::clear_optional_out_pointer(out_image, image)
+}
+
+fn init_premultiplied_rgba8_image(
+    out_image: *mut sys::mln_premultiplied_rgba8_image,
+    width: u32,
+    height: u32,
+    stride: u32,
+    pixels: *const u8,
+    byte_length: usize,
+) -> error::Result<()> {
+    if pixels.is_null() && byte_length != 0 {
+        return Err(Error::invalid_argument("image pixel buffer is null"));
+    }
+    let image = sys::mln_premultiplied_rgba8_image {
+        size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+        width,
+        height,
+        stride,
+        pixels,
+        byte_length,
+    };
+    glib::clear_optional_out_pointer(out_image, image)
+}
+
+fn default_style_image_options(
+    out_options: *mut sys::mln_style_image_options,
+) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_style_image_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
+fn default_style_image_info(out_info: *mut sys::mln_style_image_info) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let info = unsafe { sys::mln_style_image_info_default() };
+    glib::clear_optional_out_pointer(out_info, info)
 }
 
 fn get_camera(
@@ -1599,6 +1796,104 @@ fn remove_style_source(
     // and `removed` is valid output storage.
     error::check(unsafe { sys::mln_map_remove_style_source(map, source_id, &mut removed) })?;
     glib::clear_optional_out_pointer(out_removed, if removed { GTRUE } else { GFALSE })
+}
+
+fn set_style_image(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    image: *const sys::mln_premultiplied_rgba8_image,
+    options: *const sys::mln_style_image_options,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let image_id = string_view_from_c(image_id, "style image ID")?;
+    if image.is_null() {
+        return Err(Error::invalid_argument("style image is null"));
+    }
+    if options.is_null() {
+        return Err(Error::invalid_argument("style image options are null"));
+    }
+    // SAFETY: `map` is live, `image_id` borrows a caller string for this call,
+    // and image/options point to caller-owned descriptors borrowed for this call.
+    error::check(unsafe { sys::mln_map_set_style_image(map, image_id, image, options) })
+}
+
+fn remove_style_image(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_removed: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let image_id = string_view_from_c(image_id, "style image ID")?;
+    let mut removed = false;
+    // SAFETY: `map` is live, `image_id` borrows a caller string for this call,
+    // and `removed` is valid output storage.
+    error::check(unsafe { sys::mln_map_remove_style_image(map, image_id, &mut removed) })?;
+    glib::clear_optional_out_pointer(out_removed, if removed { GTRUE } else { GFALSE })
+}
+
+fn style_image_exists(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_exists: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let image_id = string_view_from_c(image_id, "style image ID")?;
+    let mut exists = false;
+    // SAFETY: `map` is live, `image_id` borrows a caller string for this call,
+    // and `exists` is valid output storage.
+    error::check(unsafe { sys::mln_map_style_image_exists(map, image_id, &mut exists) })?;
+    glib::clear_optional_out_pointer(out_exists, if exists { GTRUE } else { GFALSE })
+}
+
+fn get_style_image_info(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_info: *mut sys::mln_style_image_info,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    if out_info.is_null() {
+        return Err(Error::invalid_argument("style image info output is null"));
+    }
+    let image_id = string_view_from_c(image_id, "style image ID")?;
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut info = unsafe { sys::mln_style_image_info_default() };
+    let mut found = false;
+    // SAFETY: `map` is live, `image_id` borrows a caller string for this call,
+    // and output pointers refer to writable storage.
+    error::check(unsafe {
+        sys::mln_map_get_style_image_info(map, image_id, &mut info, &mut found)
+    })?;
+    glib::clear_optional_out_pointer(out_info, info)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
+fn copy_style_image_premultiplied_rgba8(
+    handle: *mut MapHandle,
+    image_id: *const c_char,
+    out_pixels: *mut u8,
+    pixel_capacity: usize,
+    out_byte_length: *mut usize,
+    out_found: *mut GBoolean,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let image_id = string_view_from_c(image_id, "style image ID")?;
+    let mut byte_length = 0;
+    let mut found = false;
+    // SAFETY: `map` is live, `image_id` borrows a caller string for this call,
+    // and the C API validates the caller-allocated output buffer.
+    error::check(unsafe {
+        sys::mln_map_copy_style_image_premultiplied_rgba8(
+            map,
+            image_id,
+            out_pixels,
+            pixel_capacity,
+            &mut byte_length,
+            &mut found,
+        )
+    })?;
+    glib::clear_optional_out_pointer(out_byte_length, byte_length)?;
+    glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
 }
 
 fn string_view_from_c(value: *const c_char, label: &str) -> error::Result<sys::mln_string_view> {
@@ -2196,6 +2491,126 @@ mod tests {
             ),
             GTRUE
         );
+
+        assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
+        assert_eq!(
+            mln_vala_runtime_handle_close(runtime, ptr::null_mut()),
+            GTRUE
+        );
+
+        glib::unref_object(map);
+        glib::unref_object(runtime);
+    }
+
+    #[test]
+    fn style_image_lifecycle_round_trips_metadata_and_pixels() {
+        let runtime = mln_vala_runtime_handle_new(ptr::null_mut());
+        assert!(!runtime.is_null());
+        let map = mln_vala_map_handle_new(runtime, 512, 512, 1.0, ptr::null_mut());
+        assert!(!map.is_null());
+
+        assert_eq!(
+            mln_vala_map_handle_set_style_json(
+                map,
+                c"{\"version\":8,\"sources\":{},\"layers\":[]}".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+
+        let pixels = [255_u8, 0, 0, 255];
+        // SAFETY: Zeroed storage is immediately initialized by the public init
+        // helper before use.
+        let mut image: sys::mln_premultiplied_rgba8_image = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_premultiplied_rgba8_image_init(
+                &mut image,
+                1,
+                1,
+                4,
+                pixels.as_ptr(),
+                pixels.len(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(image.byte_length, pixels.len());
+
+        // SAFETY: Zeroed storage is immediately initialized by default helpers.
+        let mut options: sys::mln_style_image_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_style_image_options_default(&mut options, ptr::null_mut()),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_set_style_image(
+                map,
+                c"fixture-image".as_ptr(),
+                &image,
+                &options,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+
+        let mut exists = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_style_image_exists(
+                map,
+                c"fixture-image".as_ptr(),
+                &mut exists,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(exists, GTRUE);
+
+        // SAFETY: Zeroed storage is immediately initialized by the wrapper.
+        let mut info: sys::mln_style_image_info = unsafe { std::mem::zeroed() };
+        let mut found = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_get_style_image_info(
+                map,
+                c"fixture-image".as_ptr(),
+                &mut info,
+                &mut found,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(found, GTRUE);
+        assert_eq!(info.width, 1);
+        assert_eq!(info.byte_length, pixels.len());
+
+        let mut copied = [0_u8; 4];
+        let mut byte_length = 0;
+        assert_eq!(
+            mln_vala_map_handle_copy_style_image_premultiplied_rgba8(
+                map,
+                c"fixture-image".as_ptr(),
+                copied.as_mut_ptr(),
+                copied.len(),
+                &mut byte_length,
+                &mut found,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(found, GTRUE);
+        assert_eq!(byte_length, pixels.len());
+        assert_eq!(copied, pixels);
+
+        let mut removed = GFALSE;
+        assert_eq!(
+            mln_vala_map_handle_remove_style_image(
+                map,
+                c"fixture-image".as_ptr(),
+                &mut removed,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(removed, GTRUE);
 
         assert_eq!(mln_vala_map_handle_close(map, ptr::null_mut()), GTRUE);
         assert_eq!(

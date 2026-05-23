@@ -135,6 +135,11 @@ typedef enum {
   MLN_VALA_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
 } MlnValaStyleRasterDemEncoding;
 
+typedef enum {
+  MLN_VALA_STYLE_IMAGE_OPTION_FIELDS_PIXEL_RATIO = 1u << 0u,
+  MLN_VALA_STYLE_IMAGE_OPTION_FIELDS_SDF = 1u << 1u,
+} MlnValaStyleImageOptionFields;
+
 /**
  * MlnValaResourceTransformCallback:
  * @kind: resource kind.
@@ -489,6 +494,32 @@ typedef struct {
   uint32_t size;
   uint32_t width;
   uint32_t height;
+  uint32_t stride;
+  const uint8_t* pixels;
+  size_t byte_length;
+} MlnValaPremultipliedRgba8Image;
+
+typedef struct {
+  uint32_t size;
+  MlnValaStyleImageOptionFields fields;
+  float pixel_ratio;
+  bool sdf;
+} MlnValaStyleImageOptions;
+
+typedef struct {
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  uint32_t stride;
+  size_t byte_length;
+  float pixel_ratio;
+  bool sdf;
+} MlnValaStyleImageInfo;
+
+typedef struct {
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
   double scale_factor;
 } MlnValaRenderTargetExtent;
 
@@ -598,6 +629,34 @@ gboolean mln_vala_map_tile_options_default(
 );
 gboolean mln_vala_style_tile_source_options_default(
   MlnValaStyleTileSourceOptions* out_options, GError** error
+);
+gboolean mln_vala_premultiplied_rgba8_image_default(
+  MlnValaPremultipliedRgba8Image* out_image, GError** error
+);
+
+/**
+ * mln_vala_premultiplied_rgba8_image_init:
+ * @out_image: (out): return location for initialized image descriptor.
+ * @width: physical image width.
+ * @height: physical image height.
+ * @stride: bytes per image row.
+ * @pixels: (array length=byte_length) (nullable): borrowed premultiplied RGBA8
+ * pixels.
+ * @byte_length: byte length of @pixels.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_premultiplied_rgba8_image_init(
+  MlnValaPremultipliedRgba8Image* out_image, uint32_t width, uint32_t height,
+  uint32_t stride, const uint8_t* pixels, size_t byte_length, GError** error
+);
+gboolean mln_vala_style_image_options_default(
+  MlnValaStyleImageOptions* out_options, GError** error
+);
+gboolean mln_vala_style_image_info_default(
+  MlnValaStyleImageInfo* out_info, GError** error
 );
 gboolean mln_vala_metal_surface_descriptor_default(
   MlnValaMetalSurfaceDescriptor* out_descriptor, GError** error
@@ -1619,6 +1678,89 @@ gboolean mln_vala_map_handle_get_style_source_info(
  */
 gboolean mln_vala_map_handle_remove_style_source(
   MlnValaMapHandle* self, const char* source_id, gboolean* out_removed,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_set_style_image:
+ * @self: a map handle.
+ * @image_id: (not nullable): image identifier.
+ * @image: (not nullable): premultiplied RGBA8 image descriptor.
+ * @options: (not nullable): style image options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_set_style_image(
+  MlnValaMapHandle* self, const char* image_id,
+  const MlnValaPremultipliedRgba8Image* image,
+  const MlnValaStyleImageOptions* options, GError** error
+);
+
+/**
+ * mln_vala_map_handle_remove_style_image:
+ * @self: a map handle.
+ * @image_id: (not nullable): image identifier.
+ * @out_removed: (out): return location for removal state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_remove_style_image(
+  MlnValaMapHandle* self, const char* image_id, gboolean* out_removed,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_style_image_exists:
+ * @self: a map handle.
+ * @image_id: (not nullable): image identifier.
+ * @out_exists: (out): return location for existence state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_style_image_exists(
+  MlnValaMapHandle* self, const char* image_id, gboolean* out_exists,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_get_style_image_info:
+ * @self: a map handle.
+ * @image_id: (not nullable): image identifier.
+ * @out_info: (out): return location for image metadata.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_get_style_image_info(
+  MlnValaMapHandle* self, const char* image_id, MlnValaStyleImageInfo* out_info,
+  gboolean* out_found, GError** error
+);
+
+/**
+ * mln_vala_map_handle_copy_style_image_premultiplied_rgba8:
+ * @self: a map handle.
+ * @image_id: (not nullable): image identifier.
+ * @out_pixels: (out caller-allocates) (array length=pixel_capacity): output
+ * pixel buffer.
+ * @pixel_capacity: byte length of @out_pixels.
+ * @out_byte_length: (out): return location for required byte length.
+ * @out_found: (out): return location for found state.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_copy_style_image_premultiplied_rgba8(
+  MlnValaMapHandle* self, const char* image_id, uint8_t* out_pixels,
+  size_t pixel_capacity, size_t* out_byte_length, gboolean* out_found,
   GError** error
 );
 
