@@ -1,3 +1,4 @@
+from pathlib import Path
 import threading
 
 import pytest
@@ -247,6 +248,22 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_ambient_cache_operation_starts_and_discards_through_public_api(
+    tmp_path: Path,
+) -> None:
+    with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path))) as runtime:
+        operation = runtime.run_ambient_cache_operation(
+            offline.AmbientCacheOperation.CLEAR,
+        )
+
+        assert isinstance(operation, offline.OfflineOperationHandle)
+        assert operation.operation_id > 0
+        assert not operation.closed
+        operation.close()
+        assert operation.closed
+        operation.close()
 
 
 def test_offline_values_wrap_runtime_event_payload_shape() -> None:

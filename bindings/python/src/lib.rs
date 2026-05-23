@@ -464,6 +464,32 @@ impl RuntimeHandle {
             .map_err(map_error)
     }
 
+    fn run_ambient_cache_operation_start(&self, operation: u32) -> PyResult<u64> {
+        let state = self.state();
+        let mut operation_id = 0;
+        // SAFETY: The C API validates the runtime handle, operation enum value,
+        // owner-thread affinity, and writable operation_id pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_run_ambient_cache_operation_start(
+                state.as_ptr(),
+                operation,
+                &mut operation_id,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(operation_id)
+    }
+
+    fn offline_operation_discard(&self, operation_id: u64) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the runtime handle, owner-thread affinity,
+        // and operation ID.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_operation_discard(state.as_ptr(), operation_id)
+        })
+        .map_err(map_error)
+    }
+
     fn set_resource_provider(
         &self,
         callback: Py<PyAny>,

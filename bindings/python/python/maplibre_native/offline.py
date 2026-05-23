@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+from types import TracebackType
+from typing import TYPE_CHECKING
 
 from .geo import GeoJson, LatLngBounds
+
+if TYPE_CHECKING:
+    from .runtime import RuntimeHandle
 
 
 class AmbientCacheOperation(IntEnum):
@@ -102,6 +107,43 @@ class OfflineOperationResultKind(IntEnum):
     def native_code(self) -> int:
         """Return the C enum value for this result kind."""
         return int(self)
+
+
+class OfflineOperationHandle:
+    """Runtime-owned offline database operation token."""
+
+    def __init__(self, runtime: "RuntimeHandle", operation_id: int) -> None:
+        self._runtime = runtime
+        self._operation_id = operation_id
+        self._closed = False
+
+    @property
+    def operation_id(self) -> int:
+        """Return the native offline operation ID."""
+        return self._operation_id
+
+    @property
+    def closed(self) -> bool:
+        """Return whether this operation token has been discarded."""
+        return self._closed
+
+    def close(self) -> None:
+        """Discard runtime-owned state for this operation."""
+        if self._closed:
+            return
+        self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
+        self._closed = True
+
+    def __enter__(self) -> "OfflineOperationHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,6 +257,7 @@ __all__ = [
     "AmbientCacheOperation",
     "OfflineGeometryRegionDefinition",
     "OfflineOperationCompleted",
+    "OfflineOperationHandle",
     "OfflineOperationKind",
     "OfflineOperationResultKind",
     "OfflineRegionDefinition",

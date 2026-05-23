@@ -165,6 +165,15 @@ class RuntimeHandle:
         """Run one pending owner-thread task for this runtime."""
         self._native.run_once()
 
+    def run_ambient_cache_operation(self, operation: object) -> object:
+        """Start an ambient cache maintenance operation."""
+        from .offline import AmbientCacheOperation, OfflineOperationHandle
+
+        operation_id = self._native.run_ambient_cache_operation_start(
+            AmbientCacheOperation(operation).native_code
+        )
+        return OfflineOperationHandle(self, operation_id)
+
     def set_resource_transform(
         self,
         callback: object,

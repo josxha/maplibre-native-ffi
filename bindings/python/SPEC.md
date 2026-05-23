@@ -123,6 +123,9 @@ The current implementation includes these completed slices:
   state selectors, and copied query result value shapes.
 - `maplibre_native.offline` provides offline operation, region definition,
   region status, and runtime event payload value shapes.
+- `RuntimeHandle.run_ambient_cache_operation()` starts native ambient cache
+  maintenance and returns an `OfflineOperationHandle` that discards
+  runtime-owned operation state on close.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish shared naming and value semantics.
 - `maplibre_native.json` provides JSON value trees that preserve numeric shape,
