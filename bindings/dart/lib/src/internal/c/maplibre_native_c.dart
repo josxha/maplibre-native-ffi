@@ -152,6 +152,88 @@ final class MaplibreNativeCApi {
   int renderSessionDumpDebugLogs(Pointer<raw.mln_render_session> session) =>
       _raw.mln_render_session_dump_debug_logs(session).value;
 
+  /// Queries rendered features from the latest render session state.
+  int renderSessionQueryRenderedFeatures(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_rendered_query_geometry> geometry,
+    Pointer<raw.mln_rendered_feature_query_options> options,
+    Pointer<Pointer<raw.mln_feature_query_result>> outResult,
+  ) => _raw
+      .mln_render_session_query_rendered_features(
+        session,
+        geometry,
+        options,
+        outResult,
+      )
+      .value;
+
+  /// Queries source features from the latest render session state.
+  int renderSessionQuerySourceFeatures(
+    Pointer<raw.mln_render_session> session,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_source_feature_query_options> options,
+    Pointer<Pointer<raw.mln_feature_query_result>> outResult,
+  ) => _raw
+      .mln_render_session_query_source_features(
+        session,
+        sourceId,
+        options,
+        outResult,
+      )
+      .value;
+
+  /// Queries a feature extension from the latest render session state.
+  int renderSessionQueryFeatureExtensions(
+    Pointer<raw.mln_render_session> session,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_feature> feature,
+    raw.mln_string_view extension,
+    raw.mln_string_view extensionField,
+    Pointer<raw.mln_json_value> arguments,
+    Pointer<Pointer<raw.mln_feature_extension_result>> outResult,
+  ) => _raw
+      .mln_render_session_query_feature_extensions(
+        session,
+        sourceId,
+        feature,
+        extension,
+        extensionField,
+        arguments,
+        outResult,
+      )
+      .value;
+
+  /// Counts features in a query result handle.
+  int featureQueryResultCount(
+    Pointer<raw.mln_feature_query_result> result,
+    Pointer<Size> outCount,
+  ) => _raw.mln_feature_query_result_count(result, outCount).value;
+
+  /// Borrows one feature from a query result handle.
+  int featureQueryResultGet(
+    Pointer<raw.mln_feature_query_result> result,
+    int index,
+    Pointer<raw.mln_queried_feature> outFeature,
+  ) => _raw.mln_feature_query_result_get(result, index, outFeature).value;
+
+  /// Destroys a feature query result handle.
+  void featureQueryResultDestroy(Pointer<raw.mln_feature_query_result> result) {
+    _raw.mln_feature_query_result_destroy(result);
+  }
+
+  /// Borrows a feature extension query result view.
+  int featureExtensionResultGet(
+    Pointer<raw.mln_feature_extension_result> result,
+    Pointer<raw.mln_feature_extension_result_info> outInfo,
+  ) => _raw.mln_feature_extension_result_get(result, outInfo).value;
+
+  /// Destroys a feature extension result handle.
+  void featureExtensionResultDestroy(
+    Pointer<raw.mln_feature_extension_result> result,
+  ) {
+    _raw.mln_feature_extension_result_destroy(result);
+  }
+
   /// Reads the most recently rendered texture frame into caller-owned storage.
   int textureReadPremultipliedRgba8(
     Pointer<raw.mln_render_session> session,
@@ -305,6 +387,30 @@ final class MaplibreNativeCApi {
   void styleIdListDestroy(Pointer<raw.mln_style_id_list> list) {
     _raw.mln_style_id_list_destroy(list);
   }
+
+  /// Returns default rendered feature query options.
+  raw.mln_rendered_feature_query_options renderedFeatureQueryOptionsDefault() =>
+      _raw.mln_rendered_feature_query_options_default();
+
+  /// Returns default source feature query options.
+  raw.mln_source_feature_query_options sourceFeatureQueryOptionsDefault() =>
+      _raw.mln_source_feature_query_options_default();
+
+  /// Returns a rendered point query geometry descriptor.
+  raw.mln_rendered_query_geometry renderedQueryGeometryPoint(
+    raw.mln_screen_point point,
+  ) => _raw.mln_rendered_query_geometry_point(point);
+
+  /// Returns a rendered box query geometry descriptor.
+  raw.mln_rendered_query_geometry renderedQueryGeometryBox(
+    raw.mln_screen_box box,
+  ) => _raw.mln_rendered_query_geometry_box(box);
+
+  /// Returns a rendered line-string query geometry descriptor.
+  raw.mln_rendered_query_geometry renderedQueryGeometryLineString(
+    Pointer<raw.mln_screen_point> points,
+    int pointCount,
+  ) => _raw.mln_rendered_query_geometry_line_string(points, pointCount);
 
   /// Borrows the root value from a JSON snapshot.
   int jsonSnapshotGet(

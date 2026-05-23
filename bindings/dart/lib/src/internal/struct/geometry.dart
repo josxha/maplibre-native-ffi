@@ -325,6 +325,10 @@ GeoJson geoJsonFromNative(raw.mln_geojson value) {
   }
 }
 
+/// Copies a borrowed native feature descriptor into an owned Dart value.
+FeatureGeoJson featureGeoJsonFromNative(raw.mln_feature value) =>
+    _featureFromNative(value);
+
 FeatureGeoJson _featureFromNative(raw.mln_feature value) => FeatureGeoJson(
   geometry: geometryFromNative(value.geometry.ref),
   properties: [
@@ -336,6 +340,14 @@ FeatureGeoJson _featureFromNative(raw.mln_feature value) => FeatureGeoJson(
   ],
   identifier: _featureIdentifierFromNative(value),
 );
+
+/// Copies a borrowed native feature collection into owned Dart values.
+List<FeatureGeoJson> featureCollectionFromNative(
+  raw.mln_feature_collection collection,
+) => [
+  for (var index = 0; index < collection.feature_count; index += 1)
+    _featureFromNative(collection.features[index]),
+];
 
 FeatureIdentifier _featureIdentifierFromNative(raw.mln_feature value) {
   switch (value.identifier_type) {

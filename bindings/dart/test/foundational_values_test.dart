@@ -191,6 +191,29 @@ void main() {
     );
   });
 
+  test('query descriptors preserve public semantic fields', () {
+    const geometry = RenderedQueryLineString([
+      ScreenPoint(1, 2),
+      ScreenPoint(3, 4),
+    ]);
+    const renderedOptions = RenderedFeatureQueryOptions(
+      layerIds: ['roads'],
+      filter: JsonArray([
+        JsonString('=='),
+        JsonString('class'),
+        JsonString('primary'),
+      ]),
+    );
+    const sourceOptions = SourceFeatureQueryOptions(
+      sourceLayerIds: ['transportation'],
+    );
+
+    expect(geometry.points.length, 2);
+    expect(renderedOptions.layerIds, ['roads']);
+    expect(renderedOptions.filter, isA<JsonArray>());
+    expect(sourceOptions.sourceLayerIds, ['transportation']);
+  });
+
   test('public enum-like values preserve native raw values', () {
     expect(ResourceKind.tile.rawValue, 3);
     expect(ResourceLoadingMethod.all.rawValue, 0);

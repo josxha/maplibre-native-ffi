@@ -14,6 +14,7 @@ import '../internal/struct/geometry.dart' as native_geometry;
 import '../internal/struct/json.dart' as native_json;
 import '../internal/struct/struct.dart' as native_struct;
 import '../json/json.dart';
+import '../query/query.dart';
 import '../render/native_pointer.dart';
 import '../render/targets.dart';
 import '../style/style.dart';
@@ -836,6 +837,92 @@ final class RenderSessionHandle {
     _check(_c.renderSessionDumpDebugLogs(_pointer));
   }
 
+  /// Queries rendered features from the latest render session state.
+  List<QueriedFeature> queryRenderedFeatures(
+    RenderedQueryGeometry geometry, {
+    RenderedFeatureQueryOptions options = const RenderedFeatureQueryOptions(),
+  }) {
+    return withNativeArena((arena) {
+      final nativeGeometry = arena<raw.mln_rendered_query_geometry>();
+      nativeGeometry.ref = _renderedQueryGeometryToNative(geometry, arena);
+      final nativeOptions = _renderedFeatureQueryOptionsToNative(
+        options,
+        arena,
+      );
+      final outResult = arena<Pointer<raw.mln_feature_query_result>>();
+      outResult.value = nullptr;
+      _check(
+        _c.renderSessionQueryRenderedFeatures(
+          _pointer,
+          nativeGeometry,
+          nativeOptions,
+          outResult,
+        ),
+      );
+      return _copyFeatureQueryResult(outResult.value);
+    });
+  }
+
+  /// Queries source features from the latest render session state.
+  List<QueriedFeature> querySourceFeatures(
+    String sourceId, {
+    SourceFeatureQueryOptions options = const SourceFeatureQueryOptions(),
+  }) {
+    return withNativeArena((arena) {
+      final nativeSourceId = nativeStringView(sourceId, arena);
+      final nativeOptions = _sourceFeatureQueryOptionsToNative(options, arena);
+      final outResult = arena<Pointer<raw.mln_feature_query_result>>();
+      outResult.value = nullptr;
+      _check(
+        _c.renderSessionQuerySourceFeatures(
+          _pointer,
+          nativeSourceId.value,
+          nativeOptions,
+          outResult,
+        ),
+      );
+      return _copyFeatureQueryResult(outResult.value);
+    });
+  }
+
+  /// Queries a feature extension from the latest render session state.
+  FeatureExtensionResult queryFeatureExtensions({
+    required String sourceId,
+    required FeatureGeoJson feature,
+    required String extension,
+    required String extensionField,
+    JsonValue? arguments,
+  }) {
+    return withNativeArena((arena) {
+      final nativeSourceId = nativeStringView(sourceId, arena);
+      final nativeFeature = native_geometry
+          .nativeGeoJson(feature, arena)
+          .pointer
+          .ref
+          .data
+          .feature;
+      final nativeExtension = nativeStringView(extension, arena);
+      final nativeExtensionField = nativeStringView(extensionField, arena);
+      final nativeArguments = arguments == null
+          ? nullptr.cast<raw.mln_json_value>()
+          : native_json.nativeJsonValue(arguments, arena).pointer;
+      final outResult = arena<Pointer<raw.mln_feature_extension_result>>();
+      outResult.value = nullptr;
+      _check(
+        _c.renderSessionQueryFeatureExtensions(
+          _pointer,
+          nativeSourceId.value,
+          nativeFeature,
+          nativeExtension.value,
+          nativeExtensionField.value,
+          nativeArguments,
+          outResult,
+        ),
+      );
+      return _copyFeatureExtensionResult(outResult.value);
+    });
+  }
+
   /// Reads the latest rendered session-owned texture as premultiplied RGBA8.
   TextureImage readPremultipliedRgba8() {
     return withNativeArena((arena) {
@@ -1044,6 +1131,186 @@ final class VulkanOwnedTextureFrame {
     }
     final _ = _session._pointer;
     return NativePointer(pointer.address);
+  }
+}
+
+raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(
+  RenderedQueryGeometry geometry,
+  Allocator allocator,
+) {
+  switch (geometry) {
+    case RenderedQueryPoint(:final point):
+      return _c.renderedQueryGeometryPoint(
+        native_struct.screenPointToNative(point),
+      );
+    case RenderedQueryBox(:final box):
+      final nativeBox = Struct.create<raw.mln_screen_box>();
+      nativeBox.min = native_struct.screenPointToNative(box.min);
+      nativeBox.max = native_struct.screenPointToNative(box.max);
+      return _c.renderedQueryGeometryBox(nativeBox);
+    case RenderedQueryLineString(:final points):
+      final nativePoints = points.isEmpty
+          ? nullptr.cast<raw.mln_screen_point>()
+          : allocator<raw.mln_screen_point>(points.length);
+      for (var index = 0; index < points.length; index += 1) {
+        nativePoints[index] = native_struct.screenPointToNative(points[index]);
+      }
+      return _c.renderedQueryGeometryLineString(nativePoints, points.length);
+  }
+}
+
+Pointer<raw.mln_rendered_feature_query_options>
+_renderedFeatureQueryOptionsToNative(
+  RenderedFeatureQueryOptions options,
+  Allocator allocator,
+) {
+  final nativeOptions = allocator<raw.mln_rendered_feature_query_options>();
+  nativeOptions.ref = _c.renderedFeatureQueryOptionsDefault();
+  final layerIds = options.layerIds;
+  if (layerIds != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_rendered_feature_query_option_field
+        .MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
+        .value;
+    nativeOptions.ref.layer_ids = _stringViewArray(layerIds, allocator);
+    nativeOptions.ref.layer_id_count = layerIds.length;
+  }
+  final filter = options.filter;
+  if (filter != null) {
+    nativeOptions.ref.filter = native_json
+        .nativeJsonValue(filter, allocator)
+        .pointer;
+  }
+  return nativeOptions;
+}
+
+Pointer<raw.mln_source_feature_query_options>
+_sourceFeatureQueryOptionsToNative(
+  SourceFeatureQueryOptions options,
+  Allocator allocator,
+) {
+  final nativeOptions = allocator<raw.mln_source_feature_query_options>();
+  nativeOptions.ref = _c.sourceFeatureQueryOptionsDefault();
+  final sourceLayerIds = options.sourceLayerIds;
+  if (sourceLayerIds != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_source_feature_query_option_field
+        .MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+        .value;
+    nativeOptions.ref.source_layer_ids = _stringViewArray(
+      sourceLayerIds,
+      allocator,
+    );
+    nativeOptions.ref.source_layer_id_count = sourceLayerIds.length;
+  }
+  final filter = options.filter;
+  if (filter != null) {
+    nativeOptions.ref.filter = native_json
+        .nativeJsonValue(filter, allocator)
+        .pointer;
+  }
+  return nativeOptions;
+}
+
+Pointer<raw.mln_string_view> _stringViewArray(
+  List<String> values,
+  Allocator allocator,
+) {
+  if (values.isEmpty) {
+    return nullptr.cast<raw.mln_string_view>();
+  }
+  final views = allocator<raw.mln_string_view>(values.length);
+  for (var index = 0; index < values.length; index += 1) {
+    views[index] = nativeStringView(values[index], allocator).value;
+  }
+  return views;
+}
+
+List<QueriedFeature> _copyFeatureQueryResult(
+  Pointer<raw.mln_feature_query_result> result,
+) {
+  try {
+    return withNativeArena((arena) {
+      final outCount = arena<Size>();
+      _check(_c.featureQueryResultCount(result, outCount));
+      return [
+        for (var index = 0; index < outCount.value; index += 1)
+          _copyQueriedFeature(result, index, arena),
+      ];
+    });
+  } finally {
+    _c.featureQueryResultDestroy(result);
+  }
+}
+
+QueriedFeature _copyQueriedFeature(
+  Pointer<raw.mln_feature_query_result> result,
+  int index,
+  Allocator allocator,
+) {
+  final outFeature = allocator<raw.mln_queried_feature>();
+  outFeature.ref.size = sizeOf<raw.mln_queried_feature>();
+  _check(_c.featureQueryResultGet(result, index, outFeature));
+  final feature = outFeature.ref;
+  final state =
+      (feature.fields &
+                  raw
+                      .mln_queried_feature_field
+                      .MLN_QUERIED_FEATURE_STATE
+                      .value) ==
+              0 ||
+          feature.state == nullptr
+      ? null
+      : native_json.jsonValueFromNative(feature.state.ref);
+  return QueriedFeature(
+    feature: native_geometry.featureGeoJsonFromNative(feature.feature),
+    sourceId:
+        (feature.fields &
+                raw
+                    .mln_queried_feature_field
+                    .MLN_QUERIED_FEATURE_SOURCE_ID
+                    .value) ==
+            0
+        ? null
+        : _copyStringView(feature.source_id),
+    sourceLayerId:
+        (feature.fields &
+                raw
+                    .mln_queried_feature_field
+                    .MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+                    .value) ==
+            0
+        ? null
+        : _copyStringView(feature.source_layer_id),
+    state: state,
+  );
+}
+
+FeatureExtensionResult _copyFeatureExtensionResult(
+  Pointer<raw.mln_feature_extension_result> result,
+) {
+  try {
+    return withNativeArena((arena) {
+      final outInfo = arena<raw.mln_feature_extension_result_info>();
+      outInfo.ref.size = sizeOf<raw.mln_feature_extension_result_info>();
+      _check(_c.featureExtensionResultGet(result, outInfo));
+      final info = outInfo.ref;
+      return switch (info.type) {
+        1 => FeatureExtensionValue(
+          native_json.jsonValueFromNative(info.data.value.ref),
+        ),
+        2 => FeatureExtensionFeatureCollection(
+          native_geometry.featureCollectionFromNative(
+            info.data.feature_collection,
+          ),
+        ),
+        _ => throwInvalidArgument(
+          'unknown native feature extension result type: ${info.type}',
+        ),
+      };
+    });
+  } finally {
+    _c.featureExtensionResultDestroy(result);
   }
 }
 
