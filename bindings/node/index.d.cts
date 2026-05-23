@@ -611,7 +611,6 @@ export declare class RenderSessionHandle {
 
 export declare class MapProjectionHandle {
   constructor(map: MapHandle);
-  readonly map: MapHandle;
   readonly closed: boolean;
   close(): void;
   getCamera(): CameraOptions;

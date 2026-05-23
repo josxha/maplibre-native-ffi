@@ -664,7 +664,6 @@ class MapProjectionHandle {
     if (!(map instanceof MapHandle)) {
       throw new InvalidArgumentError(null, "map must be a MapHandle");
     }
-    this.map = map;
     this.native = translateNativeErrors(() =>
       native.createNativeMapProjectionHandle(map.native),
     );

@@ -338,7 +338,6 @@ test("map handle retains runtime parent and closes before runtime", () => {
   assert.equal(map instanceof MapHandle, true);
   assert.equal(map.closed, false);
   const projection = map.createProjection();
-  assert.equal(projection.map, map);
   projection.close();
   const retainedSession = Reflect.construct(
     /** @type {any} */ (RenderSessionHandle),
