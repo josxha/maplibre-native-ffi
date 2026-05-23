@@ -504,3 +504,43 @@ Review artifacts:
 - `mise run fix`
 - `mise run //bindings/vala:ci` (50-test run before the in-flight coverage, then
   51-test run after adding the in-flight custom-geometry teardown test)
+
+## Round 13
+
+Review artifacts:
+
+- `review-loop/round13-api-spec.md`
+- `review-loop/round13-runtime-lifecycle.md`
+- `review-loop/round13-build-generation-tests.md`
+- `review-loop/round13-maintainability-docs.md`
+
+### Applied findings
+
+- Added direct Rust regression coverage for hidden feature-state selector size
+  initialization through the Vala-visible semantic setters.
+- Added direct Rust regression coverage for offline region definition size
+  initialization, including selected nested tile-pyramid and geometry variant
+  sizes before C ABI submission.
+- Added direct Rust regression coverage for custom-geometry in-flight callback
+  teardown waiting, proving destroy-notify runs only after the active callback
+  guard exits.
+
+### Rejected or deferred findings
+
+- The typelib round-trip drops anonymous offline definition union fields; this
+  does not affect the generated Vala VAPI path and remains deferred unless
+  non-Vala GI consumers become in scope.
+- `set_style_url()` custom-geometry teardown remains deferred because URL style
+  replacement completes asynchronously after the new style loads and needs
+  load-state/event coordination or a maintainer-approved policy.
+
+### User-input-needed findings
+
+- Public result/list/snapshot handles, direct weak string fields, and global
+  sidecar descriptor string storage remain the same recorded API-policy
+  decisions from Round 12.
+
+### Validation
+
+- `mise run fix`
+- `mise run //bindings/vala:ci`

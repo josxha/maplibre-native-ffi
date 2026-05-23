@@ -7095,6 +7095,90 @@ mod tests {
     }
 
     #[test]
+    fn feature_state_selector_setters_initialize_hidden_size() {
+        // SAFETY: Zeroed storage is initialized by semantic setters.
+        let mut selector: sys::mln_feature_state_selector = unsafe { std::mem::zeroed() };
+
+        assert_eq!(
+            mln_vala_feature_state_selector_set_source_id(
+                &mut selector,
+                c"source".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            selector.size,
+            std::mem::size_of::<sys::mln_feature_state_selector>() as u32
+        );
+        assert_eq!(
+            mln_vala_feature_state_selector_set_source_layer_id(
+                &mut selector,
+                c"source-layer".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_feature_state_selector_set_feature_id(
+                &mut selector,
+                c"feature".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_feature_state_selector_set_state_key(
+                &mut selector,
+                c"state-key".as_ptr(),
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            selector.fields
+                & (sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+                    | sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+                    | sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY),
+            sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+                | sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+                | sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+        );
+    }
+
+    #[test]
+    fn offline_region_definition_initializer_sets_nested_sizes() {
+        // SAFETY: Zeroed storage is initialized by the adapter helper before
+        // being passed to the C ABI.
+        let mut tile_definition: sys::mln_offline_region_definition = unsafe { std::mem::zeroed() };
+        tile_definition.type_ = sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
+        initialize_offline_region_definition(&mut tile_definition);
+        assert_eq!(
+            tile_definition.size,
+            std::mem::size_of::<sys::mln_offline_region_definition>() as u32
+        );
+        assert_eq!(
+            unsafe { tile_definition.data.tile_pyramid.size },
+            std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32
+        );
+
+        // SAFETY: Zeroed storage is initialized by the adapter helper before
+        // being passed to the C ABI.
+        let mut geometry_definition: sys::mln_offline_region_definition =
+            unsafe { std::mem::zeroed() };
+        geometry_definition.type_ = sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
+        initialize_offline_region_definition(&mut geometry_definition);
+        assert_eq!(
+            geometry_definition.size,
+            std::mem::size_of::<sys::mln_offline_region_definition>() as u32
+        );
+        assert_eq!(
+            unsafe { geometry_definition.data.geometry.size },
+            std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32
+        );
+    }
+
+    #[test]
     fn custom_geometry_destroy_waits_for_in_flight_callback() {
         let destroy_count = AtomicUsize::new(0);
         let state = Box::into_raw(Box::new(CustomGeometrySourceCallbackState {
