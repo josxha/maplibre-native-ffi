@@ -317,3 +317,35 @@ Review artifacts:
 ### User-input-needed findings
 
 - None.
+
+## Round 8
+
+### Applied findings
+
+- Added final safe setters for style tile source and feature query options, so
+  Vala callers set layer IDs, source-layer IDs, zoom, tile size, and attribution
+  through methods that maintain native field masks.
+- Hid remaining raw value records, field-mask enums, ABI count fields, weak
+  value members, and feature-extension raw entry points from generated VAPI.
+- Added GIR sanitization for review artifacts so generated GIR mirrors the
+  Vala-facing safety surface instead of scanner-discovered C ABI bookkeeping.
+- Strengthened the Vala compile/runtime fixture to exercise the new setters and
+  to use readback stride and height instead of raw byte-length fields.
+- Confirmed final local validation: `mise run fix`,
+  `mise run //bindings/vala:ci`, and `mise run test` pass; risky-surface scans
+  over generated VAPI and GIR report no descriptor size/field-mask fields, raw
+  feature records, raw count fields, or `void*` public Vala construction
+  surfaces.
+
+### Remaining validation notes
+
+- Linux x64 and arm64 Vala jobs are present in the generated CI matrices for
+  `linux-x64-vulkan` and `linux-arm64-vulkan` as `//bindings/vala:ci`.
+- GitHub Actions run `26328348224` did not reach Linux binding jobs because
+  native prerequisite jobs were canceled during setup/build before binding jobs
+  started. The failure is recorded as CI orchestration/native-prerequisite
+  evidence rather than a Vala binding compile failure.
+
+### User-input-needed findings
+
+- None.
