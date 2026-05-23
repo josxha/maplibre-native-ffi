@@ -4,7 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import camera, geo, json, log, render, resource, style
+from maplibre_native import camera, geo, json, log, query, render, resource, style
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -237,6 +237,53 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_query_descriptors_and_results_preserve_public_shape() -> None:
+    point = camera.ScreenPoint(1.0, 2.0)
+    geometry = query.RenderedQueryGeometry.point_geometry(point)
+    box_geometry = query.RenderedQueryGeometry.box_geometry(
+        query.ScreenBox(camera.ScreenPoint(0.0, 0.0), camera.ScreenPoint(10.0, 10.0))
+    )
+    line_geometry = query.RenderedQueryGeometry.line_string_geometry(
+        (camera.ScreenPoint(0.0, 0.0), camera.ScreenPoint(5.0, 5.0))
+    )
+    rendered_options = query.RenderedFeatureQueryOptions(
+        layer_ids=("landuse",),
+        filter=json.json_array(("==", "class", "park")),
+    )
+    source_options = query.SourceFeatureQueryOptions(source_layer_ids=("landuse",))
+    selector = query.FeatureStateSelector(
+        source_id="source",
+        source_layer_id="layer",
+        feature_id="feature-1",
+        state_key="hover",
+    )
+    feature = geo.Feature(geo.point(0.0, 0.0))
+    queried = query.QueriedFeature(
+        feature=feature,
+        source_id="source",
+        source_layer_id="layer",
+        state=json.json_object((json.JsonMember("hover", True),)),
+    )
+    extension = query.FeatureExtensionResult.feature_collection_result((feature,))
+
+    assert geometry.point == point
+    assert box_geometry.box is not None
+    assert line_geometry.line_string == (
+        camera.ScreenPoint(0.0, 0.0),
+        camera.ScreenPoint(5.0, 5.0),
+    )
+    assert rendered_options.layer_ids == ("landuse",)
+    assert source_options.source_layer_ids == ("landuse",)
+    assert selector.state_key == "hover"
+    assert queried.source_id == "source"
+    assert extension.feature_collection == (feature,)
+
+
+def test_query_selector_rejects_state_key_without_feature_id() -> None:
+    with pytest.raises(ValueError, match="state_key requires feature_id"):
+        query.FeatureStateSelector(source_id="source", state_key="hover")
 
 
 def test_process_global_logging_receiver_copies_native_records() -> None:

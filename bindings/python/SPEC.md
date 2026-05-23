@@ -119,6 +119,8 @@ The current implementation includes these completed slices:
   camera snapshot, jump, pan, and transition-cancel operations.
 - `maplibre_native.log` provides process-global logging callback configuration,
   bounded copied-record queues, async severity masks, and copied log records.
+- `maplibre_native.query` provides rendered/source query descriptors, feature
+  state selectors, and copied query result value shapes.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish shared naming and value semantics.
 - `maplibre_native.json` provides JSON value trees that preserve numeric shape,
