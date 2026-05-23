@@ -242,6 +242,10 @@ export declare class MapHandle {
   cancelTransitions(): void;
   getCamera(): CameraOptions;
   jumpTo(camera: CameraOptions): void;
+  cameraForLatLngBounds(bounds: LatLngBounds): CameraOptions;
+  cameraForLatLngs(coordinates: LatLng[]): CameraOptions;
+  latLngBoundsForCamera(camera: CameraOptions): LatLngBounds;
+  latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
   pixelsForLatLngs(coordinates: LatLng[]): ScreenPoint[];

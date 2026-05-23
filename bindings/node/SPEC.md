@@ -550,9 +550,10 @@ area instead of retesting all native C validation rules.
    async log severity control proof slices complete; resource callback handoff
    remains.)_
 8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
-   descriptor, camera movement commands, standalone projection handle, screen
-   projection helpers, URL/tile/image source values, style JSON/list/metadata/
-   layer/light/property helpers, and style probe proof slices complete.)_
+   descriptor, camera fitting/movement commands, standalone projection handle,
+   screen projection helpers, URL/tile/image source values, style
+   JSON/list/metadata/ layer/light/property helpers, and style probe proof
+   slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result

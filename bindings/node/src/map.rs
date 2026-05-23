@@ -286,6 +286,94 @@ impl NativeMapHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "cameraForLatLngBounds")]
+    pub fn camera_for_lat_lng_bounds(&self, bounds: LatLngBounds) -> Result<CameraOptions> {
+        let bounds = core::values::lat_lng_bounds_to_native(bounds.into_core());
+        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
+        core::check(unsafe {
+            sys::mln_map_camera_for_lat_lng_bounds(
+                self.state.as_ptr(),
+                bounds,
+                std::ptr::null(),
+                &mut raw_camera,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(CameraOptions::from_core(
+            core::camera::camera_options_from_native(raw_camera),
+        ))
+    }
+
+    #[napi(js_name = "cameraForLatLngs")]
+    pub fn camera_for_lat_lngs(&self, coordinates: Vec<LatLng>) -> Result<CameraOptions> {
+        let coordinates = lat_lngs_to_native(coordinates);
+        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
+        core::check(unsafe {
+            sys::mln_map_camera_for_lat_lngs(
+                self.state.as_ptr(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                std::ptr::null(),
+                &mut raw_camera,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(CameraOptions::from_core(
+            core::camera::camera_options_from_native(raw_camera),
+        ))
+    }
+
+    #[napi(js_name = "latLngBoundsForCamera")]
+    pub fn lat_lng_bounds_for_camera(&self, camera: CameraOptions) -> Result<LatLngBounds> {
+        let camera = core::camera::camera_options_to_native(&camera.into_core());
+        let mut raw_bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+        };
+        core::check(unsafe {
+            sys::mln_map_lat_lng_bounds_for_camera(self.state.as_ptr(), &camera, &mut raw_bounds)
+        })
+        .map_err(error::from_core)?;
+        Ok(LatLngBounds::from_core(
+            core::values::lat_lng_bounds_from_native(raw_bounds),
+        ))
+    }
+
+    #[napi(js_name = "latLngBoundsForCameraUnwrapped")]
+    pub fn lat_lng_bounds_for_camera_unwrapped(
+        &self,
+        camera: CameraOptions,
+    ) -> Result<LatLngBounds> {
+        let camera = core::camera::camera_options_to_native(&camera.into_core());
+        let mut raw_bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+        };
+        core::check(unsafe {
+            sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
+                self.state.as_ptr(),
+                &camera,
+                &mut raw_bounds,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(LatLngBounds::from_core(
+            core::values::lat_lng_bounds_from_native(raw_bounds),
+        ))
+    }
+
     #[napi(js_name = "pixelForLatLng")]
     pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
         let mut raw_point = sys::mln_screen_point { x: 0.0, y: 0.0 };

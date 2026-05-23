@@ -491,6 +491,30 @@ class MapHandle {
     return translateNativeErrors(() => this.native.jumpTo(camera));
   }
 
+  cameraForLatLngBounds(bounds) {
+    return translateNativeErrors(() =>
+      this.native.cameraForLatLngBounds(bounds),
+    );
+  }
+
+  cameraForLatLngs(coordinates) {
+    return translateNativeErrors(() =>
+      this.native.cameraForLatLngs(coordinates),
+    );
+  }
+
+  latLngBoundsForCamera(camera) {
+    return translateNativeErrors(() =>
+      this.native.latLngBoundsForCamera(camera),
+    );
+  }
+
+  latLngBoundsForCameraUnwrapped(camera) {
+    return translateNativeErrors(() =>
+      this.native.latLngBoundsForCameraUnwrapped(camera),
+    );
+  }
+
   pixelForLatLng(coordinate) {
     return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
   }

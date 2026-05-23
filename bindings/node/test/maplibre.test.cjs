@@ -339,6 +339,33 @@ test("map projection mode maps optional descriptor fields", () => {
   }
 });
 
+test("map camera fitting helpers copy camera and bounds values", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 256, height: 256 });
+  const bounds = {
+    southwest: { latitude: -1, longitude: -2 },
+    northeast: { latitude: 1, longitude: 2 },
+  };
+
+  try {
+    const camera = map.cameraForLatLngBounds(bounds);
+    assert.equal(typeof camera.zoom, "number");
+    assert.equal(typeof camera.center?.latitude, "number");
+    const cameraFromCoordinates = map.cameraForLatLngs([
+      bounds.southwest,
+      bounds.northeast,
+    ]);
+    assert.equal(typeof cameraFromCoordinates.zoom, "number");
+    const visibleBounds = map.latLngBoundsForCamera(camera);
+    const unwrappedBounds = map.latLngBoundsForCameraUnwrapped(camera);
+    assert.equal(typeof visibleBounds.southwest.latitude, "number");
+    assert.equal(typeof unwrappedBounds.northeast.longitude, "number");
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map camera commands copy descriptor values", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });
