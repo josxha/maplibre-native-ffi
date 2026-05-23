@@ -31,7 +31,19 @@ const {
   threadLastErrorMessage,
 } = require("..");
 
-test("process-global proof slice crosses the native add-on", () => {
+test("concept subpath modules expose curated public API groups", () => {
+  const runtimeModule = require("../runtime.cjs");
+  const renderModule = require("../render.cjs");
+  const errorModule = require("../error.cjs");
+
+  assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
+  assert.equal(runtimeModule.networkStatus, networkStatus);
+  assert.equal(renderModule.RenderSessionHandle, RenderSessionHandle);
+  assert.equal(renderModule.NativeBuffer, NativeBuffer);
+  assert.equal(errorModule.InvalidArgumentError, InvalidArgumentError);
+});
+
+test("process-global APIs cross the native add-on", () => {
   assert.equal(cVersion(), 0);
 
   const backends = supportedRenderBackends();

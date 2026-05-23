@@ -6,7 +6,22 @@
   "type": "commonjs",
   "main": "index.cjs",
   "types": "index.d.cts",
-  "files": ["index.cjs", "index.d.cts", "index.js", "index.d.ts", "*.node"],
+  "exports": {
+    ".": { "types": "./index.d.cts", "default": "./index.cjs" },
+    "./camera": { "types": "./camera.d.cts", "default": "./camera.cjs" },
+    "./error": { "types": "./error.d.cts", "default": "./error.cjs" },
+    "./geo": { "types": "./geo.d.cts", "default": "./geo.cjs" },
+    "./json": { "types": "./json.d.cts", "default": "./json.cjs" },
+    "./log": { "types": "./log.d.cts", "default": "./log.cjs" },
+    "./map": { "types": "./map.d.cts", "default": "./map.cjs" },
+    "./offline": { "types": "./offline.d.cts", "default": "./offline.cjs" },
+    "./query": { "types": "./query.d.cts", "default": "./query.cjs" },
+    "./render": { "types": "./render.d.cts", "default": "./render.cjs" },
+    "./resource": { "types": "./resource.d.cts", "default": "./resource.cjs" },
+    "./runtime": { "types": "./runtime.d.cts", "default": "./runtime.cjs" },
+    "./style": { "types": "./style.d.cts", "default": "./style.cjs" }
+  },
+  "files": ["*.cjs", "*.d.cts", "index.js", "index.d.ts", "*.node"],
   "engines": { "node": ">=22.14" },
   "napi": { "binaryName": "maplibre-native-node" },
   "scripts": {

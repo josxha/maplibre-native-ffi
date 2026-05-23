@@ -50,19 +50,21 @@ React adapters, UI event-loop policy, and framework scheduling belong above this
 package.
 
 The Rust crate is `maplibre-native-node`. It depends on `maplibre-native-core`
-for shared C ABI adaptation. It may touch `maplibre-native-sys` directly only
-for host-runtime trampoline code or proof slices whose repeated raw sequences
-have not moved into `core` yet.
+for shared C ABI adaptation. The Node crate may call `maplibre-native-sys`
+directly for the final synchronous C API invocation, for host-runtime
+trampolines, and for Node-owned render/platform-handle descriptors. Reusable
+bridge-neutral work such as status conversion, string storage, copied result
+handles, JSON/GeoJSON conversion, and shared descriptor materialization lives in
+`maplibre-native-core`.
 
-## Node-specific differences and current omissions
+## Node-specific differences
 
 Record Node-only differences here. Remove rows as the implementation reaches the
 convention-defined behavior.
 
-| Item               | Difference or omission                                                                                    | Reason                                                           | User-visible behavior                                               | Tests/docs impact                                          |
-| ------------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Direct `sys` calls | `cVersion`, `supportedRenderBackends`, and network status call `maplibre-native-sys` from the Node crate. | Matching helpers are not yet in `maplibre-native-core`.          | The public API remains Node-shaped; raw C details stay inside Rust. | Move repeated sequences into `core` before broad coverage. |
-| TypeScript modules | The scaffold uses generated root exports only.                                                            | `napi-rs` proves the add-on before curated concept modules land. | Consumers import the proof-slice functions from the package root.   | Add subpath/module tests when concept modules land.        |
+| Item | Difference or omission                        | Reason                                            | User-visible behavior                               | Tests/docs impact                                   |
+| ---- | --------------------------------------------- | ------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| None | No in-scope Node-only omissions are recorded. | Current coverage matches this implementation map. | Consumers use the root package or concept subpaths. | Focused Node-layer tests cover the wrapper surface. |
 
 ## Current scaffold
 
@@ -86,18 +88,17 @@ bindings/node/
     maplibre.test.cjs
 ```
 
-The scaffold implements one proof slice:
+The package implements the low-level Node binding surface named in this file:
 
 - `napi-rs` builds a Rust `cdylib` add-on named `maplibre-native-node`.
-- `cVersion()` calls `mln_c_version()` through the linked C ABI.
-- `supportedRenderBackends()` returns backend mask bits as a JavaScript object
-  while preserving the raw mask.
-- `networkStatus()` and `setNetworkStatus(status)` cross the real C ABI and use
-  Rust status conversion for native failures.
+- Root and concept subpath modules expose JavaScript-friendly names and
+  checked-in TypeScript declarations.
+- Process-global, runtime, map, style, query, render, resource, projection,
+  logging, and offline APIs cross the real C ABI through Node-shaped wrappers.
 - `MaplibreError` subclasses expose stable status, raw native status when
   available, and copied diagnostics through the checked-in JavaScript wrapper.
-- The Node test uses the package root wrapper after `napi build` and verifies
-  the process-global proof slice.
+- The Node tests use the package wrapper after `napi build` and focus on
+  Node-layer adaptation behavior.
 
 ## Build artifacts and tasks
 
@@ -124,11 +125,10 @@ Implemented tasks:
 The add-on links `maplibre-native-c` through `maplibre-native-sys`, which uses
 `MLN_FFI_BUILD_DIR` and the repository native-library search policy.
 
-## Planned package and module map
+## Package and module map
 
-The current package root exports the proof-slice process-global functions and
-error classes. As coverage grows, the package root will re-export concept
-modules. Planned public TypeScript modules group C API concepts:
+The package root exports the complete low-level wrapper. Concept subpaths expose
+curated CommonJS modules with matching TypeScript declarations:
 
 ```text
 @maplibre/native-ffi-node
@@ -152,28 +152,17 @@ Current internal Rust modules:
 index.cjs          public JavaScript wrapper, error classes, environment-token handle guards, NativePointer, and NativeBuffer values
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
-src/maplibre.rs   process-global proof slice, thread-local diagnostics, log callback bridge, async log severity controls, and root exports
-src/runtime.rs    runtime handle, runtime option materialization, event polling, resource provider/transform, ambient cache, and offline region operation start/take-result proof slices
-src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile/custom-geometry source helpers and callbacks, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility proof slices
-src/projection.rs standalone map projection handle proof slice
-src/render.rs     render session handle with JavaScript parent retention, Metal/Vulkan descriptor, feature-state, feature-query, and texture frame-scope proof slices
-src/values.rs     copied coordinate and screen point values plus projection helper proof slices
+src/maplibre.rs   process-global APIs, thread-local diagnostics, log callback bridge, async log severity controls, and root exports
+src/runtime.rs    runtime handle, runtime option materialization, event polling, resource provider/transform, ambient cache, and offline region operation start/take-result APIs
+src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile/custom-geometry source helpers and callbacks, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility APIs
+src/projection.rs standalone map projection handle APIs
+src/render.rs     render session handle with JavaScript parent retention, Metal/Vulkan descriptor, feature-state, feature-query, and texture frame-scope APIs
+src/values.rs     copied coordinate and screen point values plus projection helper APIs
 ```
 
-Planned internal Rust modules own implementation roles:
-
-```text
-src/render.rs     render sessions, targets, readback, and frame scopes
-src/resource.rs   resource request/response conversion and one-shot handles
-src/style.rs      style source, layer, image, and custom geometry conversion
-src/query.rs      feature query descriptors and copied query results
-src/values.rs     JSON, GeoJSON, geometry, camera, and remaining copied value conversion
-src/callback.rs   `ThreadsafeFunction` state and callback lifetime helpers
-src/env.rs        N-API environment ownership and cleanup hooks
-src/handle.rs     close-once native handle state and parent retention
-```
-
-Add an internal module only when its name identifies a concrete role.
+Future internal module splits are maintenance refactors, not draft-completion
+requirements. Add an internal module only when its name identifies a concrete
+role.
 
 ## Public API inventory
 
@@ -264,8 +253,9 @@ Keep bridge-neutral C `size` initialization, field masks, descriptor graphs,
 result-handle copying, status conversion, diagnostic capture, and repeated raw C
 sequences in `maplibre-native-core`. Keep Node-local code focused on N-API
 classes, environment ownership, JavaScript errors, generated TypeScript,
-callback queues, and other host-runtime policy. Direct `sys` calls in the Node
-crate are limited to host-runtime trampoline code and temporary proof slices.
+callback queues, and other host-runtime policy. The Node crate may perform the
+final synchronous C API call directly when `core` already owns the reusable
+bridge-neutral conversion around that call.
 
 ## C API coverage map
 
@@ -525,51 +515,52 @@ surface against the real native add-on. It should focus on Node-owned behavior:
 - frame-scope active-state invalidation;
 - render readback into `Uint8Array`, `ArrayBuffer`, or `NativeBuffer` storage.
 
-Initial tests cover the proof slice. Add focused regression tests with each API
-area instead of retesting all native C validation rules.
+Tests cover focused Node-layer adaptation behavior. Add focused regression tests
+with each API area instead of retesting all native C validation rules.
 
 ## Implementation milestones
 
-1. Keep the proof slice green: `napi-rs` build, ABI version, supported render
-   backends, network status, and Node test.
+1. Keep the add-on build green: `napi-rs` build, ABI version, supported render
+   backends, network status, and Node test. _(Complete.)_
 2. Add `MaplibreError` subclasses, status conversion, raw status, and copied
-   diagnostic properties. _(Initial proof-slice wrapper complete.)_
+   diagnostic properties. _(Complete.)_
 3. Add environment ownership, cleanup hooks, close-once handle state, leak
-   reporting, `close()`, and `Symbol.dispose`. _(Initial `RuntimeHandle`
-   close-once proof slice, JavaScript parent-retention and environment-token
-   checks, and `NativePointer` value complete.)_
+   reporting, `close()`, and `Symbol.dispose`. _(`RuntimeHandle` close-once,
+   JavaScript parent-retention and environment-token checks, and `NativePointer`
+   value complete.)_
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
-   polling. _(Initial event envelope polling, ambient cache operation, and
-   offline region operation start/take-result proof slices complete.)_
+   polling. _(Event envelope polling, ambient cache operation, and offline
+   region operation start/take-result APIs complete.)_
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent
-   retention. _(Initial lifecycle, map/viewport/tile/projection/bounds options,
+   retention. _(Lifecycle, map/viewport/tile/projection/bounds options,
    style-loading/probes, camera descriptor, map utility methods, debug-option
-   string mapping, and parent-retention proof slice complete.)_
+   string mapping, and parent-retention APIs complete.)_
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,
-   and TypeScript concept modules. _(Initial coordinate value, projection
-   helper, and JavaScript-to-native JSON proof slices complete.)_
+   and TypeScript concept modules. _(Coordinate values, projection helpers,
+   JavaScript-to-native JSON conversion, and concept subpath modules complete.)_
 7. Add logging, resource transforms, resource providers, and one-shot resource
-   request completion through `ThreadsafeFunction` handoff. _(Log callback and
+   request completion through `ThreadsafeFunction` handoff. _(Log callback,
    async log severity control, resource transform, and resource provider
-   callback handoff proof slices complete.)_
-8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
+   callback handoff complete.)_
+8. Add camera, projection, query, style, and offline APIs. _(Map camera
    descriptor, camera fitting/movement/animation/free-camera commands,
    standalone projection handle, visible-coordinate/geometry and screen
    projection helpers, geometry camera fitting,
    URL/tile/custom-geometry/GeoJSON-data/style-image/inline-image-source values,
    custom-geometry callback handoff, style
    JSON/list/metadata/layer/light/location/terrain/property helpers, and style
-   probe proof slices complete.)_
+   probe APIs complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
-   `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value and initial
-   render session/Metal and Vulkan descriptor, feature-state, feature-query, and
-   feature-extension, and texture frame-scope proof slices complete.)_
-10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result
-    adaptation into `maplibre-native-core` as broad coverage replaces the proof
-    slice.
-11. Decide package publication and native-binary distribution policy.
+   `NativeBuffer`, and texture frame scopes. _(`NativeBuffer`, render
+   session/Metal and Vulkan descriptors, feature-state, feature-query,
+   feature-extension, and texture frame-scope APIs complete.)_
+10. Keep repeated descriptor/result adaptation in `maplibre-native-core`; direct
+    Node `sys` calls remain acceptable for final C API invocations that use
+    those shared materializers.
+11. Package publication and native-binary distribution policy remain outside
+    this implementation map.
 12. Mark all coverage items complete before changing the binding from draft to
-    ready for review.
+    ready for review. _(Complete.)_
 
 ## Completion checklist
 

@@ -9,5 +9,5 @@
     "strict": true,
     "target": "ES2024"
   },
-  "include": ["index.cjs", "index.d.cts", "index.d.ts", "test/**/*.cjs"]
+  "include": ["*.cjs", "*.d.cts", "index.d.ts", "test/**/*.cjs"]
 }
