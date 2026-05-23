@@ -1,0 +1,23 @@
+{
+  "name": "@maplibre/native-ffi-node",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Low-level Node.js bindings for the MapLibre Native C FFI.",
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts", "*.node"],
+  "engines": { "node": ">=22.14" },
+  "napi": { "binaryName": "maplibre-native-node" },
+  "scripts": {
+    "build": "napi build --platform --manifest-path Cargo.toml",
+    "build:debug": "napi build --platform --manifest-path Cargo.toml",
+    "test": "node --test test/*.test.cjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.0.0",
+    "@types/node": "^25.9.1",
+    "typescript": "^5.9.0"
+  }
+}

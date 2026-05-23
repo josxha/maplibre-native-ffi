@@ -1,0 +1,11 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = "pnpm install --frozen-lockfile && pnpm build"
+
+[tasks.test]
+depends = [":build"]
+run = "pnpm test"
+
+[tasks.ci]
+depends = [":test"]
+run = "pnpm typecheck"

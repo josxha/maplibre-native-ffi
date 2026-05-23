@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+  "bindings/node",
   "bindings/rust/crates/maplibre-native",
   "bindings/rust/crates/maplibre-native-core",
   "bindings/rust/crates/maplibre-native-sys",
