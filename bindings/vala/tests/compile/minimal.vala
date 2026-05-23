@@ -6,6 +6,8 @@ int main(string[] args) {
     MaplibreNative.RenderBackendFlags backends = MaplibreNative.supported_render_backends();
     MaplibreNative.NetworkStatus.get(out status);
     status.set();
+    MaplibreNative.log_set_async_severity_mask(MaplibreNative.LogSeverityFlags.DEFAULT);
+    MaplibreNative.log_clear_callback();
 
     MaplibreNative.NativePointer native_pointer;
     MaplibreNative.NativePointer.@new(0x1234, out native_pointer);

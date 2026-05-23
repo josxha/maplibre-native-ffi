@@ -26,6 +26,43 @@ typedef enum {
   MLN_VALA_NETWORK_STATUS_OFFLINE = 2,
 } MlnValaNetworkStatus;
 
+typedef enum {
+  MLN_VALA_LOG_SEVERITY_INFO = 1,
+  MLN_VALA_LOG_SEVERITY_WARNING = 2,
+  MLN_VALA_LOG_SEVERITY_ERROR = 3,
+} MlnValaLogSeverity;
+
+typedef enum {
+  MLN_VALA_LOG_SEVERITY_FLAGS_INFO = 1u << 1u,
+  MLN_VALA_LOG_SEVERITY_FLAGS_WARNING = 1u << 2u,
+  MLN_VALA_LOG_SEVERITY_FLAGS_ERROR = 1u << 3u,
+  MLN_VALA_LOG_SEVERITY_FLAGS_DEFAULT =
+    MLN_VALA_LOG_SEVERITY_FLAGS_INFO | MLN_VALA_LOG_SEVERITY_FLAGS_WARNING,
+  MLN_VALA_LOG_SEVERITY_FLAGS_ALL = MLN_VALA_LOG_SEVERITY_FLAGS_INFO |
+                                    MLN_VALA_LOG_SEVERITY_FLAGS_WARNING |
+                                    MLN_VALA_LOG_SEVERITY_FLAGS_ERROR,
+} MlnValaLogSeverityFlags;
+
+typedef enum {
+  MLN_VALA_LOG_EVENT_GENERAL = 0,
+  MLN_VALA_LOG_EVENT_SETUP = 1,
+  MLN_VALA_LOG_EVENT_SHADER = 2,
+  MLN_VALA_LOG_EVENT_PARSE_STYLE = 3,
+  MLN_VALA_LOG_EVENT_PARSE_TILE = 4,
+  MLN_VALA_LOG_EVENT_RENDER = 5,
+  MLN_VALA_LOG_EVENT_STYLE = 6,
+  MLN_VALA_LOG_EVENT_DATABASE = 7,
+  MLN_VALA_LOG_EVENT_HTTP_REQUEST = 8,
+  MLN_VALA_LOG_EVENT_SPRITE = 9,
+  MLN_VALA_LOG_EVENT_IMAGE = 10,
+  MLN_VALA_LOG_EVENT_OPENGL = 11,
+  MLN_VALA_LOG_EVENT_JNI = 12,
+  MLN_VALA_LOG_EVENT_ANDROID = 13,
+  MLN_VALA_LOG_EVENT_CRASH = 14,
+  MLN_VALA_LOG_EVENT_GLYPH = 15,
+  MLN_VALA_LOG_EVENT_TIMING = 16,
+} MlnValaLogEvent;
+
 GQuark mln_vala_error_quark(void);
 
 typedef struct {
@@ -148,6 +185,28 @@ gboolean mln_vala_network_status_get(
 gboolean mln_vala_network_status_set(
   MlnValaNetworkStatus status, GError** error
 );
+
+/**
+ * mln_vala_log_clear_callback:
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_log_clear_callback(GError** error);
+
+/**
+ * mln_vala_log_set_async_severity_mask:
+ * @mask: log severity flags.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_log_set_async_severity_mask(
+  MlnValaLogSeverityFlags mask, GError** error
+);
+
 /**
  * mln_vala_projected_meters_for_lat_lng:
  * @coordinate: (not nullable): geographic coordinate in degrees.

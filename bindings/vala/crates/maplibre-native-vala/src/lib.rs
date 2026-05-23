@@ -8,6 +8,7 @@ pub mod events;
 pub mod geo;
 pub mod glib;
 pub mod handles;
+pub mod logging;
 pub mod native_pointer;
 pub mod projection;
 pub mod status;
