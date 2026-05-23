@@ -51,6 +51,38 @@ void main() {
       expect(map.removeStyleSource('missing-source'), isFalse);
       expect(map.removeStyleLayer('missing-layer'), isFalse);
 
+      map.addGeoJsonSourceData(
+        'dart-geojson-source',
+        const FeatureGeoJson(
+          geometry: PointGeometry(LatLng(0, 0)),
+          properties: [JsonMember('kind', JsonString('dart'))],
+        ),
+      );
+      expect(map.styleSourceExists('dart-geojson-source'), isTrue);
+      final info = map.getStyleSourceInfo('dart-geojson-source');
+      expect(info, isNotNull);
+      expect(info!.type, SourceType.geoJson);
+      expect(info.id, 'dart-geojson-source');
+      expect(info.attribution, isNull);
+      expect(map.listStyleSourceIds(), contains('dart-geojson-source'));
+
+      map.setGeoJsonSourceData(
+        'dart-geojson-source',
+        const GeometryGeoJson(PointGeometry(LatLng(1, 2))),
+      );
+      map.addStyleLayerJson(
+        const JsonObject([
+          JsonMember('id', JsonString('dart-circle-layer')),
+          JsonMember('type', JsonString('circle')),
+          JsonMember('source', JsonString('dart-geojson-source')),
+        ]),
+      );
+      expect(map.styleLayerExists('dart-circle-layer'), isTrue);
+      expect(map.getStyleLayerType('dart-circle-layer'), 'circle');
+      expect(map.listStyleLayerIds(), contains('dart-circle-layer'));
+      expect(map.removeStyleLayer('dart-circle-layer'), isTrue);
+      expect(map.removeStyleSource('dart-geojson-source'), isTrue);
+
       map.close();
       expect(map.isClosed, isTrue);
       runtime.close();

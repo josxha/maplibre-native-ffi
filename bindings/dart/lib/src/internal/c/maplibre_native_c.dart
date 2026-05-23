@@ -106,6 +106,27 @@ final class MaplibreNativeCApi {
     _raw.mln_style_id_list_destroy(list);
   }
 
+  /// Adds one style source from a style-spec source JSON object.
+  int mapAddStyleSourceJson(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_json_value> sourceJson,
+  ) => _raw.mln_map_add_style_source_json(map, sourceId, sourceJson).value;
+
+  /// Adds a GeoJSON source with inline data.
+  int mapAddGeoJsonSourceData(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_geojson> data,
+  ) => _raw.mln_map_add_geojson_source_data(map, sourceId, data).value;
+
+  /// Updates a GeoJSON source with inline data.
+  int mapSetGeoJsonSourceData(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_geojson> data,
+  ) => _raw.mln_map_set_geojson_source_data(map, sourceId, data).value;
+
   /// Reports whether a style source exists.
   int mapStyleSourceExists(
     Pointer<raw.mln_map> map,
@@ -120,11 +141,47 @@ final class MaplibreNativeCApi {
     Pointer<Bool> outRemoved,
   ) => _raw.mln_map_remove_style_source(map, sourceId, outRemoved).value;
 
+  /// Gets fixed style source metadata.
+  int mapGetStyleSourceInfo(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<raw.mln_style_source_info> outInfo,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_map_get_style_source_info(map, sourceId, outInfo, outFound)
+      .value;
+
+  /// Copies one style source attribution string.
+  int mapCopyStyleSourceAttribution(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<Char> outAttribution,
+    int attributionCapacity,
+    Pointer<Size> outAttributionSize,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_map_copy_style_source_attribution(
+        map,
+        sourceId,
+        outAttribution,
+        attributionCapacity,
+        outAttributionSize,
+        outFound,
+      )
+      .value;
+
   /// Lists style source IDs.
   int mapListStyleSourceIds(
     Pointer<raw.mln_map> map,
     Pointer<Pointer<raw.mln_style_id_list>> outSourceIds,
   ) => _raw.mln_map_list_style_source_ids(map, outSourceIds).value;
+
+  /// Adds one style layer from a style-spec layer JSON object.
+  int mapAddStyleLayerJson(
+    Pointer<raw.mln_map> map,
+    Pointer<raw.mln_json_value> layerJson,
+    raw.mln_string_view beforeLayerId,
+  ) => _raw.mln_map_add_style_layer_json(map, layerJson, beforeLayerId).value;
 
   /// Reports whether a style layer exists.
   int mapStyleLayerExists(
@@ -132,6 +189,16 @@ final class MaplibreNativeCApi {
     raw.mln_string_view layerId,
     Pointer<Bool> outExists,
   ) => _raw.mln_map_style_layer_exists(map, layerId, outExists).value;
+
+  /// Gets one style layer type string.
+  int mapGetStyleLayerType(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    Pointer<raw.mln_string_view> outLayerType,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_map_get_style_layer_type(map, layerId, outLayerType, outFound)
+      .value;
 
   /// Removes one style layer by ID.
   int mapRemoveStyleLayer(

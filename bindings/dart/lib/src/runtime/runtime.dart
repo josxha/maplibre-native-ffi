@@ -2,11 +2,16 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import '../geo/geo.dart';
 import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
 import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
+import '../internal/struct/geometry.dart' as native_geometry;
+import '../internal/struct/json.dart' as native_json;
+import '../json/json.dart';
+import '../style/style.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
@@ -209,6 +214,51 @@ final class MapHandle {
     });
   }
 
+  /// Adds one style source from a style-spec source JSON object.
+  void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeSourceJson = native_json.nativeJsonValue(sourceJson, arena);
+      _check(
+        _c.mapAddStyleSourceJson(
+          _pointer,
+          nativeId.value,
+          nativeSourceJson.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Adds a GeoJSON source with inline data.
+  void addGeoJsonSourceData(String sourceId, GeoJson data) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeData = native_geometry.nativeGeoJson(data, arena);
+      _check(
+        _c.mapAddGeoJsonSourceData(
+          _pointer,
+          nativeId.value,
+          nativeData.pointer,
+        ),
+      );
+    });
+  }
+
+  /// Updates one GeoJSON source with inline data.
+  void setGeoJsonSourceData(String sourceId, GeoJson data) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeData = native_geometry.nativeGeoJson(data, arena);
+      _check(
+        _c.mapSetGeoJsonSourceData(
+          _pointer,
+          nativeId.value,
+          nativeData.pointer,
+        ),
+      );
+    });
+  }
+
   /// Reports whether a style source ID exists.
   bool styleSourceExists(String sourceId) {
     return withNativeArena((arena) {
@@ -229,6 +279,35 @@ final class MapHandle {
     });
   }
 
+  /// Copies fixed style source metadata, or returns null when the source is absent.
+  SourceInfo? getStyleSourceInfo(String sourceId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final outInfo = arena<raw.mln_style_source_info>();
+      outInfo.ref.size = sizeOf<raw.mln_style_source_info>();
+      final outFound = arena<Bool>();
+      _check(
+        _c.mapGetStyleSourceInfo(_pointer, nativeId.value, outInfo, outFound),
+      );
+      if (!outFound.value) {
+        return null;
+      }
+      final info = outInfo.ref;
+      return SourceInfo(
+        type: SourceType.fromRaw(info.type),
+        id: sourceId,
+        isVolatile: info.is_volatile,
+        attribution: _copyStyleSourceAttribution(
+          _pointer,
+          nativeId.value,
+          info.has_attribution,
+          info.attribution_size,
+          arena,
+        ),
+      );
+    });
+  }
+
   /// Copies style source IDs in style order.
   List<String> listStyleSourceIds() {
     return withNativeArena((arena) {
@@ -239,6 +318,21 @@ final class MapHandle {
     });
   }
 
+  /// Adds one style layer from a full style-spec layer JSON object.
+  void addStyleLayerJson(JsonValue layerJson, {String? beforeLayerId}) {
+    withNativeArena((arena) {
+      final nativeLayerJson = native_json.nativeJsonValue(layerJson, arena);
+      final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
+      _check(
+        _c.mapAddStyleLayerJson(
+          _pointer,
+          nativeLayerJson.pointer,
+          nativeBeforeLayerId.value,
+        ),
+      );
+    });
+  }
+
   /// Reports whether a style layer ID exists.
   bool styleLayerExists(String layerId) {
     return withNativeArena((arena) {
@@ -246,6 +340,27 @@ final class MapHandle {
       final outExists = arena<Bool>();
       _check(_c.mapStyleLayerExists(_pointer, nativeId.value, outExists));
       return outExists.value;
+    });
+  }
+
+  /// Borrows one style layer type string, or returns null when absent.
+  String? getStyleLayerType(String layerId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      final outLayerType = arena<raw.mln_string_view>();
+      final outFound = arena<Bool>();
+      _check(
+        _c.mapGetStyleLayerType(
+          _pointer,
+          nativeId.value,
+          outLayerType,
+          outFound,
+        ),
+      );
+      if (!outFound.value) {
+        return null;
+      }
+      return _copyStringView(outLayerType.ref);
     });
   }
 
@@ -273,6 +388,40 @@ final class MapHandle {
   void close() {
     _state.close(_c.mapDestroy, _c.threadLastErrorMessage);
   }
+}
+
+String? _copyStyleSourceAttribution(
+  Pointer<raw.mln_map> map,
+  raw.mln_string_view sourceId,
+  bool hasAttribution,
+  int attributionSize,
+  Allocator allocator,
+) {
+  if (!hasAttribution) {
+    return null;
+  }
+  final buffer = attributionSize == 0
+      ? nullptr.cast<Char>()
+      : allocator<Char>(attributionSize);
+  final outSize = allocator<Size>();
+  final outFound = allocator<Bool>();
+  _check(
+    _c.mapCopyStyleSourceAttribution(
+      map,
+      sourceId,
+      buffer,
+      attributionSize,
+      outSize,
+      outFound,
+    ),
+  );
+  if (!outFound.value) {
+    return null;
+  }
+  if (outSize.value == 0) {
+    return '';
+  }
+  return buffer.cast<Utf8>().toDartString(length: outSize.value);
 }
 
 List<String> _copyStyleIdList(Pointer<raw.mln_style_id_list> list) {

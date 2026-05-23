@@ -7,6 +7,20 @@ import '../geo/geo.dart';
 final class SourceType {
   const SourceType._(this.rawValue, this.name);
 
+  /// Creates a source type from a native raw value.
+  factory SourceType.fromRaw(int rawValue) => switch (rawValue) {
+    0 => unknown,
+    1 => vector,
+    2 => raster,
+    3 => rasterDem,
+    4 => geoJson,
+    5 => image,
+    6 => video,
+    7 => annotations,
+    8 => customVector,
+    _ => SourceType._(rawValue, 'unknown($rawValue)'),
+  };
+
   /// Unknown source type.
   static const unknown = SourceType._(0, 'unknown');
 
