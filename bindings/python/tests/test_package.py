@@ -4,7 +4,17 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import camera, geo, json, log, query, render, resource, style
+from maplibre_native import (
+    camera,
+    geo,
+    json,
+    log,
+    offline,
+    query,
+    render,
+    resource,
+    style,
+)
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -237,6 +247,44 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_offline_values_wrap_runtime_event_payload_shape() -> None:
+    bounds = geo.LatLngBounds(geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))
+    definition = offline.OfflineTilePyramidRegionDefinition(
+        style_url="https://example.test/style.json",
+        bounds=bounds,
+        min_zoom=1.0,
+        max_zoom=3.0,
+        pixel_ratio=2.0,
+    )
+    status = offline.OfflineRegionStatus(
+        download_state=offline.OfflineRegionDownloadState.ACTIVE,
+        completed_resource_count=1,
+        completed_resource_size=2,
+        completed_tile_count=3,
+        required_tile_count=4,
+        completed_tile_size=5,
+        required_resource_count=6,
+        required_resource_count_is_precise=True,
+        complete=False,
+    )
+    completed = offline.OfflineOperationCompleted.from_runtime_payload(
+        {
+            "operation_id": 7,
+            "operation_kind": offline.OfflineOperationKind.REGION_CREATE.native_code,
+            "result_kind": offline.OfflineOperationResultKind.REGION,
+            "result_status": mln.MaplibreStatus.OK.native_code,
+            "found": True,
+        }
+    )
+
+    assert (
+        definition.definition_type == offline.OfflineRegionDefinitionType.TILE_PYRAMID
+    )
+    assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
+    assert completed.operation_kind == offline.OfflineOperationKind.REGION_CREATE
+    assert completed.result_kind == offline.OfflineOperationResultKind.REGION
 
 
 def test_query_descriptors_and_results_preserve_public_shape() -> None:

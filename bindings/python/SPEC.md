@@ -121,6 +121,8 @@ The current implementation includes these completed slices:
   bounded copied-record queues, async severity masks, and copied log records.
 - `maplibre_native.query` provides rendered/source query descriptors, feature
   state selectors, and copied query result value shapes.
+- `maplibre_native.offline` provides offline operation, region definition,
+  region status, and runtime event payload value shapes.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
   `NativePointer` establish shared naming and value semantics.
 - `maplibre_native.json` provides JSON value trees that preserve numeric shape,
