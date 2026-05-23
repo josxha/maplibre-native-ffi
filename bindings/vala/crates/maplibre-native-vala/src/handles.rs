@@ -281,6 +281,20 @@ pub extern "C" fn mln_vala_animation_options_default(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_camera_fit_options_default(
+    out_options: *mut sys::mln_camera_fit_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match default_camera_fit_options(out_options) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_bound_options_default(
     out_options: *mut sys::mln_bound_options,
     error_out: *mut *mut GError,
@@ -745,6 +759,79 @@ pub extern "C" fn mln_vala_map_handle_set_projection_mode(
     error_out: *mut *mut GError,
 ) -> GBoolean {
     match set_projection_mode(handle, mode) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_camera_for_lat_lng_bounds(
+    handle: *mut MapHandle,
+    bounds: *const sys::mln_lat_lng_bounds,
+    fit_options: *const sys::mln_camera_fit_options,
+    out_camera: *mut sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match camera_for_lat_lng_bounds(handle, bounds, fit_options, out_camera) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_camera_for_lat_lngs(
+    handle: *mut MapHandle,
+    coordinates: *const LatLng,
+    coordinate_count: usize,
+    fit_options: *const sys::mln_camera_fit_options,
+    out_camera: *mut sys::mln_camera_options,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match camera_for_lat_lngs(
+        handle,
+        coordinates,
+        coordinate_count,
+        fit_options,
+        out_camera,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_lat_lng_bounds_for_camera(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    out_bounds: *mut sys::mln_lat_lng_bounds,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match lat_lng_bounds_for_camera(handle, camera, out_bounds, false) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_lat_lng_bounds_for_camera_unwrapped(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    out_bounds: *mut sys::mln_lat_lng_bounds,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match lat_lng_bounds_for_camera(handle, camera, out_bounds, true) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);
@@ -1745,6 +1832,12 @@ fn default_animation_options(out_options: *mut sys::mln_animation_options) -> er
     glib::clear_optional_out_pointer(out_options, options)
 }
 
+fn default_camera_fit_options(out_options: *mut sys::mln_camera_fit_options) -> error::Result<()> {
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let options = unsafe { sys::mln_camera_fit_options_default() };
+    glib::clear_optional_out_pointer(out_options, options)
+}
+
 fn default_bound_options(out_options: *mut sys::mln_bound_options) -> error::Result<()> {
     // SAFETY: Default constructor returns a value initialized for this C ABI.
     let options = unsafe { sys::mln_bound_options_default() };
@@ -1992,6 +2085,85 @@ fn set_projection_mode(
     }
     // SAFETY: `map` is live and `mode` points to caller-owned options.
     error::check(unsafe { sys::mln_map_set_projection_mode(map, mode) })
+}
+
+fn camera_for_lat_lng_bounds(
+    handle: *mut MapHandle,
+    bounds: *const sys::mln_lat_lng_bounds,
+    fit_options: *const sys::mln_camera_fit_options,
+    out_camera: *mut sys::mln_camera_options,
+) -> error::Result<()> {
+    if bounds.is_null() {
+        return Err(Error::invalid_argument("bounds are null"));
+    }
+    if out_camera.is_null() {
+        return Err(Error::invalid_argument("camera output pointer is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut camera = unsafe { sys::mln_camera_options_default() };
+    // SAFETY: `bounds` is checked non-null and copied by value for the C API;
+    // fit_options may be null; local output storage has the required size.
+    let bounds = unsafe { *bounds };
+    error::check(unsafe {
+        sys::mln_map_camera_for_lat_lng_bounds(map, bounds, fit_options, &mut camera)
+    })?;
+    glib::clear_optional_out_pointer(out_camera, camera)
+}
+
+fn camera_for_lat_lngs(
+    handle: *mut MapHandle,
+    coordinates: *const LatLng,
+    coordinate_count: usize,
+    fit_options: *const sys::mln_camera_fit_options,
+    out_camera: *mut sys::mln_camera_options,
+) -> error::Result<()> {
+    if coordinates.is_null() {
+        return Err(Error::invalid_argument("coordinates are null"));
+    }
+    if out_camera.is_null() {
+        return Err(Error::invalid_argument("camera output pointer is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: Default constructor returns a value initialized for this C ABI.
+    let mut camera = unsafe { sys::mln_camera_options_default() };
+    // SAFETY: `LatLng` is repr-compatible with `mln_lat_lng`; coordinates are
+    // borrowed for this call and the C API validates count and values. Local
+    // output storage has the required size.
+    error::check(unsafe {
+        sys::mln_map_camera_for_lat_lngs(
+            map,
+            coordinates.cast::<sys::mln_lat_lng>(),
+            coordinate_count,
+            fit_options,
+            &mut camera,
+        )
+    })?;
+    glib::clear_optional_out_pointer(out_camera, camera)
+}
+
+fn lat_lng_bounds_for_camera(
+    handle: *mut MapHandle,
+    camera: *const sys::mln_camera_options,
+    out_bounds: *mut sys::mln_lat_lng_bounds,
+    unwrapped: bool,
+) -> error::Result<()> {
+    if camera.is_null() {
+        return Err(Error::invalid_argument("camera options are null"));
+    }
+    if out_bounds.is_null() {
+        return Err(Error::invalid_argument("bounds output pointer is null"));
+    }
+    let map = map_native(handle)?;
+    // SAFETY: `map` is live and pointers are valid for this call.
+    let status = unsafe {
+        if unwrapped {
+            sys::mln_map_lat_lng_bounds_for_camera_unwrapped(map, camera, out_bounds)
+        } else {
+            sys::mln_map_lat_lng_bounds_for_camera(map, camera, out_bounds)
+        }
+    };
+    error::check(status)
 }
 
 fn jump_to(handle: *mut MapHandle, camera: *const sys::mln_camera_options) -> error::Result<()> {
@@ -4121,6 +4293,76 @@ mod tests {
             GTRUE
         );
         assert_ne!(animation.size, 0);
+
+        // SAFETY: Zeroed storage is immediately initialized through the public
+        // default entry point before use.
+        let mut fit_options: sys::mln_camera_fit_options = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_camera_fit_options_default(&mut fit_options, ptr::null_mut()),
+            GTRUE
+        );
+        assert_ne!(fit_options.size, 0);
+        let bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: -1.0,
+                longitude: -1.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 1.0,
+                longitude: 1.0,
+            },
+        };
+        assert_eq!(
+            mln_vala_map_handle_camera_for_lat_lng_bounds(
+                map,
+                &bounds,
+                &fit_options,
+                &mut camera,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        let fit_coordinates = [
+            LatLng {
+                latitude: -1.0,
+                longitude: -1.0,
+            },
+            LatLng {
+                latitude: 1.0,
+                longitude: 1.0,
+            },
+        ];
+        assert_eq!(
+            mln_vala_map_handle_camera_for_lat_lngs(
+                map,
+                fit_coordinates.as_ptr(),
+                fit_coordinates.len(),
+                &fit_options,
+                &mut camera,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        // SAFETY: Zeroed storage is overwritten through the public output API.
+        let mut fitted_bounds: sys::mln_lat_lng_bounds = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            mln_vala_map_handle_lat_lng_bounds_for_camera(
+                map,
+                &camera,
+                &mut fitted_bounds,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
+        assert_eq!(
+            mln_vala_map_handle_lat_lng_bounds_for_camera_unwrapped(
+                map,
+                &camera,
+                &mut fitted_bounds,
+                ptr::null_mut(),
+            ),
+            GTRUE
+        );
 
         assert_eq!(
             mln_vala_map_handle_jump_to(map, &camera, ptr::null_mut()),

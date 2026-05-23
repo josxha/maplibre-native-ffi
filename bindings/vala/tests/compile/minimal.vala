@@ -231,6 +231,22 @@ int main(string[] args) {
     MaplibreNative.CameraOptions camera = {};
     camera.default();
     map.get_camera(out camera);
+    MaplibreNative.CameraFitOptions fit_options = {};
+    fit_options.default();
+    MaplibreNative.LatLngBounds camera_bounds = {
+      { -1.0, -1.0 },
+      { 1.0, 1.0 },
+    };
+    MaplibreNative.CameraOptions fitted_camera;
+    map.camera_for_lat_lng_bounds(camera_bounds, fit_options, out fitted_camera);
+    MaplibreNative.LatLng[] fit_coordinates = {
+      { -1.0, -1.0 },
+      { 1.0, 1.0 },
+    };
+    map.camera_for_lat_lngs(fit_coordinates, fit_options, out fitted_camera);
+    MaplibreNative.LatLngBounds fitted_bounds;
+    map.lat_lng_bounds_for_camera(fitted_camera, out fitted_bounds);
+    map.lat_lng_bounds_for_camera_unwrapped(fitted_camera, out fitted_bounds);
     MaplibreNative.AnimationOptions animation = {};
     animation.default();
     map.jump_to(camera);

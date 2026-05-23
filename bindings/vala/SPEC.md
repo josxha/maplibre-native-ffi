@@ -84,7 +84,8 @@ The scaffold implements one proof slice in Rust:
 - `RuntimeHandle` and `MapHandle` are registered as GObject classes with
   deterministic close methods, runtime/map option descriptors, ambient cache
   operation controls, map lifecycle/style methods, debug option flags,
-  rendering-stats controls, camera commands, and map state option descriptors.
+  rendering-stats controls, camera fit helpers, camera commands, and map state
+  option descriptors.
 - Runtime event polling copies event metadata and message bytes into a boxed
   `RuntimeEvent` value.
 - `RenderBackendFlags` and `NetworkStatus` expose typed Vala enum surfaces

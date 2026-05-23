@@ -289,6 +289,12 @@ typedef enum {
 } MlnValaAnimationOptionFields;
 
 typedef enum {
+  MLN_VALA_CAMERA_FIT_OPTION_FIELDS_PADDING = 1u << 0u,
+  MLN_VALA_CAMERA_FIT_OPTION_FIELDS_BEARING = 1u << 1u,
+  MLN_VALA_CAMERA_FIT_OPTION_FIELDS_PITCH = 1u << 2u,
+} MlnValaCameraFitOptionFields;
+
+typedef enum {
   MLN_VALA_BOUND_OPTION_FIELDS_BOUNDS = 1u << 0u,
   MLN_VALA_BOUND_OPTION_FIELDS_MIN_ZOOM = 1u << 1u,
   MLN_VALA_BOUND_OPTION_FIELDS_MAX_ZOOM = 1u << 2u,
@@ -503,6 +509,14 @@ typedef struct {
 } MlnValaAnimationOptions;
 
 typedef struct {
+  uint32_t size;
+  MlnValaCameraFitOptionFields fields;
+  MlnValaEdgeInsets padding;
+  double bearing;
+  double pitch;
+} MlnValaCameraFitOptions;
+
+typedef struct {
   MlnValaLatLng southwest;
   MlnValaLatLng northeast;
 } MlnValaLatLngBounds;
@@ -708,6 +722,9 @@ gboolean mln_vala_camera_options_default(
  */
 gboolean mln_vala_animation_options_default(
   MlnValaAnimationOptions* out_options, GError** error
+);
+gboolean mln_vala_camera_fit_options_default(
+  MlnValaCameraFitOptions* out_options, GError** error
 );
 
 gboolean mln_vala_bound_options_default(
@@ -1353,6 +1370,71 @@ gboolean mln_vala_map_handle_get_rendering_stats_view_enabled(
  */
 gboolean mln_vala_map_handle_get_camera(
   MlnValaMapHandle* self, MlnValaCameraOptions* out_camera, GError** error
+);
+
+/**
+ * mln_vala_map_handle_camera_for_lat_lng_bounds:
+ * @self: a map handle.
+ * @bounds: (not nullable): geographic bounds.
+ * @fit_options: (not nullable): camera fit options.
+ * @out_camera: (out): return location for computed camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_camera_for_lat_lng_bounds(
+  MlnValaMapHandle* self, const MlnValaLatLngBounds* bounds,
+  const MlnValaCameraFitOptions* fit_options, MlnValaCameraOptions* out_camera,
+  GError** error
+);
+
+/**
+ * mln_vala_map_handle_camera_for_lat_lngs:
+ * @self: a map handle.
+ * @coordinates: (array length=coordinate_count): input coordinates.
+ * @coordinate_count: number of coordinates.
+ * @fit_options: (not nullable): camera fit options.
+ * @out_camera: (out): return location for computed camera options.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_camera_for_lat_lngs(
+  MlnValaMapHandle* self, const MlnValaLatLng* coordinates,
+  size_t coordinate_count, const MlnValaCameraFitOptions* fit_options,
+  MlnValaCameraOptions* out_camera, GError** error
+);
+
+/**
+ * mln_vala_map_handle_lat_lng_bounds_for_camera:
+ * @self: a map handle.
+ * @camera: (not nullable): camera options.
+ * @out_bounds: (out): return location for bounds.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_lat_lng_bounds_for_camera(
+  MlnValaMapHandle* self, const MlnValaCameraOptions* camera,
+  MlnValaLatLngBounds* out_bounds, GError** error
+);
+
+/**
+ * mln_vala_map_handle_lat_lng_bounds_for_camera_unwrapped:
+ * @self: a map handle.
+ * @camera: (not nullable): camera options.
+ * @out_bounds: (out): return location for bounds.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
+gboolean mln_vala_map_handle_lat_lng_bounds_for_camera_unwrapped(
+  MlnValaMapHandle* self, const MlnValaCameraOptions* camera,
+  MlnValaLatLngBounds* out_bounds, GError** error
 );
 
 /**
