@@ -49,9 +49,9 @@ pub extern "C" fn mln_vala_c_version() -> u32 {
     c_version()
 }
 
-/// C-callable proof-slice entry point used by future GIR scanner fixtures.
+/// C-callable proof-slice entry point used by GIR scanner fixtures.
 #[unsafe(no_mangle)]
-pub extern "C" fn mln_vala_supported_render_backend_mask() -> u32 {
+pub extern "C" fn mln_vala_supported_render_backends() -> u32 {
     supported_render_backend_mask()
 }
 
@@ -75,10 +75,10 @@ pub extern "C" fn mln_vala_network_status_get(
 /// GLib `GError` convention used by the generated GIR/VAPI API.
 #[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_network_status_set(
-    raw_status: u32,
+    status: u32,
     error_out: *mut *mut GError,
 ) -> GBoolean {
-    match set_network_status(raw_status) {
+    match set_network_status(status) {
         Ok(()) => GTRUE,
         Err(error) => {
             glib::set_error(error_out, error);

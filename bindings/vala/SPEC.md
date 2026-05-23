@@ -85,6 +85,8 @@ The scaffold implements one proof slice in Rust:
   deterministic close methods and a minimal lifecycle slice.
 - Runtime event polling copies event metadata and message bytes into a boxed
   `RuntimeEvent` value.
+- `RenderBackendFlags` and `NetworkStatus` expose typed Vala enum surfaces
+  instead of raw integer masks/statuses.
 - Geographic value structs and projected-meter conversion helpers are visible in
   generated Vala.
 - `MapProjectionHandle` is registered as a standalone GObject class with

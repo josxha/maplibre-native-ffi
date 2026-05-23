@@ -41,10 +41,9 @@ throws = false
 [[functions]]
 name = "supported_render_backends"
 c_symbol = "mln_supported_render_backend_mask"
-gobject_symbol = "mln_vala_supported_render_backend_mask"
+gobject_symbol = "mln_vala_supported_render_backends"
 return = "RenderBackendFlags"
 throws = false
-scaffold_return = "uint32"
 
 [[functions]]
 name = "network_status_get"

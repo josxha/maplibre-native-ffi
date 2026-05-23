@@ -1,10 +1,11 @@
 int main(string[] args) {
   uint32 version = MaplibreNative.c_version();
-  uint32 status = 0;
+  MaplibreNative.NetworkStatus status;
 
   try {
-    MaplibreNative.network_status_get(out status);
-    MaplibreNative.network_status_set(status);
+    MaplibreNative.RenderBackendFlags backends = MaplibreNative.supported_render_backends();
+    MaplibreNative.NetworkStatus.get(out status);
+    status.set();
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ProjectedMeters meters;
@@ -28,6 +29,10 @@ int main(string[] args) {
 
     map.close();
     runtime.close();
+
+    if (backends == 0) {
+      return 1;
+    }
   } catch (GLib.Error error) {
     return 1;
   }

@@ -16,6 +16,16 @@ typedef enum {
   MLN_VALA_ERROR_UNKNOWN_STATUS,
 } MlnValaError;
 
+typedef enum {
+  MLN_VALA_RENDER_BACKEND_FLAGS_METAL = 1u << 0u,
+  MLN_VALA_RENDER_BACKEND_FLAGS_VULKAN = 1u << 1u,
+} MlnValaRenderBackendFlags;
+
+typedef enum {
+  MLN_VALA_NETWORK_STATUS_ONLINE = 1,
+  MLN_VALA_NETWORK_STATUS_OFFLINE = 2,
+} MlnValaNetworkStatus;
+
 GQuark mln_vala_error_quark(void);
 
 typedef struct {
@@ -77,32 +87,35 @@ G_DECLARE_FINAL_TYPE(
 uint32_t mln_vala_c_version(void);
 
 /**
- * mln_vala_supported_render_backend_mask:
+ * mln_vala_supported_render_backends:
  *
  * Returns: a bit mask of supported `MlnValaRenderBackendFlags` values.
  */
-uint32_t mln_vala_supported_render_backend_mask(void);
+MlnValaRenderBackendFlags mln_vala_supported_render_backends(void);
 
 /**
  * mln_vala_network_status_get:
- * @out_status: (out): return location for the raw network status value.
+ * @out_status: (out): return location for the network status value.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
  * Throws: MlnValaError
  */
-gboolean mln_vala_network_status_get(uint32_t* out_status, GError** error);
+gboolean mln_vala_network_status_get(
+  MlnValaNetworkStatus* out_status, GError** error
+);
 
 /**
  * mln_vala_network_status_set:
- * @raw_status: raw network status value.
+ * @status: network status value.
  * @error: return location for a `GError`, or `NULL`.
  *
  * Returns: `TRUE` on success; `FALSE` with @error set on failure.
  * Throws: MlnValaError
  */
-gboolean mln_vala_network_status_set(uint32_t raw_status, GError** error);
-
+gboolean mln_vala_network_status_set(
+  MlnValaNetworkStatus status, GError** error
+);
 /**
  * mln_vala_projected_meters_for_lat_lng:
  * @coordinate: (not nullable): geographic coordinate in degrees.
