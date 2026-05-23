@@ -182,6 +182,11 @@ export declare class MapHandle {
   listStyleSourceIds(): string[];
   getStyleSourceType(sourceId: string): StyleSourceType | null;
   getStyleSourceInfo(sourceId: string): StyleSourceInfo | null;
+  addGeoJsonSourceUrl(sourceId: string, url: string): void;
+  setGeoJsonSourceUrl(sourceId: string, url: string): void;
+  addVectorSourceUrl(sourceId: string, url: string): void;
+  addRasterSourceUrl(sourceId: string, url: string): void;
+  addRasterDemSourceUrl(sourceId: string, url: string): void;
   addImageSourceUrl(sourceId: string, coordinates: LatLng[], url: string): void;
   setImageSourceUrl(sourceId: string, url: string): void;
   setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;

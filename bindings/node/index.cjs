@@ -465,6 +465,36 @@ class MapHandle {
     );
   }
 
+  addGeoJsonSourceUrl(sourceId, url) {
+    return translateNativeErrors(() =>
+      this.native.addGeoJsonSourceUrl(sourceId, url),
+    );
+  }
+
+  setGeoJsonSourceUrl(sourceId, url) {
+    return translateNativeErrors(() =>
+      this.native.setGeoJsonSourceUrl(sourceId, url),
+    );
+  }
+
+  addVectorSourceUrl(sourceId, url) {
+    return translateNativeErrors(() =>
+      this.native.addVectorSourceUrl(sourceId, url),
+    );
+  }
+
+  addRasterSourceUrl(sourceId, url) {
+    return translateNativeErrors(() =>
+      this.native.addRasterSourceUrl(sourceId, url),
+    );
+  }
+
+  addRasterDemSourceUrl(sourceId, url) {
+    return translateNativeErrors(() =>
+      this.native.addRasterDemSourceUrl(sourceId, url),
+    );
+  }
+
   addImageSourceUrl(sourceId, coordinates, url) {
     return translateNativeErrors(() =>
       this.native.addImageSourceUrl(sourceId, coordinates, url),

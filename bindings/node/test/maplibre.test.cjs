@@ -346,6 +346,22 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       { latitude: 0, longitude: 3 },
       { latitude: 0, longitude: 2 },
     ];
+    map.addGeoJsonSourceUrl("geojson-url", "https://example.test/data.geojson");
+    assert.equal(map.getStyleSourceType("geojson-url"), "geojson");
+    map.setGeoJsonSourceUrl(
+      "geojson-url",
+      "https://example.test/updated.geojson",
+    );
+    map.addVectorSourceUrl("vector-url", "https://example.test/vector.json");
+    assert.equal(map.getStyleSourceType("vector-url"), "vector");
+    map.addRasterSourceUrl("raster-url", "https://example.test/raster.json");
+    assert.equal(map.getStyleSourceType("raster-url"), "raster");
+    map.addRasterDemSourceUrl(
+      "raster-dem-url",
+      "https://example.test/dem.json",
+    );
+    assert.equal(map.getStyleSourceType("raster-dem-url"), "raster-dem");
+
     map.addImageSourceUrl(
       "image-source",
       imageCoordinates,
@@ -360,6 +376,10 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     );
     assert.equal(map.getImageSourceCoordinates("missing-source"), null);
     assert.equal(map.removeStyleSource("image-source"), true);
+    assert.equal(map.removeStyleSource("raster-dem-url"), true);
+    assert.equal(map.removeStyleSource("raster-url"), true);
+    assert.equal(map.removeStyleSource("vector-url"), true);
+    assert.equal(map.removeStyleSource("geojson-url"), true);
     assert.equal(map.removeStyleSource("empty-geojson"), true);
 
     map.addStyleLayerJson({

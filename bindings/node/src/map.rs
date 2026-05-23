@@ -325,6 +325,71 @@ impl NativeMapHandle {
         }))
     }
 
+    #[napi(js_name = "addGeoJsonSourceUrl")]
+    pub fn add_geo_json_source_url(&self, source_id: String, url: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_add_geojson_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setGeoJsonSourceUrl")]
+    pub fn set_geo_json_source_url(&self, source_id: String, url: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_set_geojson_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addVectorSourceUrl")]
+    pub fn add_vector_source_url(&self, source_id: String, url: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_add_vector_source_url(
+                self.state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addRasterSourceUrl")]
+    pub fn add_raster_source_url(&self, source_id: String, url: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_add_raster_source_url(
+                self.state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "addRasterDemSourceUrl")]
+    pub fn add_raster_dem_source_url(&self, source_id: String, url: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_add_raster_dem_source_url(
+                self.state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                std::ptr::null(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "addImageSourceUrl")]
     pub fn add_image_source_url(
         &self,
