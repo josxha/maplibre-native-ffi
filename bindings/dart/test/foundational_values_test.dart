@@ -1,6 +1,10 @@
+import 'dart:ffi';
+
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
+import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
+import 'package:maplibre_native_ffi/src/internal/struct/json.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/struct.dart';
 import 'package:test/test.dart';
 
@@ -71,6 +75,43 @@ void main() {
     );
     expect(native.duration_ms, 100);
     expect(native.easing.y2, 1);
+  });
+
+  test('JSON values materialize and copy native descriptor trees', () {
+    withNativeArena((arena) {
+      final native = nativeJsonValue(
+        const JsonObject([
+          JsonMember('name', JsonString('maplibre')),
+          JsonMember('enabled', JsonBool(true)),
+          JsonMember('values', JsonArray([JsonInt(-1), JsonUInt(2)])),
+        ]),
+        arena,
+      );
+
+      expect(
+        native.pointer.ref.type,
+        raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT.value,
+      );
+      final object = native.pointer.ref.data.object_value;
+      expect(object.member_count, 3);
+      expect(object.members[0].key.size, 4);
+      expect(object.members[1].value.ref.data.bool_value, isTrue);
+
+      final copied = jsonValueFromNative(native.pointer.ref);
+      expect(copied, isA<JsonObject>());
+      final copiedObject = copied as JsonObject;
+      expect(copiedObject.members[0].key, 'name');
+      expect((copiedObject.members[2].value as JsonArray).values.length, 2);
+    });
+  });
+
+  test('JSON double descriptors reject non-finite values before C calls', () {
+    expect(
+      () => withNativeArena(
+        (arena) => nativeJsonValue(const JsonDouble(double.nan), arena),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
   });
 
   test('public enum-like values preserve native raw values', () {
