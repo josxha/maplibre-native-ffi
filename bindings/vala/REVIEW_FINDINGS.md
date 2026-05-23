@@ -452,20 +452,28 @@ Review artifacts:
 
 Review artifacts:
 
-- `review-loop/round12-api-surface.md`
-- `review-loop/round12-lifecycle.md`
-- `review-loop/round12-validation-docs.md`
+- `review-loop/round12-api-spec.md`
+- `review-loop/round12-runtime-lifecycle.md`
+- `review-loop/round12-build-generation-tests.md`
+- `review-loop/round12-maintainability-docs.md`
 
 ### Applied findings
 
-- Added focused Rust adapter tests proving captured custom-geometry delegate
-  destroy-notify state is released after successful matching source removal and
-  after successful inline style JSON replacement.
+- Initialized hidden `FeatureStateSelector.size` inside every semantic selector
+  setter so Vala-created selectors satisfy the C ABI before feature-state
+  operations.
+- Initialized hidden offline region definition `size` fields in the adapter
+  before starting offline region creation, including the selected nested tile or
+  geometry definition.
+- Removed undocumented exported helper symbols for the hidden boxed `Feature`
+  surface and the unused `StringList.is_empty()` helper, keeping exported
+  symbols aligned with the scanner header and metadata inventory.
+- Kept the custom-geometry callback cleanup tests from the earlier Round 12
+  pass, proving destroy-notify state is released after successful matching
+  source removal and successful inline style JSON replacement.
 
 ### Rejected or deferred findings
 
-- `NativePointer` remains a public opaque pointer-address value by design for
-  backend-native handles; this is documented in the SPEC and Vala conventions.
 - `set_style_url()` custom-geometry teardown remains deferred because URL style
   replacement completes asynchronously after the new style loads and needs
   load-state/event coordination or a maintainer-approved policy.
@@ -483,7 +491,12 @@ Review artifacts:
   `RuntimeOptions.cache_path`, `ResourceResponse.error_message`, and
   `ResourceResponse.etag` should remain low-level fields or move behind owned
   validated setters.
+- Decide whether the current global sidecar storage for reusable plain-value
+  descriptor strings is an acceptable interim low-level retention policy or
+  whether those descriptors should become owned boxed/object wrappers with
+  destructor-backed cleanup.
 
 ### Validation
 
+- `mise run fix`
 - `mise run //bindings/vala:ci`
