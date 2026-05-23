@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         ScreenPoint,
     )
     from .geo import GeoJson, LatLng, LatLngBounds
+    from .json import JsonValue
     from .render import (
         MetalBorrowedTextureDescriptor,
         MetalOwnedTextureDescriptor,
@@ -461,9 +462,19 @@ class MapHandle:
             int(options.lod_mode) if options.lod_mode is not None else None,
         )
 
+    def set_style_url(self, url: str) -> None:
+        """Load a style URL through MapLibre Native style APIs."""
+        self._native.set_style_url(url)
+
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
+
+    def add_style_source_json(self, source_id: str, source_json: JsonValue) -> None:
+        """Add one style source from a style-spec source JSON object."""
+        from .json import _to_native_wire as _json_to_native_wire
+
+        self._native.add_style_source_json(source_id, _json_to_native_wire(source_json))
 
     def add_geojson_source_url(self, source_id: str, url: str) -> None:
         """Add a GeoJSON source that loads data from a URL."""

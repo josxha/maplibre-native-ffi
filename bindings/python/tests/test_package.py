@@ -192,10 +192,29 @@ def test_map_debug_and_status_options_round_trip_public_values() -> None:
             assert map_handle.get_rendering_stats_view_enabled() is False
 
 
+def test_style_url_reports_native_status_for_invalid_url() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.set_style_url("bad\0url")
+
+
 def test_style_source_url_metadata_and_removal_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            map_handle.add_style_source_json(
+                "style-json-points",
+                json.from_python(
+                    {
+                        "type": "geojson",
+                        "data": {
+                            "type": "FeatureCollection",
+                            "features": [],
+                        },
+                    }
+                ),
+            )
             map_handle.add_geojson_source_url(
                 "points", "https://example.test/points.geojson"
             )
@@ -252,6 +271,10 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert map_handle.style_source_exists("points") is True
             assert map_handle.style_source_exists("missing") is False
             assert (
+                map_handle.get_style_source_type("style-json-points")
+                == style.StyleSourceType.GEOJSON
+            )
+            assert (
                 map_handle.get_style_source_type("points")
                 == style.StyleSourceType.GEOJSON
             )
@@ -285,6 +308,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             )
             assert map_handle.get_style_source_type("missing") is None
             source_ids = map_handle.list_style_source_ids()
+            assert "style-json-points" in source_ids
             assert "points" in source_ids
             assert "inline-points" in source_ids
             assert "vector-tiles" in source_ids
@@ -300,6 +324,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert info.attribution is None
             assert map_handle.get_style_source_info("missing") is None
 
+            assert map_handle.remove_style_source("style-json-points") is True
             assert map_handle.remove_style_source("points") is True
             assert map_handle.remove_style_source("points") is False
             assert map_handle.remove_style_source("inline-points") is True
@@ -310,6 +335,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert map_handle.remove_style_source("raster-inline") is True
             assert map_handle.remove_style_source("dem-inline") is True
             source_ids = map_handle.list_style_source_ids()
+            assert "style-json-points" not in source_ids
             assert "points" not in source_ids
             assert "inline-points" not in source_ids
             assert "vector-tiles" not in source_ids

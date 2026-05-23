@@ -112,13 +112,13 @@ The current implementation includes these completed slices:
 - `RuntimeHandle` creates, runs, closes, and supports context-manager cleanup
   for a native runtime handle.
 - `MapHandle` creates and closes maps with parent runtime retention, basic map
-  options, repaint requests, and still-image requests.
+  options, style URL/JSON loading, repaint requests, and still-image requests.
 - `MapHandle` exposes map debug overlay options, rendering-stats view state,
   loaded-state queries, viewport options, and tile options.
-- `MapHandle` exposes GeoJSON source URL/data insertion and update plus vector,
-  raster, and raster DEM style source URL/inline-tile insertion, source removal,
-  existence checks, type/info lookup, attribution copying, and source ID
-  listing.
+- `MapHandle` exposes style-spec source JSON insertion, GeoJSON source URL/data
+  insertion and update plus vector, raster, and raster DEM style source
+  URL/inline-tile insertion, source removal, existence checks, type/info lookup,
+  attribution copying, and source ID listing.
 - `MapHandle` exposes custom geometry source callback queues, tile data updates,
   and tile/region invalidation.
 - `MapHandle` exposes built-in hillshade, color-relief, and location-indicator

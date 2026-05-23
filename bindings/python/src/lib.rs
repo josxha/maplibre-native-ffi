@@ -777,6 +777,17 @@ impl MapHandle {
         })
     }
 
+    fn set_style_url(&self, url: String) -> PyResult<()> {
+        let state = self.state();
+        let url = maplibre_core::string::c_string(&url).map_err(map_error)?;
+        // SAFETY: The C API validates that the pointer is a live map handle.
+        // url is a null-terminated C string whose storage lives for this call.
+        maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.as_ptr(), url.as_ptr()) })
+            .map_err(map_error)?;
+        self.clear_custom_geometry_sources();
+        Ok(())
+    }
+
     fn set_style_json(&self, json: String) -> PyResult<()> {
         let state = self.state();
         let json = maplibre_core::string::c_string(&json).map_err(map_error)?;
@@ -1162,6 +1173,27 @@ impl MapHandle {
     }
 
     #[allow(clippy::too_many_arguments)]
+    fn add_style_source_json(
+        &self,
+        source_id: String,
+        source_json: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let source_json = json_value_from_wire(source_json)?;
+        let source_json =
+            maplibre_core::json::json_value_try_to_native(&source_json).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, source ID, and JSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_style_source_json(
+                state.as_ptr(),
+                source_id.raw(),
+                source_json.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
     fn add_geojson_source_url(&self, source_id: String, url: String) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
