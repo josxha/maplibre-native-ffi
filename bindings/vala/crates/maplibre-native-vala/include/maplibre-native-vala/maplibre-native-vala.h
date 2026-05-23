@@ -2036,6 +2036,14 @@ gboolean mln_vala_map_handle_get_image_source_coordinates(
   GError** error
 );
 
+gboolean mln_vala_map_handle_add_hillshade_layer(
+  MlnValaMapHandle* self, const char* layer_id, const char* source_id,
+  const char* before_layer_id, GError** error
+);
+gboolean mln_vala_map_handle_add_color_relief_layer(
+  MlnValaMapHandle* self, const char* layer_id, const char* source_id,
+  const char* before_layer_id, GError** error
+);
 gboolean mln_vala_map_handle_add_location_indicator_layer(
   MlnValaMapHandle* self, const char* layer_id, const char* before_layer_id,
   GError** error

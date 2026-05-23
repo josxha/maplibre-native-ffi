@@ -142,6 +142,10 @@ int main(string[] args) {
     map.add_raster_source_url("raster-source", "asset://raster-source.json", tile_source_options);
     map.remove_style_source("raster-source", out source_removed);
     map.add_raster_dem_source_url("dem-source", "asset://dem-source.json", tile_source_options);
+    map.add_hillshade_layer("hillshade-layer", "dem-source", "");
+    map.add_color_relief_layer("color-relief-layer", "dem-source", "");
+    map.remove_style_layer("hillshade-layer", out source_removed);
+    map.remove_style_layer("color-relief-layer", out source_removed);
     map.remove_style_source("dem-source", out source_removed);
     uint8[] image_pixels = { 255, 0, 0, 255 };
     MaplibreNative.PremultipliedRgba8Image style_image = {};

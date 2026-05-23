@@ -1326,6 +1326,52 @@ pub extern "C" fn mln_vala_map_handle_get_image_source_coordinates(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_hillshade_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    source_id: *const c_char,
+    before_layer_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_dem_layer(
+        handle,
+        layer_id,
+        source_id,
+        before_layer_id,
+        DemLayerKind::Hillshade,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn mln_vala_map_handle_add_color_relief_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    source_id: *const c_char,
+    before_layer_id: *const c_char,
+    error_out: *mut *mut GError,
+) -> GBoolean {
+    match add_dem_layer(
+        handle,
+        layer_id,
+        source_id,
+        before_layer_id,
+        DemLayerKind::ColorRelief,
+    ) {
+        Ok(()) => GTRUE,
+        Err(error) => {
+            glib::set_error(error_out, error);
+            GFALSE
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn mln_vala_map_handle_add_location_indicator_layer(
     handle: *mut MapHandle,
     layer_id: *const c_char,
@@ -2371,6 +2417,37 @@ fn get_image_source_coordinates(
     })?;
     glib::clear_optional_out_pointer(out_coordinate_count, coordinate_count)?;
     glib::clear_optional_out_pointer(out_found, if found { GTRUE } else { GFALSE })
+}
+
+#[derive(Clone, Copy)]
+enum DemLayerKind {
+    Hillshade,
+    ColorRelief,
+}
+
+fn add_dem_layer(
+    handle: *mut MapHandle,
+    layer_id: *const c_char,
+    source_id: *const c_char,
+    before_layer_id: *const c_char,
+    kind: DemLayerKind,
+) -> error::Result<()> {
+    let map = map_native(handle)?;
+    let layer_id = string_view_from_c(layer_id, "DEM layer ID")?;
+    let source_id = string_view_from_c(source_id, "DEM source ID")?;
+    let before_layer_id = string_view_from_c(before_layer_id, "before layer ID")?;
+    // SAFETY: `map` is live and string views borrow caller strings for this call.
+    let status = unsafe {
+        match kind {
+            DemLayerKind::Hillshade => {
+                sys::mln_map_add_hillshade_layer(map, layer_id, source_id, before_layer_id)
+            }
+            DemLayerKind::ColorRelief => {
+                sys::mln_map_add_color_relief_layer(map, layer_id, source_id, before_layer_id)
+            }
+        }
+    };
+    error::check(status)
 }
 
 fn add_location_indicator_layer(
