@@ -937,6 +937,96 @@ final class MapHandle {
     });
   }
 
+  /// Sets or replaces one runtime style image.
+  void setStyleImage(
+    String imageId,
+    PremultipliedRgba8Image image, {
+    StyleImageOptions options = const StyleImageOptions(),
+  }) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
+      nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
+      final nativeOptions = arena<raw.mln_style_image_options>();
+      nativeOptions.ref = _styleImageOptionsToNative(options);
+      _check(
+        _c.mapSetStyleImage(
+          _pointer,
+          nativeId.value,
+          nativeImage,
+          nativeOptions,
+        ),
+      );
+    });
+  }
+
+  /// Removes one runtime style image and returns whether one was removed.
+  bool removeStyleImage(String imageId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final outRemoved = arena<Bool>();
+      _check(_c.mapRemoveStyleImage(_pointer, nativeId.value, outRemoved));
+      return outRemoved.value;
+    });
+  }
+
+  /// Reports whether one runtime style image exists.
+  bool styleImageExists(String imageId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final outExists = arena<Bool>();
+      _check(_c.mapStyleImageExists(_pointer, nativeId.value, outExists));
+      return outExists.value;
+    });
+  }
+
+  /// Copies fixed metadata for one runtime style image.
+  StyleImageInfo? getStyleImageInfo(String imageId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final outInfo = arena<raw.mln_style_image_info>();
+      outInfo.ref.size = sizeOf<raw.mln_style_image_info>();
+      final outFound = arena<Bool>();
+      _check(
+        _c.mapGetStyleImageInfo(_pointer, nativeId.value, outInfo, outFound),
+      );
+      return outFound.value ? _styleImageInfoFromNative(outInfo.ref) : null;
+    });
+  }
+
+  /// Copies one runtime style image as premultiplied RGBA8 pixels.
+  StyleImage? copyStyleImagePremultipliedRgba8(String imageId) {
+    final info = getStyleImageInfo(imageId);
+    if (info == null) {
+      return null;
+    }
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final pixels = info.byteLength == 0
+          ? nullptr.cast<Uint8>()
+          : arena<Uint8>(info.byteLength);
+      final outByteLength = arena<Size>();
+      final outFound = arena<Bool>();
+      _check(
+        _c.mapCopyStyleImagePremultipliedRgba8(
+          _pointer,
+          nativeId.value,
+          pixels,
+          info.byteLength,
+          outByteLength,
+          outFound,
+        ),
+      );
+      if (!outFound.value) {
+        return null;
+      }
+      return StyleImage(
+        info: info,
+        bytes: Uint8List.fromList(pixels.asTypedList(outByteLength.value)),
+      );
+    });
+  }
+
   /// Adds one style source from a style-spec source JSON object.
   void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
     withNativeArena((arena) {
@@ -1905,6 +1995,58 @@ final class VulkanOwnedTextureFrame {
     final _ = _session._pointer;
     return NativePointer(pointer.address);
   }
+}
+
+raw.mln_premultiplied_rgba8_image _premultipliedRgba8ImageToNative(
+  PremultipliedRgba8Image image,
+  Allocator allocator,
+) {
+  final result = _c.premultipliedRgba8ImageDefault();
+  result.width = image.width;
+  result.height = image.height;
+  result.stride = image.stride;
+  final bytes = image.bytes;
+  result.byte_length = bytes.length;
+  if (bytes.isNotEmpty) {
+    final nativeBytes = allocator<Uint8>(bytes.length);
+    for (var index = 0; index < bytes.length; index += 1) {
+      nativeBytes[index] = bytes[index];
+    }
+    result.pixels = nativeBytes;
+  }
+  return result;
+}
+
+raw.mln_style_image_options _styleImageOptionsToNative(
+  StyleImageOptions options,
+) {
+  final result = _c.styleImageOptionsDefault();
+  final pixelRatio = options.pixelRatio;
+  if (pixelRatio != null) {
+    result.fields |= raw
+        .mln_style_image_option_field
+        .MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
+        .value;
+    result.pixel_ratio = pixelRatio;
+  }
+  final sdf = options.sdf;
+  if (sdf != null) {
+    result.fields |=
+        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF.value;
+    result.sdf = sdf;
+  }
+  return result;
+}
+
+StyleImageInfo _styleImageInfoFromNative(raw.mln_style_image_info info) {
+  return StyleImageInfo(
+    width: info.width,
+    height: info.height,
+    stride: info.stride,
+    byteLength: info.byte_length,
+    pixelRatio: info.pixel_ratio,
+    sdf: info.sdf,
+  );
 }
 
 final class _CustomGeometryCallbackState {

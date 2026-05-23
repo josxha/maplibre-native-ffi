@@ -682,6 +682,63 @@ final class MaplibreNativeCApi {
   raw.mln_custom_geometry_source_options customGeometrySourceOptionsDefault() =>
       _raw.mln_custom_geometry_source_options_default();
 
+  /// Returns default premultiplied RGBA8 image descriptor.
+  raw.mln_premultiplied_rgba8_image premultipliedRgba8ImageDefault() =>
+      _raw.mln_premultiplied_rgba8_image_default();
+
+  /// Returns default style image options.
+  raw.mln_style_image_options styleImageOptionsDefault() =>
+      _raw.mln_style_image_options_default();
+
+  /// Sets or replaces one runtime style image.
+  int mapSetStyleImage(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view imageId,
+    Pointer<raw.mln_premultiplied_rgba8_image> image,
+    Pointer<raw.mln_style_image_options> options,
+  ) => _raw.mln_map_set_style_image(map, imageId, image, options).value;
+
+  /// Removes one runtime style image.
+  int mapRemoveStyleImage(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view imageId,
+    Pointer<Bool> outRemoved,
+  ) => _raw.mln_map_remove_style_image(map, imageId, outRemoved).value;
+
+  /// Reports whether one runtime style image exists.
+  int mapStyleImageExists(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view imageId,
+    Pointer<Bool> outExists,
+  ) => _raw.mln_map_style_image_exists(map, imageId, outExists).value;
+
+  /// Copies style image metadata.
+  int mapGetStyleImageInfo(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view imageId,
+    Pointer<raw.mln_style_image_info> outInfo,
+    Pointer<Bool> outFound,
+  ) => _raw.mln_map_get_style_image_info(map, imageId, outInfo, outFound).value;
+
+  /// Copies style image pixels as premultiplied RGBA8.
+  int mapCopyStyleImagePremultipliedRgba8(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view imageId,
+    Pointer<Uint8> outPixels,
+    int pixelCapacity,
+    Pointer<Size> outByteLength,
+    Pointer<Bool> outFound,
+  ) => _raw
+      .mln_map_copy_style_image_premultiplied_rgba8(
+        map,
+        imageId,
+        outPixels,
+        pixelCapacity,
+        outByteLength,
+        outFound,
+      )
+      .value;
+
   /// Adds a custom geometry source.
   int mapAddCustomGeometrySource(
     Pointer<raw.mln_map> map,

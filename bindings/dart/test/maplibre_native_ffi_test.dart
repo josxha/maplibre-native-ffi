@@ -96,6 +96,28 @@ void main() {
       expect(map.debugOptions().contains(MapDebugOptions.tileBorders), isTrue);
       map.setDebugOptions(MapDebugOptions.none);
       map.dumpDebugLogs();
+      map.setStyleImage(
+        'dart-image',
+        PremultipliedRgba8Image(
+          width: 1,
+          height: 1,
+          stride: 4,
+          bytes: Uint8List.fromList([255, 0, 0, 255]),
+        ),
+        options: const StyleImageOptions(pixelRatio: 2, sdf: true),
+      );
+      expect(map.styleImageExists('dart-image'), isTrue);
+      final styleImageInfo = map.getStyleImageInfo('dart-image');
+      expect(styleImageInfo, isNotNull);
+      expect(styleImageInfo!.width, 1);
+      expect(styleImageInfo.height, 1);
+      expect(styleImageInfo.pixelRatio, closeTo(2, 0.0001));
+      expect(styleImageInfo.sdf, isTrue);
+      final styleImage = map.copyStyleImagePremultipliedRgba8('dart-image');
+      expect(styleImage, isNotNull);
+      expect(styleImage!.bytes, [255, 0, 0, 255]);
+      expect(map.removeStyleImage('dart-image'), isTrue);
+      expect(map.styleImageExists('dart-image'), isFalse);
       runtime.runOnce();
       runtime.drainEvents();
       map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 1));

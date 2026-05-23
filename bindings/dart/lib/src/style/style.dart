@@ -1,6 +1,8 @@
 /// Style source, layer, image, light, property, and custom geometry APIs.
 library;
 
+import 'dart:typed_data';
+
 import '../geo/geo.dart';
 
 /// Style source type.
@@ -200,12 +202,37 @@ final class StyleImageOptions {
   final bool? sdf;
 }
 
+/// Caller-owned premultiplied RGBA8 image pixels.
+final class PremultipliedRgba8Image {
+  /// Creates a premultiplied RGBA8 image.
+  const PremultipliedRgba8Image({
+    required this.width,
+    required this.height,
+    required this.stride,
+    required this.bytes,
+  });
+
+  /// Image width in pixels.
+  final int width;
+
+  /// Image height in pixels.
+  final int height;
+
+  /// Bytes per image row.
+  final int stride;
+
+  /// Premultiplied RGBA8 pixels.
+  final Uint8List bytes;
+}
+
 /// Style image metadata.
 final class StyleImageInfo {
   /// Creates style image metadata.
   const StyleImageInfo({
     required this.width,
     required this.height,
+    required this.stride,
+    required this.byteLength,
     required this.pixelRatio,
     required this.sdf,
   });
@@ -216,11 +243,29 @@ final class StyleImageInfo {
   /// Image height in pixels.
   final int height;
 
+  /// Bytes per image row.
+  final int stride;
+
+  /// Required byte length for a copied premultiplied RGBA8 image.
+  final int byteLength;
+
   /// Pixel ratio.
   final double pixelRatio;
 
   /// Whether the image is an SDF image.
   final bool sdf;
+}
+
+/// Copied style image pixels and metadata.
+final class StyleImage {
+  /// Creates a copied style image.
+  const StyleImage({required this.info, required this.bytes});
+
+  /// Copied image metadata.
+  final StyleImageInfo info;
+
+  /// Copied tightly packed premultiplied RGBA8 pixels.
+  final Uint8List bytes;
 }
 
 /// Callback invoked when a custom geometry source needs or cancels one tile.
