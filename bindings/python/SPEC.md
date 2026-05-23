@@ -69,7 +69,7 @@ Record Python-only differences here.
 | Callback execution | Low-level callbacks may use bounded queues before Python callable execution. | Native callbacks may arrive on threads where arbitrary Python execution is unsafe or too slow. | Queue overflow follows each callback contract: fail, drop best-effort notification, or report cancellation. | Callback tests will cover queue capacity, exception conversion, and non-blocking behavior.                      |
 | Finalizers         | Finalizers report leaked thread-affine handles instead of destroying them.   | Python finalizers can run on arbitrary threads or during interpreter finalization.             | Users close handles explicitly or with context managers. Leak reports identify unreleased handles.          | Handle tests will assert close-once behavior; leak reporting tests will avoid native destruction from GC paths. |
 
-## Current scaffold
+## Current implementation map
 
 ```text
 bindings/python/
@@ -98,7 +98,7 @@ bindings/python/
   tests/test_package.py
 ```
 
-This scaffold implements one proof slice:
+The current implementation includes these completed slices:
 
 - maturin builds the private `maplibre_native._native` PyO3 extension.
 - `_native` links through the Rust `maplibre-native-sys` crate to the public C
@@ -116,8 +116,11 @@ This scaffold implements one proof slice:
 - `RuntimeHandle.poll_event()` returns runtime events copied into Python-owned
   values.
 - Public error classes, `MaplibreStatus`, `NetworkStatus`, `RenderBackend`, and
-  `NativePointer` establish naming and value semantics for later concept
-  implementations.
+  `NativePointer` establish shared naming and value semantics.
+- `maplibre_native.json` provides JSON value trees that preserve numeric shape,
+  ordering, and duplicate object members.
+- `maplibre_native.geo` provides geographic, geometry, and GeoJSON value trees
+  for later native source/query APIs.
 - Concept modules exist so future changes land in stable package locations.
 
 ## Build artifacts and tasks

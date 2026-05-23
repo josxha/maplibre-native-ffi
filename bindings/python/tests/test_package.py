@@ -4,7 +4,7 @@ import pytest
 
 import maplibre_native as mln
 from maplibre_native import _native
-from maplibre_native import render, resource, style
+from maplibre_native import geo, json, render, resource, style
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -212,6 +212,45 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
+
+
+def test_json_values_preserve_order_duplicates_and_numeric_shape() -> None:
+    value = json.json_object(
+        (
+            json.JsonMember("same", json.json_uint(1)),
+            json.JsonMember("same", json.json_int(-1)),
+            json.JsonMember("nested", json.json_array((True, json.json_double(1.5)))),
+        )
+    )
+
+    assert json.to_python(value) == [
+        ("same", 1),
+        ("same", -1),
+        ("nested", [True, 1.5]),
+    ]
+    assert value.members[0].value == json.JsonUInt(1)
+    assert value.members[1].value == json.JsonInt(-1)
+
+
+def test_geojson_values_preserve_geometry_and_properties() -> None:
+    feature = geo.Feature(
+        geometry=geo.line_string((geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))),
+        properties=(
+            json.JsonMember("name", "road"),
+            json.JsonMember("name", "duplicate"),
+        ),
+        identifier=geo.FeatureIdentifierString("feature-1"),
+    )
+    collection = geo.FeatureCollection((feature,))
+
+    assert collection.features[0].geometry == geo.LineString(
+        (geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))
+    )
+    assert [member.key for member in collection.features[0].properties] == [
+        "name",
+        "name",
+    ]
+    assert collection.features[0].identifier == geo.FeatureIdentifierString("feature-1")
 
 
 def test_resource_values_preserve_native_shape() -> None:
