@@ -354,12 +354,24 @@ class MapHandle {
     });
   }
 
+  addStyleSourceJson(sourceId, source) {
+    return translateNativeErrors(() =>
+      this.native.addStyleSourceJson(sourceId, stringifyJson(source)),
+    );
+  }
+
   styleSourceExists(sourceId) {
     return translateNativeErrors(() => this.native.styleSourceExists(sourceId));
   }
 
   removeStyleSource(sourceId) {
     return translateNativeErrors(() => this.native.removeStyleSource(sourceId));
+  }
+
+  addStyleLayerJson(layer, beforeLayerId = null) {
+    return translateNativeErrors(() =>
+      this.native.addStyleLayerJson(stringifyJson(layer), beforeLayerId),
+    );
   }
 
   styleLayerExists(layerId) {
@@ -381,6 +393,17 @@ class MapHandle {
   [Symbol.dispose]() {
     this.close();
   }
+}
+
+function stringifyJson(value) {
+  const json = JSON.stringify(value);
+  if (json === undefined) {
+    throw new InvalidArgumentError(
+      null,
+      "JSON value must be serializable as an object, array, string, number, boolean, or null",
+    );
+  }
+  return json;
 }
 
 function translateNativeErrors(callback) {

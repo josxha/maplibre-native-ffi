@@ -166,6 +166,22 @@ impl NativeMapHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "addStyleSourceJson")]
+    pub fn add_style_source_json(&self, source_id: String, source_json: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let source_json = parse_json_value(source_json)?;
+        let native_source_json =
+            core::json::json_value_try_to_native(&source_json).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_map_add_style_source_json(
+                self.state.as_ptr(),
+                source_id.raw(),
+                native_source_json.as_ptr(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "styleSourceExists")]
     pub fn style_source_exists(&self, source_id: String) -> Result<bool> {
         let source_id = core::string::string_view(&source_id);
@@ -186,6 +202,27 @@ impl NativeMapHandle {
         })
         .map_err(error::from_core)?;
         Ok(removed)
+    }
+
+    #[napi(js_name = "addStyleLayerJson")]
+    pub fn add_style_layer_json(
+        &self,
+        layer_json: String,
+        before_layer_id: Option<String>,
+    ) -> Result<()> {
+        let layer_json = parse_json_value(layer_json)?;
+        let native_layer_json =
+            core::json::json_value_try_to_native(&layer_json).map_err(error::from_core)?;
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = core::string::string_view(&before_layer_id);
+        core::check(unsafe {
+            sys::mln_map_add_style_layer_json(
+                self.state.as_ptr(),
+                native_layer_json.as_ptr(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(error::from_core)
     }
 
     #[napi(js_name = "styleLayerExists")]
@@ -309,6 +346,44 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
         other => Err(error::invalid_argument(format!(
             "debug option must be a known MapDebugOption, got '{other}'"
         ))),
+    }
+}
+
+fn parse_json_value(value: String) -> Result<core::JsonValue> {
+    let value: serde_json::Value = serde_json::from_str(&value).map_err(|parse_error| {
+        error::invalid_argument(format!("JSON input is invalid: {parse_error}"))
+    })?;
+    json_value_from_serde(value)
+}
+
+fn json_value_from_serde(value: serde_json::Value) -> Result<core::JsonValue> {
+    match value {
+        serde_json::Value::Null => Ok(core::JsonValue::Null),
+        serde_json::Value::Bool(value) => Ok(core::JsonValue::Bool(value)),
+        serde_json::Value::Number(value) => {
+            if let Some(value) = value.as_u64() {
+                Ok(core::JsonValue::UInt(value))
+            } else if let Some(value) = value.as_i64() {
+                Ok(core::JsonValue::Int(value))
+            } else if let Some(value) = value.as_f64() {
+                Ok(core::JsonValue::Double(value))
+            } else {
+                Err(error::invalid_argument(
+                    "JSON number could not be represented",
+                ))
+            }
+        }
+        serde_json::Value::String(value) => Ok(core::JsonValue::String(value)),
+        serde_json::Value::Array(values) => values
+            .into_iter()
+            .map(json_value_from_serde)
+            .collect::<Result<Vec<_>>>()
+            .map(core::JsonValue::Array),
+        serde_json::Value::Object(members) => members
+            .into_iter()
+            .map(|(key, value)| Ok(core::JsonMember::new(key, json_value_from_serde(value)?)))
+            .collect::<Result<Vec<_>>>()
+            .map(core::JsonValue::Object),
     }
 }
 

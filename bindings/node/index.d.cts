@@ -159,8 +159,10 @@ export declare class MapHandle {
   jumpTo(camera: CameraOptions): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
+  addStyleSourceJson(sourceId: string, source: JsonValue): void;
   styleSourceExists(sourceId: string): boolean;
   removeStyleSource(sourceId: string): boolean;
+  addStyleLayerJson(layer: JsonValue, beforeLayerId?: string | null): void;
   styleLayerExists(layerId: string): boolean;
   removeStyleLayer(layerId: string): boolean;
   setStyleJson(json: string): void;
@@ -182,6 +184,14 @@ export interface ScreenPoint {
   x: number;
   y: number;
 }
+
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;

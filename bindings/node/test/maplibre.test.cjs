@@ -198,6 +198,37 @@ test("map screen projection helpers copy point values", () => {
   }
 });
 
+test("style JSON helpers serialize JavaScript values and copy booleans", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
+    runtime.runOnce();
+    map.addStyleSourceJson("empty-geojson", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] },
+    });
+    assert.equal(map.styleSourceExists("empty-geojson"), true);
+    assert.equal(map.removeStyleSource("empty-geojson"), true);
+
+    map.addStyleLayerJson({
+      id: "background",
+      type: "background",
+      paint: { "background-color": "#000000" },
+    });
+    assert.equal(map.styleLayerExists("background"), true);
+    assert.equal(map.removeStyleLayer("background"), true);
+    assert.throws(
+      () => map.addStyleLayerJson(/** @type {any} */ (undefined)),
+      InvalidArgumentError,
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("style existence and removal probes return copied booleans", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });

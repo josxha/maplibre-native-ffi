@@ -541,14 +541,14 @@ area instead of retesting all native C validation rules.
    descriptor, map utility methods, debug-option string mapping, and
    parent-retention proof slice complete.)_
 6. Add copied values, descriptors, enum conversions, JSON, geometry, GeoJSON,
-   and TypeScript concept modules. _(Initial coordinate value and projection
-   helper proof slice complete.)_
+   and TypeScript concept modules. _(Initial coordinate value, projection
+   helper, and JavaScript-to-native JSON proof slices complete.)_
 7. Add logging, resource transforms, resource providers, and one-shot resource
    request completion through `ThreadsafeFunction` handoff. _(Async log severity
    control proof slice complete; callback handoff remains.)_
 8. Add camera, projection, query, style, and offline APIs. _(Initial map camera
-   descriptor, screen projection helper, and style probe proof slices
-   complete.)_
+   descriptor, screen projection helper, style JSON helper, and style probe
+   proof slices complete.)_
 9. Add render sessions, Metal/Vulkan descriptors, texture readback,
    `NativeBuffer`, and texture frame scopes. _(`NativeBuffer` value complete.)_
 10. Move repeated direct `sys` sequences and bridge-neutral descriptor/result
