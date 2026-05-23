@@ -288,3 +288,31 @@ Applied findings:
 Recorded limitations / not applied: none.
 
 Findings requiring user input: none.
+
+## Post-redesign review round 3
+
+Review evidence:
+
+- Ran three independent review agents after the route handoff refinement:
+  - FFI/threading/minimal-route-matching review.
+  - JavaScript/TypeScript API, declaration, export, and test review.
+  - SPEC/REVIEW record-conformance review.
+- The JavaScript/TypeScript and SPEC/REVIEW reviewers reported no remaining
+  actionable findings.
+- Applied accepted findings in this round and validated with Rust formatting for
+  the Node crate, `cargo check -p maplibre-native-node`, `mise run fix`, and
+  `mise run //bindings/node:ci`.
+
+Applied findings:
+
+1. The provider handoff wrapper used a one-argument callback shape, while
+   napi-rs invokes `ThreadsafeFunction<ResourceProviderRequest>` callbacks as
+   `(error, request)` under the default callee-handled error convention.
+   - Action: the wrapper now accepts `(error, request)`, throws the error before
+     request wrapping, and unwraps the request from the second argument.
+   - Test action: provider wrapper tests now invoke the fake native callback as
+     `(null, request)` to match the real ThreadsafeFunction call shape.
+
+Recorded limitations / not applied: none.
+
+Findings requiring user input: none.

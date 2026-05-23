@@ -437,10 +437,10 @@ test("resource provider routes validate Node handoff shape", async () => {
     RuntimeHandle.prototype.setResourceProviderRoutes.call(
       {
         native: {
-          /** @param {any} routes @param {(request: any) => void} callback */
+          /** @param {any} routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(routes, callback) {
             assert.deepEqual(routes, [{ urlPrefix: "custom://" }]);
-            callback(fakeResourceProviderRequest("1", "custom://tile"));
+            callback(null, fakeResourceProviderRequest("1", "custom://tile"));
           },
         },
       },
@@ -462,9 +462,9 @@ test("resource provider routes validate Node handoff shape", async () => {
     RuntimeHandle.prototype.setResourceProviderRoutes.call(
       {
         native: {
-          /** @param {any} _routes @param {(request: any) => void} callback */
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(_routes, callback) {
-            callback(fakeResourceProviderRequest("2", "custom://throw"));
+            callback(null, fakeResourceProviderRequest("2", "custom://throw"));
           },
         },
       },
@@ -490,9 +490,9 @@ test("resource provider routes validate Node handoff shape", async () => {
     RuntimeHandle.prototype.setResourceProviderRoutes.call(
       {
         native: {
-          /** @param {any} _routes @param {(request: any) => void} callback */
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(_routes, callback) {
-            callback(fakeResourceProviderRequest("3", "custom://reject"));
+            callback(null, fakeResourceProviderRequest("3", "custom://reject"));
           },
         },
       },
@@ -519,9 +519,12 @@ test("resource provider routes validate Node handoff shape", async () => {
     RuntimeHandle.prototype.setResourceProviderRoutes.call(
       {
         native: {
-          /** @param {any} _routes @param {(request: any) => void} callback */
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(_routes, callback) {
-            callback(fakeResourceProviderRequest("4", "custom://thenable"));
+            callback(
+              null,
+              fakeResourceProviderRequest("4", "custom://thenable"),
+            );
           },
         },
       },

@@ -663,7 +663,10 @@ class RuntimeHandle {
       );
     }
     return translateNativeErrors(() =>
-      this.native.setResourceProviderRoutes(routes, (request) => {
+      this.native.setResourceProviderRoutes(routes, (error, request) => {
+        if (error) {
+          throw error;
+        }
         const handle = new ResourceRequestHandle(
           CONSTRUCTION_TOKEN,
           request.handleId,
