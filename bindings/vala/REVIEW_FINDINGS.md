@@ -129,18 +129,6 @@ Review artifacts:
 
 ### Applied findings
 
-- Fixed the `poll_event` GIR annotation so VAPI marks a no-event result as a
-  nullable `RuntimeEvent?` rather than a non-null out value.
-- Left native resource-provider request ownership with the C provider path when
-  the temporary GObject wrapper cannot be allocated, avoiding double release on
-  allocation failure.
-- Narrowed SPEC and Vala convention wording so deferred descriptor, JSON, native
-  pointer, and struct-buffer ergonomics are documented as future wrapper work
-  rather than current API behavior.
-- Added `mln_offline_region_id` and `mln_offline_operation_id` to the SPEC
-  checklist with their current scalar Vala mappings.
-- Added direct owner-thread finalizer coverage for an unclosed projection
-  handle.
 - Moved Metal readback before frame acquisition and assert readback metadata so
   the fixture does not call readback while a texture frame is held.
 - Protected Vala logging fixture counters with a mutex, matching provider-state
@@ -159,6 +147,68 @@ Review artifacts:
 - First-class async Vala provider retention ergonomics remain deferred as a
   broader API-shape follow-up; the current low-level callback parameter is
   callback-duration borrowed.
+
+### User-input-needed findings
+
+- None.
+
+## Round 4
+
+Review artifacts:
+
+- `review-loop/round4-api-spec.md`
+- `review-loop/round4-runtime-lifecycle.md`
+- `review-loop/round4-build-generation-tests.md`
+- `review-loop/round4-maintainability-docs.md`
+
+### Applied findings
+
+- Fixed the `poll_event` GIR annotation so VAPI marks a no-event result as a
+  nullable `RuntimeEvent?` rather than a non-null out value.
+- Left native resource-provider request ownership with the C provider path when
+  the temporary GObject wrapper cannot be allocated, avoiding double release on
+  allocation failure.
+- Narrowed SPEC and Vala convention wording so deferred descriptor, JSON, native
+  pointer, and struct-buffer ergonomics are documented as future wrapper work
+  rather than current API behavior.
+- Added `mln_offline_region_id` and `mln_offline_operation_id` to the SPEC
+  checklist with their current scalar Vala mappings.
+- Added direct owner-thread finalizer coverage for an unclosed projection
+  handle.
+
+### Rejected or deferred findings
+
+- Linux CI validation remains deferred to the configured runner; local macOS
+  validation covers generation, VAPI shape, compile fixture execution, Rust
+  tests, and clippy.
+
+### User-input-needed findings
+
+- None.
+
+## Round 5
+
+Review artifacts:
+
+- `review-loop/round5-api-spec.md`
+- `review-loop/round5-runtime-lifecycle.md`
+- `review-loop/round5-build-generation-tests.md`
+- `review-loop/round5-maintainability-docs.md`
+
+### Applied findings
+
+- Added Round 4 provenance to this committed finding log.
+- Renamed single-value flag enum members in vapigen metadata to idiomatic Vala
+  names and referenced them from the compile fixture.
+- Moved the offline get-status result documentation block next to its actual
+  declaration.
+- Tightened the generator's annotation parser so it associates only immediately
+  adjacent documentation blocks with declarations, then corrected stale
+  annotation inventory entries exposed by that stricter check.
+
+### Rejected or deferred findings
+
+- No new deferrals beyond the API-shape and Linux CI items already recorded.
 
 ### User-input-needed findings
 

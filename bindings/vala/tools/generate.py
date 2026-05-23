@@ -12,8 +12,8 @@ METADATA = ROOT / "metadata" / "api.toml"
 
 FUNCTION_RE = re.compile(r"^[\w\s\*]+\b(mln_vala_\w+)\s*\(", re.MULTILINE)
 FUNCTION_DECL_RE = re.compile(
-    r"(?P<doc>/\*\*.*?\*/\s*)?(?P<decl>[\w\s\*]+\b(?P<name>mln_vala_\w+)\s*\(.*?\)\s*;)",
-    re.DOTALL,
+    r"(?P<decl>^[A-Za-z_][A-Za-z0-9_\s\*]*\b(?P<name>mln_vala_\w+)\s*\([^;{}]*?\)\s*;)",
+    re.MULTILINE,
 )
 TYPE_PATTERNS = [
     re.compile(r"typedef struct _(MlnVala\w+)\s+\1;"),
@@ -45,6 +45,17 @@ def extract_types(header: str) -> list[str]:
     return sorted(types)
 
 
+def adjacent_doc(header: str, declaration_start: int) -> str:
+    prefix = header[:declaration_start]
+    stripped = prefix.rstrip()
+    if not stripped.endswith("*/"):
+        return ""
+    doc_start = stripped.rfind("/**")
+    if doc_start == -1:
+        return ""
+    return stripped[doc_start:]
+
+
 def extract_annotation_inventory(header: str) -> dict[str, list[str]]:
     annotations: dict[str, set[str]] = {
         "throws": set(),
@@ -56,7 +67,7 @@ def extract_annotation_inventory(header: str) -> dict[str, list[str]]:
     }
     for match in FUNCTION_DECL_RE.finditer(header):
         name = match.group("name")
-        doc = match.group("doc") or ""
+        doc = adjacent_doc(header, match.start("decl"))
         decl = match.group("decl")
         if "GError**" in decl or "Throws:" in doc:
             annotations["throws"].add(name)

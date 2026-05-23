@@ -661,7 +661,6 @@ transfer_full_returns = [
   "mln_vala_runtime_handle_offline_region_update_metadata_take_result",
   "mln_vala_runtime_handle_offline_regions_list_take_result",
   "mln_vala_runtime_handle_offline_regions_merge_database_take_result",
-  "mln_vala_runtime_options_default",
   "mln_vala_style_id_list_handle_get",
   "mln_vala_vulkan_owned_texture_frame_handle_get_device",
   "mln_vala_vulkan_owned_texture_frame_handle_get_image",
@@ -772,7 +771,6 @@ nullable_parameters = [
   "mln_vala_runtime_handle_offline_region_update_metadata_start",
   "mln_vala_runtime_handle_offline_regions_merge_database_start",
   "mln_vala_runtime_handle_poll_event",
-  "mln_vala_runtime_options_default",
 ]
 
 out_parameters = [
@@ -839,10 +837,10 @@ out_parameters = [
   "mln_vala_resource_request_handle_is_cancelled",
   "mln_vala_resource_response_default",
   "mln_vala_runtime_handle_offline_region_create_start",
-  "mln_vala_runtime_handle_offline_region_create_take_result",
   "mln_vala_runtime_handle_offline_region_delete_start",
   "mln_vala_runtime_handle_offline_region_get_start",
   "mln_vala_runtime_handle_offline_region_get_status_start",
+  "mln_vala_runtime_handle_offline_region_get_status_take_result",
   "mln_vala_runtime_handle_offline_region_get_take_result",
   "mln_vala_runtime_handle_offline_region_invalidate_start",
   "mln_vala_runtime_handle_offline_region_set_download_state_start",

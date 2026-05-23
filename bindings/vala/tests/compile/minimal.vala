@@ -406,8 +406,10 @@ int main(string[] args) {
     response.default();
     MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
     rendered_query_options.default();
+    rendered_query_options.fields = MaplibreNative.RenderedFeatureQueryOptionFields.LAYER_IDS;
     MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
     source_query_options.default();
+    source_query_options.fields = MaplibreNative.SourceFeatureQueryOptionFields.SOURCE_LAYER_IDS;
 
     MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
     MaplibreNative.ScreenPoint query_point = { 0.0, 0.0 };
@@ -425,6 +427,8 @@ int main(string[] args) {
 
     MaplibreNative.RuntimeOptions runtime_options = {};
     runtime_options.default();
+    runtime_options.flags = MaplibreNative.RuntimeOptionFlags.MAXIMUM_CACHE_SIZE;
+    runtime_options.maximum_cache_size = 1024 * 1024;
     var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
     runtime.set_resource_provider(provide_resource);
     runtime.set_resource_transform(transform_resource);

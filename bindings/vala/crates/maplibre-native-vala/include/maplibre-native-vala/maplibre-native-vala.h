@@ -1699,16 +1699,6 @@ gboolean mln_vala_runtime_handle_offline_region_delete_start(
 );
 
 /**
- * mln_vala_runtime_handle_offline_region_get_status_take_result:
- * @self: a runtime handle.
- * @operation_id: completed get-status operation ID.
- * @out_status: (out): return location for the copied status snapshot.
- * @error: return location for a `GError`, or `NULL`.
- *
- * Returns: `TRUE` on success; `FALSE` with @error set on failure.
- * Throws: MlnValaError
- */
-/**
  * mln_vala_runtime_handle_offline_region_create_take_result:
  * @self: a runtime handle.
  * @operation_id: completed create operation ID.
@@ -1781,6 +1771,16 @@ mln_vala_runtime_handle_offline_region_update_metadata_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id, GError** error
 );
 
+/**
+ * mln_vala_runtime_handle_offline_region_get_status_take_result:
+ * @self: a runtime handle.
+ * @operation_id: completed get-status operation ID.
+ * @out_status: (out): return location for the copied status snapshot.
+ * @error: return location for a `GError`, or `NULL`.
+ *
+ * Returns: `TRUE` on success; `FALSE` with @error set on failure.
+ * Throws: MlnValaError
+ */
 gboolean mln_vala_runtime_handle_offline_region_get_status_take_result(
   MlnValaRuntimeHandle* self, uint64_t operation_id,
   MlnValaOfflineRegionStatus* out_status, GError** error

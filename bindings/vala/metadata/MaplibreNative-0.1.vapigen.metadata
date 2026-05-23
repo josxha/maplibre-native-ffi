@@ -1,4 +1,7 @@
 MaplibreNative name="MaplibreNative" cheader_filename="maplibre-native-vala.h"
+RenderedFeatureQueryOptionFields.rendered_feature_query_option_fields_layer_ids name="LAYER_IDS"
+RuntimeOptionFlags.runtime_option_flags_maximum_cache_size name="MAXIMUM_CACHE_SIZE"
+SourceFeatureQueryOptionFields.source_feature_query_option_fields_source_layer_ids name="SOURCE_LAYER_IDS"
 MapHandle.copy_style_image_premultiplied_rgba8.out_pixels out="0"
 MapHandle.copy_style_source_attribution.out_attribution out="0"
 MapHandle.get_image_source_coordinates.out_coordinates out="0"
