@@ -208,6 +208,16 @@ impl RuntimeHandle {
     }
 }
 
+fn start_offline_operation<F>(runtime: &RuntimeHandle, start: F) -> PyResult<u64>
+where
+    F: FnOnce(*mut sys::mln_runtime, *mut u64) -> i32,
+{
+    let state = runtime.state();
+    let mut operation_id = 0;
+    maplibre_core::check(start(state.as_ptr(), &mut operation_id)).map_err(map_error)?;
+    Ok(operation_id)
+}
+
 impl PyLogCallbackState {
     fn new(max_queued_records: usize, consume: bool) -> Arc<Self> {
         Arc::new(Self {
@@ -493,6 +503,96 @@ impl RuntimeHandle {
         })
         .map_err(map_error)?;
         Ok(operation_id)
+    }
+
+    fn offline_region_create_start(
+        &self,
+        definition: &Bound<'_, PyAny>,
+        metadata: Vec<u8>,
+    ) -> PyResult<u64> {
+        let state = self.state();
+        let definition = offline_region_definition_from_wire(definition)?;
+        let definition = maplibre_core::runtime::offline_region_definition_to_native(&definition)
+            .map_err(map_error)?;
+        let raw = definition.to_raw();
+        let mut operation_id = 0;
+        // SAFETY: The C API validates the runtime, definition, metadata pointer/length, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_offline_region_create_start(
+                state.as_ptr(),
+                &raw,
+                maplibre_core::runtime::metadata_ptr(&metadata),
+                metadata.len(),
+                &mut operation_id,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(operation_id)
+    }
+
+    fn offline_region_get_start(&self, region_id: i64) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_get_start(runtime, region_id, out)
+        })
+    }
+
+    fn offline_regions_list_start(&self) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_regions_list_start(runtime, out)
+        })
+    }
+
+    fn offline_regions_merge_database_start(&self, side_database_path: String) -> PyResult<u64> {
+        let path = maplibre_core::string::c_string(&side_database_path).map_err(map_error)?;
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_regions_merge_database_start(runtime, path.as_ptr(), out)
+        })
+    }
+
+    fn offline_region_update_metadata_start(
+        &self,
+        region_id: i64,
+        metadata: Vec<u8>,
+    ) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_update_metadata_start(
+                runtime,
+                region_id,
+                maplibre_core::runtime::metadata_ptr(&metadata),
+                metadata.len(),
+                out,
+            )
+        })
+    }
+
+    fn offline_region_get_status_start(&self, region_id: i64) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_get_status_start(runtime, region_id, out)
+        })
+    }
+
+    fn offline_region_set_observed_start(&self, region_id: i64, observed: bool) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_set_observed_start(runtime, region_id, observed, out)
+        })
+    }
+
+    fn offline_region_set_download_state_start(&self, region_id: i64, state: u32) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_set_download_state_start(runtime, region_id, state, out)
+        })
+    }
+
+    fn offline_region_invalidate_start(&self, region_id: i64) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_invalidate_start(runtime, region_id, out)
+        })
+    }
+
+    fn offline_region_delete_start(&self, region_id: i64) -> PyResult<u64> {
+        start_offline_operation(self, |runtime, out| unsafe {
+            sys::mln_runtime_offline_region_delete_start(runtime, region_id, out)
+        })
     }
 
     fn offline_operation_discard(&self, operation_id: u64) -> PyResult<()> {
@@ -4289,6 +4389,47 @@ fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> Py
     dict.set_item("x", event.tile_id.x)?;
     dict.set_item("y", event.tile_id.y)?;
     Ok(dict.into_any().unbind())
+}
+
+fn offline_region_definition_from_wire(
+    raw: &Bound<'_, PyAny>,
+) -> PyResult<maplibre_core::OfflineRegionDefinition> {
+    let dict = raw.cast::<PyDict>()?;
+    let kind: String = required_dict_item(dict, "type")?.extract()?;
+    let style_url: String = required_dict_item(dict, "style_url")?.extract()?;
+    let min_zoom: f64 = required_dict_item(dict, "min_zoom")?.extract()?;
+    let max_zoom: f64 = required_dict_item(dict, "max_zoom")?.extract()?;
+    let pixel_ratio: f32 = required_dict_item(dict, "pixel_ratio")?.extract()?;
+    let include_ideographs: bool = required_dict_item(dict, "include_ideographs")?.extract()?;
+    match kind.as_str() {
+        "tile_pyramid" => Ok(maplibre_core::OfflineRegionDefinition::TilePyramid {
+            style_url,
+            bounds: lat_lng_bounds_core_from_wire(&required_dict_item(dict, "bounds")?)?,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        }),
+        "geometry" => Ok(maplibre_core::OfflineRegionDefinition::GeometryRegion {
+            style_url,
+            geometry: geometry_from_wire(&required_dict_item(dict, "geometry")?)?,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        }),
+        _ => Err(invalid_argument_error(format!(
+            "unsupported offline region definition wire type: {kind}"
+        ))),
+    }
+}
+
+fn lat_lng_bounds_core_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::LatLngBounds> {
+    let (southwest, northeast): ((f64, f64), (f64, f64)) = raw.extract()?;
+    Ok(maplibre_core::LatLngBounds::new(
+        maplibre_core::LatLng::new(southwest.0, southwest.1),
+        maplibre_core::LatLng::new(northeast.0, northeast.1),
+    ))
 }
 
 fn rendered_query_geometry_from_wire(

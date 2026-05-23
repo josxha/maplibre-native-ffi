@@ -174,6 +174,107 @@ class RuntimeHandle:
         )
         return OfflineOperationHandle(self, operation_id)
 
+    def create_offline_region(
+        self, definition: object, metadata: bytes = b""
+    ) -> object:
+        """Start creating an offline region."""
+        from .offline import OfflineOperationHandle, _definition_to_native_wire
+
+        operation_id = self._native.offline_region_create_start(
+            _definition_to_native_wire(definition),
+            metadata,
+        )
+        return OfflineOperationHandle(self, operation_id)
+
+    def get_offline_region(self, region_id: int) -> object:
+        """Start getting an offline region snapshot by ID."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_get_start(region_id),
+        )
+
+    def list_offline_regions(self) -> object:
+        """Start listing offline region snapshots."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(self, self._native.offline_regions_list_start())
+
+    def merge_offline_regions_database(self, side_database_path: str) -> object:
+        """Start merging offline regions from another database path."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_regions_merge_database_start(side_database_path),
+        )
+
+    def update_offline_region_metadata(
+        self,
+        region_id: int,
+        metadata: bytes,
+    ) -> object:
+        """Start updating opaque binary metadata for an offline region."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_update_metadata_start(region_id, metadata),
+        )
+
+    def get_offline_region_status(self, region_id: int) -> object:
+        """Start getting completed/download status for an offline region."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_get_status_start(region_id),
+        )
+
+    def set_offline_region_observed(self, region_id: int, observed: bool) -> object:
+        """Start enabling or disabling runtime events for an offline region."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_set_observed_start(region_id, observed),
+        )
+
+    def set_offline_region_download_state(
+        self,
+        region_id: int,
+        state: object,
+    ) -> object:
+        """Start setting an offline region's native download state."""
+        from .offline import OfflineOperationHandle, OfflineRegionDownloadState
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_set_download_state_start(
+                region_id,
+                OfflineRegionDownloadState(state).native_code,
+            ),
+        )
+
+    def invalidate_offline_region(self, region_id: int) -> object:
+        """Start invalidating cached resources for an offline region."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_invalidate_start(region_id),
+        )
+
+    def delete_offline_region(self, region_id: int) -> object:
+        """Start deleting an offline region."""
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(
+            self,
+            self._native.offline_region_delete_start(region_id),
+        )
+
     def set_resource_transform(
         self,
         callback: object,

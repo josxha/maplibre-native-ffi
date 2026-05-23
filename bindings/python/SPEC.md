@@ -143,9 +143,10 @@ The current implementation includes these completed slices:
   rendered/source/extension query and feature-state APIs.
 - `maplibre_native.offline` provides offline operation, region definition,
   region status, and runtime event payload value shapes.
-- `RuntimeHandle.run_ambient_cache_operation()` starts native ambient cache
-  maintenance and returns an `OfflineOperationHandle` that discards
-  runtime-owned operation state on close.
+- `RuntimeHandle` starts native ambient cache and offline region
+  create/get/list, merge, metadata, status, observation, download-state,
+  invalidation, and delete operations, returning `OfflineOperationHandle` values
+  that discard runtime-owned operation state on close.
 - `maplibre_native.map` provides `MapProjectionHandle` and standalone Mercator
   projection helpers for copied camera, coordinate, geometry fitting, and
   screen-point values.

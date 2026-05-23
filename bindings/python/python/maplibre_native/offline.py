@@ -7,7 +7,7 @@ from enum import IntEnum
 from types import TracebackType
 from typing import TYPE_CHECKING
 
-from .geo import GeoJson, LatLngBounds
+from .geo import Geometry, LatLngBounds
 
 if TYPE_CHECKING:
     from .runtime import RuntimeHandle
@@ -183,7 +183,7 @@ class OfflineGeometryRegionDefinition:
     """Geometry offline region definition."""
 
     style_url: str
-    geometry: GeoJson
+    geometry: Geometry
     min_zoom: float
     max_zoom: float
     pixel_ratio: float
@@ -235,6 +235,45 @@ class OfflineOperationCompleted:
             result_status=_payload_int(payload, "result_status"),
             found=_payload_bool(payload, "found"),
         )
+
+
+def _definition_to_native_wire(
+    definition: OfflineRegionDefinition,
+) -> dict[str, object]:
+    """Convert an offline region definition to private native-bridge values."""
+    if isinstance(definition, OfflineTilePyramidRegionDefinition):
+        return {
+            "type": "tile_pyramid",
+            "style_url": definition.style_url,
+            "bounds": (
+                (
+                    definition.bounds.southwest.latitude,
+                    definition.bounds.southwest.longitude,
+                ),
+                (
+                    definition.bounds.northeast.latitude,
+                    definition.bounds.northeast.longitude,
+                ),
+            ),
+            "min_zoom": definition.min_zoom,
+            "max_zoom": definition.max_zoom,
+            "pixel_ratio": definition.pixel_ratio,
+            "include_ideographs": definition.include_ideographs,
+        }
+    if isinstance(definition, OfflineGeometryRegionDefinition):
+        from .geo import _geometry_to_native_wire
+
+        return {
+            "type": "geometry",
+            "style_url": definition.style_url,
+            "geometry": _geometry_to_native_wire(definition.geometry),
+            "min_zoom": definition.min_zoom,
+            "max_zoom": definition.max_zoom,
+            "pixel_ratio": definition.pixel_ratio,
+            "include_ideographs": definition.include_ideographs,
+        }
+    msg = f"unsupported offline region definition: {type(definition).__name__}"
+    raise TypeError(msg)
 
 
 def _payload_int(payload: dict[str, object], key: str) -> int:

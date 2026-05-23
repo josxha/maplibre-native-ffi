@@ -1010,6 +1010,42 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
             assert projection.closed
 
 
+def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -> None:
+    definition = offline.OfflineTilePyramidRegionDefinition(
+        style_url="https://example.test/style.json",
+        bounds=geo.LatLngBounds(
+            southwest=geo.LatLng(-1.0, -1.0),
+            northeast=geo.LatLng(1.0, 1.0),
+        ),
+        min_zoom=0.0,
+        max_zoom=1.0,
+        pixel_ratio=1.0,
+    )
+    with mln.RuntimeHandle(
+        mln.RuntimeOptions(cache_path=str(tmp_path / "cache.db"))
+    ) as runtime:
+        operations = [
+            runtime.create_offline_region(definition, b"metadata"),
+            runtime.list_offline_regions(),
+            runtime.get_offline_region(1),
+            runtime.update_offline_region_metadata(1, b"updated"),
+            runtime.get_offline_region_status(1),
+            runtime.set_offline_region_observed(1, False),
+            runtime.set_offline_region_download_state(
+                1,
+                offline.OfflineRegionDownloadState.INACTIVE,
+            ),
+            runtime.invalidate_offline_region(1),
+            runtime.delete_offline_region(1),
+        ]
+
+        for operation in operations:
+            assert isinstance(operation, offline.OfflineOperationHandle)
+            assert operation.operation_id > 0
+            operation.close()
+            assert operation.closed
+
+
 def test_ambient_cache_operation_starts_and_discards_through_public_api(
     tmp_path: Path,
 ) -> None:
