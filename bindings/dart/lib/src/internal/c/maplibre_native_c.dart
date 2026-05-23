@@ -87,4 +87,62 @@ final class MaplibreNativeCApi {
   /// Sets the map style JSON.
   int mapSetStyleJson(Pointer<raw.mln_map> map, Pointer<Char> json) =>
       _raw.mln_map_set_style_json(map, json).value;
+
+  /// Counts IDs in a style ID list.
+  int styleIdListCount(
+    Pointer<raw.mln_style_id_list> list,
+    Pointer<Size> outCount,
+  ) => _raw.mln_style_id_list_count(list, outCount).value;
+
+  /// Borrows one ID from a style ID list.
+  int styleIdListGet(
+    Pointer<raw.mln_style_id_list> list,
+    int index,
+    Pointer<raw.mln_string_view> outId,
+  ) => _raw.mln_style_id_list_get(list, index, outId).value;
+
+  /// Destroys a style ID list handle.
+  void styleIdListDestroy(Pointer<raw.mln_style_id_list> list) {
+    _raw.mln_style_id_list_destroy(list);
+  }
+
+  /// Reports whether a style source exists.
+  int mapStyleSourceExists(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<Bool> outExists,
+  ) => _raw.mln_map_style_source_exists(map, sourceId, outExists).value;
+
+  /// Removes one style source by ID.
+  int mapRemoveStyleSource(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view sourceId,
+    Pointer<Bool> outRemoved,
+  ) => _raw.mln_map_remove_style_source(map, sourceId, outRemoved).value;
+
+  /// Lists style source IDs.
+  int mapListStyleSourceIds(
+    Pointer<raw.mln_map> map,
+    Pointer<Pointer<raw.mln_style_id_list>> outSourceIds,
+  ) => _raw.mln_map_list_style_source_ids(map, outSourceIds).value;
+
+  /// Reports whether a style layer exists.
+  int mapStyleLayerExists(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    Pointer<Bool> outExists,
+  ) => _raw.mln_map_style_layer_exists(map, layerId, outExists).value;
+
+  /// Removes one style layer by ID.
+  int mapRemoveStyleLayer(
+    Pointer<raw.mln_map> map,
+    raw.mln_string_view layerId,
+    Pointer<Bool> outRemoved,
+  ) => _raw.mln_map_remove_style_layer(map, layerId, outRemoved).value;
+
+  /// Lists style layer IDs.
+  int mapListStyleLayerIds(
+    Pointer<raw.mln_map> map,
+    Pointer<Pointer<raw.mln_style_id_list>> outLayerIds,
+  ) => _raw.mln_map_list_style_layer_ids(map, outLayerIds).value;
 }

@@ -209,11 +209,92 @@ final class MapHandle {
     });
   }
 
+  /// Reports whether a style source ID exists.
+  bool styleSourceExists(String sourceId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final outExists = arena<Bool>();
+      _check(_c.mapStyleSourceExists(_pointer, nativeId.value, outExists));
+      return outExists.value;
+    });
+  }
+
+  /// Removes one style source by ID and returns whether one was removed.
+  bool removeStyleSource(String sourceId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final outRemoved = arena<Bool>();
+      _check(_c.mapRemoveStyleSource(_pointer, nativeId.value, outRemoved));
+      return outRemoved.value;
+    });
+  }
+
+  /// Copies style source IDs in style order.
+  List<String> listStyleSourceIds() {
+    return withNativeArena((arena) {
+      final outList = arena<Pointer<raw.mln_style_id_list>>();
+      outList.value = nullptr;
+      _check(_c.mapListStyleSourceIds(_pointer, outList));
+      return _copyStyleIdList(outList.value);
+    });
+  }
+
+  /// Reports whether a style layer ID exists.
+  bool styleLayerExists(String layerId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      final outExists = arena<Bool>();
+      _check(_c.mapStyleLayerExists(_pointer, nativeId.value, outExists));
+      return outExists.value;
+    });
+  }
+
+  /// Removes one style layer by ID and returns whether one was removed.
+  bool removeStyleLayer(String layerId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      final outRemoved = arena<Bool>();
+      _check(_c.mapRemoveStyleLayer(_pointer, nativeId.value, outRemoved));
+      return outRemoved.value;
+    });
+  }
+
+  /// Copies style layer IDs in style order.
+  List<String> listStyleLayerIds() {
+    return withNativeArena((arena) {
+      final outList = arena<Pointer<raw.mln_style_id_list>>();
+      outList.value = nullptr;
+      _check(_c.mapListStyleLayerIds(_pointer, outList));
+      return _copyStyleIdList(outList.value);
+    });
+  }
+
   /// Explicitly destroys this map.
   void close() {
     _state.close(_c.mapDestroy, _c.threadLastErrorMessage);
   }
 }
+
+List<String> _copyStyleIdList(Pointer<raw.mln_style_id_list> list) {
+  try {
+    return withNativeArena((arena) {
+      final outCount = arena<Size>();
+      _check(_c.styleIdListCount(list, outCount));
+      final ids = <String>[];
+      for (var index = 0; index < outCount.value; index += 1) {
+        final outId = arena<raw.mln_string_view>();
+        _check(_c.styleIdListGet(list, index, outId));
+        ids.add(_copyStringView(outId.ref) ?? '');
+      }
+      return ids;
+    });
+  } finally {
+    _c.styleIdListDestroy(list);
+  }
+}
+
+String? _copyStringView(raw.mln_string_view view) =>
+    _copyNativeString(view.data, view.size);
 
 String? _copyNativeString(Pointer<Char> pointer, int byteLength) {
   if (pointer == nullptr || byteLength == 0) {

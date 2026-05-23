@@ -40,6 +40,16 @@ void main() {
       map.setStyleJson(_emptyStyleJson);
       runtime.runOnce();
       runtime.drainEvents();
+      final sourceIds = map.listStyleSourceIds();
+      expect(sourceIds, contains('org.maplibre.annotations'));
+      expect(
+        map.listStyleLayerIds(),
+        contains('org.maplibre.annotations.points'),
+      );
+      expect(map.styleSourceExists('missing-source'), isFalse);
+      expect(map.styleLayerExists('missing-layer'), isFalse);
+      expect(map.removeStyleSource('missing-source'), isFalse);
+      expect(map.removeStyleLayer('missing-layer'), isFalse);
 
       map.close();
       expect(map.isClosed, isTrue);
