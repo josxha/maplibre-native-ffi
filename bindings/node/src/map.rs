@@ -2247,7 +2247,7 @@ fn style_source_type_name(raw_type: u32) -> &'static str {
     }
 }
 
-fn parse_json_value(value: String) -> Result<core::JsonValue> {
+pub(crate) fn parse_json_value(value: String) -> Result<core::JsonValue> {
     let value: serde_json::Value = serde_json::from_str(&value).map_err(|parse_error| {
         error::invalid_argument(format!("JSON input is invalid: {parse_error}"))
     })?;
@@ -2448,7 +2448,7 @@ fn polygons_from_serde(value: &serde_json::Value) -> Result<Vec<Vec<Vec<core::La
         .collect()
 }
 
-fn json_value_to_string(value: core::JsonValue) -> Result<String> {
+pub(crate) fn json_value_to_string(value: core::JsonValue) -> Result<String> {
     serde_json::to_string(&json_value_to_serde(value)).map_err(|serialize_error| {
         error::invalid_argument(format!(
             "JSON value could not be serialized: {serialize_error}"

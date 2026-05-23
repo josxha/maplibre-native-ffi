@@ -486,6 +486,13 @@ export interface TextureReadback {
   pixels: Uint8Array;
 }
 
+export interface FeatureStateSelector {
+  sourceId: string;
+  sourceLayerId?: string | null;
+  featureId?: string | null;
+  stateKey?: string | null;
+}
+
 export declare class RenderSessionHandle {
   private constructor(nativeHandle: unknown);
   static attachMetalOwnedTexture(
@@ -520,6 +527,9 @@ export declare class RenderSessionHandle {
   reduceMemoryUse(): void;
   clearData(): void;
   dumpDebugLogs(): void;
+  setFeatureState(selector: FeatureStateSelector, state: JsonValue): void;
+  getFeatureState(selector: FeatureStateSelector): JsonValue;
+  removeFeatureState(selector: FeatureStateSelector): void;
   readPremultipliedRgba8(): TextureReadback;
   [Symbol.dispose](): void;
 }

@@ -309,6 +309,10 @@ test("render session attach descriptors translate native failures", () => {
       typeof RenderSessionHandle.attachVulkanOwnedTexture,
       "function",
     );
+    assert.equal(
+      typeof RenderSessionHandle.prototype.setFeatureState,
+      "function",
+    );
   } finally {
     map.close();
     runtime.close();

@@ -660,6 +660,24 @@ class RenderSessionHandle {
     return translateNativeErrors(() => this.native.dumpDebugLogs());
   }
 
+  setFeatureState(selector, state) {
+    return translateNativeErrors(() =>
+      this.native.setFeatureState(selector, stringifyJson(state)),
+    );
+  }
+
+  getFeatureState(selector) {
+    return translateNativeErrors(() =>
+      JSON.parse(this.native.getFeatureState(selector)),
+    );
+  }
+
+  removeFeatureState(selector) {
+    return translateNativeErrors(() =>
+      this.native.removeFeatureState(selector),
+    );
+  }
+
   readPremultipliedRgba8() {
     return translateNativeErrors(() => this.native.readPremultipliedRgba8());
   }

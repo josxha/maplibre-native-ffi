@@ -5,7 +5,10 @@ use maplibre_native_sys as sys;
 use napi::bindgen_prelude::{BigInt, Result, Uint8Array};
 use napi_derive::napi;
 
-use crate::{error, map::NativeMapHandle};
+use crate::{
+    error,
+    map::{NativeMapHandle, json_value_to_string, parse_json_value},
+};
 
 #[napi(object)]
 pub struct RenderTargetExtent {
@@ -83,6 +86,14 @@ pub struct TextureImageInfo {
 pub struct TextureReadback {
     pub info: TextureImageInfo,
     pub pixels: Uint8Array,
+}
+
+#[napi(object)]
+pub struct FeatureStateSelectorInput {
+    pub source_id: String,
+    pub source_layer_id: Option<String>,
+    pub feature_id: Option<String>,
+    pub state_key: Option<String>,
 }
 
 #[napi(js_name = "NativeRenderSessionHandle")]
@@ -226,6 +237,61 @@ impl NativeRenderSessionHandle {
             .map_err(error::from_core)
     }
 
+    #[napi(js_name = "setFeatureState")]
+    pub fn set_feature_state(
+        &self,
+        selector: FeatureStateSelectorInput,
+        state: String,
+    ) -> Result<()> {
+        let selector = selector.into_core()?;
+        let native_selector = core::query::feature_state_selector_to_native(&selector);
+        let state = parse_json_value(state)?;
+        let native_state =
+            core::json::json_value_try_to_native(&state).map_err(error::from_core)?;
+        core::check(unsafe {
+            sys::mln_render_session_set_feature_state(
+                self.state.as_ptr(),
+                native_selector.as_ptr(),
+                native_state.as_ref(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getFeatureState")]
+    pub fn get_feature_state(&self, selector: FeatureStateSelectorInput) -> Result<String> {
+        let selector = selector.into_core()?;
+        let native_selector = core::query::feature_state_selector_to_native(&selector);
+        let mut snapshot = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_render_session_get_feature_state(
+                self.state.as_ptr(),
+                native_selector.as_ptr(),
+                &mut snapshot,
+            )
+        })
+        .map_err(error::from_core)?;
+        let snapshot = std::ptr::NonNull::new(snapshot)
+            .ok_or_else(|| error::invalid_argument("feature state snapshot result was null"))?;
+        let value = unsafe { core::json::copy_json_snapshot(Some(snapshot)) }
+            .map_err(error::from_core)?
+            .unwrap_or(core::JsonValue::Null);
+        json_value_to_string(value)
+    }
+
+    #[napi(js_name = "removeFeatureState")]
+    pub fn remove_feature_state(&self, selector: FeatureStateSelectorInput) -> Result<()> {
+        let selector = selector.into_core()?;
+        let native_selector = core::query::feature_state_selector_to_native(&selector);
+        core::check(unsafe {
+            sys::mln_render_session_remove_feature_state(
+                self.state.as_ptr(),
+                native_selector.as_ptr(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
     #[napi(js_name = "readPremultipliedRgba8")]
     pub fn read_premultiplied_rgba8(&self) -> Result<TextureReadback> {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
@@ -254,6 +320,24 @@ impl NativeRenderSessionHandle {
             info: TextureImageInfo::from_native(info),
             pixels: Uint8Array::from(pixels),
         })
+    }
+}
+
+impl FeatureStateSelectorInput {
+    fn into_core(self) -> Result<core::query::FeatureStateSelector> {
+        let mut selector = core::query::FeatureStateSelector::new(self.source_id);
+        if let Some(source_layer_id) = self.source_layer_id {
+            selector = selector.with_source_layer_id(source_layer_id);
+        }
+        if let Some(feature_id) = self.feature_id {
+            selector = selector.with_feature_id(feature_id);
+        }
+        if let Some(state_key) = self.state_key {
+            selector = selector
+                .with_state_key(state_key)
+                .map_err(error::from_core)?;
+        }
+        Ok(selector)
     }
 }
 
