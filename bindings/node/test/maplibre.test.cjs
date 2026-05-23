@@ -339,6 +339,27 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       "geojson",
     );
     assert.equal(map.getStyleSourceInfo("missing-source"), null);
+
+    const imageCoordinates = [
+      { latitude: 1, longitude: 2 },
+      { latitude: 1, longitude: 3 },
+      { latitude: 0, longitude: 3 },
+      { latitude: 0, longitude: 2 },
+    ];
+    map.addImageSourceUrl(
+      "image-source",
+      imageCoordinates,
+      "https://example.test/image.png",
+    );
+    assert.equal(map.getStyleSourceType("image-source"), "image");
+    map.setImageSourceUrl("image-source", "https://example.test/updated.png");
+    map.setImageSourceCoordinates("image-source", imageCoordinates);
+    assert.deepEqual(
+      map.getImageSourceCoordinates("image-source"),
+      imageCoordinates,
+    );
+    assert.equal(map.getImageSourceCoordinates("missing-source"), null);
+    assert.equal(map.removeStyleSource("image-source"), true);
     assert.equal(map.removeStyleSource("empty-geojson"), true);
 
     map.addStyleLayerJson({

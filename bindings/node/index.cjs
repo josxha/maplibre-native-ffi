@@ -465,6 +465,30 @@ class MapHandle {
     );
   }
 
+  addImageSourceUrl(sourceId, coordinates, url) {
+    return translateNativeErrors(() =>
+      this.native.addImageSourceUrl(sourceId, coordinates, url),
+    );
+  }
+
+  setImageSourceUrl(sourceId, url) {
+    return translateNativeErrors(() =>
+      this.native.setImageSourceUrl(sourceId, url),
+    );
+  }
+
+  setImageSourceCoordinates(sourceId, coordinates) {
+    return translateNativeErrors(() =>
+      this.native.setImageSourceCoordinates(sourceId, coordinates),
+    );
+  }
+
+  getImageSourceCoordinates(sourceId) {
+    return translateNativeErrors(() =>
+      this.native.getImageSourceCoordinates(sourceId),
+    );
+  }
+
   addStyleLayerJson(layer, beforeLayerId = null) {
     return translateNativeErrors(() =>
       this.native.addStyleLayerJson(stringifyJson(layer), beforeLayerId),

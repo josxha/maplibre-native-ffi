@@ -325,6 +325,89 @@ impl NativeMapHandle {
         }))
     }
 
+    #[napi(js_name = "addImageSourceUrl")]
+    pub fn add_image_source_url(
+        &self,
+        source_id: String,
+        coordinates: Vec<LatLng>,
+        url: String,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let coordinates = lat_lngs_to_native(coordinates);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_add_image_source_url(
+                self.state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+                url.raw(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setImageSourceUrl")]
+    pub fn set_image_source_url(&self, source_id: String, url: String) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let url = core::string::string_view(&url);
+        core::check(unsafe {
+            sys::mln_map_set_image_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "setImageSourceCoordinates")]
+    pub fn set_image_source_coordinates(
+        &self,
+        source_id: String,
+        coordinates: Vec<LatLng>,
+    ) -> Result<()> {
+        let source_id = core::string::string_view(&source_id);
+        let coordinates = lat_lngs_to_native(coordinates);
+        core::check(unsafe {
+            sys::mln_map_set_image_source_coordinates(
+                self.state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_ptr(),
+                coordinates.len(),
+            )
+        })
+        .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getImageSourceCoordinates")]
+    pub fn get_image_source_coordinates(&self, source_id: String) -> Result<Option<Vec<LatLng>>> {
+        let source_id = core::string::string_view(&source_id);
+        let mut coordinates = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            };
+            4
+        ];
+        let mut coordinate_count = 0;
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_map_get_image_source_coordinates(
+                self.state.as_ptr(),
+                source_id.raw(),
+                coordinates.as_mut_ptr(),
+                coordinates.len(),
+                &mut coordinate_count,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if !found {
+            return Ok(None);
+        }
+        coordinates.truncate(coordinate_count);
+        Ok(Some(
+            coordinates.into_iter().map(LatLng::from_native).collect(),
+        ))
+    }
+
     #[napi(js_name = "addStyleLayerJson")]
     pub fn add_style_layer_json(
         &self,
@@ -664,6 +747,10 @@ pub fn native_map_debug_option_mask_bit(option: String) -> Result<u32> {
             "debug option must be a known MapDebugOption, got '{other}'"
         ))),
     }
+}
+
+fn lat_lngs_to_native(coordinates: Vec<LatLng>) -> Vec<sys::mln_lat_lng> {
+    coordinates.into_iter().map(LatLng::into_native).collect()
 }
 
 fn json_snapshot_to_string(snapshot: *mut sys::mln_json_snapshot) -> Result<Option<String>> {

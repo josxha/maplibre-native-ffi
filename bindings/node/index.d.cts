@@ -182,6 +182,10 @@ export declare class MapHandle {
   listStyleSourceIds(): string[];
   getStyleSourceType(sourceId: string): StyleSourceType | null;
   getStyleSourceInfo(sourceId: string): StyleSourceInfo | null;
+  addImageSourceUrl(sourceId: string, coordinates: LatLng[], url: string): void;
+  setImageSourceUrl(sourceId: string, url: string): void;
+  setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;
+  getImageSourceCoordinates(sourceId: string): LatLng[] | null;
   addStyleLayerJson(layer: JsonValue, beforeLayerId?: string | null): void;
   styleLayerExists(layerId: string): boolean;
   removeStyleLayer(layerId: string): boolean;
