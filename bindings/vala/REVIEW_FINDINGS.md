@@ -310,6 +310,17 @@ Review artifacts:
 - Confirmed local `mise run //bindings/vala:ci`, `mise run fix`, and
   `mise run test` pass on macOS arm64 Metal after regeneration.
 
+### Remaining validation notes
+
+- Linux Vala CI remains configured through `.github/config/variants.toml` for
+  `//bindings/vala:ci`. GitHub Actions run `26328621145` for commit `43e216d`
+  failed during shared dependency setup before matrix generation because mise
+  could not verify `github:nicklockwood/SwiftFormat@0.61.1`: the GitHub release
+  API returned `401 Unauthorized`. No Vala binding job ran in that attempt.
+- Earlier same-branch CI evidence includes successful Linux arm64 Vala binding
+  validation in run `26327825296`. Local validation covers the field-mask setter
+  patch on macOS arm64 Metal.
+
 ### Rejected or deferred findings
 
 - None.
