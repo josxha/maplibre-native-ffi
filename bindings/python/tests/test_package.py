@@ -352,6 +352,56 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
             assert map_handle.remove_style_source("overlay-inline") is True
 
 
+def test_style_json_light_layer_property_and_filter_public_api() -> None:
+    background = json.from_python({"id": "json-background", "type": "background"})
+    circle = json.from_python(
+        {"id": "json-circle", "type": "circle", "source": "points"}
+    )
+    filter_value = json.json_array(
+        (
+            "==",
+            json.json_array(("get", "kind")),
+            "park",
+        )
+    )
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+            map_handle.add_geojson_source_url(
+                "points",
+                "https://example.test/points.geojson",
+            )
+            map_handle.add_style_layer_json(background)
+            map_handle.add_style_layer_json(circle)
+            map_handle.set_layer_property(
+                "json-background",
+                "background-color",
+                "#ff0000",
+            )
+            map_handle.set_layer_filter("json-circle", filter_value)
+            map_handle.set_style_light_json(json.from_python({"anchor": "viewport"}))
+            map_handle.set_style_light_property("intensity", json.json_double(0.5))
+
+            layer_json = map_handle.get_style_layer_json("json-background")
+            assert layer_json is not None
+            assert ("id", "json-background") in json.to_python(layer_json)
+            assert map_handle.get_style_layer_json("missing") is None
+            background_color = map_handle.get_layer_property(
+                "json-background",
+                "background-color",
+            )
+            assert isinstance(background_color, json.JsonArray)
+            assert background_color.values[0] == "rgba"
+            assert map_handle.get_layer_filter("json-circle") == filter_value
+            assert map_handle.get_style_light_property("anchor") == "viewport"
+            assert map_handle.get_style_light_property("intensity") == json.json_double(
+                0.5
+            )
+
+            map_handle.set_layer_filter("json-circle", None)
+            assert map_handle.get_layer_filter("json-circle") is None
+
+
 def test_style_image_metadata_copy_and_removal_public_api() -> None:
     image = render.PremultipliedRgba8Image(
         info=render.TextureImageInfo(width=1, height=1, stride=4, byte_length=4),

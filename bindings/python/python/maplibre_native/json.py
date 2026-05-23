@@ -135,6 +135,58 @@ def to_python(value: JsonValue) -> Any:
     return value
 
 
+def _to_native_wire(value: JsonValue) -> Any:
+    """Convert an explicit JSON tree to private native-bridge wire values."""
+    if value is None or isinstance(value, bool | str):
+        return value
+    if isinstance(value, JsonUInt):
+        return {"type": "uint", "value": value.value}
+    if isinstance(value, JsonInt):
+        return {"type": "int", "value": value.value}
+    if isinstance(value, JsonDouble):
+        return {"type": "double", "value": value.value}
+    if isinstance(value, JsonArray):
+        return {
+            "type": "array",
+            "values": [_to_native_wire(item) for item in value.values],
+        }
+    if isinstance(value, JsonObject):
+        return {
+            "type": "object",
+            "members": [
+                (member.key, _to_native_wire(member.value)) for member in value.members
+            ],
+        }
+    msg = f"unsupported JSON value: {type(value).__name__}"
+    raise TypeError(msg)
+
+
+def _from_native_wire(raw: Any) -> JsonValue:
+    """Convert private native-bridge wire values to an explicit JSON tree."""
+    if raw is None or isinstance(raw, bool | str):
+        return raw
+    kind = raw["type"]
+    if kind == "bool":
+        return raw["value"]
+    if kind == "uint":
+        return JsonUInt(raw["value"])
+    if kind == "int":
+        return JsonInt(raw["value"])
+    if kind == "double":
+        return JsonDouble(raw["value"])
+    if kind == "array":
+        return JsonArray(tuple(_from_native_wire(item) for item in raw["values"]))
+    if kind == "object":
+        return JsonObject(
+            tuple(
+                JsonMember(key, _from_native_wire(value))
+                for key, value in raw["members"]
+            )
+        )
+    msg = f"unsupported native JSON wire kind: {kind}"
+    raise TypeError(msg)
+
+
 __all__ = [
     "JsonArray",
     "JsonDouble",

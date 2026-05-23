@@ -1528,6 +1528,211 @@ impl MapHandle {
         .map_err(map_error)
     }
 
+    fn add_style_layer_json(
+        &self,
+        layer_json: &Bound<'_, PyAny>,
+        before_layer_id: Option<String>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_json = json_value_from_wire(layer_json)?;
+        let layer_json =
+            maplibre_core::json::json_value_try_to_native(&layer_json).map_err(map_error)?;
+        let before_layer_id = before_layer_id.unwrap_or_default();
+        let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
+        // SAFETY: The C API validates the map pointer, JSON descriptor, and before-layer ID.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_style_layer_json(
+                state.as_ptr(),
+                layer_json.as_ptr(),
+                before_layer_id.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn get_style_layer_json(
+        &self,
+        py: Python<'_>,
+        layer_id: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer, layer ID, out pointer, and found pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_layer_json(
+                state.as_ptr(),
+                layer_id.raw(),
+                out.as_mut_ptr(),
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+        let snapshot = out.into_option();
+        // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+        let value =
+            unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
+        value
+            .map(|value| json_value_to_wire(py, &value))
+            .transpose()
+    }
+
+    fn set_style_light_json(&self, light_json: &Bound<'_, PyAny>) -> PyResult<()> {
+        let state = self.state();
+        let light_json = json_value_from_wire(light_json)?;
+        let light_json =
+            maplibre_core::json::json_value_try_to_native(&light_json).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer and JSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_light_json(state.as_ptr(), light_json.as_ptr())
+        })
+        .map_err(map_error)
+    }
+
+    fn set_style_light_property(
+        &self,
+        property_name: String,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let value = json_value_from_wire(value)?;
+        let value = maplibre_core::json::json_value_try_to_native(&value).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, property name, and JSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_light_property(
+                state.as_ptr(),
+                property_name.raw(),
+                value.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn get_style_light_property(
+        &self,
+        py: Python<'_>,
+        property_name: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: The C API validates the map pointer, property name, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_light_property(
+                state.as_ptr(),
+                property_name.raw(),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let snapshot = out.into_option();
+        // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+        let value =
+            unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
+        value
+            .map(|value| json_value_to_wire(py, &value))
+            .transpose()
+    }
+
+    fn set_layer_property(
+        &self,
+        layer_id: String,
+        property_name: String,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let value = json_value_from_wire(value)?;
+        let value = maplibre_core::json::json_value_try_to_native(&value).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, layer/property names, and JSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_property(
+                state.as_ptr(),
+                layer_id.raw(),
+                property_name.raw(),
+                value.as_ptr(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn get_layer_property(
+        &self,
+        py: Python<'_>,
+        layer_id: String,
+        property_name: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let property_name = maplibre_core::string::string_view(&property_name);
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: The C API validates the map pointer, layer/property names, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_property(
+                state.as_ptr(),
+                layer_id.raw(),
+                property_name.raw(),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)?;
+        let snapshot = out.into_option();
+        // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+        let value =
+            unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
+        value
+            .map(|value| json_value_to_wire(py, &value))
+            .transpose()
+    }
+
+    fn set_layer_filter(
+        &self,
+        layer_id: String,
+        filter: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let filter = filter.map(json_value_from_wire).transpose()?;
+        let filter = filter
+            .as_ref()
+            .map(maplibre_core::json::json_value_try_to_native)
+            .transpose()
+            .map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, layer ID, and optional JSON descriptor.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_filter(
+                state.as_ptr(),
+                layer_id.raw(),
+                optional_ref_ptr(filter.as_ref().map(|filter| filter.as_ref())),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn get_layer_filter(&self, py: Python<'_>, layer_id: String) -> PyResult<Option<Py<PyAny>>> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: The C API validates the map pointer, layer ID, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_filter(state.as_ptr(), layer_id.raw(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let snapshot = out.into_option();
+        // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+        let value =
+            unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
+        value
+            .map(|value| json_value_to_wire(py, &value))
+            .transpose()
+    }
+
     fn remove_style_layer(&self, layer_id: String) -> PyResult<bool> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
@@ -3118,6 +3323,121 @@ fn custom_geometry_event_to_py(py: Python<'_>, event: CustomGeometryEvent) -> Py
     dict.set_item("x", event.tile_id.x)?;
     dict.set_item("y", event.tile_id.y)?;
     Ok(dict.into_any().unbind())
+}
+
+fn json_value_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonValue> {
+    if raw.is_none() {
+        return Ok(maplibre_core::JsonValue::Null);
+    }
+    if let Ok(value) = raw.extract::<bool>() {
+        return Ok(maplibre_core::JsonValue::Bool(value));
+    }
+    if let Ok(value) = raw.extract::<String>() {
+        return Ok(maplibre_core::JsonValue::String(value));
+    }
+    let dict = raw
+        .cast::<PyDict>()
+        .map_err(|_| invalid_argument_error("unsupported JSON wire value"))?;
+    let kind: String = required_dict_item(dict, "type")?.extract()?;
+    match kind.as_str() {
+        "uint" => Ok(maplibre_core::JsonValue::UInt(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        "int" => Ok(maplibre_core::JsonValue::Int(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        "double" => Ok(maplibre_core::JsonValue::Double(
+            required_dict_item(dict, "value")?.extract()?,
+        )),
+        "array" => {
+            let values = required_dict_item(dict, "values")?;
+            let values = values.cast::<PyList>()?;
+            let mut copied = Vec::with_capacity(values.len());
+            for value in values.iter() {
+                copied.push(json_value_from_wire(&value)?);
+            }
+            Ok(maplibre_core::JsonValue::Array(copied))
+        }
+        "object" => {
+            let members = required_dict_item(dict, "members")?;
+            let members = members.cast::<PyList>()?;
+            let mut copied = Vec::with_capacity(members.len());
+            for member in members.iter() {
+                let key: String = member.get_item(0)?.extract()?;
+                let value = member.get_item(1)?;
+                copied.push(maplibre_core::JsonMember::new(
+                    key,
+                    json_value_from_wire(&value)?,
+                ));
+            }
+            Ok(maplibre_core::JsonValue::Object(copied))
+        }
+        _ => Err(invalid_argument_error(format!(
+            "unsupported JSON wire type: {kind}"
+        ))),
+    }
+}
+
+fn required_dict_item<'py>(dict: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
+    dict.get_item(key)?
+        .ok_or_else(|| invalid_argument_error(format!("JSON wire value missing {key}")))
+}
+
+fn json_value_to_wire(py: Python<'_>, value: &maplibre_core::JsonValue) -> PyResult<Py<PyAny>> {
+    match value {
+        maplibre_core::JsonValue::Null => Ok(py.None()),
+        maplibre_core::JsonValue::Bool(value) => {
+            let dict = PyDict::new(py);
+            dict.set_item("type", "bool")?;
+            dict.set_item("value", *value)?;
+            Ok(dict.into_any().unbind())
+        }
+        maplibre_core::JsonValue::String(value) => Ok(value.into_pyobject(py)?.into_any().unbind()),
+        maplibre_core::JsonValue::UInt(value) => {
+            let dict = PyDict::new(py);
+            dict.set_item("type", "uint")?;
+            dict.set_item("value", *value)?;
+            Ok(dict.into_any().unbind())
+        }
+        maplibre_core::JsonValue::Int(value) => {
+            let dict = PyDict::new(py);
+            dict.set_item("type", "int")?;
+            dict.set_item("value", *value)?;
+            Ok(dict.into_any().unbind())
+        }
+        maplibre_core::JsonValue::Double(value) => {
+            let dict = PyDict::new(py);
+            dict.set_item("type", "double")?;
+            dict.set_item("value", *value)?;
+            Ok(dict.into_any().unbind())
+        }
+        maplibre_core::JsonValue::Array(values) => {
+            let dict = PyDict::new(py);
+            let list = PyList::empty(py);
+            for value in values {
+                list.append(json_value_to_wire(py, value)?)?;
+            }
+            dict.set_item("type", "array")?;
+            dict.set_item("values", list)?;
+            Ok(dict.into_any().unbind())
+        }
+        maplibre_core::JsonValue::Object(members) => {
+            let dict = PyDict::new(py);
+            let list = PyList::empty(py);
+            for member in members {
+                let pair = PyList::empty(py);
+                pair.append(&member.key)?;
+                pair.append(json_value_to_wire(py, &member.value)?)?;
+                list.append(pair)?;
+            }
+            dict.set_item("type", "object")?;
+            dict.set_item("members", list)?;
+            Ok(dict.into_any().unbind())
+        }
+        _ => Err(invalid_argument_error(
+            "unsupported unknown JSON value variant",
+        )),
+    }
 }
 
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {
