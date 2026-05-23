@@ -152,6 +152,45 @@ final class MaplibreNativeCApi {
   int renderSessionDumpDebugLogs(Pointer<raw.mln_render_session> session) =>
       _raw.mln_render_session_dump_debug_logs(session).value;
 
+  /// Reads the most recently rendered texture frame into caller-owned storage.
+  int textureReadPremultipliedRgba8(
+    Pointer<raw.mln_render_session> session,
+    Pointer<Uint8> outData,
+    int outDataCapacity,
+    Pointer<raw.mln_texture_image_info> outInfo,
+  ) => _raw
+      .mln_texture_read_premultiplied_rgba8(
+        session,
+        outData,
+        outDataCapacity,
+        outInfo,
+      )
+      .value;
+
+  /// Acquires the most recently rendered Metal texture frame.
+  int metalOwnedTextureAcquireFrame(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_metal_owned_texture_frame> outFrame,
+  ) => _raw.mln_metal_owned_texture_acquire_frame(session, outFrame).value;
+
+  /// Releases a Metal texture frame.
+  int metalOwnedTextureReleaseFrame(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_metal_owned_texture_frame> frame,
+  ) => _raw.mln_metal_owned_texture_release_frame(session, frame).value;
+
+  /// Acquires the most recently rendered Vulkan texture frame.
+  int vulkanOwnedTextureAcquireFrame(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_vulkan_owned_texture_frame> outFrame,
+  ) => _raw.mln_vulkan_owned_texture_acquire_frame(session, outFrame).value;
+
+  /// Releases a Vulkan texture frame.
+  int vulkanOwnedTextureReleaseFrame(
+    Pointer<raw.mln_render_session> session,
+    Pointer<raw.mln_vulkan_owned_texture_frame> frame,
+  ) => _raw.mln_vulkan_owned_texture_release_frame(session, frame).value;
+
   /// Copies the current camera snapshot.
   int mapGetCamera(
     Pointer<raw.mln_map> map,

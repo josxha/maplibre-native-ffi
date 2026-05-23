@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -13,6 +14,7 @@ import '../internal/struct/geometry.dart' as native_geometry;
 import '../internal/struct/json.dart' as native_json;
 import '../internal/struct/struct.dart' as native_struct;
 import '../json/json.dart';
+import '../render/native_pointer.dart';
 import '../render/targets.dart';
 import '../style/style.dart';
 
@@ -834,9 +836,214 @@ final class RenderSessionHandle {
     _check(_c.renderSessionDumpDebugLogs(_pointer));
   }
 
+  /// Reads the latest rendered session-owned texture as premultiplied RGBA8.
+  TextureImage readPremultipliedRgba8() {
+    return withNativeArena((arena) {
+      final info = arena<raw.mln_texture_image_info>();
+      info.ref.size = sizeOf<raw.mln_texture_image_info>();
+      final probeStatus = _c.textureReadPremultipliedRgba8(
+        _pointer,
+        nullptr.cast<Uint8>(),
+        0,
+        info,
+      );
+      if (probeStatus != nativeStatusInvalidArgument ||
+          info.ref.byte_length == 0) {
+        _check(probeStatus);
+      }
+
+      final data = arena<Uint8>(info.ref.byte_length);
+      _check(
+        _c.textureReadPremultipliedRgba8(
+          _pointer,
+          data,
+          info.ref.byte_length,
+          info,
+        ),
+      );
+      return TextureImage(
+        info: TextureImageInfo._fromNative(info.ref),
+        bytes: Uint8List.fromList(data.asTypedList(info.ref.byte_length)),
+      );
+    });
+  }
+
+  /// Acquires the latest Metal texture frame until [MetalOwnedTextureFrame.close].
+  MetalOwnedTextureFrame acquireMetalTextureFrame() {
+    return withNativeArena((arena) {
+      final outFrame = arena<raw.mln_metal_owned_texture_frame>();
+      outFrame.ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
+      _check(_c.metalOwnedTextureAcquireFrame(_pointer, outFrame));
+      return MetalOwnedTextureFrame._(this, outFrame.ref);
+    });
+  }
+
+  /// Acquires the latest Vulkan texture frame until [VulkanOwnedTextureFrame.close].
+  VulkanOwnedTextureFrame acquireVulkanTextureFrame() {
+    return withNativeArena((arena) {
+      final outFrame = arena<raw.mln_vulkan_owned_texture_frame>();
+      outFrame.ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
+      _check(_c.vulkanOwnedTextureAcquireFrame(_pointer, outFrame));
+      return VulkanOwnedTextureFrame._(this, outFrame.ref);
+    });
+  }
+
   /// Explicitly destroys this render session.
   void close() {
     _state.close(_c.renderSessionDestroy, _c.threadLastErrorMessage);
+  }
+}
+
+/// CPU image readback metadata for a texture session frame.
+final class TextureImageInfo {
+  const TextureImageInfo._({
+    required this.width,
+    required this.height,
+    required this.stride,
+    required this.byteLength,
+  });
+
+  factory TextureImageInfo._fromNative(raw.mln_texture_image_info value) =>
+      TextureImageInfo._(
+        width: value.width,
+        height: value.height,
+        stride: value.stride,
+        byteLength: value.byte_length,
+      );
+
+  /// Physical image width in device pixels.
+  final int width;
+
+  /// Physical image height in device pixels.
+  final int height;
+
+  /// Bytes per image row.
+  final int stride;
+
+  /// Required output buffer byte length.
+  final int byteLength;
+}
+
+/// Dart-owned premultiplied RGBA8 texture readback bytes.
+final class TextureImage {
+  const TextureImage({required this.info, required this.bytes});
+
+  /// Image metadata.
+  final TextureImageInfo info;
+
+  /// Copied premultiplied RGBA8 bytes.
+  final Uint8List bytes;
+}
+
+/// Scoped Metal texture frame borrowed from a session-owned texture target.
+final class MetalOwnedTextureFrame {
+  MetalOwnedTextureFrame._(this._session, this._frame);
+
+  final RenderSessionHandle _session;
+  final raw.mln_metal_owned_texture_frame _frame;
+  var _closed = false;
+
+  /// Physical texture width in device pixels.
+  int get width => _frame.width;
+
+  /// Physical texture height in device pixels.
+  int get height => _frame.height;
+
+  /// UI-to-device pixel scale used for this frame.
+  double get scaleFactor => _frame.scale_factor;
+
+  /// Backend-native Metal pixel format value.
+  int get pixelFormat => _frame.pixel_format;
+
+  /// Unsafe borrowed `id<MTLTexture>` / `MTL::Texture*` pointer.
+  ///
+  /// The pointer is valid only until [close] releases this frame.
+  NativePointer get unsafeTexture => _borrowedPointer(_frame.texture);
+
+  /// Unsafe borrowed `id<MTLDevice>` / `MTL::Device*` pointer.
+  ///
+  /// The pointer is valid only until [close] releases this frame.
+  NativePointer get unsafeDevice => _borrowedPointer(_frame.device);
+
+  /// Releases this frame. The unsafe backend pointers become invalid.
+  void close() {
+    if (_closed) {
+      return;
+    }
+    withNativeArena((arena) {
+      final nativeFrame = arena<raw.mln_metal_owned_texture_frame>();
+      nativeFrame.ref = _frame;
+      _check(_c.metalOwnedTextureReleaseFrame(_session._pointer, nativeFrame));
+    });
+    _closed = true;
+  }
+
+  NativePointer _borrowedPointer(Pointer<Void> pointer) {
+    if (_closed) {
+      throwInvalidArgument('Metal texture frame has already been released');
+    }
+    final _ = _session._pointer;
+    return NativePointer(pointer.address);
+  }
+}
+
+/// Scoped Vulkan texture frame borrowed from a session-owned texture target.
+final class VulkanOwnedTextureFrame {
+  VulkanOwnedTextureFrame._(this._session, this._frame);
+
+  final RenderSessionHandle _session;
+  final raw.mln_vulkan_owned_texture_frame _frame;
+  var _closed = false;
+
+  /// Physical image width in device pixels.
+  int get width => _frame.width;
+
+  /// Physical image height in device pixels.
+  int get height => _frame.height;
+
+  /// UI-to-device pixel scale used for this frame.
+  double get scaleFactor => _frame.scale_factor;
+
+  /// Backend-native Vulkan format value.
+  int get format => _frame.format;
+
+  /// Backend-native Vulkan image layout value.
+  int get layout => _frame.layout;
+
+  /// Unsafe borrowed VkImage pointer.
+  ///
+  /// The pointer is valid only until [close] releases this frame.
+  NativePointer get unsafeImage => _borrowedPointer(_frame.image);
+
+  /// Unsafe borrowed VkImageView pointer.
+  ///
+  /// The pointer is valid only until [close] releases this frame.
+  NativePointer get unsafeImageView => _borrowedPointer(_frame.image_view);
+
+  /// Unsafe borrowed VkDevice pointer.
+  ///
+  /// The pointer is valid only until [close] releases this frame.
+  NativePointer get unsafeDevice => _borrowedPointer(_frame.device);
+
+  /// Releases this frame. The unsafe backend pointers become invalid.
+  void close() {
+    if (_closed) {
+      return;
+    }
+    withNativeArena((arena) {
+      final nativeFrame = arena<raw.mln_vulkan_owned_texture_frame>();
+      nativeFrame.ref = _frame;
+      _check(_c.vulkanOwnedTextureReleaseFrame(_session._pointer, nativeFrame));
+    });
+    _closed = true;
+  }
+
+  NativePointer _borrowedPointer(Pointer<Void> pointer) {
+    if (_closed) {
+      throwInvalidArgument('Vulkan texture frame has already been released');
+    }
+    final _ = _session._pointer;
+    return NativePointer(pointer.address);
   }
 }
 
