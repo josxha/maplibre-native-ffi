@@ -573,27 +573,27 @@ area instead of retesting all native C validation rules.
 
 ## Completion checklist
 
-- [ ] The public TypeScript API exposes no raw C symbols, raw C structs, field
+- [x] The public TypeScript API exposes no raw C symbols, raw C structs, field
       masks, or callback trampolines.
-- [ ] Every long-lived native object has a `*Handle` class with `close()`,
+- [x] Every long-lived native object has a `*Handle` class with `close()`,
       `Symbol.dispose`, and documented owner-thread behavior.
-- [ ] Every handle records its creating N-API environment and rejects use from
+- [x] Every handle records its creating N-API environment and rejects use from
       another environment.
-- [ ] Every C function in the coverage map has a Node implementation or a
+- [x] Every C function in the coverage map has a Node implementation or a
       recorded unsupported reason.
-- [ ] Native failures throw `MaplibreError` subclasses with stable kind, raw
+- [x] Native failures throw `MaplibreError` subclasses with stable kind, raw
       status, and copied diagnostic.
 - [ ] Bridge-neutral descriptor materializers in `maplibre-native-core` own C
       `size` fields, field masks, temporary strings, arrays, and nested backing
       storage.
 - [ ] Callback state releases exactly once after the C owner scope and active
       upcalls finish.
-- [ ] Resource provider requests enforce one-shot completion and exact-once
+- [x] Resource provider requests enforce one-shot completion and exact-once
       native request release.
 - [x] Session-owned texture frame values reject use after frame scope close.
 - [ ] Node Worker tests cover wrong-environment and wrong-thread behavior.
       _(Initial worker-local runtime and non-cloneable handle coverage added;
       native wrong-thread status coverage remains.)_
-- [ ] `mise run //bindings/node:build` passes.
-- [ ] `mise run //bindings/node:test` passes.
-- [ ] `mise run //bindings/node:ci` passes.
+- [x] `mise run //bindings/node:build` passes.
+- [x] `mise run //bindings/node:test` passes.
+- [x] `mise run //bindings/node:ci` passes.
