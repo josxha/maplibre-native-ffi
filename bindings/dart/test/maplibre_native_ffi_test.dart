@@ -215,7 +215,7 @@ void main() {
       );
       runtime.setResourceUrlRewriteRules([
         const ResourceUrlRewriteRule(
-          kind: ResourceKind.style,
+          kind: ResourceKind.unknown,
           url: 'https://example.com/style.json',
           replacementUrl: 'https://example.com/rewritten-style.json',
         ),
@@ -438,6 +438,14 @@ void main() {
         SourceType.vector,
       );
       expect(map.removeStyleSource('dart-vector-source'), isTrue);
+      expect(
+        () => map.addVectorSourceTiles(
+          'dart-vector-invalid-tiles-source',
+          const ['https://example.com/{z}/{x}/{y}.mvt'],
+          options: const TileSourceOptions(tileSize: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
       map.addVectorSourceTiles(
         'dart-vector-tiles-source',
         const ['https://example.com/{z}/{x}/{y}.mvt'],
@@ -541,6 +549,20 @@ void main() {
       expect(map.removeStyleSource('dart-image-source'), isTrue);
 
       final fetchedTiles = <CanonicalTileId>[];
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-invalid-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-invalid-buffer-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
       map.addCustomGeometrySource(
         'dart-custom-source',
         CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),

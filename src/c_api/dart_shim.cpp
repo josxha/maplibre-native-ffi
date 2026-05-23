@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <span>
 #include <string>
@@ -13,6 +14,9 @@
 #include "maplibre_native_c.h"
 
 namespace {
+
+constexpr std::uint32_t DartResourceKindWildcard =
+  std::numeric_limits<std::uint32_t>::max();
 
 struct DartResourceRewriteRule {
   std::uint32_t kind;
@@ -102,7 +106,7 @@ struct DartHandleLeakToken {
 };
 
 auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
-  return rule_kind == MLN_RESOURCE_KIND_UNKNOWN || rule_kind == request_kind;
+  return rule_kind == DartResourceKindWildcard || rule_kind == request_kind;
 }
 
 auto string_equals(const char* left, const char* right) -> bool {

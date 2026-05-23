@@ -25,6 +25,8 @@ import '../style/style.dart';
 
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
+const int _resourceKindWildcard = 0xffffffff;
+
 /// Dart resource provider callback run on the owner isolate.
 typedef ResourceProviderCallback =
     void Function(ResourceRequest request, ResourceRequestHandle handle);
@@ -429,7 +431,8 @@ final class _ResourceTransformState {
         : calloc<_NativeResourceRewriteRule>(rules.length);
     for (var index = 0; index < rules.length; index += 1) {
       final rule = rules[index];
-      pointer.ref.rules[index].kind = rule.kind?.rawValue ?? 0;
+      pointer.ref.rules[index].kind =
+          rule.kind?.rawValue ?? _resourceKindWildcard;
       pointer.ref.rules[index].url = _nativeOwnedCString(rule.url);
       pointer.ref.rules[index].replacementUrl = _nativeOwnedCString(
         rule.replacementUrl,
@@ -550,7 +553,8 @@ final class _ResourceProviderRulesState {
         : calloc<_NativeResourceProviderRule>(rules.length);
     for (var index = 0; index < rules.length; index += 1) {
       final rule = rules[index];
-      pointer.ref.rules[index].kind = rule.kind?.rawValue ?? 0;
+      pointer.ref.rules[index].kind =
+          rule.kind?.rawValue ?? _resourceKindWildcard;
       pointer.ref.rules[index].url = _nativeOwnedCString(rule.url);
       pointer.ref.rules[index].response = _resourceResponseToNative(
         rule.response,
@@ -593,7 +597,8 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
         : calloc<_NativeQueuedResourceProviderRoute>(provider.routes.length);
     for (var index = 0; index < provider.routes.length; index += 1) {
       final route = provider.routes[index];
-      pointer.ref.routes[index].kind = route.kind?.rawValue ?? 0;
+      pointer.ref.routes[index].kind =
+          route.kind?.rawValue ?? _resourceKindWildcard;
       pointer.ref.routes[index].url = _nativeOwnedCString(route.url);
     }
     pointer.ref.listener = callback.nativeFunction;
@@ -925,6 +930,20 @@ int _uint32(int value, String name) {
 int _positiveUint32(int value, String name) {
   if (value <= 0 || value > 0xffffffff) {
     throwInvalidArgument('$name must be between 1 and 4294967295');
+  }
+  return value;
+}
+
+int _uint16(int value, String name) {
+  if (value < 0 || value > 0xffff) {
+    throwInvalidArgument('$name must be between 0 and 65535');
+  }
+  return value;
+}
+
+int _uint16Positive(int value, String name) {
+  if (value <= 0 || value > 0xffff) {
+    throwInvalidArgument('$name must be between 1 and 65535');
   }
   return value;
 }
@@ -3339,7 +3358,7 @@ raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
         .mln_custom_geometry_source_option_field
         .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
         .value;
-    result.tile_size = tileSize;
+    result.tile_size = _uint16Positive(tileSize, 'custom geometry tile size');
   }
   final buffer = options.buffer;
   if (buffer != null) {
@@ -3347,7 +3366,7 @@ raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
         .mln_custom_geometry_source_option_field
         .MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
         .value;
-    result.buffer = buffer;
+    result.buffer = _uint16(buffer, 'custom geometry buffer');
   }
   final clip = options.clip;
   if (clip != null) {
@@ -3614,7 +3633,10 @@ Pointer<raw.mln_style_tile_source_options> _nativeTileSourceOptions(
         .mln_style_tile_source_option_field
         .MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
         .value;
-    nativeOptions.ref.tile_size = tileSize;
+    nativeOptions.ref.tile_size = _uint16Positive(
+      tileSize,
+      'tile source tile size',
+    );
   }
   final vectorEncoding = options.vectorEncoding;
   if (vectorEncoding != null) {
