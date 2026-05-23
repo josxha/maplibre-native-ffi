@@ -333,6 +333,24 @@ export declare class RuntimeHandle {
     definition: OfflineRegionDefinition,
     metadata?: Uint8Array | null,
   ): OfflineOperationHandle;
+  offlineRegionCreateTakeResult(
+    operation: OfflineOperationRef,
+  ): OfflineRegionInfo;
+  offlineRegionGetTakeResult(
+    operation: OfflineOperationRef,
+  ): OfflineRegionInfo | null;
+  offlineRegionsListTakeResult(
+    operation: OfflineOperationRef,
+  ): OfflineRegionInfo[];
+  offlineRegionsMergeDatabaseTakeResult(
+    operation: OfflineOperationRef,
+  ): OfflineRegionInfo[];
+  offlineRegionUpdateMetadataTakeResult(
+    operation: OfflineOperationRef,
+  ): OfflineRegionInfo;
+  offlineRegionGetStatusTakeResult(
+    operation: OfflineOperationRef,
+  ): OfflineRegionStatus;
   pollEvent(): RuntimeEvent | null;
   [Symbol.dispose](): void;
 }
@@ -360,6 +378,36 @@ export interface OfflineGeometryRegionDefinition {
 export type OfflineRegionDefinition =
   | OfflineTilePyramidRegionDefinition
   | OfflineGeometryRegionDefinition;
+
+export interface OfflineRegionDefinitionValue {
+  kind: "tilePyramid" | "geometry";
+  styleUrl: string;
+  bounds?: LatLngBounds | null;
+  geometry?: string | null;
+  minZoom: number;
+  maxZoom: number;
+  pixelRatio: number;
+  includeIdeographs: boolean;
+}
+
+export interface OfflineRegionInfo {
+  id: string;
+  definition: OfflineRegionDefinitionValue;
+  metadata: Uint8Array;
+}
+
+export interface OfflineRegionStatus {
+  downloadState: OfflineRegionDownloadState | "unknown";
+  rawDownloadState: number;
+  completedResourceCount: string;
+  completedResourceSize: string;
+  completedTileCount: string;
+  completedTileSize: string;
+  requiredResourceCount: string;
+  requiredResourceCountIsPrecise: boolean;
+}
+
+export type OfflineOperationRef = OfflineOperationHandle | bigint;
 
 export type OfflineRegionDownloadState = "inactive" | "active";
 

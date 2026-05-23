@@ -153,7 +153,7 @@ index.cjs          public JavaScript wrapper, error classes, NativePointer, and 
 index.d.cts        public TypeScript declarations
 src/error.rs       native error payload conversion for the wrapper
 src/maplibre.rs   process-global proof slice, thread-local diagnostics, log callback bridge, async log severity controls, and root exports
-src/runtime.rs    runtime handle, runtime option materialization, event polling, resource provider/transform, ambient cache, and offline region operation start proof slices
+src/runtime.rs    runtime handle, runtime option materialization, event polling, resource provider/transform, ambient cache, and offline region operation start/take-result proof slices
 src/map.rs        map handle, map/viewport/tile/projection/bounds/free-camera option materialization, style-loading/probes, URL/tile source helpers, style/image source values, style ID lists, style metadata/layer/light/location/terrain JSON/properties, camera/animation commands, repaint, debug-option, and utility proof slices
 src/projection.rs standalone map projection handle proof slice
 src/values.rs     copied coordinate and screen point values plus projection helper proof slices
@@ -538,7 +538,7 @@ area instead of retesting all native C validation rules.
    close-once proof slice and `NativePointer` value complete.)_
 4. Add `RuntimeHandle`, runtime options, runtime pumping, and copied event
    polling. _(Initial event envelope polling, ambient cache operation, and
-   offline region operation start proof slices complete.)_
+   offline region operation start/take-result proof slices complete.)_
 5. Add `MapHandle`, map options, style loading, map-owned callbacks, and parent
    retention. _(Initial lifecycle, map/viewport/tile/projection/bounds options,
    style-loading/probes, camera descriptor, map utility methods, debug-option

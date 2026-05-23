@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
 
@@ -34,6 +35,37 @@ pub struct OfflineRegionDefinitionInput {
     pub max_zoom: f64,
     pub pixel_ratio: f64,
     pub include_ideographs: Option<bool>,
+}
+
+#[napi(object)]
+pub struct OfflineRegionDefinitionValue {
+    pub kind: String,
+    pub style_url: String,
+    pub bounds: Option<crate::values::LatLngBounds>,
+    pub geometry: Option<String>,
+    pub min_zoom: f64,
+    pub max_zoom: f64,
+    pub pixel_ratio: f64,
+    pub include_ideographs: bool,
+}
+
+#[napi(object)]
+pub struct OfflineRegionInfoValue {
+    pub id: String,
+    pub definition: OfflineRegionDefinitionValue,
+    pub metadata: Uint8Array,
+}
+
+#[napi(object)]
+pub struct OfflineRegionStatusValue {
+    pub download_state: String,
+    pub raw_download_state: u32,
+    pub completed_resource_count: String,
+    pub completed_resource_size: String,
+    pub completed_tile_count: String,
+    pub completed_tile_size: String,
+    pub required_resource_count: String,
+    pub required_resource_count_is_precise: bool,
 }
 
 #[napi(object)]
@@ -445,6 +477,113 @@ impl NativeRuntimeHandle {
         Ok(offline_operation_start(operation_id))
     }
 
+    #[napi(js_name = "offlineRegionCreateTakeResult")]
+    pub fn offline_region_create_take_result(
+        &self,
+        operation_id: BigInt,
+    ) -> Result<OfflineRegionInfoValue> {
+        let mut snapshot = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_create_take_result(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+                &mut snapshot,
+            )
+        })
+        .map_err(error::from_core)?;
+        copy_offline_region_snapshot_value(snapshot)
+    }
+
+    #[napi(js_name = "offlineRegionGetTakeResult")]
+    pub fn offline_region_get_take_result(
+        &self,
+        operation_id: BigInt,
+    ) -> Result<Option<OfflineRegionInfoValue>> {
+        let mut snapshot = std::ptr::null_mut();
+        let mut found = false;
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_get_take_result(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+                &mut snapshot,
+                &mut found,
+            )
+        })
+        .map_err(error::from_core)?;
+        if !found {
+            return Ok(None);
+        }
+        Ok(Some(copy_offline_region_snapshot_value(snapshot)?))
+    }
+
+    #[napi(js_name = "offlineRegionsListTakeResult")]
+    pub fn offline_regions_list_take_result(
+        &self,
+        operation_id: BigInt,
+    ) -> Result<Vec<OfflineRegionInfoValue>> {
+        let mut list = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_runtime_offline_regions_list_take_result(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+                &mut list,
+            )
+        })
+        .map_err(error::from_core)?;
+        copy_offline_region_list_value(list)
+    }
+
+    #[napi(js_name = "offlineRegionsMergeDatabaseTakeResult")]
+    pub fn offline_regions_merge_database_take_result(
+        &self,
+        operation_id: BigInt,
+    ) -> Result<Vec<OfflineRegionInfoValue>> {
+        let mut list = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_runtime_offline_regions_merge_database_take_result(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+                &mut list,
+            )
+        })
+        .map_err(error::from_core)?;
+        copy_offline_region_list_value(list)
+    }
+
+    #[napi(js_name = "offlineRegionUpdateMetadataTakeResult")]
+    pub fn offline_region_update_metadata_take_result(
+        &self,
+        operation_id: BigInt,
+    ) -> Result<OfflineRegionInfoValue> {
+        let mut snapshot = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_update_metadata_take_result(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+                &mut snapshot,
+            )
+        })
+        .map_err(error::from_core)?;
+        copy_offline_region_snapshot_value(snapshot)
+    }
+
+    #[napi(js_name = "offlineRegionGetStatusTakeResult")]
+    pub fn offline_region_get_status_take_result(
+        &self,
+        operation_id: BigInt,
+    ) -> Result<OfflineRegionStatusValue> {
+        let mut raw_status = core::events::empty_offline_region_status_native();
+        core::check(unsafe {
+            sys::mln_runtime_offline_region_get_status_take_result(
+                self.state.as_ptr(),
+                bigint_to_u64(operation_id, "operationId")?,
+                &mut raw_status,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(offline_region_status_value_from_native(raw_status))
+    }
+
     #[napi(js_name = "discardOfflineOperation")]
     pub fn discard_offline_operation(&self, operation_id: BigInt) -> Result<()> {
         core::check(unsafe {
@@ -845,6 +984,149 @@ impl RuntimeOptions {
     }
 }
 
+fn copy_offline_region_snapshot_value(
+    snapshot: *mut sys::mln_offline_region_snapshot,
+) -> Result<OfflineRegionInfoValue> {
+    let snapshot = NonNull::new(snapshot)
+        .ok_or_else(|| error::invalid_argument("offline region snapshot result was null"))?;
+    let info = unsafe { core::runtime::copy_offline_region_snapshot(snapshot) }
+        .map_err(error::from_core)?;
+    offline_region_info_to_value(info)
+}
+
+fn copy_offline_region_list_value(
+    list: *mut sys::mln_offline_region_list,
+) -> Result<Vec<OfflineRegionInfoValue>> {
+    let list = NonNull::new(list)
+        .ok_or_else(|| error::invalid_argument("offline region list result was null"))?;
+    let regions =
+        unsafe { core::runtime::copy_offline_region_list(list) }.map_err(error::from_core)?;
+    regions
+        .into_iter()
+        .map(offline_region_info_to_value)
+        .collect()
+}
+
+fn offline_region_info_to_value(info: core::OfflineRegionInfo) -> Result<OfflineRegionInfoValue> {
+    Ok(OfflineRegionInfoValue {
+        id: info.id.to_string(),
+        definition: offline_region_definition_to_value(info.definition)?,
+        metadata: Uint8Array::from(info.metadata),
+    })
+}
+
+fn offline_region_definition_to_value(
+    definition: core::OfflineRegionDefinition,
+) -> Result<OfflineRegionDefinitionValue> {
+    match definition {
+        core::OfflineRegionDefinition::TilePyramid {
+            style_url,
+            bounds,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        } => Ok(OfflineRegionDefinitionValue {
+            kind: "tilePyramid".to_owned(),
+            style_url,
+            bounds: Some(crate::values::LatLngBounds::from_core(bounds)),
+            geometry: None,
+            min_zoom,
+            max_zoom,
+            pixel_ratio: f64::from(pixel_ratio),
+            include_ideographs,
+        }),
+        core::OfflineRegionDefinition::GeometryRegion {
+            style_url,
+            geometry,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        } => Ok(OfflineRegionDefinitionValue {
+            kind: "geometry".to_owned(),
+            style_url,
+            bounds: None,
+            geometry: Some(json_string_from_serde(geometry_to_serde(geometry))?),
+            min_zoom,
+            max_zoom,
+            pixel_ratio: f64::from(pixel_ratio),
+            include_ideographs,
+        }),
+        _ => Err(error::invalid_argument("unknown offline region definition")),
+    }
+}
+
+fn offline_region_status_value_from_native(
+    raw: sys::mln_offline_region_status,
+) -> OfflineRegionStatusValue {
+    OfflineRegionStatusValue {
+        download_state: offline_region_download_state_name(raw.download_state).to_owned(),
+        raw_download_state: raw.download_state,
+        completed_resource_count: raw.completed_resource_count.to_string(),
+        completed_resource_size: raw.completed_resource_size.to_string(),
+        completed_tile_count: raw.completed_tile_count.to_string(),
+        completed_tile_size: raw.completed_tile_size.to_string(),
+        required_resource_count: raw.required_resource_count.to_string(),
+        required_resource_count_is_precise: raw.required_resource_count_is_precise,
+    }
+}
+
+fn geometry_to_serde(geometry: core::Geometry) -> serde_json::Value {
+    match geometry {
+        core::Geometry::Empty => serde_json::Value::Null,
+        core::Geometry::Point(coordinate) => serde_json::json!({
+            "type": "Point",
+            "coordinates": [coordinate.longitude, coordinate.latitude]
+        }),
+        core::Geometry::LineString(coordinates) => serde_json::json!({
+            "type": "LineString",
+            "coordinates": coordinates_to_serde(coordinates)
+        }),
+        core::Geometry::Polygon(rings) => serde_json::json!({
+            "type": "Polygon",
+            "coordinates": rings.into_iter().map(coordinates_to_serde).collect::<Vec<_>>()
+        }),
+        core::Geometry::MultiPoint(coordinates) => serde_json::json!({
+            "type": "MultiPoint",
+            "coordinates": coordinates_to_serde(coordinates)
+        }),
+        core::Geometry::MultiLineString(lines) => serde_json::json!({
+            "type": "MultiLineString",
+            "coordinates": lines.into_iter().map(coordinates_to_serde).collect::<Vec<_>>()
+        }),
+        core::Geometry::MultiPolygon(polygons) => serde_json::json!({
+            "type": "MultiPolygon",
+            "coordinates": polygons
+                .into_iter()
+                .map(|rings| rings.into_iter().map(coordinates_to_serde).collect::<Vec<_>>())
+                .collect::<Vec<_>>()
+        }),
+        core::Geometry::GeometryCollection(geometries) => serde_json::json!({
+            "type": "GeometryCollection",
+            "geometries": geometries.into_iter().map(geometry_to_serde).collect::<Vec<_>>()
+        }),
+        _ => serde_json::Value::Null,
+    }
+}
+
+fn coordinates_to_serde(coordinates: Vec<core::LatLng>) -> serde_json::Value {
+    serde_json::Value::Array(
+        coordinates
+            .into_iter()
+            .map(|coordinate| serde_json::json!([coordinate.longitude, coordinate.latitude]))
+            .collect(),
+    )
+}
+
+fn json_string_from_serde(value: serde_json::Value) -> Result<String> {
+    serde_json::to_string(&value).map_err(|serialize_error| {
+        error::invalid_argument(format!(
+            "JSON value could not be serialized: {serialize_error}"
+        ))
+    })
+}
+
 fn offline_operation_start(operation_id: u64) -> OfflineOperationStart {
     OfflineOperationStart {
         operation_id: operation_id.to_string(),
@@ -882,6 +1164,15 @@ fn offline_region_definition_from_input(
         other => Err(error::invalid_argument(format!(
             "offline region kind must be 'tilePyramid' or 'geometry', got '{other}'"
         ))),
+    }
+}
+
+fn offline_region_download_state_name(raw: u32) -> &'static str {
+    match core::OfflineRegionDownloadState::from_raw(raw) {
+        core::OfflineRegionDownloadState::Inactive => "inactive",
+        core::OfflineRegionDownloadState::Active => "active",
+        core::OfflineRegionDownloadState::Unknown(_) => "unknown",
+        _ => "unknown",
     }
 }
 

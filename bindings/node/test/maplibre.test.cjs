@@ -187,6 +187,10 @@ test("offline operations expose discardable handles", () => {
     operation.close();
     const list = runtime.offlineRegionsList();
     assert.equal(list instanceof OfflineOperationHandle, true);
+    assert.throws(
+      () => runtime.offlineRegionsListTakeResult(list),
+      InvalidStateError,
+    );
     list.close();
     const get = runtime.offlineRegionGet(1n);
     get.close();

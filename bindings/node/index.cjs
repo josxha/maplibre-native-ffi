@@ -258,6 +258,19 @@ class NativeBuffer {
   }
 }
 
+function operationIdOf(operation) {
+  if (operation instanceof OfflineOperationHandle) {
+    return operation.operationId;
+  }
+  if (typeof operation === "bigint") {
+    return operation;
+  }
+  throw new InvalidArgumentError(
+    null,
+    "offline operation must be an OfflineOperationHandle or bigint",
+  );
+}
+
 function validateByteLength(byteLength) {
   if (!Number.isSafeInteger(byteLength) || byteLength < 0) {
     throw new InvalidArgumentError(
@@ -464,6 +477,46 @@ class RuntimeHandle {
     }
     return this.#offlineOperation(() =>
       this.native.offlineRegionCreate(nativeDefinition, metadata),
+    );
+  }
+
+  offlineRegionCreateTakeResult(operation) {
+    return translateNativeErrors(() =>
+      this.native.offlineRegionCreateTakeResult(operationIdOf(operation)),
+    );
+  }
+
+  offlineRegionGetTakeResult(operation) {
+    return translateNativeErrors(() =>
+      this.native.offlineRegionGetTakeResult(operationIdOf(operation)),
+    );
+  }
+
+  offlineRegionsListTakeResult(operation) {
+    return translateNativeErrors(() =>
+      this.native.offlineRegionsListTakeResult(operationIdOf(operation)),
+    );
+  }
+
+  offlineRegionsMergeDatabaseTakeResult(operation) {
+    return translateNativeErrors(() =>
+      this.native.offlineRegionsMergeDatabaseTakeResult(
+        operationIdOf(operation),
+      ),
+    );
+  }
+
+  offlineRegionUpdateMetadataTakeResult(operation) {
+    return translateNativeErrors(() =>
+      this.native.offlineRegionUpdateMetadataTakeResult(
+        operationIdOf(operation),
+      ),
+    );
+  }
+
+  offlineRegionGetStatusTakeResult(operation) {
+    return translateNativeErrors(() =>
+      this.native.offlineRegionGetStatusTakeResult(operationIdOf(operation)),
     );
   }
 
