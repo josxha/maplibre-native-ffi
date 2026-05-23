@@ -131,7 +131,13 @@ export interface ProjectedMeters {
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;
 export declare function networkStatus(): NetworkStatusValue;
+export type LogSeverity = "info" | "warning" | "error";
+
 export declare function setNetworkStatus(status: "online" | "offline"): void;
+export declare function setAsyncLogSeverities(
+  severities: Iterable<LogSeverity>,
+): void;
+export declare function restoreDefaultAsyncLogSeverities(): void;
 export declare function projectedMetersForLatLng(
   coordinate: LatLng,
 ): ProjectedMeters;

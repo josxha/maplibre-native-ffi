@@ -64,6 +64,31 @@ pub fn set_network_status(status: String) -> Result<()> {
         .map_err(error::from_core)
 }
 
+#[napi(js_name = "nativeSetAsyncLogSeverityMask")]
+pub fn native_set_async_log_severity_mask(mask: u32) -> Result<()> {
+    maplibre_native_core::check(unsafe {
+        maplibre_native_sys::mln_log_set_async_severity_mask(mask)
+    })
+    .map_err(error::from_core)
+}
+
+#[napi(js_name = "nativeDefaultAsyncLogSeverityMask")]
+pub fn native_default_async_log_severity_mask() -> u32 {
+    maplibre_native_sys::MLN_LOG_SEVERITY_MASK_DEFAULT
+}
+
+#[napi(js_name = "nativeLogSeverityMaskBit")]
+pub fn native_log_severity_mask_bit(severity: String) -> Result<u32> {
+    match severity.as_str() {
+        "info" => Ok(maplibre_native_sys::MLN_LOG_SEVERITY_MASK_INFO),
+        "warning" => Ok(maplibre_native_sys::MLN_LOG_SEVERITY_MASK_WARNING),
+        "error" => Ok(maplibre_native_sys::MLN_LOG_SEVERITY_MASK_ERROR),
+        other => Err(error::invalid_argument(format!(
+            "log severity must be 'info', 'warning', or 'error', got '{other}'"
+        ))),
+    }
+}
+
 fn network_status_from_raw(raw: u32) -> NetworkStatusValue {
     let kind = match raw {
         maplibre_native_sys::MLN_NETWORK_STATUS_ONLINE => "online".to_owned(),

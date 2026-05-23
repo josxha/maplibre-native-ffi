@@ -105,6 +105,26 @@ function latLngForProjectedMeters(meters) {
   );
 }
 
+function setAsyncLogSeverities(severities) {
+  let mask = 0;
+  for (const severity of severities) {
+    mask |= translateNativeErrors(() =>
+      native.nativeLogSeverityMaskBit(severity),
+    );
+  }
+  return translateNativeErrors(() =>
+    native.nativeSetAsyncLogSeverityMask(mask),
+  );
+}
+
+function restoreDefaultAsyncLogSeverities() {
+  return translateNativeErrors(() =>
+    native.nativeSetAsyncLogSeverityMask(
+      native.nativeDefaultAsyncLogSeverityMask(),
+    ),
+  );
+}
+
 class RuntimeHandle {
   constructor(options) {
     this.native = translateNativeErrors(() =>
@@ -282,4 +302,6 @@ module.exports = {
   setNetworkStatus,
   projectedMetersForLatLng,
   latLngForProjectedMeters,
+  setAsyncLogSeverities,
+  restoreDefaultAsyncLogSeverities,
 };

@@ -11,7 +11,9 @@ const {
   MaplibreStatus,
   networkStatus,
   projectedMetersForLatLng,
+  restoreDefaultAsyncLogSeverities,
   RuntimeHandle,
+  setAsyncLogSeverities,
   setNetworkStatus,
   supportedRenderBackends,
 } = require("..");
@@ -47,6 +49,17 @@ test("projection helpers round trip copied coordinate values", () => {
   assert.equal(typeof meters.easting, "number");
   assert.ok(Math.abs(roundTripped.latitude - coordinate.latitude) < 1e-9);
   assert.ok(Math.abs(roundTripped.longitude - coordinate.longitude) < 1e-9);
+});
+
+test("async log severities map string values and reject unknown values", () => {
+  setAsyncLogSeverities(["info", "warning"]);
+  setAsyncLogSeverities(new Set(["error"]));
+  restoreDefaultAsyncLogSeverities();
+
+  assert.throws(
+    () => setAsyncLogSeverities([/** @type {any} */ ("debug")]),
+    InvalidArgumentError,
+  );
 });
 
 test("runtime handle supports options, explicit close, and idempotent disposal", () => {
