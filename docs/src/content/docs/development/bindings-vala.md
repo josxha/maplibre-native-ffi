@@ -22,12 +22,13 @@ ABI-adaptation crates. The Rust adapter implements GObject classes, boxed
 values, `GError` mapping, handle lifetime, callback state, and thread-safety
 policy.
 
-Binding metadata drives the repetitive ABI surface. A generator derives
-scanner-facing annotated C headers and Rust `extern "C"` entry stubs for the
-GObject-style ABI: type declarations, function prototypes, transfer ownership,
-nullability, `out`/`inout`, array lengths, closure and destroy-notify metadata,
-and error behavior. The generated C headers describe the compiled Rust shared
-library to GObject Introspection; they are not a separate C implementation.
+Binding metadata drives the repetitive ABI surface. A generator emits
+scanner-facing annotated C headers for the GObject-style ABI and validates the
+Rust adapter entry points against the public inventory: type declarations,
+function prototypes, transfer ownership, nullability, `out`/`inout`, array
+lengths, closure and destroy-notify metadata, and error behavior. The generated
+C headers describe the compiled Rust shared library to GObject Introspection;
+they are not a separate C implementation.
 
 `g-ir-scanner` consumes the generated annotated headers and compiled Rust
 library to produce GIR and typelib files. `vapigen` produces the generated

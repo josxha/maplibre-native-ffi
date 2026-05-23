@@ -341,7 +341,7 @@ Implement these Rust modules as the binding grows:
 | `resource`       | Resource request, response, transform, provider, and one-shot request state.                                   |
 | `style`          | Style source, image, layer, light, and custom geometry conversion.                                             |
 | `callbacks`      | Closure storage, destroy notify, atomic replacement, active-upcall accounting, panic containment.              |
-| `generator`      | Metadata reader and annotated header/Rust-stub emission.                                                       |
+| `generator`      | Metadata reader, public inventory/annotation verifier, and scanner-facing header emission.                     |
 
 ## Naming and packaging
 
