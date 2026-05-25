@@ -90,24 +90,24 @@ final class Maplibre {
   static _LogCallbackState? _logCallbackState;
 
   /// Returns the native C ABI contract version.
-  static int cVersion() => _c.cVersion();
+  static int cVersion() => _c.raw.mln_c_version();
 
   /// Returns the render backends compiled into the linked native library.
   static RenderBackendMask supportedRenderBackends() =>
-      RenderBackendMask(_c.supportedRenderBackendMask());
+      RenderBackendMask(_c.raw.mln_supported_render_backend_mask());
 
   /// Reads MapLibre Native's process-global network status.
   static NetworkStatus networkStatus() {
     return withNativeArena((arena) {
       final outStatus = arena<Uint32>();
-      _checkStatus(_c.networkStatusGet(outStatus));
+      _checkStatus(_c.raw.mln_network_status_get(outStatus));
       return NetworkStatus.fromRawValue(outStatus.value);
     });
   }
 
   /// Sets MapLibre Native's process-global network status.
   static void setNetworkStatus(NetworkStatus status) {
-    _checkStatus(_c.networkStatusSet(status.rawValueForSet()));
+    _checkStatus(_c.raw.mln_network_status_set(status.rawValueForSet()));
   }
 
   /// Sets the process-global native log callback.
@@ -115,7 +115,10 @@ final class Maplibre {
     final state = _LogCallbackState(callback, consume: consume);
     try {
       _checkStatus(
-        _c.logSetCallback(_c.dartLogCallback(), state.pointer.cast<Void>()),
+        _c.raw.mln_log_set_callback(
+          _c.dartLogCallback(),
+          state.pointer.cast<Void>(),
+        ),
       );
       _logCallbackState?.close();
       _logCallbackState = state;
@@ -127,14 +130,14 @@ final class Maplibre {
 
   /// Clears the process-global native log callback.
   static void clearLogCallback() {
-    _checkStatus(_c.logClearCallback());
+    _checkStatus(_c.raw.mln_log_clear_callback());
     _logCallbackState?.close();
     _logCallbackState = null;
   }
 
   /// Sets which log severities MapLibre Native may dispatch asynchronously.
   static void setAsyncLogSeverityMask(LogSeverityMask mask) {
-    _checkStatus(_c.logSetAsyncSeverityMask(mask.bits));
+    _checkStatus(_c.raw.mln_log_set_async_severity_mask(mask.bits));
   }
 
   /// Converts a geographic coordinate to spherical Mercator projected meters.
@@ -142,7 +145,7 @@ final class Maplibre {
     return withNativeArena((arena) {
       final outMeters = arena<raw.mln_projected_meters>();
       _checkStatus(
-        _c.projectedMetersForLatLng(
+        _c.raw.mln_projected_meters_for_lat_lng(
           native_struct.latLngToNative(coordinate),
           outMeters,
         ),
@@ -156,7 +159,7 @@ final class Maplibre {
     return withNativeArena((arena) {
       final outCoordinate = arena<raw.mln_lat_lng>();
       _checkStatus(
-        _c.latLngForProjectedMeters(
+        _c.raw.mln_lat_lng_for_projected_meters(
           native_struct.projectedMetersToNative(meters),
           outCoordinate,
         ),
@@ -170,8 +173,8 @@ final class Maplibre {
     setAsyncLogSeverityMask(LogSeverityMask.defaultMask);
   }
 
-  static void _checkStatus(int statusCode) {
-    checkNativeStatus(statusCode, _c.threadLastErrorMessage);
+  static void _checkStatus(raw.mln_status status) {
+    checkNativeStatus(status.value, _c.threadLastErrorMessage);
   }
 }
 

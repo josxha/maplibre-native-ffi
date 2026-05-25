@@ -2,3 +2,4 @@
 /gradlew        text eol=lf
 *.bat           text eol=crlf
 *.jar           binary
+/bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart linguist-generated=true
