@@ -14,7 +14,7 @@ valac \
   -H build/include/maplibre-native-vala.h \
   -C \
   -d build/c \
-  src/maplibre_native.vala
+  src/*.vala
 '''
 
 [tasks."compile-tests"]
@@ -25,20 +25,58 @@ set -euo pipefail
 mkdir -p build
 export LD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
 export DYLD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:$CONDA_PREFIX/lib:${DYLD_LIBRARY_PATH:-}"
+metal_support_object="build/metal_support.o"
+metal_framework_args=()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  clang -fobjc-exceptions -target "$(uname -m)-apple-macos16.0" -c tests/compile/metal_support_macos.m -o "$metal_support_object"
+  metal_framework_args=(
+    -X -framework
+    -X AppKit
+    -X -framework
+    -X Metal
+    -X -framework
+    -X QuartzCore
+  )
+else
+  cat > build/metal_support_stub.c <<'STUB'
+#include <stdbool.h>
+#include <stdint.h>
+typedef struct MlnValaMetalWindowLayer { void* window; void* layer; } MlnValaMetalWindowLayer;
+bool mln_vala_metal_test_window_layer_create(uint32_t width, uint32_t height, MlnValaMetalWindowLayer* out_layer) { (void)width; (void)height; if (out_layer != 0) { out_layer->window = 0; out_layer->layer = 0; } return false; }
+void mln_vala_metal_test_window_layer_destroy(MlnValaMetalWindowLayer* window_layer) { (void)window_layer; }
+void* mln_vala_metal_test_texture_create(void* device, uint32_t width, uint32_t height) { (void)device; (void)width; (void)height; return 0; }
+void mln_vala_metal_test_object_release(void* object) { (void)object; }
+STUB
+  ${CC:-cc} -c build/metal_support_stub.c -o "$metal_support_object"
+fi
 valac \
   --vapidir vapi \
   --pkg maplibre-native-c \
   --pkg glib-2.0 \
   --pkg gmodule-2.0 \
   -X -I"{{env.MLN_FFI_INCLUDE_DIR}}" \
+  -X -I"{{env.MLN_FFI_VULKAN_INCLUDE_DIR}}" \
   -X -Wno-unused-value \
   -X -L"{{env.MLN_FFI_BUILD_DIR}}" \
+  -X -L"$CONDA_PREFIX/lib" \
   -X -lmaplibre-native-c \
+  -X -lvulkan \
+  "${metal_framework_args[@]}" \
+  -X "$metal_support_object" \
   -X -Wl,-rpath,"{{env.MLN_FFI_BUILD_DIR}}" \
   -X -Wl,-rpath,"$CONDA_PREFIX/lib" \
-  src/maplibre_native.vala \
+  src/*.vala \
   tests/compile/minimal.vala \
+  tests/compile/vulkan_support.c \
   -o build/minimal
+./build/minimal
+MLN_VALA_RUN_OFFLINE_REGION_SMOKE=1 \
+MLN_VALA_RUN_STYLE_URL_SMOKE=1 \
+MLN_VALA_RUN_DEM_LAYER_SMOKE=1 \
+MLN_VALA_RUN_STYLE_LIGHT_SMOKE=1 \
+MLN_VALA_RUN_LOCATION_INDICATOR_PROPERTY_SMOKE=1 \
+MLN_VALA_RUN_TEXTURE_BACKEND_COMPILE_SMOKE=1 \
+MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE=1 \
 ./build/minimal
 '''
 

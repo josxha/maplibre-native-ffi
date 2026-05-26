@@ -15,9 +15,9 @@ Resources:
 ## Architecture
 
 The Vala binding is a direct binding over the public MapLibre Native C API. It
-uses a private raw VAPI for `maplibre_native_c` declarations and public Vala
-source for handle classes, descriptors, copied values, errors, callbacks, and
-lifetime policy.
+uses a private raw VAPI for `maplibre_native_c` declarations and organized
+public Vala source files for handle classes, descriptors, copied values, errors,
+callbacks, and lifetime policy.
 
 ```text
 public Vala API
@@ -43,35 +43,78 @@ event, camera, geometry, and render-target concepts directly. GLib main-loop
 integration, widgets, async frameworks, and application lifecycle policy belong
 above this binding.
 
+Organize public wrapper sources by C API domain under `bindings/vala/src`.
+`base.vala` contains the public error domain, shared enums, primitive value
+wrappers, `NativePointer`, and copied string-list values. `map.vala` contains
+map options, tile options, viewport options, and `MapHandle`. `camera.vala`
+contains camera, animation, fit, bounds, and free-camera descriptors.
+`projection.vala` contains projection conversion helpers and
+`MapProjectionHandle`. `internal.vala` contains status conversion, string-view
+helpers, byte copying, list copying, and enum mapping helpers shared by domain
+files. `runtime.vala` contains runtime options and lifecycle, process-global
+logging/network helpers, copied runtime event payloads, resource request values,
+provider response descriptors, scoped provider request controllers, one-shot
+resource request handles, offline region IDs, offline operation IDs, region
+definitions, and offline snapshot/list handles. `query.vala` contains query
+descriptors, result handles, and feature-extension results.
+`render_session.vala` contains render session lifecycle, maintenance, readback,
+feature-state, query entry points, and Metal frame handles. `geometry.vala`
+contains JSON, GeoJSON, geometry, feature, feature-collection, and feature-state
+selector descriptor graphs with their call-scoped native materialization
+helpers. `style.vala` contains style source metadata values, tile source option
+descriptors, custom geometry source callbacks, image source coordinate
+materialization, runtime style image values, location indicator property enums,
+style layer JSON/property/filter/light wrappers, style layer convenience
+wrappers, and style option materialization helpers. `texture.vala` contains
+texture render-target descriptors, backend context descriptors, readback
+metadata values, and scoped Vulkan frame handles. `surface.vala` contains Metal
+and Vulkan surface render-target descriptors. New or refactored API groups move
+into focused backend-specific files as needed. Keep descriptor materialization
+utilities near the descriptor types they support unless multiple domains use
+them. The Vala build compiles all `src/*.vala` files so a new source file
+participates in build and tests automatically.
+
 The direct binding preserves practical coverage by wrapping C ABI concepts, not
 by recreating the previous generated GObject surface. Keep compact wrappers for
 lifecycle, diagnostics, options, rendering, projection, style values, resource
-transforms, offline operation tokens, copied lists, and selected query handles.
-Add larger descriptor graphs, custom resource providers, custom geometry
-sources, and offline snapshots as direct C wrappers when a Vala caller needs
-those surfaces and the wrapper can keep ownership clear. Do not keep
-adapter-only APIs, generated compatibility names, GIR metadata, or scanner
-helpers as parity surfaces.
+transforms, resource providers, offline operation tokens, copied lists, query
+handles, descriptor graphs, and offline snapshots. Do not keep adapter-only
+APIs, generated compatibility names, GIR metadata, or scanner helpers as parity
+surfaces.
 
-The old generated adapter exposed some surfaces that remain deliberate direct-C
-follow-up work:
+The direct-C surface covers the API groups that the old generated adapter could
+not express safely:
 
-- JSON, GeoJSON, geometry, feature, and feature-collection descriptor graphs
-  need Vala-owned builders that keep nested storage alive for one C call.
-  Current coverage keeps style JSON strings, GeoJSON URL sources, style values,
-  and query handles direct.
-- Resource provider request handles and custom geometry callbacks need dedicated
-  one-shot Vala handles before they are public. Current coverage includes the
-  lower-risk runtime resource transform callback.
-- Offline region snapshots, lists, and definitions need direct result-handle
-  wrappers. Current coverage includes offline operation tokens for ambient cache
-  operations.
-- Source-feature queries, feature-state details, and feature-extension payloads
-  depend on the JSON and GeoJSON descriptor wrappers. Current coverage includes
-  rendered query result handles and counts.
-- Vulkan render-target wrappers should mirror the C ABI for Vulkan builds.
-  Current tests exercise the Metal path available in the macOS development
-  environment.
+- JSON, GeoJSON, geometry, feature, and feature-collection descriptor graphs use
+  Vala-owned builders that keep nested storage alive for one C call. Coverage
+  includes JSON values, feature and feature-collection descriptors, all geometry
+  variants, geometry/feature/feature-collection GeoJSON, GeoJSON URL sources,
+  style values, and query handles.
+- Resource provider callbacks use copied request fields, scoped request
+  controllers, pass-through-by-default behavior, one-shot request handles,
+  cancellation checks, and explicit release. Runtime resource transforms keep
+  replacement URL storage scoped to the runtime callback owner. Custom geometry
+  source callbacks keep map-retained callback state, typed tile IDs, scoped
+  GeoJSON tile data, and explicit invalidation helpers.
+- Offline region definitions, operation starts, take-result helpers, snapshots,
+  lists, statuses, and completion/event payloads are direct wrappers. Snapshot
+  and list handles copy `OfflineRegionInfo` values before native handle close.
+  The required Vala test task runs both a baseline smoke pass and an extended
+  smoke pass that enables fixture-dependent offline operations.
+- Query coverage includes rendered point, box, and line-string geometries;
+  rendered/source query options with Vala-owned IDs and JSON filters;
+  source-feature query handles; feature-state commands; copied feature-state
+  JSON snapshots; rendered query result handles; counts; indexed queried-feature
+  payload copying; and feature-extension result handles with copied JSON value
+  or feature-collection payloads. The required extended smoke pass exercises
+  feature-extension calls against the available source/extension fixture.
+- Render-target wrappers mirror the C ABI for Metal, Vulkan, borrowed texture,
+  owned texture, and surface sessions. The Vala smoke test exercises the active
+  backend's public attach wrappers, resize/detach lifecycle, CPU readback for
+  owned textures, scoped frame handles, active-frame rejection, and unsupported
+  owned-frame/readback/resize calls on borrowed texture sessions. The macOS
+  Vulkan variant creates test-owned Vulkan images and Metal-backed Vulkan
+  surfaces so the public Vala wrappers cross the real C ABI.
 
 ## Public Types
 
@@ -89,11 +132,14 @@ the owner thread. `MapProjectionHandle` follows the shared exception: it owns a
 standalone projection snapshot and does not retain its source `MapHandle` for
 native validity after creation.
 
-Copied descriptors, events, snapshots, camera values, geometry values, query
-results, offline region definitions, and render metadata are Vala-owned values.
-Public APIs hide ABI `size` fields, field masks, raw union storage, borrowed
-pointers, and backend pointer fields. Constructors and setter methods initialize
-those ABI details inside the binding.
+Copied descriptors, events, snapshots, camera values, animation options, camera
+fit and bound options, free camera options, projection mode options, projection
+visible-geometry inputs, geometry values, query results, source attribution
+strings, offline region IDs, offline operation IDs, offline region definitions,
+offline region info snapshots, map viewport and tile options, debug masks, and
+render metadata are Vala-owned values. Public APIs hide ABI `size` fields, field
+masks, raw union storage, borrowed pointers, and backend pointer fields.
+Constructors and setter methods initialize those ABI details inside the binding.
 
 `NativePointer` is a small borrowed value around an address-sized integer. It
 wraps a non-null backend-native address, grants no memory access, and transfers
@@ -135,19 +181,27 @@ GLib adapters may add `GMainContext` dispatch or async APIs; this layer keeps
 native thread identity visible.
 
 Runtime event polling returns copied Vala values. Event objects expose typed
-event, source, payload, render-mode, and tile-operation enums plus copied
-message and payload data when the binding supports the payload. Public event
-objects remain valid after the next native poll.
+event, source, payload, render-mode, tile-operation, resource-error, and offline
+operation enums plus copied message and typed payload data. Render-frame,
+render-map, style-image-missing, tile-action, offline-region-status,
+offline-response-error, tile-count-limit, and offline-operation-completed
+payloads are copied before the next native poll invalidates the C storage.
+Public event objects remain valid after the next native poll.
 
 Callback adapters keep delegates and user data alive for the native owner scope.
 Native upcalls may arrive on worker, network, logging, or render-related
 threads, so callback state must be safe for those threads. Vala errors stay
-inside callback code and must not cross native frames.
+inside callback code and must not cross native frames. The process-global
+logging wrapper mirrors the C ABI callback and `user_data` shape internally, and
+public code controls asynchronous log dispatch with `LogSeverityMask`.
 
 Resource transform callbacks receive copied request URLs and return replacement
-URLs that remain scoped to the native callback. Custom geometry callbacks run on
-the native callback thread; callback code dispatches to the map owner thread
-before calling thread-affine map APIs.
+URLs that remain scoped to the native callback. Resource provider callbacks
+receive copied request fields and a scoped controller; unclaimed requests pass
+through, and claimed `ResourceRequestHandle` values complete once and release
+explicitly. Custom geometry callbacks run on the native callback thread;
+callback code dispatches to the map owner thread before calling thread-affine
+map APIs.
 
 ## Rendering and Memory
 
@@ -161,12 +215,34 @@ keeps the native frame acquired, exposes copied metadata and scoped
 `NativePointer` values, and releases on `close()`. Access after close reports a
 binding error. The binding prevents nested acquisition and rejects render
 updates, resize, detach, and session destruction while a frame is active.
+Render-session resize, detach, memory-reduction, data-clear, and debug-log
+commands remain direct owner-thread C calls with status-to-error mapping;
+`detach()` records detached state while `close()` still releases the handle.
 
 Temporary native storage lives for one adapter call. Native result, snapshot,
-and list handles stay private; internal guards copy data into Vala-owned values
-and release native handles on every exit path. Public replacements use Vala
-values such as strings, arrays, `GLib.Bytes`, descriptor structs, and handle
-classes with deterministic release.
+and list handles stay private or sit behind deterministic Vala handle classes;
+internal guards copy data into Vala-owned values and release native handles on
+every exit path. Offline region snapshots and lists expose `get()`/`to_array()`
+copying helpers, then close their native handles exactly once. JSON, feature,
+geometry, and GeoJSON builders keep nested descriptor storage alive while the
+wrapper materializes raw C descriptors for one call. `JsonValue` owns scalar
+values, strings, arrays, and object members. `Feature` owns its geometry, JSON
+properties, and identifier. `FeatureCollection` owns Vala feature arrays and
+materializes native feature spans per call. `FeatureStateSelector` owns source,
+source-layer, feature-id, and state-key strings while the wrapper materializes
+the raw field mask privately. Feature-state snapshots copy borrowed native JSON
+into Vala-owned `JsonValue` objects before destroying the native snapshot.
+Geometry builders cover empty, point, line-string, polygon, multi-point,
+multi-line, multi-polygon, and geometry collection descriptors with Vala-owned
+coordinate lists, polygons, and child geometries. Rendered/source query options
+own layer IDs, source-layer IDs, and JSON filters, and materialize private C
+views for one query call. Query result access copies result-owned feature,
+source ID, source-layer ID, and feature-state views into Vala-owned values
+before the result handle closes. Feature-extension result handles copy borrowed
+JSON value or feature-collection payloads into Vala-owned descriptors before the
+native extension result closes. Public replacements use Vala values such as
+strings, arrays, `GLib.Bytes`, descriptor structs, and handle classes with
+deterministic release.
 
 ## Testing
 
