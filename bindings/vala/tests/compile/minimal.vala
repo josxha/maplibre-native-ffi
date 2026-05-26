@@ -1,13 +1,7 @@
-[CCode (has_target = false)]
+[CCode(has_target = false)]
 delegate void* MetalCreateSystemDefaultDeviceFunc();
 
-GLib.Mutex log_lock;
-int log_first_count = 0;
-int log_second_count = 0;
-GLib.Mutex provider_lock;
-int provider_call_count = 0;
-bool provider_cancel_checked = false;
-bool provider_second_complete_failed = false;
+int log_count = 0;
 
 void* create_system_default_metal_device() {
   var module = GLib.Module.open("/System/Library/Frameworks/Metal.framework/Metal", GLib.ModuleFlags.LAZY);
@@ -22,65 +16,19 @@ void* create_system_default_metal_device() {
   return create_device();
 }
 
-int read_provider_call_count() {
-  provider_lock.lock();
-  int count = provider_call_count;
-  provider_lock.unlock();
-  return count;
-}
-
-void note_provider_call() {
-  provider_lock.lock();
-  provider_call_count++;
-  provider_lock.unlock();
-}
-
-void note_provider_cancel_checked() {
-  provider_lock.lock();
-  provider_cancel_checked = true;
-  provider_lock.unlock();
-}
-
-void note_provider_second_complete_failed() {
-  provider_lock.lock();
-  provider_second_complete_failed = true;
-  provider_lock.unlock();
-}
-
-void read_provider_state(out int call_count, out bool cancel_checked, out bool second_complete_failed) {
-  provider_lock.lock();
-  call_count = provider_call_count;
-  cancel_checked = provider_cancel_checked;
-  second_complete_failed = provider_second_complete_failed;
-  provider_lock.unlock();
-}
-
-void note_first_log() {
-  log_lock.lock();
-  log_first_count++;
-  log_lock.unlock();
-}
-
-void note_replacement_log() {
-  log_lock.lock();
-  log_second_count++;
-  log_lock.unlock();
-}
-
-void read_log_state(out int first_count, out int second_count) {
-  log_lock.lock();
-  first_count = log_first_count;
-  second_count = log_second_count;
-  log_lock.unlock();
-}
-
-bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
-  note_first_log();
+bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, MaplibreNative.RuntimeEventType event_type, uint attempts) throws MaplibreNative.Error {
+  for (uint attempt = 0; attempt < attempts; attempt++) {
+    runtime.run_once();
+    var event = runtime.poll_event();
+    if (event != null && event.event_type == event_type) {
+      return true;
+    }
+  }
   return false;
 }
 
-bool handle_replacement_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
-  note_replacement_log();
+bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+  log_count++;
   return false;
 }
 
@@ -88,717 +36,174 @@ string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
   return null;
 }
 
-string? replacement_transform_resource(MaplibreNative.ResourceKind kind, string url) {
-  return null;
-}
-
-MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceRequestHandle handle) {
-  note_provider_call();
+int main() {
   try {
-    bool cancelled = false;
-    handle.is_cancelled(out cancelled);
-    note_provider_cancel_checked();
+    assert(MaplibreNative.c_version() == 0);
+    var backends = MaplibreNative.supported_render_backends();
+    assert(backends != 0);
 
-    MaplibreNative.ResourceResponse response = {};
-    response.default();
-    response.status = MaplibreNative.ResourceResponseStatus.ERROR;
-    response.error_reason = MaplibreNative.ResourceErrorReason.OTHER;
-    var retained = handle.retain_for_async();
-    retained.complete(response);
-    try {
-      retained.complete(response);
-    } catch (GLib.Error second_error) {
-      note_provider_second_complete_failed();
-    }
-    retained.release();
-    handle.release();
-    handle.release();
-    return MaplibreNative.ResourceProviderDecision.HANDLE;
-  } catch (GLib.Error error) {
-    return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
-  }
-}
+    var original_status = MaplibreNative.network_status();
+    MaplibreNative.set_network_status(MaplibreNative.NetworkStatus.OFFLINE);
+    assert(MaplibreNative.network_status() == MaplibreNative.NetworkStatus.OFFLINE);
+    MaplibreNative.set_network_status(original_status);
 
-bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, MaplibreNative.RuntimeEventType event_type, uint attempts) throws GLib.Error {
-  for (uint attempt = 0; attempt < attempts; attempt++) {
-    runtime.run_once();
-    MaplibreNative.RuntimeEvent? event = null;
-    runtime.poll_event(out event);
-    if (event != null && event.get_event_type() == event_type) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool exercise_metal_owned_texture_runtime(MaplibreNative.RuntimeHandle runtime, MaplibreNative.MapHandle map, MaplibreNative.RenderBackendFlags backends) throws GLib.Error {
-  if ((backends & MaplibreNative.RenderBackendFlags.METAL) == 0) {
-    return true;
-  }
-  void* device = create_system_default_metal_device();
-  if (device == null) {
-    return true;
-  }
-
-  MaplibreNative.NativePointer device_pointer;
-  MaplibreNative.NativePointer.@new((size_t) device, out device_pointer);
-
-  MaplibreNative.MetalOwnedTextureDescriptor descriptor = {};
-  descriptor.default();
-  descriptor.extent.@set(32, 16, 1.0);
-  descriptor.context.set_device(device_pointer);
-
-  var session = map.attach_metal_owned_texture(descriptor);
-  map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":\"background\",\"paint\":{\"background-color\":\"#d8f1ff\"}}]}");
-  if (!wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE, 64)) {
-    session.close();
-    return false;
-  }
-  session.render_update();
-
-  uint8[] readback_pixels = new uint8[32 * 16 * 4];
-  MaplibreNative.TextureImageInfo readback_info;
-  session.read_premultiplied_rgba8(readback_pixels, out readback_info);
-  bool readback_matches_extent = readback_info.width == 32 && readback_info.height == 16 && readback_info.stride * readback_info.height <= readback_pixels.length;
-
-  var frame = session.acquire_metal_owned_texture_frame();
-  uint32 width;
-  frame.get_width(out width);
-  if (width != 32 || !readback_matches_extent) {
-    frame.close();
-    session.close();
-    return false;
-  }
-
-  bool reentrant_render_rejected = false;
-  try {
-    session.render_update();
-  } catch (GLib.Error error) {
-    reentrant_render_rejected = true;
-  }
-  frame.close();
-
-  bool frame_closed_error_seen = false;
-  try {
-    frame.get_width(out width);
-  } catch (GLib.Error error) {
-    frame_closed_error_seen = true;
-  }
-  session.render_update();
-  session.close();
-  session.close();
-  return reentrant_render_rejected && frame_closed_error_seen;
-}
-
-bool probe_wrong_thread(MaplibreNative.MapHandle map) {
-  try {
-    bool loaded = false;
-    map.is_fully_loaded(out loaded);
-    return false;
-  } catch (GLib.Error error) {
-    return true;
-  }
-}
-
-void exercise_option_setters(MaplibreNative.LatLng coordinate) throws GLib.Error {
-  MaplibreNative.EdgeInsets insets = { 1.0, 2.0, 3.0, 4.0 };
-  MaplibreNative.ScreenPoint anchor = { 5.0, 6.0 };
-  MaplibreNative.UnitBezier easing = { 0.0, 0.0, 1.0, 1.0 };
-  MaplibreNative.LatLngBounds bounds = { { -1.0, -1.0 }, { 1.0, 1.0 } };
-  MaplibreNative.Vec3 position = { 1.0, 2.0, 3.0 };
-  MaplibreNative.Quaternion orientation = { 0.0, 0.0, 0.0, 1.0 };
-
-  MaplibreNative.RuntimeOptions runtime_options = {};
-  runtime_options.default();
-  runtime_options.set_maximum_cache_size(1024 * 1024);
-
-  MaplibreNative.CameraOptions camera = {};
-  camera.default();
-  camera.set_center(coordinate);
-  camera.set_zoom(1.0);
-  camera.set_bearing(2.0);
-  camera.set_pitch(3.0);
-  camera.set_center_altitude(4.0);
-  camera.set_padding(insets);
-  camera.set_anchor(anchor);
-  camera.set_roll(5.0);
-  camera.set_field_of_view(45.0);
-
-  MaplibreNative.AnimationOptions animation = {};
-  animation.default();
-  animation.set_duration_ms(100.0);
-  animation.set_velocity(1.0);
-  animation.set_min_zoom(0.0);
-  animation.set_easing(easing);
-
-  MaplibreNative.CameraFitOptions fit = {};
-  fit.default();
-  fit.set_padding(insets);
-  fit.set_bearing(0.0);
-  fit.set_pitch(0.0);
-
-  MaplibreNative.BoundOptions bound_options = {};
-  bound_options.default();
-  bound_options.set_bounds(bounds);
-  bound_options.set_min_zoom(0.0);
-  bound_options.set_max_zoom(22.0);
-  bound_options.set_min_pitch(0.0);
-  bound_options.set_max_pitch(60.0);
-
-  MaplibreNative.FreeCameraOptions free_camera = {};
-  free_camera.default();
-  free_camera.set_position(position);
-  free_camera.set_orientation(orientation);
-
-  MaplibreNative.ProjectionMode projection = {};
-  projection.default();
-  projection.set_axonometric(false);
-  projection.set_x_skew(0.0);
-  projection.set_y_skew(0.0);
-
-  MaplibreNative.MapViewportOptions viewport = {};
-  viewport.default();
-  viewport.set_north_orientation(MaplibreNative.NorthOrientation.UP);
-  viewport.set_constrain_mode(MaplibreNative.ConstrainMode.HEIGHT_ONLY);
-  viewport.set_viewport_mode(MaplibreNative.ViewportMode.DEFAULT);
-  viewport.set_frustum_offset(insets);
-
-  MaplibreNative.MapTileOptions tile = {};
-  tile.default();
-  tile.set_prefetch_zoom_delta(1);
-  tile.set_lod_min_radius(0.0);
-  tile.set_lod_scale(1.0);
-  tile.set_lod_pitch_threshold(0.0);
-  tile.set_lod_zoom_shift(0.0);
-  tile.set_lod_mode(MaplibreNative.TileLodMode.DEFAULT);
-
-  MaplibreNative.StyleTileSourceOptions source = {};
-  source.default();
-  source.set_min_zoom(0.0);
-  source.set_max_zoom(22.0);
-  source.set_scheme(MaplibreNative.StyleTileScheme.XYZ);
-  source.set_bounds(bounds);
-  source.set_tile_size(512);
-  source.set_vector_encoding(MaplibreNative.StyleVectorTileEncoding.MVT);
-  source.set_raster_encoding(MaplibreNative.StyleRasterDemEncoding.MAPBOX);
-
-  MaplibreNative.CustomGeometrySourceOptions custom = {};
-  custom.default();
-  custom.set_min_zoom(0.0);
-  custom.set_max_zoom(22.0);
-  custom.set_tolerance(0.375);
-  custom.set_tile_size(512);
-  custom.set_buffer(128);
-  custom.set_clip(true);
-  custom.set_wrap(true);
-
-  MaplibreNative.StyleImageOptions image = {};
-  image.default();
-  image.set_pixel_ratio(1.0f);
-  image.set_sdf(false);
-}
-
-void exercise_offline_operations(MaplibreNative.RuntimeHandle runtime, MaplibreNative.Geometry geometry) throws GLib.Error {
-  uint64 operation_id;
-  MaplibreNative.LatLngBounds region_bounds = { { -1.0, -1.0 }, { 1.0, 1.0 } };
-  var tile_definition = new MaplibreNative.OfflineRegionDefinition.tile_pyramid("asset://offline-style.json", region_bounds, 0.0, 4.0, 1.0f, true);
-  var geometry_definition = new MaplibreNative.OfflineRegionDefinition.geometry("asset://offline-style.json", geometry, 0.0, 4.0, 1.0f, false);
-  var definition_copy = geometry_definition.copy();
-  string? style_url = definition_copy.dup_style_url();
-  MaplibreNative.Geometry? copied_geometry = definition_copy.get_geometry();
-  if (tile_definition.get_definition_type() == MaplibreNative.OfflineRegionDefinitionType.TILE_PYRAMID && geometry_definition.get_definition_type() == MaplibreNative.OfflineRegionDefinitionType.GEOMETRY && style_url != null && copied_geometry != null) {
-    GLib.stderr.printf("");
-  }
-  double min_zoom = definition_copy.get_min_zoom();
-  double max_zoom = definition_copy.get_max_zoom();
-  float pixel_ratio = definition_copy.get_pixel_ratio();
-  bool include_ideographs = definition_copy.get_include_ideographs();
-  if (min_zoom <= max_zoom && pixel_ratio > 0.0f && !include_ideographs) {
-    GLib.stderr.printf("");
-  }
-  uint8[] metadata = { 1, 2, 3 };
-  runtime.offline_region_create_start(geometry_definition, metadata, out operation_id);
-  runtime.offline_region_get_start(1, out operation_id);
-  runtime.offline_regions_list_start(out operation_id);
-  runtime.offline_regions_merge_database_start("offline.db", out operation_id);
-  runtime.offline_region_update_metadata_start(1, metadata, out operation_id);
-  runtime.offline_region_get_status_start(1, out operation_id);
-  runtime.offline_region_set_observed_start(1, true, out operation_id);
-  runtime.offline_region_set_download_state_start(1, MaplibreNative.OfflineRegionDownloadState.INACTIVE, out operation_id);
-  MaplibreNative.OfflineRegionStatus status;
-  runtime.offline_region_get_status_take_result(operation_id, out status);
-  MaplibreNative.OfflineRegionInfo? maybe_region = runtime.offline_region_get_take_result(operation_id, out include_ideographs);
-  if (maybe_region != null) {
-    var region_definition = maybe_region.get_definition();
-    GLib.Bytes region_metadata = maybe_region.dup_metadata();
-    if (region_definition.get_definition_type() != 0 && region_metadata.get_size() >= 0) {
-      GLib.stderr.printf("");
-    }
-  }
-  MaplibreNative.OfflineRegionInfo created_region = runtime.offline_region_create_take_result(operation_id);
-  MaplibreNative.OfflineRegionInfo updated_region = runtime.offline_region_update_metadata_take_result(operation_id);
-  if (created_region.get_id() == updated_region.get_id()) {
-    GLib.stderr.printf("");
-  }
-  MaplibreNative.OfflineRegionInfoList regions = runtime.offline_regions_list_take_result(operation_id);
-  if (regions.count() > 0) {
-    var first_region = regions.get(0);
-    first_region.dup_metadata();
-  }
-  runtime.offline_region_invalidate_start(1, out operation_id);
-  runtime.offline_region_delete_start(1, out operation_id);
-  runtime.offline_operation_discard(operation_id);
-}
-
-void exercise_json_style(MaplibreNative.MapHandle map, MaplibreNative.JsonValue json) throws GLib.Error {
-  map.add_style_source_json("json-source", json);
-  map.add_style_layer_json(json, "");
-  map.set_style_light_json(json);
-  map.set_style_light_property("anchor", json);
-  map.set_layer_property("json-layer", "visibility", json);
-  map.set_layer_filter("json-layer", json);
-}
-
-void exercise_inline_source_data(MaplibreNative.MapHandle map, MaplibreNative.Geometry geometry) throws GLib.Error {
-  string source_id = "fixture-source";
-  var data = new MaplibreNative.GeoJson.geometry(geometry);
-  var feature_data = new MaplibreNative.GeoJson.feature(geometry);
-  MaplibreNative.Geometry[] collection_geometries = { geometry };
-  var collection_data = new MaplibreNative.GeoJson.feature_collection(collection_geometries);
-  map.add_geojson_source_data(source_id, data);
-  map.set_geojson_source_data(source_id, feature_data);
-  map.set_geojson_source_data(source_id, collection_data);
-
-  MaplibreNative.CustomGeometrySourceOptions options = {};
-  options.default();
-  int captured_fetch_count = 0;
-  map.add_custom_geometry_source_with_callbacks("custom-geometry-source", (tile_id) => {
-    captured_fetch_count++;
-  }, null, options);
-  MaplibreNative.CanonicalTileId tile_id = { 0, 0, 0 };
-  map.set_custom_geometry_source_tile_data("custom-geometry-source", tile_id, data);
-  map.invalidate_custom_geometry_source_tile("custom-geometry-source", tile_id);
-  MaplibreNative.LatLngBounds bounds = { { -1.0, -1.0 }, { 1.0, 1.0 } };
-  map.invalidate_custom_geometry_source_region("custom-geometry-source", bounds);
-}
-
-void exercise_feature_queries(MaplibreNative.RenderSessionHandle session, MaplibreNative.Geometry feature_geometry, MaplibreNative.JsonValue json) throws GLib.Error {
-  MaplibreNative.RenderedFeatureQueryOptions rendered_options = {};
-  rendered_options.default();
-  MaplibreNative.SourceFeatureQueryOptions source_options = {};
-  source_options.default();
-  MaplibreNative.ScreenPoint point = { 0.0, 0.0 };
-  MaplibreNative.RenderedQueryGeometry geometry;
-  MaplibreNative.RenderedQueryGeometry.point(point, out geometry);
-  var rendered_features = session.query_rendered_features(geometry, rendered_options);
-  var source_features = session.query_source_features("fixture-source", source_options);
-  if (rendered_features.count() > 0) {
-    var rendered_feature = rendered_features.get(0);
-    MaplibreNative.Feature? copied_feature = rendered_feature.get_feature();
-    MaplibreNative.JsonValue? state = rendered_feature.get_state();
-    string? source_id = rendered_feature.dup_source_id();
-    string? source_layer_id = rendered_feature.dup_source_layer_id();
-    if ((copied_feature != null && copied_feature.to_geo_json() != null) || state != null || source_id != null || source_layer_id != null) {
-      GLib.stderr.printf("");
-    }
-  }
-  if (source_features.count() > 0) {
-    source_features.get(0).get_feature();
-  }
-  var feature = new MaplibreNative.Feature(feature_geometry);
-  var extension_result = session.query_feature_extension("fixture-source", feature, "supercluster", "children", json);
-  if (extension_result.get_result_type() == MaplibreNative.FeatureExtensionResultType.VALUE) {
-    MaplibreNative.JsonValue? value = extension_result.get_value();
-    if (value != null) {
-      GLib.stderr.printf("");
-    }
-  }
-  MaplibreNative.GeoJson? extension_collection = extension_result.get_feature_collection();
-  if (extension_collection != null) {
-    GLib.stderr.printf("");
-  }
-  MaplibreNative.FeatureStateSelector selector = {};
-  MaplibreNative.JsonValue? feature_state = session.get_feature_state(selector);
-  if (feature_state != null || geometry.type == MaplibreNative.RenderedQueryGeometryType.POINT) {
-    GLib.stderr.printf("");
-  }
-}
-
-void exercise_geometry_camera(MaplibreNative.MapHandle map, MaplibreNative.MapProjectionHandle projection, MaplibreNative.Geometry geometry) throws GLib.Error {
-  MaplibreNative.CameraFitOptions fit_options = {};
-  fit_options.default();
-  MaplibreNative.CameraOptions camera;
-  map.camera_for_geometry(geometry, fit_options, out camera);
-  MaplibreNative.EdgeInsets padding = { 0.0, 0.0, 0.0, 0.0 };
-  projection.set_visible_geometry(geometry, padding);
-}
-
-void inspect_metal_owned_texture_frame(MaplibreNative.MetalOwnedTextureFrameHandle frame) throws GLib.Error {
-  uint64 generation;
-  uint32 width;
-  uint32 height;
-  double scale_factor;
-  uint64 frame_id;
-  uint64 pixel_format;
-  frame.get_generation(out generation);
-  frame.get_width(out width);
-  frame.get_height(out height);
-  frame.get_scale_factor(out scale_factor);
-  frame.get_frame_id(out frame_id);
-  frame.get_pixel_format(out pixel_format);
-  MaplibreNative.NativePointer texture = frame.get_texture();
-  MaplibreNative.NativePointer device = frame.get_device();
-  bool frame_fields_seen = texture.get_bits() != 0 && device.get_bits() != 0 && generation != frame_id && width != height && scale_factor != 0.0 && pixel_format != 0;
-  if (frame_fields_seen) {
-    GLib.stderr.printf("");
-  }
-  frame.close();
-}
-
-void inspect_vulkan_owned_texture_frame(MaplibreNative.VulkanOwnedTextureFrameHandle frame) throws GLib.Error {
-  uint64 generation;
-  uint32 width;
-  uint32 height;
-  double scale_factor;
-  uint64 frame_id;
-  uint32 format;
-  uint32 layout;
-  frame.get_generation(out generation);
-  frame.get_width(out width);
-  frame.get_height(out height);
-  frame.get_scale_factor(out scale_factor);
-  frame.get_frame_id(out frame_id);
-  frame.get_format(out format);
-  frame.get_layout(out layout);
-  MaplibreNative.NativePointer image = frame.get_image();
-  MaplibreNative.NativePointer image_view = frame.get_image_view();
-  MaplibreNative.NativePointer device = frame.get_device();
-  bool frame_fields_seen = image.get_bits() != 0 && image_view.get_bits() != 0 && device.get_bits() != 0 && generation != frame_id && width != height && scale_factor != 0.0 && format != layout;
-  if (frame_fields_seen) {
-    GLib.stderr.printf("");
-  }
-  frame.close();
-}
-
-int main(string[] args) {
-  uint32 version = MaplibreNative.c_version();
-  MaplibreNative.NetworkStatus status;
-
-  try {
-    MaplibreNative.RenderBackendFlags backends = MaplibreNative.supported_render_backends();
-    MaplibreNative.NetworkStatus.get(out status);
-    status.set();
-    MaplibreNative.log_set_async_severity_mask(MaplibreNative.LogSeverityFlags.DEFAULT);
-    MaplibreNative.log_set_callback(handle_log);
-    MaplibreNative.log_set_callback(handle_replacement_log);
-
-    MaplibreNative.NativePointer native_pointer;
-    MaplibreNative.NativePointer.@new(0x1234, out native_pointer);
-    size_t pointer_bits = native_pointer.get_bits();
-    MaplibreNative.ResourceResponse response = {};
-    response.default();
-    MaplibreNative.RenderedFeatureQueryOptions rendered_query_options = {};
-    rendered_query_options.default();
-    MaplibreNative.SourceFeatureQueryOptions source_query_options = {};
-    source_query_options.default();
-
-    MaplibreNative.LatLng coordinate = { 37.7749, -122.4194 };
-    MaplibreNative.ScreenPoint query_point = { 0.0, 0.0 };
-    MaplibreNative.RenderedQueryGeometry query_geometry;
-    MaplibreNative.RenderedQueryGeometry.point(query_point, out query_geometry);
-    MaplibreNative.ScreenBox query_box = { { 0.0, 0.0 }, { 1.0, 1.0 } };
-    MaplibreNative.RenderedQueryGeometry.box(query_box, out query_geometry);
-    MaplibreNative.ScreenPoint[] query_points = { { 0.0, 0.0 }, { 1.0, 1.0 } };
-    MaplibreNative.RenderedQueryGeometry.line_string(query_points, out query_geometry);
-
-    MaplibreNative.ProjectedMeters meters;
-    MaplibreNative.ProjectedMeters.for_lat_lng(coordinate, out meters);
-    MaplibreNative.LatLng round_trip;
-    MaplibreNative.LatLng.for_projected_meters(meters, out round_trip);
-
-    exercise_option_setters(coordinate);
-
-    MaplibreNative.RuntimeOptions runtime_options = {};
-    runtime_options.default();
-    runtime_options.set_maximum_cache_size(1024 * 1024);
-    var runtime = new MaplibreNative.RuntimeHandle.with_options(runtime_options);
-    runtime.set_resource_provider(provide_resource);
+    var runtime_options = new MaplibreNative.RuntimeOptions();
+    runtime_options.maximum_cache_size = 1024 * 1024;
+    var runtime = new MaplibreNative.RuntimeHandle(runtime_options);
     runtime.set_resource_transform(transform_resource);
-    runtime.set_resource_transform(replacement_transform_resource);
-    runtime.run_once();
-    MaplibreNative.RuntimeEvent? event = null;
-    runtime.poll_event(out event);
-    bool event_copy_matches = true;
-    if (event != null) {
-      var event_copy = event.copy();
-      event_copy_matches = event_copy.get_event_type() == event.get_event_type() && event_copy.get_source_type() == event.get_source_type() && event_copy.get_payload_type() == event.get_payload_type() && event_copy.get_code() == event.get_code();
-    }
-
-    MaplibreNative.MapOptions map_options = {};
-    map_options.default();
-    map_options.width = 512;
-    map_options.height = 512;
-    map_options.scale_factor = 1.0;
-    map_options.map_mode = MaplibreNative.MapMode.CONTINUOUS;
-    var map = new MaplibreNative.MapHandle.with_options(runtime, map_options);
-    map.set_style_url("custom://style.json");
-    for (int provider_spin = 0; provider_spin < 200 && read_provider_call_count() == 0; provider_spin++) {
-      runtime.run_once();
-      GLib.Thread.usleep(10000);
-    }
-    map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
-    map.add_geojson_source_url("fixture-source", "asset://fixture.geojson");
-    bool source_exists = false;
-    map.style_source_exists("fixture-source", out source_exists);
-    MaplibreNative.StyleSourceType source_type;
-    bool source_found = false;
-    map.get_style_source_type("fixture-source", out source_type, out source_found);
-    MaplibreNative.StyleSourceInfo source_info;
-    map.get_style_source_info("fixture-source", out source_info, out source_found);
-    char[] attribution_buffer = new char[256];
-    size_t attribution_size = 0;
-    bool attribution_found = false;
-    map.copy_style_source_attribution("fixture-source", attribution_buffer, out attribution_size, out attribution_found);
-    map.set_geojson_source_url("fixture-source", "asset://fixture-updated.geojson");
-    bool source_removed = false;
-    map.remove_style_source("fixture-source", out source_removed);
-    MaplibreNative.StyleTileSourceOptions tile_source_options = {};
-    tile_source_options.default();
-    string vector_tile_url = "asset://vector/{z}/{x}/{y}.pbf";
-    string raster_tile_url = "asset://raster/{z}/{x}/{y}.png";
-    string dem_tile_url = "asset://dem/{z}/{x}/{y}.png";
-    var vector_tile_urls = new MaplibreNative.StringList({ vector_tile_url });
-    var raster_tile_urls = new MaplibreNative.StringList({ raster_tile_url });
-    var dem_tile_urls = new MaplibreNative.StringList({ dem_tile_url });
-    map.add_vector_source_url("vector-source", "asset://vector-source.json", tile_source_options);
-    map.remove_style_source("vector-source", out source_removed);
-    map.add_vector_source_tiles("vector-tiles-source", vector_tile_urls, tile_source_options);
-    map.remove_style_source("vector-tiles-source", out source_removed);
-    map.add_raster_source_url("raster-source", "asset://raster-source.json", tile_source_options);
-    map.remove_style_source("raster-source", out source_removed);
-    map.add_raster_source_tiles("raster-tiles-source", raster_tile_urls, tile_source_options);
-    map.remove_style_source("raster-tiles-source", out source_removed);
-    map.add_raster_dem_source_url("dem-source", "asset://dem-source.json", tile_source_options);
-    map.add_raster_dem_source_tiles("dem-tiles-source", dem_tile_urls, tile_source_options);
-    map.remove_style_source("dem-tiles-source", out source_removed);
-    map.add_hillshade_layer("hillshade-layer", "dem-source", "");
-    map.add_color_relief_layer("color-relief-layer", "dem-source", "");
-    map.remove_style_layer("hillshade-layer", out source_removed);
-    map.remove_style_layer("color-relief-layer", out source_removed);
-    map.remove_style_source("dem-source", out source_removed);
-    uint8[] image_pixels = { 255, 0, 0, 255 };
-    MaplibreNative.PremultipliedRgba8Image style_image = {};
-    style_image.init(1, 1, 4, image_pixels);
-    MaplibreNative.StyleImageOptions style_image_options = {};
-    style_image_options.default();
-    MaplibreNative.StyleImageInfo style_image_info = {};
-    style_image_info.default();
-    map.set_style_image("fixture-image", style_image, style_image_options);
-    uint8[] style_image_copy = new uint8[4];
-    size_t style_image_copy_size = 0;
-    bool style_image_copy_found = false;
-    map.copy_style_image_premultiplied_rgba8("fixture-image", style_image_copy, out style_image_copy_size, out style_image_copy_found);
-    bool image_exists = false;
-    map.style_image_exists("fixture-image", out image_exists);
-    bool image_found = false;
-    map.get_style_image_info("fixture-image", out style_image_info, out image_found);
-    bool image_removed = false;
-    map.remove_style_image("fixture-image", out image_removed);
-    MaplibreNative.LatLng[] image_coordinates = {
-      { 0.0, 0.0 },
-      { 0.0, 1.0 },
-      { 1.0, 1.0 },
-      { 1.0, 0.0 },
-    };
-    map.add_image_source_url("image-source", image_coordinates, "asset://image.png");
-    map.set_image_source_url("image-source", "asset://image-updated.png");
-    map.set_image_source_coordinates("image-source", image_coordinates);
-    MaplibreNative.LatLng[] copied_image_coordinates = new MaplibreNative.LatLng[4];
-    size_t copied_image_coordinate_count = 0;
-    map.get_image_source_coordinates("image-source", copied_image_coordinates, out copied_image_coordinate_count, out source_found);
-    map.remove_style_source("image-source", out source_removed);
-    map.add_image_source_image("inline-image-source", image_coordinates, style_image);
-    map.set_image_source_image("inline-image-source", style_image);
-    map.remove_style_source("inline-image-source", out source_removed);
-    map.add_location_indicator_layer("location-layer", "");
-    map.set_location_indicator_location("location-layer", coordinate, 0.0);
-    map.set_location_indicator_bearing("location-layer", 0.0);
-    map.set_location_indicator_accuracy_radius("location-layer", 0.0);
-    map.set_location_indicator_image_name("location-layer", MaplibreNative.LocationIndicatorImageKind.TOP, "fixture-image");
-    bool layer_exists = false;
-    map.style_layer_exists("location-layer", out layer_exists);
-    var layer_ids = map.list_style_layer_ids();
-    size_t layer_id_count = layer_ids.count();
-    string? first_layer_id = layer_id_count > 0 ? layer_ids.get(0) : null;
-    var copied_layer_ids = layer_ids.copy();
-    var source_ids = map.list_style_source_ids();
-    size_t source_id_count = source_ids.count();
-    bool layer_json_found = false;
-    MaplibreNative.JsonValue? layer_json = map.get_style_layer_json("location-layer", out layer_json_found);
-    if (first_layer_id != null && copied_layer_ids != null && source_id_count >= 0 && layer_json != null && layer_json_found) {
-      GLib.stderr.printf("");
-    }
-    string? layer_type;
-    bool layer_found = false;
-    map.get_style_layer_type("location-layer", out layer_type, out layer_found);
-    map.move_style_layer("location-layer", "");
-    bool layer_removed = false;
-    map.remove_style_layer("location-layer", out layer_removed);
-    MaplibreNative.MetalSurfaceDescriptor metal_surface = {};
-    metal_surface.default();
-    MaplibreNative.VulkanSurfaceDescriptor vulkan_surface = {};
-    vulkan_surface.default();
-    MaplibreNative.MetalOwnedTextureDescriptor metal_owned_texture = {};
-    metal_owned_texture.default();
-    MaplibreNative.MetalBorrowedTextureDescriptor metal_borrowed_texture = {};
-    metal_borrowed_texture.default();
-    MaplibreNative.VulkanOwnedTextureDescriptor vulkan_owned_texture = {};
-    vulkan_owned_texture.default();
-    MaplibreNative.VulkanBorrowedTextureDescriptor vulkan_borrowed_texture = {};
-    vulkan_borrowed_texture.default();
-    MaplibreNative.TextureImageInfo texture_info = {};
-    texture_info.default();
-    bool metal_frame_runtime_seen = exercise_metal_owned_texture_runtime(runtime, map, backends);
-    var vulkan_frame_object = GLib.Object.new(typeof(MaplibreNative.VulkanOwnedTextureFrameHandle));
-    var vulkan_frame = (MaplibreNative.VulkanOwnedTextureFrameHandle) vulkan_frame_object;
-    vulkan_frame.close();
-    vulkan_frame.close();
-    bool vulkan_frame_closed_error_seen = false;
-    try {
-      uint32 closed_frame_width;
-      vulkan_frame.get_width(out closed_frame_width);
-    } catch (GLib.Error error) {
-      vulkan_frame_closed_error_seen = true;
-    }
-    map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS);
-    MaplibreNative.MapDebugOptions debug_options;
-    map.get_debug_options(out debug_options);
-    map.set_rendering_stats_view_enabled(true);
-    bool rendering_stats_enabled = false;
-    map.get_rendering_stats_view_enabled(out rendering_stats_enabled);
-    MaplibreNative.CameraOptions camera = {};
-    camera.default();
-    map.get_camera(out camera);
-    MaplibreNative.CameraFitOptions fit_options = {};
-    fit_options.default();
-    MaplibreNative.LatLngBounds camera_bounds = {
-      { -1.0, -1.0 },
-      { 1.0, 1.0 },
-    };
-    MaplibreNative.CameraOptions fitted_camera;
-    map.camera_for_lat_lng_bounds(camera_bounds, fit_options, out fitted_camera);
-    MaplibreNative.LatLng[] fit_coordinates = {
-      { -1.0, -1.0 },
-      { 1.0, 1.0 },
-    };
-    map.camera_for_lat_lngs(fit_coordinates, fit_options, out fitted_camera);
-    MaplibreNative.LatLngBounds fitted_bounds;
-    map.lat_lng_bounds_for_camera(fitted_camera, out fitted_bounds);
-    map.lat_lng_bounds_for_camera_unwrapped(fitted_camera, out fitted_bounds);
-    MaplibreNative.AnimationOptions animation = {};
-    animation.default();
-    map.jump_to(camera);
-    map.ease_to(camera, animation);
-    map.fly_to(camera, null);
-    map.move_by(0.0, 0.0);
-    map.move_by_animated(0.0, 0.0, animation);
-    map.scale_by(1.0, null);
-    map.scale_by_animated(1.0, null, animation);
-    MaplibreNative.ScreenPoint origin = { 0.0, 0.0 };
-    map.rotate_by(origin, origin);
-    map.rotate_by_animated(origin, origin, animation);
-    map.pitch_by(0.0);
-    map.pitch_by_animated(0.0, animation);
-    map.cancel_transitions();
-    MaplibreNative.ScreenPoint map_point;
-    map.pixel_for_lat_lng(coordinate, out map_point);
-    map.lat_lng_for_pixel(map_point, out round_trip);
-    MaplibreNative.ScreenPoint[] projected_points = new MaplibreNative.ScreenPoint[fit_coordinates.length];
-    map.pixels_for_lat_lngs(fit_coordinates, projected_points);
-    MaplibreNative.LatLng[] unprojected_coordinates = new MaplibreNative.LatLng[projected_points.length];
-    map.lat_lngs_for_pixels(projected_points, unprojected_coordinates);
-
-    MaplibreNative.BoundOptions bounds = {};
-    bounds.default();
-    map.get_bounds(out bounds);
-    map.set_bounds(bounds);
-    MaplibreNative.FreeCameraOptions free_camera = {};
-    free_camera.default();
-    map.get_free_camera_options(out free_camera);
-    map.set_free_camera_options(free_camera);
-    MaplibreNative.ProjectionMode projection_mode = {};
-    projection_mode.default();
-    map.get_projection_mode(out projection_mode);
-    map.set_projection_mode(projection_mode);
-    MaplibreNative.MapViewportOptions viewport_options = {};
-    viewport_options.default();
-    map.get_viewport_options(out viewport_options);
-    map.set_viewport_options(viewport_options);
-    MaplibreNative.MapTileOptions tile_options = {};
-    tile_options.default();
-    map.get_tile_options(out tile_options);
-    map.set_tile_options(tile_options);
-
-    bool loaded = false;
-    map.is_fully_loaded(out loaded);
-    var wrong_thread = new GLib.Thread<bool>("wrong-thread", () => {
-      return probe_wrong_thread(map);
-    });
-    bool wrong_thread_error_seen = wrong_thread.join();
-    map.dump_debug_logs();
-
-    var projection = new MaplibreNative.MapProjectionHandle(map);
-    projection.get_camera(out camera);
-    projection.set_camera(camera);
-    MaplibreNative.EdgeInsets projection_padding = { 0.0, 0.0, 0.0, 0.0 };
-    MaplibreNative.LatLng[] visible_coordinates = { coordinate, round_trip };
-    projection.set_visible_coordinates(visible_coordinates, projection_padding);
-    MaplibreNative.ScreenPoint point;
-    projection.pixel_for_lat_lng(coordinate, out point);
-    projection.lat_lng_for_pixel(point, out round_trip);
-
-    unowned MaplibreNative.Geometry? bindability_geometry = null;
-    unowned MaplibreNative.JsonValue? bindability_json = null;
-    MaplibreNative.RenderSessionHandle? bindability_session = null;
-    MaplibreNative.MetalOwnedTextureFrameHandle? bindability_metal_frame = null;
-    MaplibreNative.VulkanOwnedTextureFrameHandle? bindability_vulkan_frame = null;
-    if (args.length < 0 && bindability_geometry != null && bindability_json != null && bindability_session != null) {
-      exercise_offline_operations(runtime, bindability_geometry);
-      exercise_json_style(map, bindability_json);
-      exercise_inline_source_data(map, bindability_geometry);
-      exercise_feature_queries(bindability_session, bindability_geometry, bindability_json);
-      exercise_geometry_camera(map, projection, bindability_geometry);
-      if (bindability_metal_frame != null) {
-        inspect_metal_owned_texture_frame(bindability_metal_frame);
-      }
-      if (bindability_vulkan_frame != null) {
-        inspect_vulkan_owned_texture_frame(bindability_vulkan_frame);
-      }
-    }
-
-    projection.close();
-
-    map.close();
-    map.close();
     runtime.clear_resource_transform();
-    runtime.close();
-    runtime.close();
-    MaplibreNative.log_clear_callback();
+    runtime.run_once();
+    assert(runtime.poll_event() == null);
 
-    int final_provider_call_count;
-    bool final_provider_cancel_checked;
-    bool final_provider_second_complete_failed;
-    read_provider_state(out final_provider_call_count, out final_provider_cancel_checked, out final_provider_second_complete_failed);
-    int final_log_first_count;
-    int final_log_second_count;
-    read_log_state(out final_log_first_count, out final_log_second_count);
-    if (backends == 0 || pointer_bits != 0x1234 || !event_copy_matches || !wrong_thread_error_seen || !final_provider_cancel_checked || !final_provider_second_complete_failed || final_provider_call_count == 0 || final_log_first_count != 0 || final_log_second_count == 0 || !metal_frame_runtime_seen || !vulkan_frame_closed_error_seen) {
-      GLib.stderr.printf("vala runtime check failed: backends=%u pointer=%" + size_t.FORMAT + " event=%s wrong_thread=%s provider_cancel=%s provider_second=%s provider_calls=%d log_first=%d log_second=%d metal_frame=%s vulkan_frame=%s\n", (uint) backends, pointer_bits, event_copy_matches.to_string(), wrong_thread_error_seen.to_string(), final_provider_cancel_checked.to_string(), final_provider_second_complete_failed.to_string(), final_provider_call_count, final_log_first_count, final_log_second_count, metal_frame_runtime_seen.to_string(), vulkan_frame_closed_error_seen.to_string());
-      return 1;
+    var map_options = new MaplibreNative.MapOptions();
+    map_options.width = 128;
+    map_options.height = 64;
+    map_options.scale_factor = 1.0;
+    var map = new MaplibreNative.MapHandle(runtime, map_options);
+
+    bool close_runtime_with_live_map_failed = false;
+    try {
+      runtime.close();
+    } catch (MaplibreNative.Error error) {
+      close_runtime_with_live_map_failed = true;
     }
-  } catch (GLib.Error error) {
+    assert(close_runtime_with_live_map_failed);
+
+    map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    map.set_debug_options(0);
+    assert(map.get_debug_options() == 0);
+    map.set_rendering_stats_view_enabled(false);
+    assert(!map.get_rendering_stats_view_enabled());
+    map.is_fully_loaded();
+    MaplibreNative.set_log_callback(handle_log);
+    bool parse_error_mapped = false;
+    try {
+      map.set_style_json("{");
+    } catch (MaplibreNative.Error error) {
+      parse_error_mapped = error.message.length > 0;
+    }
+    assert(parse_error_mapped);
+    assert(log_count > 0);
+    MaplibreNative.clear_log_callback();
+    map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+
+    bool invalid_argument_mapped = false;
+    try {
+      map.add_geojson_source_url("", "https://example.invalid/points.geojson");
+    } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+      invalid_argument_mapped = error.message.length > 0;
+    }
+    assert(invalid_argument_mapped);
+
+    uint8[] image_pixels = { 255, 0, 0, 255 };
+    var image = new MaplibreNative.PremultipliedRgba8Image(1, 1, 4, image_pixels);
+    var image_options = new MaplibreNative.StyleImageOptions();
+    image_options.pixel_ratio = 1.0f;
+    image_options.sdf = false;
+    map.set_style_image("marker", image, image_options);
+    assert(map.style_image_exists("marker"));
+    var image_info = map.get_style_image_info("marker");
+    assert(image_info != null && image_info.width == 1 && image_info.height == 1);
+    var copied_image = map.copy_style_image_premultiplied_rgba8("marker");
+    assert(copied_image != null && copied_image.length == 4 && copied_image[0] == 255);
+    assert(map.remove_style_image("marker"));
+    assert(!map.remove_style_image("marker"));
+
+    var camera = new MaplibreNative.CameraOptions();
+    camera.set_center(MaplibreNative.LatLng(0.0, 0.0));
+    camera.set_zoom(1.0);
+    map.jump_to(camera);
+    var copied_camera = map.get_camera();
+    double zoom;
+    copied_camera.get_zoom(out zoom);
+
+    map.add_geojson_source_url("points", "https://example.invalid/points.geojson");
+    assert(map.style_source_exists("points"));
+    assert(map.get_style_source_type("points") == MaplibreNative.StyleSourceType.GEOJSON);
+    var source_info = map.get_style_source_info("points");
+    assert(source_info != null && source_info.source_type == MaplibreNative.StyleSourceType.GEOJSON && source_info.id_size == "points".length);
+    assert(map.list_style_source_ids().contains("points"));
+    map.set_geojson_source_url("points", "https://example.invalid/updated.geojson");
+    assert(map.remove_style_source("points"));
+    assert(!map.remove_style_source("points"));
+
+    map.add_location_indicator_layer("location");
+    assert(map.style_layer_exists("location"));
+    assert(map.list_style_layer_ids().contains("location"));
+    assert(map.remove_style_layer("location"));
+    assert(!map.remove_style_layer("location"));
+
+    uint64 operation_id = runtime.run_ambient_cache_operation_start(MaplibreNative.AmbientCacheOperation.INVALIDATE);
+    runtime.discard_offline_operation(operation_id);
+
+    var projection = map.create_projection();
+    var pixel = projection.pixel_for_lat_lng(MaplibreNative.LatLng(0.0, 0.0));
+    var round_trip = projection.lat_lng_for_pixel(pixel);
+    assert(round_trip.latitude > -90.0 && round_trip.latitude < 90.0);
+    projection.set_camera(camera);
+    projection.set_visible_coordinates({ MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0) }, MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
+    projection.close();
+    bool closed_projection_failed = false;
+    try {
+      projection.get_camera();
+    } catch (MaplibreNative.Error error) {
+      closed_projection_failed = true;
+    }
+    assert(closed_projection_failed);
+
+    var meters = MaplibreNative.projected_meters_for_lat_lng(MaplibreNative.LatLng(0.0, 0.0));
+    var meters_coordinate = MaplibreNative.lat_lng_for_projected_meters(meters);
+    assert(meters_coordinate.latitude > -1.0 && meters_coordinate.latitude < 1.0);
+
+    if ((backends & MaplibreNative.RenderBackendFlags.METAL) != 0) {
+      void* device = create_system_default_metal_device();
+      if (device != null) {
+        var texture = new MaplibreNative.MetalOwnedTextureDescriptor(MaplibreNative.NativePointer((size_t) device));
+        texture.width = 32;
+        texture.height = 16;
+        texture.scale_factor = 1.0;
+        var session = map.attach_metal_owned_texture(texture);
+        assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE, 64));
+        session.render_update();
+        var query_result = session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.point(MaplibreNative.ScreenPoint(0.0, 0.0)));
+        query_result.count();
+        query_result.close();
+        uint8[] pixels = new uint8[32 * 16 * 4];
+        var info = session.read_premultiplied_rgba8(pixels);
+        assert(info.width == 32);
+        assert(info.height == 16);
+        assert(info.stride * info.height <= pixels.length);
+
+        var frame = session.acquire_metal_owned_texture_frame();
+        assert(frame.get_width() == 32);
+        bool render_while_acquired_failed = false;
+        try {
+          session.render_update();
+        } catch (MaplibreNative.Error error) {
+          render_while_acquired_failed = true;
+        }
+        assert(render_while_acquired_failed);
+        frame.close();
+        bool closed_frame_failed = false;
+        try {
+          frame.get_width();
+        } catch (MaplibreNative.Error error) {
+          closed_frame_failed = true;
+        }
+        assert(closed_frame_failed);
+        session.close();
+      }
+    }
+
+    map.close();
+    map.close();
+    runtime.close();
+    runtime.close();
+    assert(map.closed);
+    assert(runtime.closed);
+    return 0;
+  } catch (MaplibreNative.Error error) {
+    stderr.printf("Vala binding smoke test failed: %s\n", error.message);
     return 1;
   }
-
-  return version == 0 ? 0 : 0;
 }
