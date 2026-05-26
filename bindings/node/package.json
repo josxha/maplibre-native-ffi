@@ -25,7 +25,7 @@
   "engines": { "node": ">=22.14" },
   "napi": { "binaryName": "maplibre-native-node" },
   "scripts": {
-    "build": "napi build --platform --manifest-path Cargo.toml",
+    "build": "napi build --release --platform --manifest-path Cargo.toml",
     "build:debug": "napi build --platform --manifest-path Cargo.toml",
     "test": "node --test test/*.test.cjs && node test/esm-smoke.mjs",
     "typecheck": "tsc --noEmit"

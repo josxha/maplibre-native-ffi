@@ -6,7 +6,11 @@ import {
 } from "@maplibre/native-ffi-node/geo";
 import { type JsonValue } from "@maplibre/native-ffi-node/json";
 import { setLogCallback, type LogRecord } from "@maplibre/native-ffi-node/log";
-import { MapHandle } from "@maplibre/native-ffi-node/map";
+import {
+  MapHandle,
+  type MapTileOptionsInput,
+  type MapViewportOptionsInput,
+} from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
 import { type RenderedQueryGeometry } from "@maplibre/native-ffi-node/query";
 import {
@@ -50,7 +54,7 @@ const geometry: RenderedQueryGeometry = {
   kind: "point",
   point: { x: 0, y: 0 },
 };
-const response: ResourceResponseInput = { status: "ok" };
+const response: ResourceResponseInput = { status: "ok", modifiedUnixMs: 1n };
 const route: ResourceRoute = { urlPrefix: "custom://", kind: "source" };
 const providerCallback: ResourceProviderCallback = (request) => {
   request.handle.complete(response);
@@ -62,6 +66,22 @@ RuntimeHandle.prototype.setResourceProviderRoutes.call(
   [route],
   providerCallback,
 );
+const viewportOptions: MapViewportOptionsInput = { northOrientation: "up" };
+const tileOptions: MapTileOptionsInput = { lodMode: "distance" };
+const invalidViewportOptions: MapViewportOptionsInput = {
+  // @ts-expect-error input descriptors reject unknown enum sentinels.
+  viewportMode: "unknown",
+};
+// @ts-expect-error input descriptors reject unknown enum sentinels.
+const invalidTileOptions: MapTileOptionsInput = { lodMode: "unknown" };
+const runtimeEvent = RuntimeHandle.prototype.pollEvent.call(
+  {} as RuntimeHandle,
+);
+if (runtimeEvent?.payload.kind === "offline-operation-completed") {
+  const operationId: bigint =
+    runtimeEvent.payload.offlineOperationCompleted.operationId;
+  void operationId;
+}
 const transformRule: ResourceTransformRule = {
   urlPrefix: "http://example.test/",
   replacementUrlPrefix: "https://example.test/",
@@ -88,6 +108,10 @@ void geometry;
 void response;
 void route;
 void providerCallback;
+void viewportOptions;
+void tileOptions;
+void invalidViewportOptions;
+void invalidTileOptions;
 void invalidProviderCallback;
 void transformRule;
 void invalidTransformRuleMissingPrefix;

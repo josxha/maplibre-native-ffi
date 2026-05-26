@@ -1,8 +1,10 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use napi::bindgen_prelude::Result;
+use napi::bindgen_prelude::{Env, Result};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -31,7 +33,14 @@ pub struct LogRecord {
     pub message: String,
 }
 
-static LOG_CALLBACK: OnceLock<Mutex<Option<Arc<ThreadsafeFunction<LogRecord>>>>> = OnceLock::new();
+static LOG_CALLBACK: OnceLock<Mutex<Option<LogCallbackState>>> = OnceLock::new();
+static LOG_CALLBACK_IDS: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Clone)]
+struct LogCallbackState {
+    id: u64,
+    callback: Arc<ThreadsafeFunction<LogRecord>>,
+}
 
 #[napi(js_name = "cVersion")]
 pub fn c_version() -> u32 {
@@ -90,23 +99,28 @@ pub fn set_network_status(status: String) -> Result<()> {
 }
 
 #[napi(js_name = "nativeSetLogCallback")]
-pub fn native_set_log_callback(callback: ThreadsafeFunction<LogRecord>) -> Result<()> {
-    *log_callback_slot()
-        .lock()
-        .expect("log callback mutex poisoned") = Some(Arc::new(callback));
+pub fn native_set_log_callback(env: Env, callback: ThreadsafeFunction<LogRecord>) -> Result<()> {
+    let state = LogCallbackState {
+        id: LOG_CALLBACK_IDS.fetch_add(1, Ordering::Relaxed),
+        callback: Arc::new(callback),
+    };
+    env.add_env_cleanup_hook(state.id, clear_log_callback_if_current)?;
     maplibre_native_core::check(unsafe {
         maplibre_native_sys::mln_log_set_callback(Some(log_trampoline), std::ptr::null_mut())
     })
-    .map_err(error::from_core)
+    .map_err(error::from_core)?;
+    *log_callback_slot()
+        .lock()
+        .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))? = Some(state);
+    Ok(())
 }
 
 #[napi(js_name = "nativeClearLogCallback")]
 pub fn native_clear_log_callback() -> Result<()> {
-    maplibre_native_core::check(unsafe { maplibre_native_sys::mln_log_clear_callback() })
-        .map_err(error::from_core)?;
+    clear_native_log_callback()?;
     *log_callback_slot()
         .lock()
-        .expect("log callback mutex poisoned") = None;
+        .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))? = None;
     Ok(())
 }
 
@@ -142,28 +156,50 @@ extern "C" fn log_trampoline(
     code: i64,
     message: *const c_char,
 ) -> u32 {
-    let callback = log_callback_slot()
-        .lock()
-        .expect("log callback mutex poisoned")
-        .clone();
-    if let Some(callback) = callback {
-        callback.call(
-            Ok(LogRecord {
-                severity: log_severity_name(severity).to_owned(),
-                raw_severity: severity,
-                event: log_event_name(event).to_owned(),
-                raw_event: event,
-                code,
-                message: copy_log_message(message),
-            }),
-            ThreadsafeFunctionCallMode::NonBlocking,
-        );
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let callback = log_callback_slot()
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(|state| Arc::clone(&state.callback)));
+        if let Some(callback) = callback {
+            callback.call(
+                Ok(LogRecord {
+                    severity: log_severity_name(severity).to_owned(),
+                    raw_severity: severity,
+                    event: log_event_name(event).to_owned(),
+                    raw_event: event,
+                    code,
+                    message: copy_log_message(message),
+                }),
+                ThreadsafeFunctionCallMode::NonBlocking,
+            );
+        }
+    }));
     0
 }
 
-fn log_callback_slot() -> &'static Mutex<Option<Arc<ThreadsafeFunction<LogRecord>>>> {
+fn log_callback_slot() -> &'static Mutex<Option<LogCallbackState>> {
     LOG_CALLBACK.get_or_init(|| Mutex::new(None))
+}
+
+fn clear_log_callback_if_current(id: u64) {
+    let should_clear = log_callback_slot()
+        .lock()
+        .map(|slot| slot.as_ref().is_some_and(|state| state.id == id))
+        .unwrap_or(false);
+    if should_clear {
+        let _ = clear_native_log_callback();
+        if let Ok(mut slot) = log_callback_slot().lock()
+            && slot.as_ref().is_some_and(|state| state.id == id)
+        {
+            *slot = None;
+        }
+    }
+}
+
+fn clear_native_log_callback() -> Result<()> {
+    maplibre_native_core::check(unsafe { maplibre_native_sys::mln_log_clear_callback() })
+        .map_err(error::from_core)
 }
 
 fn copy_log_message(message: *const c_char) -> String {

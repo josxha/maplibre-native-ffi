@@ -226,6 +226,7 @@ const HANDLE_ENVIRONMENT = Symbol("handleEnvironment");
 const ENVIRONMENT_TOKEN = Object.freeze({});
 const TEXTURE_FRAME_RAW = Symbol("textureFrameRaw");
 const TEXTURE_FRAME_DEACTIVATE = Symbol("textureFrameDeactivate");
+const NATIVE_HANDLES = new WeakMap();
 
 function recordHandleEnvironment(handle) {
   Object.defineProperty(handle, HANDLE_ENVIRONMENT, {
@@ -243,13 +244,28 @@ function assertHandleEnvironment(handle) {
 }
 
 function defineCheckedNative(owner, nativeHandle) {
-  Object.defineProperty(owner, "native", {
-    enumerable: true,
-    get() {
-      assertHandleEnvironment(owner);
-      return nativeHandle;
-    },
-  });
+  assertHandleEnvironment(owner);
+  NATIVE_HANDLES.set(owner, nativeHandle);
+}
+
+function nativeOf(owner) {
+  if (NATIVE_HANDLES.has(owner)) {
+    assertHandleEnvironment(owner);
+    return NATIVE_HANDLES.get(owner);
+  }
+  if (owner != null && Object.prototype.hasOwnProperty.call(owner, "native")) {
+    return owner.native;
+  }
+  assertHandleEnvironment(owner);
+  throw new InvalidStateError(null, "native handle is not initialized");
+}
+
+function liveNativeOf(owner) {
+  const nativeHandle = nativeOf(owner);
+  if (nativeHandle.closed) {
+    throw new InvalidStateError(null, "handle is closed");
+  }
+  return nativeHandle;
 }
 
 class NativeBuffer {
@@ -603,7 +619,7 @@ class OfflineOperationHandle {
       return;
     }
     translateNativeErrors(() =>
-      this.runtime.native.discardOfflineOperation(this.operationId),
+      liveNativeOf(this.runtime).discardOfflineOperation(this.operationId),
     );
     this.discarded = true;
   }
@@ -634,15 +650,15 @@ class RuntimeHandle {
   }
 
   close() {
-    return translateNativeErrors(() => this.native.close());
+    return translateNativeErrors(() => nativeOf(this).close());
   }
 
   get closed() {
-    return this.native.closed;
+    return nativeOf(this).closed;
   }
 
   runOnce() {
-    return translateNativeErrors(() => this.native.runOnce());
+    return translateNativeErrors(() => liveNativeOf(this).runOnce());
   }
 
   setResourceTransformRules(rules) {
@@ -653,7 +669,7 @@ class RuntimeHandle {
       );
     }
     return translateNativeErrors(() =>
-      this.native.setResourceTransformRules(rules),
+      liveNativeOf(this).setResourceTransformRules(rules),
     );
   }
 
@@ -671,7 +687,7 @@ class RuntimeHandle {
       );
     }
     return translateNativeErrors(() =>
-      this.native.setResourceProviderRoutes(routes, (error, request) => {
+      liveNativeOf(this).setResourceProviderRoutes(routes, (error, request) => {
         if (error) {
           throw error;
         }
@@ -699,63 +715,69 @@ class RuntimeHandle {
   }
 
   clearResourceTransform() {
-    return translateNativeErrors(() => this.native.clearResourceTransform());
+    return translateNativeErrors(() =>
+      liveNativeOf(this).clearResourceTransform(),
+    );
   }
 
   runAmbientCacheOperation(operation) {
     const start = translateNativeErrors(() =>
-      this.native.runAmbientCacheOperation(operation),
+      liveNativeOf(this).runAmbientCacheOperation(operation),
     );
     return new OfflineOperationHandle(this, BigInt(start.operationId));
   }
 
   offlineRegionsList() {
-    return this.#offlineOperation(() => this.native.offlineRegionsList());
+    return this.#offlineOperation(() =>
+      liveNativeOf(this).offlineRegionsList(),
+    );
   }
 
   offlineRegionGet(regionId) {
-    return this.#offlineOperation(() => this.native.offlineRegionGet(regionId));
+    return this.#offlineOperation(() =>
+      liveNativeOf(this).offlineRegionGet(regionId),
+    );
   }
 
   offlineRegionsMergeDatabase(path) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionsMergeDatabase(path),
+      liveNativeOf(this).offlineRegionsMergeDatabase(path),
     );
   }
 
   offlineRegionUpdateMetadata(regionId, metadata = null) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionUpdateMetadata(regionId, metadata),
+      liveNativeOf(this).offlineRegionUpdateMetadata(regionId, metadata),
     );
   }
 
   offlineRegionGetStatus(regionId) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionGetStatus(regionId),
+      liveNativeOf(this).offlineRegionGetStatus(regionId),
     );
   }
 
   offlineRegionSetObserved(regionId, observed) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionSetObserved(regionId, observed),
+      liveNativeOf(this).offlineRegionSetObserved(regionId, observed),
     );
   }
 
   offlineRegionSetDownloadState(regionId, state) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionSetDownloadState(regionId, state),
+      liveNativeOf(this).offlineRegionSetDownloadState(regionId, state),
     );
   }
 
   offlineRegionInvalidate(regionId) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionInvalidate(regionId),
+      liveNativeOf(this).offlineRegionInvalidate(regionId),
     );
   }
 
   offlineRegionDelete(regionId) {
     return this.#offlineOperation(() =>
-      this.native.offlineRegionDelete(regionId),
+      liveNativeOf(this).offlineRegionDelete(regionId),
     );
   }
 
@@ -767,31 +789,33 @@ class RuntimeHandle {
       nativeDefinition.geometry = stringifyJson(definition.geometry);
     }
     return this.#offlineOperation(() =>
-      this.native.offlineRegionCreate(nativeDefinition, metadata),
+      liveNativeOf(this).offlineRegionCreate(nativeDefinition, metadata),
     );
   }
 
   offlineRegionCreateTakeResult(operation) {
     return translateNativeErrors(() =>
-      this.native.offlineRegionCreateTakeResult(operationIdOf(operation)),
+      liveNativeOf(this).offlineRegionCreateTakeResult(
+        operationIdOf(operation),
+      ),
     );
   }
 
   offlineRegionGetTakeResult(operation) {
     return translateNativeErrors(() =>
-      this.native.offlineRegionGetTakeResult(operationIdOf(operation)),
+      liveNativeOf(this).offlineRegionGetTakeResult(operationIdOf(operation)),
     );
   }
 
   offlineRegionsListTakeResult(operation) {
     return translateNativeErrors(() =>
-      this.native.offlineRegionsListTakeResult(operationIdOf(operation)),
+      liveNativeOf(this).offlineRegionsListTakeResult(operationIdOf(operation)),
     );
   }
 
   offlineRegionsMergeDatabaseTakeResult(operation) {
     return translateNativeErrors(() =>
-      this.native.offlineRegionsMergeDatabaseTakeResult(
+      liveNativeOf(this).offlineRegionsMergeDatabaseTakeResult(
         operationIdOf(operation),
       ),
     );
@@ -799,7 +823,7 @@ class RuntimeHandle {
 
   offlineRegionUpdateMetadataTakeResult(operation) {
     return translateNativeErrors(() =>
-      this.native.offlineRegionUpdateMetadataTakeResult(
+      liveNativeOf(this).offlineRegionUpdateMetadataTakeResult(
         operationIdOf(operation),
       ),
     );
@@ -807,7 +831,9 @@ class RuntimeHandle {
 
   offlineRegionGetStatusTakeResult(operation) {
     return translateNativeErrors(() =>
-      this.native.offlineRegionGetStatusTakeResult(operationIdOf(operation)),
+      liveNativeOf(this).offlineRegionGetStatusTakeResult(
+        operationIdOf(operation),
+      ),
     );
   }
 
@@ -817,7 +843,7 @@ class RuntimeHandle {
   }
 
   pollEvent() {
-    return translateNativeErrors(() => this.native.pollEvent());
+    return translateNativeErrors(() => liveNativeOf(this).pollEvent());
   }
 
   [Symbol.dispose]() {
@@ -834,45 +860,49 @@ class MapProjectionHandle {
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
-        native.createNativeMapProjectionHandle(map.native),
+        native.createNativeMapProjectionHandle(liveNativeOf(map)),
       ),
     );
   }
 
   close() {
-    return translateNativeErrors(() => this.native.close());
+    return translateNativeErrors(() => nativeOf(this).close());
   }
 
   get closed() {
-    return this.native.closed;
+    return nativeOf(this).closed;
   }
 
   getCamera() {
-    return translateNativeErrors(() => this.native.getCamera());
+    return translateNativeErrors(() => liveNativeOf(this).getCamera());
   }
 
   setCamera(camera) {
-    return translateNativeErrors(() => this.native.setCamera(camera));
+    return translateNativeErrors(() => liveNativeOf(this).setCamera(camera));
   }
 
   setVisibleCoordinates(coordinates, padding) {
     return translateNativeErrors(() =>
-      this.native.setVisibleCoordinates(coordinates, padding),
+      liveNativeOf(this).setVisibleCoordinates(coordinates, padding),
     );
   }
 
   setVisibleGeometry(geometry, padding) {
     return translateNativeErrors(() =>
-      this.native.setVisibleGeometry(stringifyJson(geometry), padding),
+      liveNativeOf(this).setVisibleGeometry(stringifyJson(geometry), padding),
     );
   }
 
   pixelForLatLng(coordinate) {
-    return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).pixelForLatLng(coordinate),
+    );
   }
 
   latLngForPixel(point) {
-    return translateNativeErrors(() => this.native.latLngForPixel(point));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).latLngForPixel(point),
+    );
   }
 
   [Symbol.dispose]() {
@@ -981,7 +1011,7 @@ class RenderSessionHandle {
   static attachMetalOwnedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
       native.createMetalOwnedTextureRenderSession(
-        map.native,
+        liveNativeOf(map),
         normalizeMetalOwnedTextureDescriptor(descriptor),
       ),
     );
@@ -990,7 +1020,7 @@ class RenderSessionHandle {
   static attachMetalBorrowedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
       native.createMetalBorrowedTextureRenderSession(
-        map.native,
+        liveNativeOf(map),
         normalizeMetalBorrowedTextureDescriptor(descriptor),
       ),
     );
@@ -999,7 +1029,7 @@ class RenderSessionHandle {
   static attachMetalSurface(map, descriptor) {
     return attachRenderSession(map, () =>
       native.createMetalSurfaceRenderSession(
-        map.native,
+        liveNativeOf(map),
         normalizeMetalSurfaceDescriptor(descriptor),
       ),
     );
@@ -1008,7 +1038,7 @@ class RenderSessionHandle {
   static attachVulkanOwnedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
       native.createVulkanOwnedTextureRenderSession(
-        map.native,
+        liveNativeOf(map),
         normalizeVulkanOwnedTextureDescriptor(descriptor),
       ),
     );
@@ -1017,7 +1047,7 @@ class RenderSessionHandle {
   static attachVulkanBorrowedTexture(map, descriptor) {
     return attachRenderSession(map, () =>
       native.createVulkanBorrowedTextureRenderSession(
-        map.native,
+        liveNativeOf(map),
         normalizeVulkanBorrowedTextureDescriptor(descriptor),
       ),
     );
@@ -1026,61 +1056,61 @@ class RenderSessionHandle {
   static attachVulkanSurface(map, descriptor) {
     return attachRenderSession(map, () =>
       native.createVulkanSurfaceRenderSession(
-        map.native,
+        liveNativeOf(map),
         normalizeVulkanSurfaceDescriptor(descriptor),
       ),
     );
   }
 
   close() {
-    return translateNativeErrors(() => this.native.close());
+    return translateNativeErrors(() => nativeOf(this).close());
   }
 
   get closed() {
-    return this.native.closed;
+    return nativeOf(this).closed;
   }
 
   resize(width, height, scaleFactor) {
     return translateNativeErrors(() =>
-      this.native.resize(width, height, scaleFactor),
+      liveNativeOf(this).resize(width, height, scaleFactor),
     );
   }
 
   renderUpdate() {
-    return translateNativeErrors(() => this.native.renderUpdate());
+    return translateNativeErrors(() => liveNativeOf(this).renderUpdate());
   }
 
   detach() {
-    return translateNativeErrors(() => this.native.detach());
+    return translateNativeErrors(() => liveNativeOf(this).detach());
   }
 
   reduceMemoryUse() {
-    return translateNativeErrors(() => this.native.reduceMemoryUse());
+    return translateNativeErrors(() => liveNativeOf(this).reduceMemoryUse());
   }
 
   clearData() {
-    return translateNativeErrors(() => this.native.clearData());
+    return translateNativeErrors(() => liveNativeOf(this).clearData());
   }
 
   dumpDebugLogs() {
-    return translateNativeErrors(() => this.native.dumpDebugLogs());
+    return translateNativeErrors(() => liveNativeOf(this).dumpDebugLogs());
   }
 
   setFeatureState(selector, state) {
     return translateNativeErrors(() =>
-      this.native.setFeatureState(selector, stringifyJson(state)),
+      liveNativeOf(this).setFeatureState(selector, stringifyJson(state)),
     );
   }
 
   getFeatureState(selector) {
     return translateNativeErrors(() =>
-      JSON.parse(this.native.getFeatureState(selector)),
+      JSON.parse(liveNativeOf(this).getFeatureState(selector)),
     );
   }
 
   removeFeatureState(selector) {
     return translateNativeErrors(() =>
-      this.native.removeFeatureState(selector),
+      liveNativeOf(this).removeFeatureState(selector),
     );
   }
 
@@ -1094,7 +1124,9 @@ class RenderSessionHandle {
               options.filter == null ? null : stringifyJson(options.filter),
           };
     return translateNativeErrors(() =>
-      JSON.parse(this.native.queryRenderedFeatures(geometry, nativeOptions)),
+      JSON.parse(
+        liveNativeOf(this).queryRenderedFeatures(geometry, nativeOptions),
+      ),
     );
   }
 
@@ -1108,7 +1140,9 @@ class RenderSessionHandle {
               options.filter == null ? null : stringifyJson(options.filter),
           };
     return translateNativeErrors(() =>
-      JSON.parse(this.native.querySourceFeatures(sourceId, nativeOptions)),
+      JSON.parse(
+        liveNativeOf(this).querySourceFeatures(sourceId, nativeOptions),
+      ),
     );
   }
 
@@ -1121,7 +1155,7 @@ class RenderSessionHandle {
   ) {
     return translateNativeErrors(() =>
       JSON.parse(
-        this.native.queryFeatureExtension(
+        liveNativeOf(this).queryFeatureExtension(
           sourceId,
           stringifyJson(feature),
           extension,
@@ -1141,14 +1175,18 @@ class RenderSessionHandle {
     }
     const frame = new MetalOwnedTextureFrame(
       CONSTRUCTION_TOKEN,
-      translateNativeErrors(() => this.native.acquireMetalOwnedTextureFrame()),
+      translateNativeErrors(() =>
+        liveNativeOf(this).acquireMetalOwnedTextureFrame(),
+      ),
     );
     try {
       return callback(frame);
     } finally {
       try {
         translateNativeErrors(() =>
-          this.native.releaseMetalOwnedTextureFrame(frame[TEXTURE_FRAME_RAW]()),
+          liveNativeOf(this).releaseMetalOwnedTextureFrame(
+            frame[TEXTURE_FRAME_RAW](),
+          ),
         );
       } finally {
         frame[TEXTURE_FRAME_DEACTIVATE]();
@@ -1165,14 +1203,16 @@ class RenderSessionHandle {
     }
     const frame = new VulkanOwnedTextureFrame(
       CONSTRUCTION_TOKEN,
-      translateNativeErrors(() => this.native.acquireVulkanOwnedTextureFrame()),
+      translateNativeErrors(() =>
+        liveNativeOf(this).acquireVulkanOwnedTextureFrame(),
+      ),
     );
     try {
       return callback(frame);
     } finally {
       try {
         translateNativeErrors(() =>
-          this.native.releaseVulkanOwnedTextureFrame(
+          liveNativeOf(this).releaseVulkanOwnedTextureFrame(
             frame[TEXTURE_FRAME_RAW](),
           ),
         );
@@ -1183,7 +1223,9 @@ class RenderSessionHandle {
   }
 
   readPremultipliedRgba8() {
-    return translateNativeErrors(() => this.native.readPremultipliedRgba8());
+    return translateNativeErrors(() =>
+      liveNativeOf(this).readPremultipliedRgba8(),
+    );
   }
 
   [Symbol.dispose]() {
@@ -1212,17 +1254,17 @@ class MapHandle {
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
-        native.createNativeMapHandle(runtime.native, options ?? {}),
+        native.createNativeMapHandle(liveNativeOf(runtime), options ?? {}),
       ),
     );
   }
 
   close() {
-    return translateNativeErrors(() => this.native.close());
+    return translateNativeErrors(() => nativeOf(this).close());
   }
 
   get closed() {
-    return this.native.closed;
+    return nativeOf(this).closed;
   }
 
   createProjection() {
@@ -1254,23 +1296,25 @@ class MapHandle {
   }
 
   requestRepaint() {
-    return translateNativeErrors(() => this.native.requestRepaint());
+    return translateNativeErrors(() => liveNativeOf(this).requestRepaint());
   }
 
   requestStillImage() {
-    return translateNativeErrors(() => this.native.requestStillImage());
+    return translateNativeErrors(() => liveNativeOf(this).requestStillImage());
   }
 
   isFullyLoaded() {
-    return translateNativeErrors(() => this.native.isFullyLoaded());
+    return translateNativeErrors(() => liveNativeOf(this).isFullyLoaded());
   }
 
   dumpDebugLogs() {
-    return translateNativeErrors(() => this.native.dumpDebugLogs());
+    return translateNativeErrors(() => liveNativeOf(this).dumpDebugLogs());
   }
 
   getDebugOptions() {
-    const mask = translateNativeErrors(() => this.native.getDebugOptionsRaw());
+    const mask = translateNativeErrors(() =>
+      liveNativeOf(this).getDebugOptionsRaw(),
+    );
     return MAP_DEBUG_OPTIONS.filter((option) =>
       Boolean(mask & mapDebugOptionMaskBit(option)),
     );
@@ -1281,256 +1325,288 @@ class MapHandle {
     for (const option of options) {
       mask |= mapDebugOptionMaskBit(option);
     }
-    return translateNativeErrors(() => this.native.setDebugOptionsRaw(mask));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).setDebugOptionsRaw(mask),
+    );
   }
 
   moveBy(deltaX, deltaY) {
-    return translateNativeErrors(() => this.native.moveBy(deltaX, deltaY));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).moveBy(deltaX, deltaY),
+    );
   }
 
   scaleBy(scale, anchor = null) {
-    return translateNativeErrors(() => this.native.scaleBy(scale, anchor));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).scaleBy(scale, anchor),
+    );
   }
 
   rotateBy(first, second) {
-    return translateNativeErrors(() => this.native.rotateBy(first, second));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).rotateBy(first, second),
+    );
   }
 
   pitchBy(pitch) {
-    return translateNativeErrors(() => this.native.pitchBy(pitch));
+    return translateNativeErrors(() => liveNativeOf(this).pitchBy(pitch));
   }
 
   moveByAnimated(deltaX, deltaY, animation = null) {
     return translateNativeErrors(() =>
-      this.native.moveByAnimated(deltaX, deltaY, animation),
+      liveNativeOf(this).moveByAnimated(deltaX, deltaY, animation),
     );
   }
 
   scaleByAnimated(scale, anchor = null, animation = null) {
     return translateNativeErrors(() =>
-      this.native.scaleByAnimated(scale, anchor, animation),
+      liveNativeOf(this).scaleByAnimated(scale, anchor, animation),
     );
   }
 
   rotateByAnimated(first, second, animation = null) {
     return translateNativeErrors(() =>
-      this.native.rotateByAnimated(first, second, animation),
+      liveNativeOf(this).rotateByAnimated(first, second, animation),
     );
   }
 
   pitchByAnimated(pitch, animation = null) {
     return translateNativeErrors(() =>
-      this.native.pitchByAnimated(pitch, animation),
+      liveNativeOf(this).pitchByAnimated(pitch, animation),
     );
   }
 
   cancelTransitions() {
-    return translateNativeErrors(() => this.native.cancelTransitions());
+    return translateNativeErrors(() => liveNativeOf(this).cancelTransitions());
   }
 
   getViewportOptions() {
-    return translateNativeErrors(() => this.native.getViewportOptions());
+    return translateNativeErrors(() => liveNativeOf(this).getViewportOptions());
   }
 
   setViewportOptions(options) {
-    return translateNativeErrors(() => this.native.setViewportOptions(options));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).setViewportOptions(options),
+    );
   }
 
   getTileOptions() {
-    return translateNativeErrors(() => this.native.getTileOptions());
+    return translateNativeErrors(() => liveNativeOf(this).getTileOptions());
   }
 
   setTileOptions(options) {
-    return translateNativeErrors(() => this.native.setTileOptions(options));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).setTileOptions(options),
+    );
   }
 
   getBounds() {
-    return translateNativeErrors(() => this.native.getBounds());
+    return translateNativeErrors(() => liveNativeOf(this).getBounds());
   }
 
   setBounds(options) {
-    return translateNativeErrors(() => this.native.setBounds(options));
+    return translateNativeErrors(() => liveNativeOf(this).setBounds(options));
   }
 
   getFreeCameraOptions() {
-    return translateNativeErrors(() => this.native.getFreeCameraOptions());
+    return translateNativeErrors(() =>
+      liveNativeOf(this).getFreeCameraOptions(),
+    );
   }
 
   setFreeCameraOptions(options) {
     return translateNativeErrors(() =>
-      this.native.setFreeCameraOptions(options),
+      liveNativeOf(this).setFreeCameraOptions(options),
     );
   }
 
   getProjectionMode() {
-    return translateNativeErrors(() => this.native.getProjectionMode());
+    return translateNativeErrors(() => liveNativeOf(this).getProjectionMode());
   }
 
   setProjectionMode(mode) {
-    return translateNativeErrors(() => this.native.setProjectionMode(mode));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).setProjectionMode(mode),
+    );
   }
 
   getCamera() {
-    return translateNativeErrors(() => this.native.getCamera());
+    return translateNativeErrors(() => liveNativeOf(this).getCamera());
   }
 
   jumpTo(camera) {
-    return translateNativeErrors(() => this.native.jumpTo(camera));
+    return translateNativeErrors(() => liveNativeOf(this).jumpTo(camera));
   }
 
   easeTo(camera, animation = null) {
-    return translateNativeErrors(() => this.native.easeTo(camera, animation));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).easeTo(camera, animation),
+    );
   }
 
   flyTo(camera, animation = null) {
-    return translateNativeErrors(() => this.native.flyTo(camera, animation));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).flyTo(camera, animation),
+    );
   }
 
   cameraForLatLngBounds(bounds) {
     return translateNativeErrors(() =>
-      this.native.cameraForLatLngBounds(bounds),
+      liveNativeOf(this).cameraForLatLngBounds(bounds),
     );
   }
 
   cameraForLatLngs(coordinates) {
     return translateNativeErrors(() =>
-      this.native.cameraForLatLngs(coordinates),
+      liveNativeOf(this).cameraForLatLngs(coordinates),
     );
   }
 
   cameraForGeometry(geometry) {
     return translateNativeErrors(() =>
-      this.native.cameraForGeometry(stringifyJson(geometry)),
+      liveNativeOf(this).cameraForGeometry(stringifyJson(geometry)),
     );
   }
 
   latLngBoundsForCamera(camera) {
     return translateNativeErrors(() =>
-      this.native.latLngBoundsForCamera(camera),
+      liveNativeOf(this).latLngBoundsForCamera(camera),
     );
   }
 
   latLngBoundsForCameraUnwrapped(camera) {
     return translateNativeErrors(() =>
-      this.native.latLngBoundsForCameraUnwrapped(camera),
+      liveNativeOf(this).latLngBoundsForCameraUnwrapped(camera),
     );
   }
 
   pixelForLatLng(coordinate) {
-    return translateNativeErrors(() => this.native.pixelForLatLng(coordinate));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).pixelForLatLng(coordinate),
+    );
   }
 
   latLngForPixel(point) {
-    return translateNativeErrors(() => this.native.latLngForPixel(point));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).latLngForPixel(point),
+    );
   }
 
   pixelsForLatLngs(coordinates) {
     return translateNativeErrors(() =>
-      this.native.pixelsForLatLngs(coordinates),
+      liveNativeOf(this).pixelsForLatLngs(coordinates),
     );
   }
 
   latLngsForPixels(points) {
-    return translateNativeErrors(() => this.native.latLngsForPixels(points));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).latLngsForPixels(points),
+    );
   }
 
   get renderingStatsViewEnabled() {
-    return translateNativeErrors(() => this.native.renderingStatsViewEnabled);
+    return translateNativeErrors(
+      () => liveNativeOf(this).renderingStatsViewEnabled,
+    );
   }
 
   set renderingStatsViewEnabled(enabled) {
     translateNativeErrors(() => {
-      this.native.renderingStatsViewEnabled = enabled;
+      liveNativeOf(this).renderingStatsViewEnabled = enabled;
     });
   }
 
   addStyleSourceJson(sourceId, source) {
     return translateNativeErrors(() =>
-      this.native.addStyleSourceJson(sourceId, stringifyJson(source)),
+      liveNativeOf(this).addStyleSourceJson(sourceId, stringifyJson(source)),
     );
   }
 
   styleSourceExists(sourceId) {
-    return translateNativeErrors(() => this.native.styleSourceExists(sourceId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).styleSourceExists(sourceId),
+    );
   }
 
   removeStyleSource(sourceId) {
-    return translateNativeErrors(() => this.native.removeStyleSource(sourceId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).removeStyleSource(sourceId),
+    );
   }
 
   listStyleSourceIds() {
-    return translateNativeErrors(() => this.native.listStyleSourceIds());
+    return translateNativeErrors(() => liveNativeOf(this).listStyleSourceIds());
   }
 
   getStyleSourceType(sourceId) {
     return translateNativeErrors(() =>
-      this.native.getStyleSourceType(sourceId),
+      liveNativeOf(this).getStyleSourceType(sourceId),
     );
   }
 
   getStyleSourceInfo(sourceId) {
     return translateNativeErrors(() =>
-      this.native.getStyleSourceInfo(sourceId),
+      liveNativeOf(this).getStyleSourceInfo(sourceId),
     );
   }
 
   addGeoJsonSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
-      this.native.addGeoJsonSourceUrl(sourceId, url),
+      liveNativeOf(this).addGeoJsonSourceUrl(sourceId, url),
     );
   }
 
   addGeoJsonSourceData(sourceId, data) {
     return translateNativeErrors(() =>
-      this.native.addGeoJsonSourceData(sourceId, stringifyJson(data)),
+      liveNativeOf(this).addGeoJsonSourceData(sourceId, stringifyJson(data)),
     );
   }
 
   setGeoJsonSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
-      this.native.setGeoJsonSourceUrl(sourceId, url),
+      liveNativeOf(this).setGeoJsonSourceUrl(sourceId, url),
     );
   }
 
   setGeoJsonSourceData(sourceId, data) {
     return translateNativeErrors(() =>
-      this.native.setGeoJsonSourceData(sourceId, stringifyJson(data)),
+      liveNativeOf(this).setGeoJsonSourceData(sourceId, stringifyJson(data)),
     );
   }
 
   addVectorSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
-      this.native.addVectorSourceUrl(sourceId, url),
+      liveNativeOf(this).addVectorSourceUrl(sourceId, url),
     );
   }
 
   addRasterSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
-      this.native.addRasterSourceUrl(sourceId, url),
+      liveNativeOf(this).addRasterSourceUrl(sourceId, url),
     );
   }
 
   addRasterDemSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
-      this.native.addRasterDemSourceUrl(sourceId, url),
+      liveNativeOf(this).addRasterDemSourceUrl(sourceId, url),
     );
   }
 
   addVectorSourceTiles(sourceId, tiles) {
     return translateNativeErrors(() =>
-      this.native.addVectorSourceTiles(sourceId, Array.from(tiles)),
+      liveNativeOf(this).addVectorSourceTiles(sourceId, Array.from(tiles)),
     );
   }
 
   addRasterSourceTiles(sourceId, tiles) {
     return translateNativeErrors(() =>
-      this.native.addRasterSourceTiles(sourceId, Array.from(tiles)),
+      liveNativeOf(this).addRasterSourceTiles(sourceId, Array.from(tiles)),
     );
   }
 
   addRasterDemSourceTiles(sourceId, tiles) {
     return translateNativeErrors(() =>
-      this.native.addRasterDemSourceTiles(sourceId, Array.from(tiles)),
+      liveNativeOf(this).addRasterDemSourceTiles(sourceId, Array.from(tiles)),
     );
   }
 
@@ -1549,7 +1625,7 @@ class MapHandle {
       );
     }
     return translateNativeErrors(() =>
-      this.native.addCustomGeometrySource(
+      liveNativeOf(this).addCustomGeometrySource(
         sourceId,
         nativeOptions,
         fetchTile ?? null,
@@ -1560,7 +1636,7 @@ class MapHandle {
 
   setCustomGeometrySourceTileData(sourceId, tileId, data) {
     return translateNativeErrors(() =>
-      this.native.setCustomGeometrySourceTileData(
+      liveNativeOf(this).setCustomGeometrySourceTileData(
         sourceId,
         tileId,
         stringifyJson(data),
@@ -1570,156 +1646,176 @@ class MapHandle {
 
   invalidateCustomGeometrySourceTile(sourceId, tileId) {
     return translateNativeErrors(() =>
-      this.native.invalidateCustomGeometrySourceTile(sourceId, tileId),
+      liveNativeOf(this).invalidateCustomGeometrySourceTile(sourceId, tileId),
     );
   }
 
   invalidateCustomGeometrySourceRegion(sourceId, bounds) {
     return translateNativeErrors(() =>
-      this.native.invalidateCustomGeometrySourceRegion(sourceId, bounds),
+      liveNativeOf(this).invalidateCustomGeometrySourceRegion(sourceId, bounds),
     );
   }
 
   setStyleImage(imageId, image) {
     return translateNativeErrors(() =>
-      this.native.setStyleImage(imageId, image),
+      liveNativeOf(this).setStyleImage(imageId, image),
     );
   }
 
   styleImageExists(imageId) {
-    return translateNativeErrors(() => this.native.styleImageExists(imageId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).styleImageExists(imageId),
+    );
   }
 
   removeStyleImage(imageId) {
-    return translateNativeErrors(() => this.native.removeStyleImage(imageId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).removeStyleImage(imageId),
+    );
   }
 
   getStyleImageInfo(imageId) {
-    return translateNativeErrors(() => this.native.getStyleImageInfo(imageId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).getStyleImageInfo(imageId),
+    );
   }
 
   copyStyleImagePremultipliedRgba8(imageId) {
     return translateNativeErrors(() =>
-      this.native.copyStyleImagePremultipliedRgba8(imageId),
+      liveNativeOf(this).copyStyleImagePremultipliedRgba8(imageId),
     );
   }
 
   addImageSourceUrl(sourceId, coordinates, url) {
     return translateNativeErrors(() =>
-      this.native.addImageSourceUrl(sourceId, coordinates, url),
+      liveNativeOf(this).addImageSourceUrl(sourceId, coordinates, url),
     );
   }
 
   addImageSourceImage(sourceId, coordinates, image) {
     return translateNativeErrors(() =>
-      this.native.addImageSourceImage(sourceId, coordinates, image),
+      liveNativeOf(this).addImageSourceImage(sourceId, coordinates, image),
     );
   }
 
   setImageSourceUrl(sourceId, url) {
     return translateNativeErrors(() =>
-      this.native.setImageSourceUrl(sourceId, url),
+      liveNativeOf(this).setImageSourceUrl(sourceId, url),
     );
   }
 
   setImageSourceImage(sourceId, image) {
     return translateNativeErrors(() =>
-      this.native.setImageSourceImage(sourceId, image),
+      liveNativeOf(this).setImageSourceImage(sourceId, image),
     );
   }
 
   setImageSourceCoordinates(sourceId, coordinates) {
     return translateNativeErrors(() =>
-      this.native.setImageSourceCoordinates(sourceId, coordinates),
+      liveNativeOf(this).setImageSourceCoordinates(sourceId, coordinates),
     );
   }
 
   getImageSourceCoordinates(sourceId) {
     return translateNativeErrors(() =>
-      this.native.getImageSourceCoordinates(sourceId),
+      liveNativeOf(this).getImageSourceCoordinates(sourceId),
     );
   }
 
   addHillshadeLayer(layerId, sourceId, beforeLayerId = null) {
     return translateNativeErrors(() =>
-      this.native.addHillshadeLayer(layerId, sourceId, beforeLayerId),
+      liveNativeOf(this).addHillshadeLayer(layerId, sourceId, beforeLayerId),
     );
   }
 
   addColorReliefLayer(layerId, sourceId, beforeLayerId = null) {
     return translateNativeErrors(() =>
-      this.native.addColorReliefLayer(layerId, sourceId, beforeLayerId),
+      liveNativeOf(this).addColorReliefLayer(layerId, sourceId, beforeLayerId),
     );
   }
 
   addLocationIndicatorLayer(layerId, beforeLayerId = null) {
     return translateNativeErrors(() =>
-      this.native.addLocationIndicatorLayer(layerId, beforeLayerId),
+      liveNativeOf(this).addLocationIndicatorLayer(layerId, beforeLayerId),
     );
   }
 
   setLocationIndicatorLocation(layerId, coordinate, altitude = 0) {
     return translateNativeErrors(() =>
-      this.native.setLocationIndicatorLocation(layerId, coordinate, altitude),
+      liveNativeOf(this).setLocationIndicatorLocation(
+        layerId,
+        coordinate,
+        altitude,
+      ),
     );
   }
 
   setLocationIndicatorBearing(layerId, bearing) {
     return translateNativeErrors(() =>
-      this.native.setLocationIndicatorBearing(layerId, bearing),
+      liveNativeOf(this).setLocationIndicatorBearing(layerId, bearing),
     );
   }
 
   setLocationIndicatorAccuracyRadius(layerId, radius) {
     return translateNativeErrors(() =>
-      this.native.setLocationIndicatorAccuracyRadius(layerId, radius),
+      liveNativeOf(this).setLocationIndicatorAccuracyRadius(layerId, radius),
     );
   }
 
   setLocationIndicatorImageName(layerId, imageKind, imageId) {
     return translateNativeErrors(() =>
-      this.native.setLocationIndicatorImageName(layerId, imageKind, imageId),
+      liveNativeOf(this).setLocationIndicatorImageName(
+        layerId,
+        imageKind,
+        imageId,
+      ),
     );
   }
 
   addStyleLayerJson(layer, beforeLayerId = null) {
     return translateNativeErrors(() =>
-      this.native.addStyleLayerJson(stringifyJson(layer), beforeLayerId),
+      liveNativeOf(this).addStyleLayerJson(stringifyJson(layer), beforeLayerId),
     );
   }
 
   styleLayerExists(layerId) {
-    return translateNativeErrors(() => this.native.styleLayerExists(layerId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).styleLayerExists(layerId),
+    );
   }
 
   removeStyleLayer(layerId) {
-    return translateNativeErrors(() => this.native.removeStyleLayer(layerId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).removeStyleLayer(layerId),
+    );
   }
 
   listStyleLayerIds() {
-    return translateNativeErrors(() => this.native.listStyleLayerIds());
+    return translateNativeErrors(() => liveNativeOf(this).listStyleLayerIds());
   }
 
   getStyleLayerType(layerId) {
-    return translateNativeErrors(() => this.native.getStyleLayerType(layerId));
+    return translateNativeErrors(() =>
+      liveNativeOf(this).getStyleLayerType(layerId),
+    );
   }
 
   getStyleLayerJson(layerId) {
     const json = translateNativeErrors(() =>
-      this.native.getStyleLayerJson(layerId),
+      liveNativeOf(this).getStyleLayerJson(layerId),
     );
     return json === null ? null : JSON.parse(json);
   }
 
   moveStyleLayer(layerId, beforeLayerId = null) {
     return translateNativeErrors(() =>
-      this.native.moveStyleLayer(layerId, beforeLayerId),
+      liveNativeOf(this).moveStyleLayer(layerId, beforeLayerId),
     );
   }
 
   setLayerProperty(layerId, propertyName, value) {
     return translateNativeErrors(() =>
-      this.native.setLayerPropertyJson(
+      liveNativeOf(this).setLayerPropertyJson(
         layerId,
         propertyName,
         stringifyJson(value),
@@ -1729,14 +1825,14 @@ class MapHandle {
 
   getLayerProperty(layerId, propertyName) {
     const json = translateNativeErrors(() =>
-      this.native.getLayerPropertyJson(layerId, propertyName),
+      liveNativeOf(this).getLayerPropertyJson(layerId, propertyName),
     );
     return json === null ? null : JSON.parse(json);
   }
 
   setLayerFilter(layerId, filter) {
     return translateNativeErrors(() =>
-      this.native.setLayerFilterJson(
+      liveNativeOf(this).setLayerFilterJson(
         layerId,
         filter === null ? null : stringifyJson(filter),
       ),
@@ -1745,36 +1841,39 @@ class MapHandle {
 
   getLayerFilter(layerId) {
     const json = translateNativeErrors(() =>
-      this.native.getLayerFilterJson(layerId),
+      liveNativeOf(this).getLayerFilterJson(layerId),
     );
     return json === null ? null : JSON.parse(json);
   }
 
   setStyleLight(light) {
     return translateNativeErrors(() =>
-      this.native.setStyleLightJson(stringifyJson(light)),
+      liveNativeOf(this).setStyleLightJson(stringifyJson(light)),
     );
   }
 
   setStyleLightProperty(propertyName, value) {
     return translateNativeErrors(() =>
-      this.native.setStyleLightPropertyJson(propertyName, stringifyJson(value)),
+      liveNativeOf(this).setStyleLightPropertyJson(
+        propertyName,
+        stringifyJson(value),
+      ),
     );
   }
 
   getStyleLightProperty(propertyName) {
     const json = translateNativeErrors(() =>
-      this.native.getStyleLightPropertyJson(propertyName),
+      liveNativeOf(this).getStyleLightPropertyJson(propertyName),
     );
     return json === null ? null : JSON.parse(json);
   }
 
   setStyleJson(json) {
-    return translateNativeErrors(() => this.native.setStyleJson(json));
+    return translateNativeErrors(() => liveNativeOf(this).setStyleJson(json));
   }
 
   setStyleUrl(url) {
-    return translateNativeErrors(() => this.native.setStyleUrl(url));
+    return translateNativeErrors(() => liveNativeOf(this).setStyleUrl(url));
   }
 
   [Symbol.dispose]() {

@@ -39,7 +39,9 @@ requires = { platform = ["linux", "macos"] }
 
 [bindings.node]
 task = "//bindings/node:ci"
-requires = { platform = ["linux", "macos"] }
+# Node currently uses napi-rs' platform binary name. Run one backend per
+# platform until backend-specific artifact names are introduced.
+requires = { platform = ["linux", "macos"], backend = ["vulkan"] }
 
 [bindings.rust]
 task = "//bindings/rust:ci"

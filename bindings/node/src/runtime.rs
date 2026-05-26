@@ -15,6 +15,7 @@ use napi_derive::napi;
 use crate::error;
 
 #[napi(object)]
+#[derive(Default)]
 pub struct RuntimeOptions {
     pub asset_path: Option<String>,
     pub cache_path: Option<String>,
@@ -23,7 +24,7 @@ pub struct RuntimeOptions {
 
 #[napi(object)]
 pub struct OfflineOperationStart {
-    pub operation_id: String,
+    pub operation_id: BigInt,
 }
 
 #[napi(object)]
@@ -52,7 +53,7 @@ pub struct OfflineRegionDefinitionValue {
 
 #[napi(object)]
 pub struct OfflineRegionInfoValue {
-    pub id: String,
+    pub id: BigInt,
     pub definition: OfflineRegionDefinitionValue,
     pub metadata: Uint8Array,
 }
@@ -61,12 +62,14 @@ pub struct OfflineRegionInfoValue {
 pub struct OfflineRegionStatusValue {
     pub download_state: String,
     pub raw_download_state: u32,
-    pub completed_resource_count: String,
-    pub completed_resource_size: String,
-    pub completed_tile_count: String,
-    pub completed_tile_size: String,
-    pub required_resource_count: String,
+    pub completed_resource_count: BigInt,
+    pub completed_resource_size: BigInt,
+    pub completed_tile_count: BigInt,
+    pub required_tile_count: BigInt,
+    pub completed_tile_size: BigInt,
+    pub required_resource_count: BigInt,
     pub required_resource_count_is_precise: bool,
+    pub complete: bool,
 }
 
 #[napi(object)]
@@ -75,10 +78,108 @@ pub struct RuntimeEvent {
     pub raw_event_type: u32,
     pub source_type: String,
     pub raw_source_type: u32,
-    pub source_address: String,
+    pub source_address: BigInt,
     pub code: i32,
     pub message: Option<String>,
     pub payload_kind: String,
+    pub payload: RuntimeEventPayloadValue,
+}
+
+#[napi(object)]
+pub struct RuntimeEventPayloadValue {
+    pub kind: String,
+    pub raw_type: u32,
+    pub render_frame: Option<RenderFrameEventValue>,
+    pub render_map: Option<RenderMapEventValue>,
+    pub style_image_missing: Option<StyleImageMissingEventValue>,
+    pub tile_action: Option<TileActionEventValue>,
+    pub offline_region_status: Option<OfflineRegionStatusEventValue>,
+    pub offline_region_response_error: Option<OfflineRegionResponseErrorEventValue>,
+    pub offline_region_tile_count_limit: Option<OfflineRegionTileCountLimitEventValue>,
+    pub offline_operation_completed: Option<OfflineOperationCompletedEventValue>,
+    pub unknown: Option<UnknownRuntimeEventPayloadValue>,
+}
+
+#[napi(object)]
+pub struct RenderingStatsValue {
+    pub encoding_time: f64,
+    pub rendering_time: f64,
+    pub frame_count: BigInt,
+    pub draw_call_count: BigInt,
+    pub total_draw_call_count: BigInt,
+}
+
+#[napi(object)]
+pub struct RenderFrameEventValue {
+    pub mode: String,
+    pub raw_mode: u32,
+    pub needs_repaint: bool,
+    pub placement_changed: bool,
+    pub stats: RenderingStatsValue,
+}
+
+#[napi(object)]
+pub struct RenderMapEventValue {
+    pub mode: String,
+    pub raw_mode: u32,
+}
+
+#[napi(object)]
+pub struct StyleImageMissingEventValue {
+    pub image_id: String,
+}
+
+#[napi(object)]
+pub struct TileIdValue {
+    pub overscaled_z: u32,
+    pub wrap: i32,
+    pub canonical_z: u32,
+    pub canonical_x: u32,
+    pub canonical_y: u32,
+}
+
+#[napi(object)]
+pub struct TileActionEventValue {
+    pub operation: String,
+    pub raw_operation: u32,
+    pub tile_id: TileIdValue,
+    pub source_id: String,
+}
+
+#[napi(object)]
+pub struct OfflineRegionStatusEventValue {
+    pub region_id: BigInt,
+    pub status: OfflineRegionStatusValue,
+}
+
+#[napi(object)]
+pub struct OfflineRegionResponseErrorEventValue {
+    pub region_id: BigInt,
+    pub reason: String,
+    pub raw_reason: u32,
+}
+
+#[napi(object)]
+pub struct OfflineRegionTileCountLimitEventValue {
+    pub region_id: BigInt,
+    pub limit: BigInt,
+}
+
+#[napi(object)]
+pub struct OfflineOperationCompletedEventValue {
+    pub operation_id: BigInt,
+    pub operation_kind: String,
+    pub raw_operation_kind: u32,
+    pub result_kind: String,
+    pub raw_result_kind: u32,
+    pub result_status: i32,
+    pub found: bool,
+}
+
+#[napi(object)]
+pub struct UnknownRuntimeEventPayloadValue {
+    pub raw_type: u32,
+    pub bytes: Uint8Array,
 }
 
 #[napi(object)]
@@ -99,8 +200,8 @@ pub struct ResourceTransformRuleInput {
 
 #[napi(object)]
 pub struct ResourceByteRange {
-    pub start: String,
-    pub end: String,
+    pub start: BigInt,
+    pub end: BigInt,
 }
 
 #[napi(object)]
@@ -117,8 +218,8 @@ pub struct ResourceProviderRequest {
     pub storage_policy: String,
     pub raw_storage_policy: u32,
     pub range: Option<ResourceByteRange>,
-    pub prior_modified_unix_ms: Option<i64>,
-    pub prior_expires_unix_ms: Option<i64>,
+    pub prior_modified_unix_ms: Option<BigInt>,
+    pub prior_expires_unix_ms: Option<BigInt>,
     pub prior_etag: Option<String>,
     pub prior_data: Uint8Array,
     pub handle_id: String,
@@ -131,10 +232,10 @@ pub struct ResourceResponseInput {
     pub bytes: Option<Uint8Array>,
     pub error_message: Option<String>,
     pub must_revalidate: Option<bool>,
-    pub modified_unix_ms: Option<i64>,
-    pub expires_unix_ms: Option<i64>,
+    pub modified_unix_ms: Option<BigInt>,
+    pub expires_unix_ms: Option<BigInt>,
     pub etag: Option<String>,
-    pub retry_after_unix_ms: Option<i64>,
+    pub retry_after_unix_ms: Option<BigInt>,
 }
 
 static RESOURCE_REQUEST_HANDLE_IDS: AtomicU64 = AtomicU64::new(1);
@@ -174,7 +275,6 @@ struct ResourceProviderState {
 pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
-    retired_resource_transforms: Mutex<Vec<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
     retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
 }
@@ -195,7 +295,6 @@ pub fn create_native_runtime_handle(
     Ok(NativeRuntimeHandle {
         state,
         resource_transform: Mutex::new(None),
-        retired_resource_transforms: Mutex::new(Vec::new()),
         resource_provider: Mutex::new(None),
         retired_resource_providers: Mutex::new(Vec::new()),
     })
@@ -316,14 +415,10 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        let replaced = self
-            .resource_transform
+        self.resource_transform
             .lock()
             .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
             .replace(transform);
-        if let Some(replaced) = replaced {
-            self.retire_resource_transform(replaced);
-        }
         Ok(())
     }
 
@@ -331,14 +426,10 @@ impl NativeRuntimeHandle {
     pub fn clear_resource_transform(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.as_ptr()) })
             .map_err(error::from_core)?;
-        let replaced = self
-            .resource_transform
+        self.resource_transform
             .lock()
             .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
             .take();
-        if let Some(replaced) = replaced {
-            self.retire_resource_transform(replaced);
-        }
         Ok(())
     }
 
@@ -770,15 +861,17 @@ unsafe extern "C" fn resource_transform_trampoline(
 
 impl RuntimeEvent {
     fn from_copied(event: core::CopiedRuntimeEvent, raw_event_type: u32) -> Self {
+        let payload_kind = runtime_event_payload_kind(&event.payload).to_owned();
         Self {
             event_type: runtime_event_type_name(event.event_type).to_owned(),
             raw_event_type,
             source_type: runtime_event_source_type_name(event.source.source_type).to_owned(),
             raw_source_type: event.source.source_type,
-            source_address: event.source.source_address.to_string(),
+            source_address: BigInt::from(event.source.source_address as u64),
             code: event.code,
             message: event.message,
-            payload_kind: runtime_event_payload_kind(&event.payload).to_owned(),
+            payload_kind,
+            payload: runtime_event_payload_to_value(event.payload),
         }
     }
 }
@@ -927,11 +1020,11 @@ fn resource_provider_request_from_core(
         storage_policy: resource_storage_policy_name(request.storage_policy).to_owned(),
         raw_storage_policy: request.raw_storage_policy,
         range: request.range.map(|range| ResourceByteRange {
-            start: range.start.to_string(),
-            end: range.end.to_string(),
+            start: BigInt::from(range.start),
+            end: BigInt::from(range.end),
         }),
-        prior_modified_unix_ms: request.prior_modified_unix_ms,
-        prior_expires_unix_ms: request.prior_expires_unix_ms,
+        prior_modified_unix_ms: request.prior_modified_unix_ms.map(BigInt::from),
+        prior_expires_unix_ms: request.prior_expires_unix_ms.map(BigInt::from),
         prior_etag: request.prior_etag,
         prior_data: Uint8Array::from(request.prior_data),
         handle_id: handle_id.to_string(),
@@ -948,10 +1041,19 @@ fn resource_response_from_input(input: ResourceResponseInput) -> Result<core::Re
     response.bytes = input.bytes.map(|bytes| bytes.to_vec()).unwrap_or_default();
     response.error_message = input.error_message;
     response.must_revalidate = input.must_revalidate.unwrap_or(false);
-    response.modified_unix_ms = input.modified_unix_ms;
-    response.expires_unix_ms = input.expires_unix_ms;
+    response.modified_unix_ms = input
+        .modified_unix_ms
+        .map(|value| bigint_to_i64(value, "modifiedUnixMs"))
+        .transpose()?;
+    response.expires_unix_ms = input
+        .expires_unix_ms
+        .map(|value| bigint_to_i64(value, "expiresUnixMs"))
+        .transpose()?;
     response.etag = input.etag;
-    response.retry_after_unix_ms = input.retry_after_unix_ms;
+    response.retry_after_unix_ms = input
+        .retry_after_unix_ms
+        .map(|value| bigint_to_i64(value, "retryAfterUnixMs"))
+        .transpose()?;
     Ok(response)
 }
 
@@ -1075,6 +1177,243 @@ fn runtime_event_payload_kind(payload: &core::RuntimeEventPayload) -> &'static s
     }
 }
 
+fn runtime_event_payload_to_value(payload: core::RuntimeEventPayload) -> RuntimeEventPayloadValue {
+    match payload {
+        core::RuntimeEventPayload::None => {
+            empty_runtime_event_payload("none", sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE)
+        }
+        core::RuntimeEventPayload::RenderFrame(event) => RuntimeEventPayloadValue {
+            kind: "render-frame".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
+            render_frame: Some(RenderFrameEventValue {
+                mode: render_mode_name(event.mode).to_owned(),
+                raw_mode: render_mode_raw(event.mode),
+                needs_repaint: event.needs_repaint,
+                placement_changed: event.placement_changed,
+                stats: rendering_stats_to_value(event.stats),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::RenderMap(event) => RuntimeEventPayloadValue {
+            kind: "render-map".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
+            render_map: Some(RenderMapEventValue {
+                mode: render_mode_name(event.mode).to_owned(),
+                raw_mode: render_mode_raw(event.mode),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::StyleImageMissing(event) => RuntimeEventPayloadValue {
+            kind: "style-image-missing".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING,
+            style_image_missing: Some(StyleImageMissingEventValue {
+                image_id: event.image_id,
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::TileAction(event) => RuntimeEventPayloadValue {
+            kind: "tile-action".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
+            tile_action: Some(TileActionEventValue {
+                operation: tile_operation_name(event.operation).to_owned(),
+                raw_operation: tile_operation_raw(event.operation),
+                tile_id: tile_id_to_value(event.tile_id),
+                source_id: event.source_id,
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::OfflineRegionStatus(event) => RuntimeEventPayloadValue {
+            kind: "offline-region-status".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
+            offline_region_status: Some(OfflineRegionStatusEventValue {
+                region_id: BigInt::from(event.region_id),
+                status: offline_region_status_to_value(event.status),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::OfflineRegionResponseError(event) => RuntimeEventPayloadValue {
+            kind: "offline-region-response-error".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
+            offline_region_response_error: Some(OfflineRegionResponseErrorEventValue {
+                region_id: BigInt::from(event.region_id),
+                reason: resource_error_reason_name(event.reason).to_owned(),
+                raw_reason: event.reason.raw_value(),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::OfflineRegionTileCountLimit(event) => RuntimeEventPayloadValue {
+            kind: "offline-region-tile-count-limit".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
+            offline_region_tile_count_limit: Some(OfflineRegionTileCountLimitEventValue {
+                region_id: BigInt::from(event.region_id),
+                limit: BigInt::from(event.limit),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::OfflineOperationCompleted(event) => RuntimeEventPayloadValue {
+            kind: "offline-operation-completed".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
+            offline_operation_completed: Some(OfflineOperationCompletedEventValue {
+                operation_id: BigInt::from(event.operation_id),
+                operation_kind: offline_operation_kind_name(event.operation_kind).to_owned(),
+                raw_operation_kind: event.raw_operation_kind,
+                result_kind: offline_operation_result_kind_name(event.result_kind).to_owned(),
+                raw_result_kind: event.raw_result_kind,
+                result_status: event.result_status,
+                found: event.found,
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        core::RuntimeEventPayload::Unknown(payload) => RuntimeEventPayloadValue {
+            kind: "unknown".to_owned(),
+            raw_type: payload.raw_type,
+            unknown: Some(UnknownRuntimeEventPayloadValue {
+                raw_type: payload.raw_type,
+                bytes: Uint8Array::from(payload.bytes),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
+        _ => empty_runtime_event_payload("unknown", 0),
+    }
+}
+
+fn empty_runtime_event_payload(kind: &str, raw_type: u32) -> RuntimeEventPayloadValue {
+    RuntimeEventPayloadValue {
+        kind: kind.to_owned(),
+        raw_type,
+        ..empty_runtime_event_payload_fields()
+    }
+}
+
+fn empty_runtime_event_payload_fields() -> RuntimeEventPayloadValue {
+    RuntimeEventPayloadValue {
+        kind: String::new(),
+        raw_type: 0,
+        render_frame: None,
+        render_map: None,
+        style_image_missing: None,
+        tile_action: None,
+        offline_region_status: None,
+        offline_region_response_error: None,
+        offline_region_tile_count_limit: None,
+        offline_operation_completed: None,
+        unknown: None,
+    }
+}
+
+fn rendering_stats_to_value(stats: core::RenderingStats) -> RenderingStatsValue {
+    RenderingStatsValue {
+        encoding_time: stats.encoding_time,
+        rendering_time: stats.rendering_time,
+        frame_count: BigInt::from(stats.frame_count),
+        draw_call_count: BigInt::from(stats.draw_call_count),
+        total_draw_call_count: BigInt::from(stats.total_draw_call_count),
+    }
+}
+
+fn tile_id_to_value(tile_id: core::TileId) -> TileIdValue {
+    TileIdValue {
+        overscaled_z: tile_id.overscaled_z,
+        wrap: tile_id.wrap,
+        canonical_z: tile_id.canonical_z,
+        canonical_x: tile_id.canonical_x,
+        canonical_y: tile_id.canonical_y,
+    }
+}
+
+fn render_mode_name(mode: core::RenderMode) -> &'static str {
+    match mode {
+        core::RenderMode::Partial => "partial",
+        core::RenderMode::Full => "full",
+        core::RenderMode::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn render_mode_raw(mode: core::RenderMode) -> u32 {
+    match mode {
+        core::RenderMode::Partial => sys::MLN_RENDER_MODE_PARTIAL,
+        core::RenderMode::Full => sys::MLN_RENDER_MODE_FULL,
+        core::RenderMode::Unknown(raw) => raw,
+        _ => sys::MLN_RENDER_MODE_PARTIAL,
+    }
+}
+
+fn tile_operation_name(operation: core::TileOperation) -> &'static str {
+    match operation {
+        core::TileOperation::RequestedFromCache => "requestedFromCache",
+        core::TileOperation::RequestedFromNetwork => "requestedFromNetwork",
+        core::TileOperation::LoadFromNetwork => "loadFromNetwork",
+        core::TileOperation::LoadFromCache => "loadFromCache",
+        core::TileOperation::StartParse => "startParse",
+        core::TileOperation::EndParse => "endParse",
+        core::TileOperation::Error => "error",
+        core::TileOperation::Cancelled => "cancelled",
+        core::TileOperation::Null => "null",
+        core::TileOperation::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn tile_operation_raw(operation: core::TileOperation) -> u32 {
+    match operation {
+        core::TileOperation::RequestedFromCache => sys::MLN_TILE_OPERATION_REQUESTED_FROM_CACHE,
+        core::TileOperation::RequestedFromNetwork => sys::MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK,
+        core::TileOperation::LoadFromNetwork => sys::MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
+        core::TileOperation::LoadFromCache => sys::MLN_TILE_OPERATION_LOAD_FROM_CACHE,
+        core::TileOperation::StartParse => sys::MLN_TILE_OPERATION_START_PARSE,
+        core::TileOperation::EndParse => sys::MLN_TILE_OPERATION_END_PARSE,
+        core::TileOperation::Error => sys::MLN_TILE_OPERATION_ERROR,
+        core::TileOperation::Cancelled => sys::MLN_TILE_OPERATION_CANCELLED,
+        core::TileOperation::Null => sys::MLN_TILE_OPERATION_NULL,
+        core::TileOperation::Unknown(raw) => raw,
+        _ => sys::MLN_TILE_OPERATION_NULL,
+    }
+}
+
+fn resource_error_reason_name(reason: core::ResourceErrorReason) -> &'static str {
+    match reason {
+        core::ResourceErrorReason::None => "none",
+        core::ResourceErrorReason::NotFound => "notFound",
+        core::ResourceErrorReason::Server => "server",
+        core::ResourceErrorReason::Connection => "connection",
+        core::ResourceErrorReason::RateLimit => "rateLimit",
+        core::ResourceErrorReason::Other => "other",
+        core::ResourceErrorReason::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn offline_operation_kind_name(kind: core::OfflineOperationKind) -> &'static str {
+    match kind {
+        core::OfflineOperationKind::AmbientCache => "ambientCache",
+        core::OfflineOperationKind::RegionCreate => "regionCreate",
+        core::OfflineOperationKind::RegionGet => "regionGet",
+        core::OfflineOperationKind::RegionsList => "regionsList",
+        core::OfflineOperationKind::RegionsMergeDatabase => "regionsMergeDatabase",
+        core::OfflineOperationKind::RegionUpdateMetadata => "regionUpdateMetadata",
+        core::OfflineOperationKind::RegionGetStatus => "regionGetStatus",
+        core::OfflineOperationKind::RegionSetObserved => "regionSetObserved",
+        core::OfflineOperationKind::RegionSetDownloadState => "regionSetDownloadState",
+        core::OfflineOperationKind::RegionInvalidate => "regionInvalidate",
+        core::OfflineOperationKind::RegionDelete => "regionDelete",
+        core::OfflineOperationKind::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
+fn offline_operation_result_kind_name(kind: core::OfflineOperationResultKind) -> &'static str {
+    match kind {
+        core::OfflineOperationResultKind::None => "none",
+        core::OfflineOperationResultKind::Region => "region",
+        core::OfflineOperationResultKind::OptionalRegion => "optionalRegion",
+        core::OfflineOperationResultKind::RegionList => "regionList",
+        core::OfflineOperationResultKind::RegionStatus => "regionStatus",
+        core::OfflineOperationResultKind::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
 fn runtime_event_type_name(event_type: core::RuntimeEventType) -> &'static str {
     match event_type {
         core::RuntimeEventType::MapCameraWillChange => "map-camera-will-change",
@@ -1111,14 +1450,6 @@ impl NativeRuntimeHandle {
         self.state.as_ptr()
     }
 
-    fn retire_resource_transform(&self, transform: Arc<ResourceTransformState>) {
-        if let Ok(mut retired) = self.retired_resource_transforms.lock() {
-            retired.push(transform);
-        } else {
-            std::mem::forget(transform);
-        }
-    }
-
     fn retire_resource_provider(&self, provider: Arc<ResourceProviderState>) {
         if let Ok(mut retired) = self.retired_resource_providers.lock() {
             retired.push(provider);
@@ -1130,9 +1461,6 @@ impl NativeRuntimeHandle {
     fn release_resource_callback_state(&self) {
         if let Ok(mut transform) = self.resource_transform.lock() {
             *transform = None;
-        }
-        if let Ok(mut retired_transforms) = self.retired_resource_transforms.lock() {
-            retired_transforms.clear();
         }
         if let Ok(mut provider) = self.resource_provider.lock() {
             *provider = None;
@@ -1165,36 +1493,21 @@ impl Drop for ResourceProviderState {
 impl Drop for NativeRuntimeHandle {
     fn drop(&mut self) {
         if self.state.leak_for_report().is_some() {
-            if let Ok(mut transform) = self.resource_transform.lock() {
-                if let Some(transform) = transform.take() {
-                    std::mem::forget(transform);
-                }
+            if let Ok(mut transform) = self.resource_transform.lock()
+                && let Some(transform) = transform.take()
+            {
+                std::mem::forget(transform);
             }
-            if let Ok(mut retired_transforms) = self.retired_resource_transforms.lock() {
-                for transform in retired_transforms.drain(..) {
-                    std::mem::forget(transform);
-                }
-            }
-            if let Ok(mut provider) = self.resource_provider.lock() {
-                if let Some(provider) = provider.take() {
-                    std::mem::forget(provider);
-                }
+            if let Ok(mut provider) = self.resource_provider.lock()
+                && let Some(provider) = provider.take()
+            {
+                std::mem::forget(provider);
             }
             if let Ok(mut retired_providers) = self.retired_resource_providers.lock() {
                 for provider in retired_providers.drain(..) {
                     std::mem::forget(provider);
                 }
             }
-        }
-    }
-}
-
-impl Default for RuntimeOptions {
-    fn default() -> Self {
-        Self {
-            asset_path: None,
-            cache_path: None,
-            maximum_cache_size: None,
         }
     }
 }
@@ -1241,7 +1554,7 @@ fn copy_offline_region_list_value(
 
 fn offline_region_info_to_value(info: core::OfflineRegionInfo) -> Result<OfflineRegionInfoValue> {
     Ok(OfflineRegionInfoValue {
-        id: info.id.to_string(),
+        id: BigInt::from(info.id),
         definition: offline_region_definition_to_value(info.definition)?,
         metadata: Uint8Array::from(info.metadata),
     })
@@ -1292,15 +1605,21 @@ fn offline_region_definition_to_value(
 fn offline_region_status_value_from_native(
     raw: sys::mln_offline_region_status,
 ) -> OfflineRegionStatusValue {
+    offline_region_status_to_value(core::events::offline_region_status_from_native(raw))
+}
+
+fn offline_region_status_to_value(status: core::OfflineRegionStatus) -> OfflineRegionStatusValue {
     OfflineRegionStatusValue {
-        download_state: offline_region_download_state_name(raw.download_state).to_owned(),
-        raw_download_state: raw.download_state,
-        completed_resource_count: raw.completed_resource_count.to_string(),
-        completed_resource_size: raw.completed_resource_size.to_string(),
-        completed_tile_count: raw.completed_tile_count.to_string(),
-        completed_tile_size: raw.completed_tile_size.to_string(),
-        required_resource_count: raw.required_resource_count.to_string(),
-        required_resource_count_is_precise: raw.required_resource_count_is_precise,
+        download_state: offline_region_download_state_name(status.download_state).to_owned(),
+        raw_download_state: offline_region_download_state_raw(status.download_state),
+        completed_resource_count: BigInt::from(status.completed_resource_count),
+        completed_resource_size: BigInt::from(status.completed_resource_size),
+        completed_tile_count: BigInt::from(status.completed_tile_count),
+        required_tile_count: BigInt::from(status.required_tile_count),
+        completed_tile_size: BigInt::from(status.completed_tile_size),
+        required_resource_count: BigInt::from(status.required_resource_count),
+        required_resource_count_is_precise: status.required_resource_count_is_precise,
+        complete: status.complete,
     }
 }
 
@@ -1361,7 +1680,7 @@ fn json_string_from_serde(value: serde_json::Value) -> Result<String> {
 
 fn offline_operation_start(operation_id: u64) -> OfflineOperationStart {
     OfflineOperationStart {
-        operation_id: operation_id.to_string(),
+        operation_id: BigInt::from(operation_id),
     }
 }
 
@@ -1399,12 +1718,21 @@ fn offline_region_definition_from_input(
     }
 }
 
-fn offline_region_download_state_name(raw: u32) -> &'static str {
-    match core::OfflineRegionDownloadState::from_raw(raw) {
+fn offline_region_download_state_name(state: core::OfflineRegionDownloadState) -> &'static str {
+    match state {
         core::OfflineRegionDownloadState::Inactive => "inactive",
         core::OfflineRegionDownloadState::Active => "active",
         core::OfflineRegionDownloadState::Unknown(_) => "unknown",
         _ => "unknown",
+    }
+}
+
+fn offline_region_download_state_raw(state: core::OfflineRegionDownloadState) -> u32 {
+    match state {
+        core::OfflineRegionDownloadState::Inactive => sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
+        core::OfflineRegionDownloadState::Active => sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
+        core::OfflineRegionDownloadState::Unknown(raw) => raw,
+        _ => sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
     }
 }
 

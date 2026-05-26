@@ -87,6 +87,10 @@ test("concept subpath modules expose curated public API groups", () => {
   const mapModule = require("@maplibre/native-ffi-node/map");
   const offlineModule = require("@maplibre/native-ffi-node/offline");
   const resourceModule = require("@maplibre/native-ffi-node/resource");
+  const cameraModule = require("@maplibre/native-ffi-node/camera");
+  const jsonModule = require("@maplibre/native-ffi-node/json");
+  const queryModule = require("@maplibre/native-ffi-node/query");
+  const styleModule = require("@maplibre/native-ffi-node/style");
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
   assert.equal(runtimeModule.networkStatus, networkStatus);
@@ -98,6 +102,10 @@ test("concept subpath modules expose curated public API groups", () => {
   assert.equal(mapModule.MapHandle, MapHandle);
   assert.equal(offlineModule.OfflineOperationHandle, OfflineOperationHandle);
   assert.equal(resourceModule.ResourceRequestHandle, ResourceRequestHandle);
+  assert.deepEqual(cameraModule, {});
+  assert.deepEqual(jsonModule, {});
+  assert.deepEqual(queryModule, {});
+  assert.deepEqual(styleModule, {});
 });
 
 test("process-global APIs cross the native add-on", () => {
@@ -388,6 +396,38 @@ test("offline operations expose discardable handles", () => {
   }
 });
 
+test("offline operation events expose copied typed payloads", async () => {
+  const runtime = new RuntimeHandle();
+  try {
+    const operation = runtime.runAmbientCacheOperation("clear");
+    const event = await eventually(() => {
+      runtime.runOnce();
+      const event = runtime.pollEvent();
+      return event?.payload.kind === "offline-operation-completed" &&
+        event.payload.offlineOperationCompleted.operationId ===
+          operation.operationId
+        ? event
+        : null;
+    });
+
+    assert.equal(event.payloadKind, "offline-operation-completed");
+    assert.equal(event.payload.rawType > 0, true);
+    assert.equal(event.sourceType, "runtime");
+    assert.equal(typeof event.sourceAddress, "bigint");
+    const completed = /** @type {any} */ (event.payload)
+      .offlineOperationCompleted;
+    assert.equal(completed.operationId, operation.operationId);
+    assert.equal(completed.operationKind, "ambientCache");
+    assert.equal(completed.resultKind, "none");
+    assert.equal(typeof completed.rawOperationKind, "number");
+    assert.equal(typeof completed.rawResultKind, "number");
+    assert.equal(typeof completed.resultStatus, "number");
+    assert.equal(typeof completed.found, "boolean");
+  } finally {
+    runtime.close();
+  }
+});
+
 test("resource provider routes validate Node handoff shape", async () => {
   const runtime = new RuntimeHandle();
 
@@ -592,6 +632,11 @@ test("runtime handle supports options, resource transform, explicit close, and i
   const runtime = new RuntimeHandle({ maximumCacheSize: 1n });
 
   assert.equal(runtime.closed, false);
+  assert.equal(
+    Object.prototype.propertyIsEnumerable.call(runtime, "native"),
+    false,
+  );
+  assert.equal("native" in runtime, false);
   runtime.runOnce();
   assert.equal(runtime.pollEvent(), null);
   runtime.setResourceTransformRules([
@@ -622,6 +667,7 @@ test("runtime handle supports options, resource transform, explicit close, and i
   );
   runtime.close();
   assert.equal(runtime.closed, true);
+  assert.throws(() => runtime.runOnce(), /handle is closed/);
   runtime.close();
   runtime[Symbol.dispose]();
 });
@@ -649,6 +695,8 @@ test("map handle retains runtime parent and closes before runtime", () => {
   assert.throws(() => runtime.close(), InvalidStateError);
   map.close();
   assert.equal(map.closed, true);
+  assert.equal("native" in map, false);
+  assert.throws(() => map.requestRepaint(), /handle is closed/);
   map.close();
   runtime.close();
 });
@@ -1279,16 +1327,19 @@ test("runtime options reject invalid bigint values", () => {
   );
 });
 
-/** @param {() => boolean} predicate */
+/** @template T @param {() => T | false | null | undefined} predicate */
 async function eventually(predicate) {
   const deadline = Date.now() + 500;
   while (Date.now() < deadline) {
-    if (predicate()) {
-      return;
+    const value = predicate();
+    if (value) {
+      return value;
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  assert.equal(predicate(), true);
+  const value = predicate();
+  assert.ok(value);
+  return value;
 }
 
 test("binding-owned validation rejects unknown network status strings", () => {

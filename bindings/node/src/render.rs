@@ -140,12 +140,14 @@ pub struct RenderedQueryGeometryInput {
 }
 
 #[napi(object)]
+#[derive(Default)]
 pub struct RenderedFeatureQueryOptionsInput {
     pub layer_ids: Option<Vec<String>>,
     pub filter: Option<String>,
 }
 
 #[napi(object)]
+#[derive(Default)]
 pub struct SourceFeatureQueryOptionsInput {
     pub source_layer_ids: Option<Vec<String>>,
     pub filter: Option<String>,
@@ -559,24 +561,6 @@ impl NativeRenderSessionHandle {
             ));
         }
         Ok(())
-    }
-}
-
-impl Default for RenderedFeatureQueryOptionsInput {
-    fn default() -> Self {
-        Self {
-            layer_ids: None,
-            filter: None,
-        }
-    }
-}
-
-impl Default for SourceFeatureQueryOptionsInput {
-    fn default() -> Self {
-        Self {
-            source_layer_ids: None,
-            filter: None,
-        }
     }
 }
 

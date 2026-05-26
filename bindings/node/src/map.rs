@@ -17,6 +17,7 @@ use crate::{
 };
 
 #[napi(object)]
+#[derive(Default)]
 pub struct MapOptions {
     pub width: Option<u32>,
     pub height: Option<u32>,
@@ -135,6 +136,7 @@ pub struct CanonicalTileId {
 }
 
 #[napi(object)]
+#[derive(Default)]
 pub struct CustomGeometrySourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -1697,17 +1699,6 @@ impl Drop for NativeMapHandle {
     }
 }
 
-impl Default for MapOptions {
-    fn default() -> Self {
-        Self {
-            width: None,
-            height: None,
-            scale_factor: None,
-            map_mode: None,
-        }
-    }
-}
-
 impl EdgeInsets {
     pub(crate) fn into_core(self) -> core::EdgeInsets {
         core::EdgeInsets::new(self.top, self.left, self.bottom, self.right)
@@ -1941,20 +1932,6 @@ impl Quaternion {
             y: value.y,
             z: value.z,
             w: value.w,
-        }
-    }
-}
-
-impl Default for CustomGeometrySourceOptions {
-    fn default() -> Self {
-        Self {
-            min_zoom: None,
-            max_zoom: None,
-            tolerance: None,
-            tile_size: None,
-            buffer: None,
-            clip: None,
-            wrap: None,
         }
     }
 }

@@ -1,6 +1,7 @@
 export {
   ResourceRequestHandle,
   type ResourceKind,
+  type ResourceErrorReason,
   type ResourceRoute,
   type ResourceTransformRule,
   type ResourceByteRange,

@@ -86,10 +86,173 @@ export interface RuntimeEvent {
   rawEventType: number;
   sourceType: string;
   rawSourceType: number;
-  sourceAddress: string;
+  sourceAddress: bigint;
   code: number;
   message?: string | null;
-  payloadKind: string;
+  payloadKind: RuntimeEventPayload["kind"];
+  payload: RuntimeEventPayload;
+}
+
+export type RuntimeEventPayload =
+  | RuntimeEventPayloadNone
+  | RuntimeEventPayloadRenderFrame
+  | RuntimeEventPayloadRenderMap
+  | RuntimeEventPayloadStyleImageMissing
+  | RuntimeEventPayloadTileAction
+  | RuntimeEventPayloadOfflineRegionStatus
+  | RuntimeEventPayloadOfflineRegionResponseError
+  | RuntimeEventPayloadOfflineRegionTileCountLimit
+  | RuntimeEventPayloadOfflineOperationCompleted
+  | RuntimeEventPayloadUnknown;
+
+export interface RuntimeEventPayloadBase {
+  kind: string;
+  rawType: number;
+}
+
+export interface RuntimeEventPayloadNone extends RuntimeEventPayloadBase {
+  kind: "none";
+}
+
+export interface RenderingStats {
+  encodingTime: number;
+  renderingTime: number;
+  frameCount: bigint;
+  drawCallCount: bigint;
+  totalDrawCallCount: bigint;
+}
+
+export type RenderMode = "partial" | "full" | "unknown";
+
+export interface RuntimeEventPayloadRenderFrame extends RuntimeEventPayloadBase {
+  kind: "render-frame";
+  renderFrame: {
+    mode: RenderMode;
+    rawMode: number;
+    needsRepaint: boolean;
+    placementChanged: boolean;
+    stats: RenderingStats;
+  };
+}
+
+export interface RuntimeEventPayloadRenderMap extends RuntimeEventPayloadBase {
+  kind: "render-map";
+  renderMap: {
+    mode: RenderMode;
+    rawMode: number;
+  };
+}
+
+export interface RuntimeEventPayloadStyleImageMissing extends RuntimeEventPayloadBase {
+  kind: "style-image-missing";
+  styleImageMissing: { imageId: string };
+}
+
+export type TileOperation =
+  | "requestedFromCache"
+  | "requestedFromNetwork"
+  | "loadFromNetwork"
+  | "loadFromCache"
+  | "startParse"
+  | "endParse"
+  | "error"
+  | "cancelled"
+  | "null"
+  | "unknown";
+
+export interface TileId {
+  overscaledZ: number;
+  wrap: number;
+  canonicalZ: number;
+  canonicalX: number;
+  canonicalY: number;
+}
+
+export interface RuntimeEventPayloadTileAction extends RuntimeEventPayloadBase {
+  kind: "tile-action";
+  tileAction: {
+    operation: TileOperation;
+    rawOperation: number;
+    tileId: TileId;
+    sourceId: string;
+  };
+}
+
+export interface RuntimeEventPayloadOfflineRegionStatus extends RuntimeEventPayloadBase {
+  kind: "offline-region-status";
+  offlineRegionStatus: {
+    regionId: bigint;
+    status: OfflineRegionStatus;
+  };
+}
+
+export type ResourceErrorReason =
+  | "none"
+  | "notFound"
+  | "server"
+  | "connection"
+  | "rateLimit"
+  | "other"
+  | "unknown";
+
+export interface RuntimeEventPayloadOfflineRegionResponseError extends RuntimeEventPayloadBase {
+  kind: "offline-region-response-error";
+  offlineRegionResponseError: {
+    regionId: bigint;
+    reason: ResourceErrorReason;
+    rawReason: number;
+  };
+}
+
+export interface RuntimeEventPayloadOfflineRegionTileCountLimit extends RuntimeEventPayloadBase {
+  kind: "offline-region-tile-count-limit";
+  offlineRegionTileCountLimit: {
+    regionId: bigint;
+    limit: bigint;
+  };
+}
+
+export type OfflineOperationKind =
+  | "ambientCache"
+  | "regionCreate"
+  | "regionGet"
+  | "regionsList"
+  | "regionsMergeDatabase"
+  | "regionUpdateMetadata"
+  | "regionGetStatus"
+  | "regionSetObserved"
+  | "regionSetDownloadState"
+  | "regionInvalidate"
+  | "regionDelete"
+  | "unknown";
+
+export type OfflineOperationResultKind =
+  | "none"
+  | "region"
+  | "optionalRegion"
+  | "regionList"
+  | "regionStatus"
+  | "unknown";
+
+export interface RuntimeEventPayloadOfflineOperationCompleted extends RuntimeEventPayloadBase {
+  kind: "offline-operation-completed";
+  offlineOperationCompleted: {
+    operationId: bigint;
+    operationKind: OfflineOperationKind;
+    rawOperationKind: number;
+    resultKind: OfflineOperationResultKind;
+    rawResultKind: number;
+    resultStatus: number;
+    found: boolean;
+  };
+}
+
+export interface RuntimeEventPayloadUnknown extends RuntimeEventPayloadBase {
+  kind: "unknown";
+  unknown: {
+    rawType: number;
+    bytes: Uint8Array;
+  };
 }
 
 export type MapDebugOption =
@@ -152,6 +315,13 @@ export interface EdgeInsets {
   right: number;
 }
 
+export interface MapViewportOptionsInput {
+  northOrientation?: "up" | "right" | "down" | "left" | null;
+  constrainMode?: "none" | "heightOnly" | "widthAndHeight" | "screen" | null;
+  viewportMode?: "default" | "flippedY" | null;
+  frustumOffset?: EdgeInsets | null;
+}
+
 export interface MapViewportOptions {
   northOrientation?: "up" | "right" | "down" | "left" | "unknown" | null;
   constrainMode?:
@@ -163,6 +333,15 @@ export interface MapViewportOptions {
     | null;
   viewportMode?: "default" | "flippedY" | "unknown" | null;
   frustumOffset?: EdgeInsets | null;
+}
+
+export interface MapTileOptionsInput {
+  prefetchZoomDelta?: number | null;
+  lodMinRadius?: number | null;
+  lodScale?: number | null;
+  lodPitchThreshold?: number | null;
+  lodZoomShift?: number | null;
+  lodMode?: "default" | "distance" | null;
 }
 
 export interface MapTileOptions {
@@ -249,8 +428,8 @@ export type ResourceTransformRule =
     });
 
 export interface ResourceByteRange {
-  start: string;
-  end: string;
+  start: bigint;
+  end: bigint;
 }
 
 export interface ResourceProviderRequest {
@@ -266,8 +445,8 @@ export interface ResourceProviderRequest {
   storagePolicy: "permanent" | "volatile" | "unknown";
   rawStoragePolicy: number;
   range?: ResourceByteRange | null;
-  priorModifiedUnixMs?: number | null;
-  priorExpiresUnixMs?: number | null;
+  priorModifiedUnixMs?: bigint | null;
+  priorExpiresUnixMs?: bigint | null;
   priorEtag?: string | null;
   priorData: Uint8Array;
   handle: ResourceRequestHandle;
@@ -286,10 +465,10 @@ export interface ResourceResponseInput {
   bytes?: Uint8Array | null;
   errorMessage?: string | null;
   mustRevalidate?: boolean | null;
-  modifiedUnixMs?: number | null;
-  expiresUnixMs?: number | null;
+  modifiedUnixMs?: bigint | null;
+  expiresUnixMs?: bigint | null;
   etag?: string | null;
-  retryAfterUnixMs?: number | null;
+  retryAfterUnixMs?: bigint | null;
 }
 
 export type ResourceProviderCallback = (
@@ -400,7 +579,7 @@ export interface OfflineRegionDefinitionValue {
 }
 
 export interface OfflineRegionInfo {
-  id: string;
+  id: bigint;
   definition: OfflineRegionDefinitionValue;
   metadata: Uint8Array;
 }
@@ -408,12 +587,14 @@ export interface OfflineRegionInfo {
 export interface OfflineRegionStatus {
   downloadState: OfflineRegionDownloadState | "unknown";
   rawDownloadState: number;
-  completedResourceCount: string;
-  completedResourceSize: string;
-  completedTileCount: string;
-  completedTileSize: string;
-  requiredResourceCount: string;
+  completedResourceCount: bigint;
+  completedResourceSize: bigint;
+  completedTileCount: bigint;
+  requiredTileCount: bigint;
+  completedTileSize: bigint;
+  requiredResourceCount: bigint;
   requiredResourceCountIsPrecise: boolean;
+  complete: boolean;
 }
 
 export type OfflineOperationRef = OfflineOperationHandle | bigint;
@@ -660,9 +841,9 @@ export declare class MapHandle {
   getDebugOptions(): MapDebugOption[];
   setDebugOptions(options: Iterable<MapDebugOption>): void;
   getViewportOptions(): MapViewportOptions;
-  setViewportOptions(options: MapViewportOptions): void;
+  setViewportOptions(options: MapViewportOptionsInput): void;
   getTileOptions(): MapTileOptions;
-  setTileOptions(options: MapTileOptions): void;
+  setTileOptions(options: MapTileOptionsInput): void;
   getBounds(): BoundOptions;
   setBounds(options: BoundOptions): void;
   getFreeCameraOptions(): FreeCameraOptions;

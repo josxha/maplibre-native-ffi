@@ -8,4 +8,8 @@ run = "pnpm test"
 
 [tasks.ci]
 depends = [":test"]
-run = "pnpm typecheck"
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = [
+  "pnpm --dir bindings/node typecheck",
+  "cargo clippy -p maplibre-native-node --all-targets -- -D warnings",
+]
