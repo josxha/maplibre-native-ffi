@@ -14,15 +14,19 @@ Resources:
 ## Architecture
 
 The Go binding exposes one low-level package over the public C headers through
-`cgo`. Raw `C.*` declarations, `unsafe.Pointer` conversions, exported callback
-trampolines, and C helper structs stay internal. Public APIs use Go handles,
-values, slices, errors, callbacks, and `NativePointer`.
+`cgo`. It calls public `mln_*` functions directly; it does not maintain a
+handwritten Go mirror of the C ABI. Raw `C.*` declarations, `unsafe.Pointer`
+conversions, exported callback trampolines, and small C helper structs stay
+internal. Public APIs use Go handles, values, slices, errors, callbacks, and
+`NativePointer`.
 
 Keep direct C calls small and regular. Internal helpers own repeated invariants:
 status checks, same-thread diagnostic capture, descriptor materialization,
 string conversion, callback registries, retained C storage, and finalizer leak
-reporting. The Go binding targets Go 1.21 or newer for `runtime.Pinner`;
-ordinary call-scoped buffers rely on cgo's per-call pinning.
+reporting. C shim headers stay minimal and serve cgo-specific needs such as
+union access, inline descriptor construction, and callback trampolines. The Go
+binding targets Go 1.21 or newer for `runtime.Pinner`; ordinary call-scoped
+buffers rely on cgo's per-call pinning.
 
 ## Public Surface
 
