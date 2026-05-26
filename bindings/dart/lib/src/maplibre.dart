@@ -11,58 +11,36 @@ import 'internal/status/status.dart';
 import 'internal/struct/struct.dart' as native_struct;
 import 'log/log.dart';
 
-typedef _LogRecordListenerFunction = Void Function(Pointer<Void>);
-
-final class _NativeLogCallbackState extends Struct {
-  external Pointer<NativeFunction<_LogRecordListenerFunction>> listener;
-
-  @Uint32()
-  external int consume;
-}
-
-final class _NativeLogRecord extends Struct {
-  external Pointer<Void> owner;
-
-  @Uint32()
-  external int severity;
-
-  @Uint32()
-  external int event;
-
-  @Int64()
-  external int code;
-
-  external Pointer<Char> message;
-}
-
 final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
-    listener = NativeCallable<_LogRecordListenerFunction>.listener((
-      Pointer<Void> record,
-    ) {
-      final ran = runUpcall(() {
-        try {
+    listener = NativeCallable<raw.mln_dart_log_record_listenerFunction>.listener(
+      (Pointer<Void> record) {
+        final ran = runUpcall(() {
           try {
-            callback(_copyLogRecord(record.cast<_NativeLogRecord>().ref));
-          } catch (_) {
-            // Log callbacks are notification boundaries; user exceptions are
-            // contained so they never surface from native callback delivery.
+            try {
+              callback(
+                _copyLogRecord(record.cast<raw.mln_dart_log_record>().ref),
+              );
+            } catch (_) {
+              // Log callbacks are notification boundaries; user exceptions are
+              // contained so they never surface from native callback delivery.
+            }
+          } finally {
+            Maplibre._c.dartLogRecordDestroy(record);
           }
-        } finally {
+        });
+        if (!ran) {
           Maplibre._c.dartLogRecordDestroy(record);
         }
-      });
-      if (!ran) {
-        Maplibre._c.dartLogRecordDestroy(record);
-      }
-    });
-    pointer = calloc<_NativeLogCallbackState>();
+      },
+    );
+    pointer = calloc<raw.mln_dart_log_callback_state>();
     pointer.ref.listener = listener.nativeFunction;
     pointer.ref.consume = consume ? 1 : 0;
   }
 
-  late final Pointer<_NativeLogCallbackState> pointer;
-  late final NativeCallable<_LogRecordListenerFunction> listener;
+  late final Pointer<raw.mln_dart_log_callback_state> pointer;
+  late final NativeCallable<raw.mln_dart_log_record_listenerFunction> listener;
 
   @override
   void closeResources() {
@@ -71,7 +49,7 @@ final class _LogCallbackState extends RetainedCallbackState {
   }
 }
 
-LogRecord _copyLogRecord(_NativeLogRecord record) {
+LogRecord _copyLogRecord(raw.mln_dart_log_record record) {
   return LogRecord(
     severity: LogSeverity.fromRawValue(record.severity),
     event: LogEvent.fromRawValue(record.event),

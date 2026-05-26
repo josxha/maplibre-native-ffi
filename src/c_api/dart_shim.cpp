@@ -1,5 +1,20 @@
 #define MLN_BUILDING_C
 
+// Dart exposes native callbacks through two different mechanisms. Synchronous
+// callbacks have strict thread and isolate limits, while listener callbacks may
+// be invoked from arbitrary native threads but must return void and deliver
+// work asynchronously to the owning isolate. MapLibre callback contracts need
+// more: logging and resource providers return immediate decisions, and borrowed
+// request payloads expire when the C callback returns.
+//
+// This shim handles the native-thread part of those contracts. It copies
+// borrowed payloads into small native-owned records, applies native-owned
+// routing rules when a result is needed immediately, and invokes only void Dart
+// listener functions for isolate delivery. Dart user callbacks therefore run on
+// their owning isolate, not on MapLibre worker, network, logging, or render
+// threads. The matching private C layouts live in dart_shim.h so ffigen can
+// generate the Dart struct declarations from one source of truth.
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -11,6 +26,8 @@
 #include <string>
 #include <vector>
 
+#include "dart_shim.h"
+
 #include "maplibre_native_c.h"
 
 namespace {
@@ -18,61 +35,13 @@ namespace {
 constexpr std::uint32_t DartResourceKindWildcard =
   std::numeric_limits<std::uint32_t>::max();
 
-struct DartResourceRewriteRule {
-  std::uint32_t kind;
-  const char* url;
-  const char* replacement_url;
-};
-
-struct DartResourceRewriteRules {
-  const DartResourceRewriteRule* rules;
-  std::size_t count;
-};
-
-struct DartResourceProviderRule {
-  std::uint32_t kind;
-  const char* url;
-  mln_resource_response response;
-};
-
-struct DartResourceProviderRules {
-  const DartResourceProviderRule* rules;
-  std::size_t count;
-};
-
-struct DartQueuedResourceProviderRoute {
-  std::uint32_t kind;
-  const char* url;
-};
-
-using DartQueuedResourceRequestListener = void (*)(void* request);
-
-struct DartQueuedResourceProvider {
-  const DartQueuedResourceProviderRoute* routes;
-  std::size_t route_count;
-  DartQueuedResourceRequestListener listener;
-};
-
-struct DartQueuedResourceRequestView {
-  void* owner;
-  mln_resource_request_handle* handle;
-  const char* url;
-  std::uint32_t kind;
-  std::uint32_t loading_method;
-  std::uint32_t priority;
-  std::uint32_t usage;
-  std::uint32_t storage_policy;
-  bool has_range;
-  std::uint64_t range_start;
-  std::uint64_t range_end;
-  bool has_prior_modified;
-  std::int64_t prior_modified_unix_ms;
-  bool has_prior_expires;
-  std::int64_t prior_expires_unix_ms;
-  const char* prior_etag;
-  const std::uint8_t* prior_data;
-  std::size_t prior_data_size;
-};
+using DartResourceRewriteRule = mln_dart_resource_rewrite_rule;
+using DartResourceRewriteRules = mln_dart_resource_rewrite_rules;
+using DartResourceProviderRule = mln_dart_resource_provider_rule;
+using DartResourceProviderRules = mln_dart_resource_provider_rules;
+using DartQueuedResourceProviderRoute = mln_dart_queued_resource_provider_route;
+using DartQueuedResourceProvider = mln_dart_queued_resource_provider;
+using DartQueuedResourceRequestView = mln_dart_queued_resource_request;
 
 struct DartQueuedResourceRequest {
   DartQueuedResourceRequestView view{};
@@ -81,20 +50,8 @@ struct DartQueuedResourceRequest {
   std::vector<std::uint8_t> prior_data;
 };
 
-using DartLogRecordListener = void (*)(void* record);
-
-struct DartLogCallbackState {
-  DartLogRecordListener listener;
-  std::uint32_t consume;
-};
-
-struct DartLogRecordView {
-  void* owner;
-  std::uint32_t severity;
-  std::uint32_t event;
-  std::int64_t code;
-  const char* message;
-};
+using DartLogCallbackState = mln_dart_log_callback_state;
+using DartLogRecordView = mln_dart_log_record;
 
 struct DartLogRecord {
   DartLogRecordView view{};

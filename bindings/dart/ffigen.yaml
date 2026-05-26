@@ -5,15 +5,15 @@ output: lib/src/internal/c/maplibre_native_c.g.dart
 headers:
   entry-points:
     - ../../include/maplibre_native_c.h
+    - ../../src/c_api/dart_shim.h
   include-directives:
     - ../../include/maplibre_native_c.h
     - ../../include/maplibre_native_c/**.h
+    - ../../src/c_api/dart_shim.h
 compiler-opts:
   - -I../../include
   - -I../../third_party/maplibre-native/vendor/Vulkan-Headers/include
-comments:
-  style: any
-  length: full
+comments: false
 silence-enum-warning: true
 preamble: |
   // ignore_for_file: always_specify_types

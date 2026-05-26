@@ -25,8 +25,6 @@ class MaplibreNativeC {
     ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
   ) : _lookup = lookup;
 
-  /// Reports the C ABI contract version. The value is 0 while the ABI is unstable,
-  /// and will increment on each SemVer major release.
   int mln_c_version() {
     return _mln_c_version();
   }
@@ -35,9 +33,6 @@ class MaplibreNativeC {
       _lookup<ffi.NativeFunction<ffi.Uint32 Function()>>('mln_c_version');
   late final _mln_c_version = _mln_c_versionPtr.asFunction<int Function()>();
 
-  /// Reports the render backends available in this native library build.
-  ///
-  /// The return value is a mask of mln_render_backend_flag values.
   int mln_supported_render_backend_mask() {
     return _mln_supported_render_backend_mask();
   }
@@ -49,14 +44,6 @@ class MaplibreNativeC {
   late final _mln_supported_render_backend_mask =
       _mln_supported_render_backend_maskPtr.asFunction<int Function()>();
 
-  /// Reads MapLibre Native's process-global network status.
-  ///
-  /// On success, out_status receives a mln_network_status value.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when out_status is null.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_network_status_get(ffi.Pointer<ffi.Uint32> out_status) {
     return mln_status.fromValue(_mln_network_status_get(out_status));
   }
@@ -68,17 +55,6 @@ class MaplibreNativeC {
   late final _mln_network_status_get = _mln_network_status_getPtr
       .asFunction<int Function(ffi.Pointer<ffi.Uint32>)>();
 
-  /// Sets MapLibre Native's process-global network status.
-  ///
-  /// MLN_NETWORK_STATUS_ONLINE allows HTTP and HTTPS requests and wakes native
-  /// subscribers when transitioning from offline. MLN_NETWORK_STATUS_OFFLINE makes
-  /// MapLibre's online source stop starting network requests until reachability
-  /// returns. Runtime-scoped resource configuration is unchanged.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when status is not a mln_network_status value.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_network_status_set(int status) {
     return mln_status.fromValue(_mln_network_status_set(status));
   }
@@ -90,7 +66,6 @@ class MaplibreNativeC {
   late final _mln_network_status_set = _mln_network_status_setPtr
       .asFunction<int Function(int)>();
 
-  /// Returns runtime options initialized for this C API version.
   mln_runtime_options mln_runtime_options_default() {
     return _mln_runtime_options_default();
   }
@@ -102,18 +77,6 @@ class MaplibreNativeC {
   late final _mln_runtime_options_default = _mln_runtime_options_defaultPtr
       .asFunction<mln_runtime_options Function()>();
 
-  /// Creates a runtime handle.
-  ///
-  /// The creating thread becomes the runtime owner thread. Each owner thread may
-  /// hold one live runtime.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when out_runtime is null, *out_runtime is not
-  /// null, or options has an unsupported size or flags.
-  /// - MLN_STATUS_INVALID_STATE when the current thread already owns a live
-  /// runtime.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_create(
     ffi.Pointer<mln_runtime_options> options,
     ffi.Pointer<ffi.Pointer<mln_runtime>> out_runtime,
@@ -138,23 +101,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Sets a runtime-scoped network resource provider.
-  ///
-  /// The provider must be set before any map is created from the runtime. It is
-  /// invoked for requests that reach the C API network file source. Built-in
-  /// non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
-  /// native MainResourceLoader before this extension point. The callback and
-  /// user_data are stored by reference and must remain valid until the runtime is
-  /// destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, provider is
-  /// null, provider->size is too small, or callback is null.
-  /// - MLN_STATUS_INVALID_STATE when runtime already owns live maps.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_set_resource_provider(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<mln_resource_provider> provider,
@@ -182,22 +128,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Completes a C API resource provider request.
-  ///
-  /// This function may be called inline from the provider callback or later from
-  /// any thread. The C API copies all response bytes and strings before returning.
-  ///
-  /// Completion is one-shot. A second completion, completion after cancellation,
-  /// or completion with null arguments returns a non-OK status and does not invoke
-  /// MapLibre's resource callback. Malformed response contents are converted to
-  /// provider error responses and still consume the completion.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the response was accepted for asynchronous delivery.
-  /// - MLN_STATUS_INVALID_ARGUMENT when handle or response is null.
-  /// - MLN_STATUS_INVALID_STATE when the request was cancelled, already completed,
-  /// or can no longer accept a response.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_resource_request_complete(
     ffi.Pointer<mln_resource_request_handle> handle,
     ffi.Pointer<mln_resource_response> response,
@@ -224,15 +154,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Reports whether MapLibre has cancelled a C API resource provider request.
-  ///
-  /// This function may be called from any thread while the provider still owns the
-  /// handle. A cancelled request no longer wants a response; later completion is
-  /// ignored with MLN_STATUS_INVALID_STATE.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when handle or out_cancelled is null.
   mln_status mln_resource_request_cancelled(
     ffi.Pointer<mln_resource_request_handle> handle,
     ffi.Pointer<ffi.Bool> out_cancelled,
@@ -260,12 +181,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Releases the provider's reference to a resource request handle.
-  ///
-  /// Providers own a releasable handle only after returning
-  /// MLN_RESOURCE_PROVIDER_DECISION_HANDLE from the callback. Release the handle
-  /// exactly once after completing the request or deciding not to complete it.
-  /// Passing null is a no-op. A released handle must not be used again.
   void mln_resource_request_release(
     ffi.Pointer<mln_resource_request_handle> handle,
   ) {
@@ -281,23 +196,6 @@ class MaplibreNativeC {
   late final _mln_resource_request_release = _mln_resource_request_releasePtr
       .asFunction<void Function(ffi.Pointer<mln_resource_request_handle>)>();
 
-  /// Registers or updates a runtime-scoped URL transform for network resources.
-  ///
-  /// It is forwarded to MapLibre's OnlineFileSource, so it applies wherever native
-  /// OnlineFileSource applies transforms, including nested PMTiles network range
-  /// requests. It does not apply to file, asset, database, MBTiles, or registered
-  /// C API provider responses intercepted before OnlineFileSource.
-  ///
-  /// This call may replace an existing transform while maps exist. When it
-  /// returns, no in-flight request can still invoke the previous transform.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
-  /// null, transform->size is too small, or callback is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_set_resource_transform(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<mln_resource_transform> transform,
@@ -325,17 +223,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Clears the runtime-scoped URL transform for network resources.
-  ///
-  /// After this call succeeds, network resource URLs pass through unchanged. When
-  /// it returns, no in-flight request can still invoke the previous transform.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_clear_resource_transform(
     ffi.Pointer<mln_runtime> runtime,
   ) {
@@ -350,20 +237,6 @@ class MaplibreNativeC {
       _mln_runtime_clear_resource_transformPtr
           .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
 
-  /// Starts a MapLibre ambient cache maintenance operation for this runtime.
-  ///
-  /// When runtime options omit cache_path, this operates on MapLibre's default
-  /// in-memory database and its effects are not durable beyond the native database
-  /// lifetime. Completion is reported through
-  /// MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or operation
-  /// is not a mln_ambient_cache_operation value, or out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_run_ambient_cache_operation_start(
     ffi.Pointer<mln_runtime> runtime,
     int operation,
@@ -398,19 +271,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Discards runtime-owned state for an offline database operation.
-  ///
-  /// Discarding does not cancel native database work. It drops stored results,
-  /// removes queued completion events for the operation, and suppresses later
-  /// completion delivery when the native operation is still pending.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// operation_id is zero or unknown.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_operation_discard(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -430,18 +290,6 @@ class MaplibreNativeC {
       _mln_runtime_offline_operation_discardPtr
           .asFunction<int Function(ffi.Pointer<mln_runtime>, int)>();
 
-  /// Destroys a runtime handle.
-  ///
-  /// The runtime must no longer own live maps.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
-  /// handle.
-  /// - MLN_STATUS_INVALID_STATE when runtime still owns live maps.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the creating
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_destroy(ffi.Pointer<mln_runtime> runtime) {
     return mln_status.fromValue(_mln_runtime_destroy(runtime));
   }
@@ -453,17 +301,6 @@ class MaplibreNativeC {
   late final _mln_runtime_destroy = _mln_runtime_destroyPtr
       .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
 
-  /// Runs one pending owner-thread task for this runtime.
-  ///
-  /// If no task is pending, the call returns MLN_STATUS_OK without doing work.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
-  /// handle.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_run_once(ffi.Pointer<mln_runtime> runtime) {
     return mln_status.fromValue(_mln_runtime_run_once(runtime));
   }
@@ -475,32 +312,6 @@ class MaplibreNativeC {
   late final _mln_runtime_run_once = _mln_runtime_run_oncePtr
       .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
 
-  /// Pops the next queued runtime event.
-  ///
-  /// On success, *out_event is reset and *out_has_event indicates whether an event
-  /// was available. When an event is available, *out_event receives it.
-  /// Map-originated events set out_event->source_type to
-  /// MLN_RUNTIME_EVENT_SOURCE_MAP and out_event->source to the source map.
-  /// Runtime-originated events set out_event->source_type to
-  /// MLN_RUNTIME_EVENT_SOURCE_RUNTIME.
-  ///
-  /// When an event is available, out_event->payload points to runtime-owned
-  /// storage containing a struct selected by out_event->payload_type, or null when
-  /// the payload type is MLN_RUNTIME_EVENT_PAYLOAD_NONE. String pointers inside
-  /// typed payloads and out_event->message remain valid until the next
-  /// mln_runtime_poll_event() call for the same runtime or until the runtime is
-  /// destroyed. Copy those bytes before then when they must outlive that window.
-  /// For style-image-missing and tile-action events, out_event->message contains
-  /// the same ID string exposed by the typed payload.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the poll completed; out_has_event indicates whether an
-  /// event was written to out_event.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_event is
-  /// null, out_has_event is null, or out_event->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_poll_event(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<mln_runtime_event> out_event,
@@ -530,21 +341,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Starts creating an offline region.
-  ///
-  /// Input strings, geometry descriptors, and metadata are copied before this call
-  /// returns. Completion is reported through
-  /// MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. On successful completion, call
-  /// mln_runtime_offline_region_create_take_result() to take the snapshot.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, definition is
-  /// null or invalid, metadata is null with a non-zero size, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_create_start(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<mln_offline_region_definition> definition,
@@ -587,19 +383,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Starts getting an offline region snapshot by ID.
-  ///
-  /// Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
-  /// On successful completion, call
-  /// mln_runtime_offline_region_get_take_result().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_get_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -634,15 +417,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Starts listing offline region snapshots in the runtime database.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_regions_list_start(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
@@ -670,18 +444,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Starts merging offline regions from another database path.
-  ///
-  /// The side database may be upgraded in place by native code and must be
-  /// writable when native merge requires it.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live,
-  /// side_database_path is null, or out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_regions_merge_database_start(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<ffi.Char> side_database_path,
@@ -716,18 +478,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Starts updating opaque binary metadata for an offline region.
-  ///
-  /// On successful completion, call
-  /// mln_runtime_offline_region_update_metadata_take_result().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, metadata is
-  /// null with a non-zero size, or out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_update_metadata_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -770,15 +520,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Starts getting the current completed/download status for an offline region.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_get_status_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -813,20 +554,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Enables or disables runtime events for an offline region.
-  ///
-  /// Observer callbacks are copied into runtime events. Disabling observation also
-  /// discards queued events for this region.
-  ///
-  /// Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_set_observed_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -865,21 +592,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Sets an offline region's native download state.
-  ///
-  /// Register observation separately with
-  /// mln_runtime_offline_region_set_observed_start() to receive progress and error
-  /// events.
-  ///
-  /// Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, state is not
-  /// a mln_offline_region_download_state value, or out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_set_download_state_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -918,17 +630,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Invalidates cached resources for an offline region.
-  ///
-  /// Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_invalidate_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -963,17 +664,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Deletes an offline region.
-  ///
-  /// Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_operation_id is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_runtime_offline_region_delete_start(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_region_id region_id,
@@ -1008,24 +698,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Takes the snapshot result from a completed offline region create operation.
-  ///
-  /// Must only be called after the matching
-  /// mln_runtime_offline_region_create_start() operation has completed
-  /// successfully (MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED with result
-  /// status MLN_STATUS_OK). The caller owns the returned snapshot handle and must
-  /// destroy it with mln_offline_region_snapshot_destroy().
-  ///
-  /// On success, the operation entry is consumed. On failure, it remains live so
-  /// the caller may retry this call or discard the operation with
-  /// mln_runtime_offline_operation_discard().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the result was taken and out_region was set.
-  /// - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
-  /// kind does not match a region snapshot.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_region
-  /// is null.
   mln_status mln_runtime_offline_region_create_take_result(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -1060,24 +732,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Takes the snapshot result from a completed offline region get operation.
-  ///
-  /// Must only be called after the matching
-  /// mln_runtime_offline_region_get_start() operation has completed successfully.
-  /// The caller owns the returned snapshot handle and must destroy it with
-  /// mln_offline_region_snapshot_destroy().
-  ///
-  /// On success, the operation entry is consumed. On failure, it remains live so
-  /// the caller may retry this call or discard the operation with
-  /// mln_runtime_offline_operation_discard().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the result was taken; out_found indicates whether a
-  /// region existed for the requested ID.
-  /// - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
-  /// kind does not match an optional region snapshot.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_region is
-  /// null, or out_found is null.
   mln_status mln_runtime_offline_region_get_take_result(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -1116,23 +770,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Takes the region list from a completed offline regions list operation.
-  ///
-  /// Must only be called after the matching
-  /// mln_runtime_offline_regions_list_start() operation has completed
-  /// successfully. The caller owns the returned list handle and must destroy it
-  /// with mln_offline_region_list_destroy().
-  ///
-  /// On success, the operation entry is consumed. On failure, it remains live so
-  /// the caller may retry this call or discard the operation with
-  /// mln_runtime_offline_operation_discard().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the result was taken and out_regions was set.
-  /// - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
-  /// kind does not match a region list.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_regions is null.
   mln_status mln_runtime_offline_regions_list_take_result(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -1167,23 +804,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Takes the region list from a completed offline database merge operation.
-  ///
-  /// Must only be called after the matching
-  /// mln_runtime_offline_regions_merge_database_start() operation has completed
-  /// successfully. The caller owns the returned list handle and must destroy it
-  /// with mln_offline_region_list_destroy().
-  ///
-  /// On success, the operation entry is consumed. On failure, it remains live so
-  /// the caller may retry this call or discard the operation with
-  /// mln_runtime_offline_operation_discard().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the result was taken and out_regions was set.
-  /// - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
-  /// kind does not match a region list.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
-  /// out_regions is null.
   mln_status mln_runtime_offline_regions_merge_database_take_result(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -1218,24 +838,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Takes the snapshot result from a completed offline region update-metadata
-  /// operation.
-  ///
-  /// Must only be called after the matching
-  /// mln_runtime_offline_region_update_metadata_start() operation has completed
-  /// successfully. The caller owns the returned snapshot handle and must destroy
-  /// it with mln_offline_region_snapshot_destroy().
-  ///
-  /// On success, the operation entry is consumed. On failure, it remains live so
-  /// the caller may retry this call or discard the operation with
-  /// mln_runtime_offline_operation_discard().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the result was taken and out_region was set.
-  /// - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
-  /// kind does not match a region snapshot.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_region
-  /// is null.
   mln_status mln_runtime_offline_region_update_metadata_take_result(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -1270,23 +872,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Takes the status struct from a completed offline region get-status operation.
-  ///
-  /// Must only be called after the matching
-  /// mln_runtime_offline_region_get_status_start() operation has completed
-  /// successfully. The caller provides a pre-allocated mln_offline_region_status
-  /// struct which is filled by this function.
-  ///
-  /// On success, the operation entry is consumed. On failure, it remains live so
-  /// the caller may retry this call or discard the operation with
-  /// mln_runtime_offline_operation_discard().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the result was taken and out_status was filled.
-  /// - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
-  /// kind does not match a region status.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_status
-  /// is null.
   mln_status mln_runtime_offline_region_get_status_take_result(
     ffi.Pointer<mln_runtime> runtime,
     Dartmln_offline_operation_id operation_id,
@@ -1321,16 +906,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies a region data view out of a snapshot handle.
-  ///
-  /// On success, out_info receives pointers into snapshot-owned storage. Those
-  /// pointers remain valid until the snapshot is destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when snapshot is null or not live, out_info is
-  /// null, or out_info->size is too small.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_offline_region_snapshot_get(
     ffi.Pointer<mln_offline_region_snapshot> snapshot,
     ffi.Pointer<mln_offline_region_info> out_info,
@@ -1358,7 +933,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Destroys an offline region snapshot handle. Null is accepted as a no-op.
   void mln_offline_region_snapshot_destroy(
     ffi.Pointer<mln_offline_region_snapshot> snapshot,
   ) {
@@ -1377,13 +951,6 @@ class MaplibreNativeC {
             void Function(ffi.Pointer<mln_offline_region_snapshot>)
           >();
 
-  /// Gets the number of regions in a list handle.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
-  /// null.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_offline_region_list_count(
     ffi.Pointer<mln_offline_region_list> list,
     ffi.Pointer<ffi.Size> out_count,
@@ -1410,16 +977,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies a region data view for one list entry.
-  ///
-  /// On success, out_info receives pointers into list-owned storage. Those
-  /// pointers remain valid until the list is destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
-  /// range, out_info is null, or out_info->size is too small.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_offline_region_list_get(
     ffi.Pointer<mln_offline_region_list> list,
     int index,
@@ -1449,7 +1006,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Destroys an offline region list handle. Null is accepted as a no-op.
   void mln_offline_region_list_destroy(
     ffi.Pointer<mln_offline_region_list> list,
   ) {
@@ -1466,7 +1022,6 @@ class MaplibreNativeC {
       _mln_offline_region_list_destroyPtr
           .asFunction<void Function(ffi.Pointer<mln_offline_region_list>)>();
 
-  /// Returns map options initialized for this C API version.
   mln_map_options mln_map_options_default() {
     return _mln_map_options_default();
   }
@@ -1478,17 +1033,6 @@ class MaplibreNativeC {
   late final _mln_map_options_default = _mln_map_options_defaultPtr
       .asFunction<mln_map_options Function()>();
 
-  /// Creates a map handle on the runtime owner thread.
-  ///
-  /// On success, the runtime owner thread becomes the map owner thread.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_map is
-  /// null, *out_map is not null, or options are invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_create(
     ffi.Pointer<mln_runtime> runtime,
     ffi.Pointer<mln_map_options> options,
@@ -1516,22 +1060,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Requests a repaint for a continuous map.
-  ///
-  /// Continuous maps also invalidate automatically when style data, resources,
-  /// camera, or transitions change. Ask attached render targets to process the
-  /// latest update when MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE is reported.
-  /// Repaint requests do not produce
-  /// MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
-  /// MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED events.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the request was accepted.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when map is not in MLN_MAP_MODE_CONTINUOUS.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_request_repaint(ffi.Pointer<mln_map> map) {
     return mln_status.fromValue(_mln_map_request_repaint(map));
   }
@@ -1543,27 +1071,6 @@ class MaplibreNativeC {
   late final _mln_map_request_repaint = _mln_map_request_repaintPtr
       .asFunction<int Function(ffi.Pointer<mln_map>)>();
 
-  /// Requests one still image for a static or tile map.
-  ///
-  /// Pump the runtime and poll runtime events for this map until
-  /// MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
-  /// MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED is reported. While the request is
-  /// pending, process each MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event
-  /// from this map. Render targets use mln_render_session_render_update(). Surface
-  /// targets present directly. A render-update
-  /// call can return MLN_STATUS_INVALID_STATE before the next update is available;
-  /// keep pumping and polling in that case. After
-  /// MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, use the latest successful texture
-  /// update when the host needs image bytes or a backend texture.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the request was accepted.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when map is not in MLN_MAP_MODE_STATIC or
-  /// MLN_MAP_MODE_TILE, or when a still-image request is already pending.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_request_still_image(ffi.Pointer<mln_map> map) {
     return mln_status.fromValue(_mln_map_request_still_image(map));
   }
@@ -1575,18 +1082,6 @@ class MaplibreNativeC {
   late final _mln_map_request_still_image = _mln_map_request_still_imagePtr
       .asFunction<int Function(ffi.Pointer<mln_map>)>();
 
-  /// Destroys a map handle on its owner thread.
-  ///
-  /// The map must not have an attached render session.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle.
-  /// - MLN_STATUS_INVALID_STATE when map still has an attached render target
-  /// session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_destroy(ffi.Pointer<mln_map> map) {
     return mln_status.fromValue(_mln_map_destroy(map));
   }
@@ -1598,19 +1093,6 @@ class MaplibreNativeC {
   late final _mln_map_destroy = _mln_map_destroyPtr
       .asFunction<int Function(ffi.Pointer<mln_map>)>();
 
-  /// Loads a style URL through MapLibre Native style APIs.
-  ///
-  /// This is a map command. The return status reports synchronous acceptance or
-  /// failure. Later native success and failure are reported through runtime
-  /// events.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the load request was accepted.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or url is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
-  /// internal exception is converted to status.
   mln_status mln_map_set_style_url(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Char> url,
@@ -1627,20 +1109,6 @@ class MaplibreNativeC {
   late final _mln_map_set_style_url = _mln_map_set_style_urlPtr
       .asFunction<int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Char>)>();
 
-  /// Loads inline style JSON through MapLibre Native style APIs.
-  ///
-  /// This is a map command. The return status reports synchronous acceptance or
-  /// failure. Later native success and failure are reported through runtime
-  /// events. Malformed JSON can fail synchronously and still enqueue a
-  /// loading-failed event.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK when the load request was accepted.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or json is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
-  /// internal exception is converted to status.
   mln_status mln_map_set_style_json(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Char> json,
@@ -1657,7 +1125,6 @@ class MaplibreNativeC {
   late final _mln_map_set_style_json = _mln_map_set_style_jsonPtr
       .asFunction<int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Char>)>();
 
-  /// Returns empty camera options initialized for this C API version.
   mln_camera_options mln_camera_options_default() {
     return _mln_camera_options_default();
   }
@@ -1669,7 +1136,6 @@ class MaplibreNativeC {
   late final _mln_camera_options_default = _mln_camera_options_defaultPtr
       .asFunction<mln_camera_options Function()>();
 
-  /// Returns empty animation options initialized for this C API version.
   mln_animation_options mln_animation_options_default() {
     return _mln_animation_options_default();
   }
@@ -1681,7 +1147,6 @@ class MaplibreNativeC {
   late final _mln_animation_options_default = _mln_animation_options_defaultPtr
       .asFunction<mln_animation_options Function()>();
 
-  /// Returns empty camera fitting options initialized for this C API version.
   mln_camera_fit_options mln_camera_fit_options_default() {
     return _mln_camera_fit_options_default();
   }
@@ -1694,7 +1159,6 @@ class MaplibreNativeC {
       _mln_camera_fit_options_defaultPtr
           .asFunction<mln_camera_fit_options Function()>();
 
-  /// Returns empty map bound options initialized for this C API version.
   mln_bound_options mln_bound_options_default() {
     return _mln_bound_options_default();
   }
@@ -1706,7 +1170,6 @@ class MaplibreNativeC {
   late final _mln_bound_options_default = _mln_bound_options_defaultPtr
       .asFunction<mln_bound_options Function()>();
 
-  /// Returns empty free camera options initialized for this C API version.
   mln_free_camera_options mln_free_camera_options_default() {
     return _mln_free_camera_options_default();
   }
@@ -1719,8 +1182,6 @@ class MaplibreNativeC {
       _mln_free_camera_options_defaultPtr
           .asFunction<mln_free_camera_options Function()>();
 
-  /// Returns empty axonometric rendering options initialized for this C API
-  /// version.
   mln_projection_mode mln_projection_mode_default() {
     return _mln_projection_mode_default();
   }
@@ -1732,7 +1193,6 @@ class MaplibreNativeC {
   late final _mln_projection_mode_default = _mln_projection_mode_defaultPtr
       .asFunction<mln_projection_mode Function()>();
 
-  /// Returns empty viewport options initialized for this C API version.
   mln_map_viewport_options mln_map_viewport_options_default() {
     return _mln_map_viewport_options_default();
   }
@@ -1745,7 +1205,6 @@ class MaplibreNativeC {
       _mln_map_viewport_options_defaultPtr
           .asFunction<mln_map_viewport_options Function()>();
 
-  /// Returns empty tile tuning options initialized for this C API version.
   mln_map_tile_options mln_map_tile_options_default() {
     return _mln_map_tile_options_default();
   }
@@ -1757,17 +1216,6 @@ class MaplibreNativeC {
   late final _mln_map_tile_options_default = _mln_map_tile_options_defaultPtr
       .asFunction<mln_map_tile_options Function()>();
 
-  /// Applies MapLibre debug overlay mask bits to a map.
-  ///
-  /// Pass 0 to disable all debug overlays.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or options
-  /// contains unknown bits.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_debug_options(ffi.Pointer<mln_map> map, int options) {
     return mln_status.fromValue(_mln_map_set_debug_options(map, options));
   }
@@ -1779,15 +1227,6 @@ class MaplibreNativeC {
   late final _mln_map_set_debug_options = _mln_map_set_debug_optionsPtr
       .asFunction<int Function(ffi.Pointer<mln_map>, int)>();
 
-  /// Copies the current MapLibre debug overlay mask bits.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_options is
-  /// null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_debug_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Uint32> out_options,
@@ -1806,14 +1245,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Uint32>)
       >();
 
-  /// Enables or disables MapLibre's rendering stats overlay view.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_rendering_stats_view_enabled(
     ffi.Pointer<mln_map> map,
     bool enabled,
@@ -1831,15 +1262,6 @@ class MaplibreNativeC {
       _mln_map_set_rendering_stats_view_enabledPtr
           .asFunction<int Function(ffi.Pointer<mln_map>, bool)>();
 
-  /// Copies whether MapLibre's rendering stats overlay view is enabled.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_enabled is
-  /// null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_rendering_stats_view_enabled(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Bool> out_enabled,
@@ -1861,15 +1283,6 @@ class MaplibreNativeC {
             int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Bool>)
           >();
 
-  /// Copies whether MapLibre currently considers the map fully loaded.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_loaded is
-  /// null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_is_fully_loaded(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Bool> out_loaded,
@@ -1886,14 +1299,6 @@ class MaplibreNativeC {
   late final _mln_map_is_fully_loaded = _mln_map_is_fully_loadedPtr
       .asFunction<int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Bool>)>();
 
-  /// Dumps map debug logs through MapLibre Native logging.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_dump_debug_logs(ffi.Pointer<mln_map> map) {
     return mln_status.fromValue(_mln_map_dump_debug_logs(map));
   }
@@ -1905,17 +1310,6 @@ class MaplibreNativeC {
   late final _mln_map_dump_debug_logs = _mln_map_dump_debug_logsPtr
       .asFunction<int Function(ffi.Pointer<mln_map>)>();
 
-  /// Copies live map viewport and render-transform controls.
-  ///
-  /// On success, *out_options is overwritten and all known fields are marked.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
-  /// null, or out_options->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_viewport_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_map_viewport_options> out_options,
@@ -1942,18 +1336,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies selected live map viewport and render-transform controls.
-  ///
-  /// Only fields indicated by options->fields affect the map.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
-  /// options->size is too small, options->fields contains unknown bits, an enum
-  /// value is unknown, or an enabled frustum offset value is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_viewport_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_map_viewport_options> options,
@@ -1978,17 +1360,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies tile prefetch and LOD tuning controls.
-  ///
-  /// On success, *out_options is overwritten and all known fields are marked.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
-  /// null, or out_options->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_tile_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_map_tile_options> out_options,
@@ -2010,19 +1381,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_map_tile_options>)
       >();
 
-  /// Applies selected tile prefetch and LOD tuning controls.
-  ///
-  /// Only fields indicated by options->fields affect the map.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
-  /// options->size is too small, options->fields contains unknown bits,
-  /// prefetch_zoom_delta is greater than 255, a double field is non-finite, or
-  /// lod_mode is unknown.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_tile_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_map_tile_options> options,
@@ -2044,17 +1402,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_map_tile_options>)
       >();
 
-  /// Copies the current camera snapshot.
-  ///
-  /// On success, *out_camera is overwritten.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_camera is
-  /// null, or out_camera->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_camera(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_camera_options> out_camera,
@@ -2076,18 +1423,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_camera_options>)
       >();
 
-  /// Applies a camera jump command.
-  ///
-  /// Only fields indicated by camera->fields affect the map.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
-  /// camera->size is too small, camera->fields contains unknown bits, or an
-  /// enabled camera field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_jump_to(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_camera_options> camera,
@@ -2109,20 +1444,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_camera_options>)
       >();
 
-  /// Applies a camera ease transition command.
-  ///
-  /// Only fields indicated by camera->fields affect the map. Passing a null
-  /// animation uses MapLibre Native's default animation options.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
-  /// camera->size is too small, camera->fields contains unknown bits, an enabled
-  /// camera field is invalid, animation->size is too small, animation->fields
-  /// contains unknown bits, or an enabled animation field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_ease_to(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_camera_options> camera,
@@ -2150,20 +1471,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies a camera fly transition command.
-  ///
-  /// Only fields indicated by camera->fields affect the map. Passing a null
-  /// animation uses MapLibre Native's default animation options.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
-  /// camera->size is too small, camera->fields contains unknown bits, an enabled
-  /// camera field is invalid, animation->size is too small, animation->fields
-  /// contains unknown bits, or an enabled animation field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_fly_to(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_camera_options> camera,
@@ -2191,15 +1498,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies a screen-space pan command.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or a delta value
-  /// is non-finite.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_move_by(
     ffi.Pointer<mln_map> map,
     double delta_x,
@@ -2217,18 +1515,6 @@ class MaplibreNativeC {
   late final _mln_map_move_by = _mln_map_move_byPtr
       .asFunction<int Function(ffi.Pointer<mln_map>, double, double)>();
 
-  /// Applies an animated screen-space pan command.
-  ///
-  /// Passing a null animation uses MapLibre Native's default animation options.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a delta value is
-  /// non-finite, animation->size is too small, animation->fields contains
-  /// unknown bits, or an enabled animation field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_move_by_animated(
     ffi.Pointer<mln_map> map,
     double delta_x,
@@ -2261,17 +1547,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies a screen-space zoom command.
-  ///
-  /// Passing a null anchor uses MapLibre Native's default zoom anchor.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, scale is
-  /// non-positive or non-finite, or anchor contains non-finite values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_scale_by(
     ffi.Pointer<mln_map> map,
     double scale,
@@ -2299,20 +1574,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies an animated screen-space zoom command.
-  ///
-  /// Passing a null anchor uses MapLibre Native's default zoom anchor. Passing a
-  /// null animation uses MapLibre Native's default animation options.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, scale is
-  /// non-positive or non-finite, anchor contains non-finite values,
-  /// animation->size is too small, animation->fields contains unknown bits, or
-  /// an enabled animation field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_scale_by_animated(
     ffi.Pointer<mln_map> map,
     double scale,
@@ -2345,15 +1606,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies a screen-space rotate command.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or a point
-  /// contains non-finite values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_rotate_by(
     ffi.Pointer<mln_map> map,
     mln_screen_point first,
@@ -2377,18 +1629,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, mln_screen_point, mln_screen_point)
       >();
 
-  /// Applies an animated screen-space rotate command.
-  ///
-  /// Passing a null animation uses MapLibre Native's default animation options.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a point contains
-  /// non-finite values, animation->size is too small, animation->fields contains
-  /// unknown bits, or an enabled animation field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_rotate_by_animated(
     ffi.Pointer<mln_map> map,
     mln_screen_point first,
@@ -2421,15 +1661,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies a pitch delta command.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or pitch is
-  /// non-finite.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_pitch_by(ffi.Pointer<mln_map> map, double pitch) {
     return mln_status.fromValue(_mln_map_pitch_by(map, pitch));
   }
@@ -2441,18 +1672,6 @@ class MaplibreNativeC {
   late final _mln_map_pitch_by = _mln_map_pitch_byPtr
       .asFunction<int Function(ffi.Pointer<mln_map>, double)>();
 
-  /// Applies an animated pitch delta command.
-  ///
-  /// Passing a null animation uses MapLibre Native's default animation options.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, pitch is
-  /// non-finite, animation->size is too small, animation->fields contains
-  /// unknown bits, or an enabled animation field is invalid.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_pitch_by_animated(
     ffi.Pointer<mln_map> map,
     double pitch,
@@ -2482,14 +1701,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Cancels active camera transitions.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_cancel_transitions(ffi.Pointer<mln_map> map) {
     return mln_status.fromValue(_mln_map_cancel_transitions(map));
   }
@@ -2501,19 +1712,6 @@ class MaplibreNativeC {
   late final _mln_map_cancel_transitions = _mln_map_cancel_transitionsPtr
       .asFunction<int Function(ffi.Pointer<mln_map>)>();
 
-  /// Computes a camera that fits geographic bounds in the current viewport.
-  ///
-  /// Passing null fit_options uses zero padding with no bearing or pitch override.
-  /// On success, *out_camera is overwritten.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, bounds are
-  /// invalid, fit_options is invalid, out_camera is null, or out_camera->size is
-  /// too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_camera_for_lat_lng_bounds(
     ffi.Pointer<mln_map> map,
     mln_lat_lng_bounds bounds,
@@ -2547,20 +1745,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Computes a camera that fits geographic coordinates in the current viewport.
-  ///
-  /// The coordinates array is borrowed for the duration of this call and is not
-  /// retained. Passing null fit_options uses zero padding with no bearing or pitch
-  /// override. On success, *out_camera is overwritten.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, coordinates is
-  /// null, coordinate_count is 0, any coordinate is invalid, fit_options is
-  /// invalid, out_camera is null, or out_camera->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_camera_for_lat_lngs(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_lat_lng> coordinates,
@@ -2602,22 +1786,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Computes a camera that fits a geometry in the current viewport.
-  ///
-  /// The geometry descriptor graph is borrowed for the duration of this call and
-  /// is not retained. Empty geometry objects and geometry collections with no
-  /// coordinates are invalid for camera fitting. Passing null fit_options uses
-  /// zero padding with no bearing or pitch override. On success, *out_camera is
-  /// overwritten.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, geometry is null
-  /// or invalid, geometry contains no coordinates, fit_options is invalid,
-  /// out_camera is null, or out_camera->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_camera_for_geometry(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_geometry> geometry,
@@ -2650,15 +1818,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Computes wrapped geographic bounds for a camera in the current viewport.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null or
-  /// invalid, or out_bounds is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_lat_lng_bounds_for_camera(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_camera_options> camera,
@@ -2689,15 +1848,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Computes unwrapped geographic bounds for a camera in the current viewport.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null or
-  /// invalid, or out_bounds is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_camera_options> camera,
@@ -2728,17 +1878,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies map camera constraint options.
-  ///
-  /// On success, *out_options is overwritten and all known fields are marked.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
-  /// null, or out_options->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_bounds(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_bound_options> out_options,
@@ -2760,19 +1899,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_bound_options>)
       >();
 
-  /// Applies selected map camera constraint options.
-  ///
-  /// Only fields indicated by options->fields affect the map.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
-  /// options->size is too small, options->fields contains unknown bits, bounds
-  /// are invalid, a numeric field is non-finite, or paired min/max fields are
-  /// inconsistent.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_bounds(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_bound_options> options,
@@ -2794,17 +1920,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_bound_options>)
       >();
 
-  /// Copies the current free camera position and orientation.
-  ///
-  /// On success, *out_options is overwritten.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
-  /// null, or out_options->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_free_camera_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_free_camera_options> out_options,
@@ -2832,21 +1947,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Applies selected free camera position and orientation fields.
-  ///
-  /// Position uses MapLibre Native's modified Web Mercator camera space.
-  /// Orientation is a quaternion stored as x, y, z, w. Only fields indicated by
-  /// options->fields affect the map.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
-  /// options->size is too small, options->fields contains unknown bits, position
-  /// contains non-finite values, or orientation contains non-finite values or is
-  /// zero length.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_free_camera_options(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_free_camera_options> options,
@@ -2872,17 +1972,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies the current axonometric rendering options.
-  ///
-  /// On success, *out_mode is overwritten. MapLibre currently reports all fields.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_mode is null,
-  /// or out_mode->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_projection_mode(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_projection_mode> out_mode,
@@ -2904,20 +1993,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_projection_mode>)
       >();
 
-  /// Applies axonometric rendering option fields to a map.
-  ///
-  /// Only fields indicated by mode->fields affect the map. Unspecified fields keep
-  /// their current native values. These options mutate the live map render
-  /// transform and do not change coordinate conversion units or formulas.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, mode is null,
-  /// mode->size is too small, mode->fields contains unknown bits, or an enabled
-  /// skew value is non-finite.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_projection_mode(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_projection_mode> mode,
@@ -2939,18 +2014,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_projection_mode>)
       >();
 
-  /// Converts a geographic world coordinate to a screen point for the current map.
-  ///
-  /// The output point uses logical map pixels with an origin at the top-left of
-  /// the map viewport.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_point is
-  /// null, or coordinate contains invalid latitude or longitude values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_pixel_for_lat_lng(
     ffi.Pointer<mln_map> map,
     mln_lat_lng coordinate,
@@ -2980,18 +2043,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Converts a screen point to a geographic world coordinate for the current map.
-  ///
-  /// The input point uses logical map pixels with an origin at the top-left of the
-  /// map viewport.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_coordinate is
-  /// null, or point contains non-finite values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_lat_lng_for_pixel(
     ffi.Pointer<mln_map> map,
     mln_screen_point point,
@@ -3021,19 +2072,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Converts geographic world coordinates to screen points for the current map.
-  ///
-  /// The caller owns both arrays. On success, out_points receives coordinate_count
-  /// entries. coordinates and out_points may be null only when coordinate_count is
-  /// 0.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a required array
-  /// is null, or any coordinate contains invalid latitude or longitude values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_pixels_for_lat_lngs(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_lat_lng> coordinates,
@@ -3071,18 +2109,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Converts screen points to geographic world coordinates for the current map.
-  ///
-  /// The caller owns both arrays. On success, out_coordinates receives point_count
-  /// entries. points and out_coordinates may be null only when point_count is 0.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a required array
-  /// is null, or any point contains non-finite values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_lat_lngs_for_pixels(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_screen_point> points,
@@ -3115,11 +2141,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Returns the last thread-local diagnostic message.
-  ///
-  /// The returned string is empty when no diagnostic is available. The pointer is
-  /// owned by the C API and remains valid until the next C API call on the same
-  /// thread that writes a thread-local diagnostic.
   ffi.Pointer<ffi.Char> mln_thread_last_error_message() {
     return _mln_thread_last_error_message();
   }
@@ -3131,26 +2152,6 @@ class MaplibreNativeC {
   late final _mln_thread_last_error_message = _mln_thread_last_error_messagePtr
       .asFunction<ffi.Pointer<ffi.Char> Function()>();
 
-  /// Installs a process-global MapLibre Native log callback.
-  ///
-  /// Passing null clears the current callback. The callback and user_data are
-  /// stored by reference and must remain valid until the callback is replaced or
-  /// cleared.
-  ///
-  /// The callback is a low-level native callback:
-  ///
-  /// - MapLibre may invoke it from logging or worker threads selected by the async
-  /// severity mask.
-  /// - MapLibre may invoke it while holding internal logging locks.
-  /// - The callback must be thread-safe, return quickly, and must not call this C
-  /// API or MapLibre Native APIs.
-  /// - Language adapters for runtimes that restrict native-thread callbacks can
-  /// marshal records into host-managed logging facilities before invoking user
-  /// code.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_log_set_callback(
     mln_log_callback callback,
     ffi.Pointer<ffi.Void> user_data,
@@ -3167,14 +2168,6 @@ class MaplibreNativeC {
   late final _mln_log_set_callback = _mln_log_set_callbackPtr
       .asFunction<int Function(mln_log_callback, ffi.Pointer<ffi.Void>)>();
 
-  /// Clears the process-global log callback.
-  ///
-  /// After this call succeeds, future log dispatches no longer use the callback
-  /// that was previously registered through mln_log_set_callback().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_log_clear_callback() {
     return mln_status.fromValue(_mln_log_clear_callback());
   }
@@ -3186,16 +2179,6 @@ class MaplibreNativeC {
   late final _mln_log_clear_callback = _mln_log_clear_callbackPtr
       .asFunction<int Function()>();
 
-  /// Controls which log severities MapLibre Native may dispatch asynchronously.
-  ///
-  /// MLN_LOG_SEVERITY_MASK_DEFAULT restores MapLibre Native's default behavior:
-  /// info and warning records may be asynchronous, while error records remain
-  /// synchronous.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when mask contains unknown bits.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_log_set_async_severity_mask(int mask) {
     return mln_status.fromValue(_mln_log_set_async_severity_mask(mask));
   }
@@ -3207,23 +2190,6 @@ class MaplibreNativeC {
   late final _mln_log_set_async_severity_mask =
       _mln_log_set_async_severity_maskPtr.asFunction<int Function(int)>();
 
-  /// Creates a standalone projection helper from the current map transform.
-  ///
-  /// The helper owns projection and camera transform state only. It does not own
-  /// style, resources, render targets, or runtime events. Use it to convert
-  /// coordinates or compute camera fitting without changing the source map.
-  ///
-  /// Creation snapshots the map's transform. Later map camera or projection
-  /// changes do not update the helper. The creating thread owns the helper and
-  /// must call projection functions on that thread.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_projection is
-  /// null, or *out_projection is not null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_create(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Pointer<mln_map_projection>> out_projection,
@@ -3250,14 +2216,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Destroys a standalone projection helper.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_destroy(
     ffi.Pointer<mln_map_projection> projection,
   ) {
@@ -3271,17 +2229,6 @@ class MaplibreNativeC {
   late final _mln_map_projection_destroy = _mln_map_projection_destroyPtr
       .asFunction<int Function(ffi.Pointer<mln_map_projection>)>();
 
-  /// Copies the current camera snapshot from a standalone projection helper.
-  ///
-  /// On success, *out_camera is overwritten.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, out_camera
-  /// is null, or out_camera->size is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_get_camera(
     ffi.Pointer<mln_map_projection> projection,
     ffi.Pointer<mln_camera_options> out_camera,
@@ -3308,17 +2255,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Applies camera fields to a standalone projection helper.
-  ///
-  /// Only fields indicated by camera->fields affect the helper.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, camera is
-  /// null, camera->size is too small, or camera->fields contains unknown bits.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_set_camera(
     ffi.Pointer<mln_map_projection> projection,
     ffi.Pointer<mln_camera_options> camera,
@@ -3345,21 +2281,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Updates a projection helper camera so coordinates are visible within padding.
-  ///
-  /// The coordinates array is borrowed for the duration of this call and is not
-  /// retained. Use mln_map_projection_get_camera() after this call to read the
-  /// computed camera.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
-  /// coordinates is null, coordinate_count is 0, padding contains negative or
-  /// non-finite values, or any coordinate contains invalid latitude or longitude
-  /// values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_set_visible_coordinates(
     ffi.Pointer<mln_map_projection> projection,
     ffi.Pointer<mln_lat_lng> coordinates,
@@ -3398,22 +2319,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Updates a projection helper camera so geometry coordinates are visible.
-  ///
-  /// The geometry descriptor graph, including all nested pointers, is borrowed for
-  /// the duration of this call and is not retained. Use
-  /// mln_map_projection_get_camera() after this call to read the computed camera.
-  /// Empty geometry objects and geometry collections with no coordinates are
-  /// invalid for camera fitting.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, geometry
-  /// is null or invalid, padding contains negative or non-finite values, or the
-  /// geometry contains no coordinates.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_set_visible_geometry(
     ffi.Pointer<mln_map_projection> projection,
     ffi.Pointer<mln_geometry> geometry,
@@ -3444,18 +2349,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Converts a geographic world coordinate using a standalone projection helper.
-  ///
-  /// The output point uses logical map pixels with an origin at the top-left of
-  /// the helper viewport.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, out_point
-  /// is null, or coordinate contains invalid latitude or longitude values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_pixel_for_lat_lng(
     ffi.Pointer<mln_map_projection> projection,
     mln_lat_lng coordinate,
@@ -3486,18 +2379,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Converts a screen point using a standalone projection helper.
-  ///
-  /// The input point uses logical map pixels with an origin at the top-left of the
-  /// helper viewport.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
-  /// out_coordinate is null, or point contains non-finite values.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_projection_lat_lng_for_pixel(
     ffi.Pointer<mln_map_projection> projection,
     mln_screen_point point,
@@ -3528,13 +2409,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Converts a geographic coordinate to spherical Mercator projected meters.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when out_meters is null or coordinate contains
-  /// invalid latitude or longitude values.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_projected_meters_for_lat_lng(
     mln_lat_lng coordinate,
     ffi.Pointer<mln_projected_meters> out_meters,
@@ -3556,13 +2430,6 @@ class MaplibreNativeC {
             int Function(mln_lat_lng, ffi.Pointer<mln_projected_meters>)
           >();
 
-  /// Converts spherical Mercator projected meters to a geographic coordinate.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when out_coordinate is null or meters contains
-  /// non-finite values.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_lat_lng_for_projected_meters(
     mln_projected_meters meters,
     ffi.Pointer<mln_lat_lng> out_coordinate,
@@ -3584,7 +2451,6 @@ class MaplibreNativeC {
             int Function(mln_projected_meters, ffi.Pointer<mln_lat_lng>)
           >();
 
-  /// Returns default rendered feature query options.
   mln_rendered_feature_query_options
   mln_rendered_feature_query_options_default() {
     return _mln_rendered_feature_query_options_default();
@@ -3598,7 +2464,6 @@ class MaplibreNativeC {
       _mln_rendered_feature_query_options_defaultPtr
           .asFunction<mln_rendered_feature_query_options Function()>();
 
-  /// Returns default source feature query options.
   mln_source_feature_query_options mln_source_feature_query_options_default() {
     return _mln_source_feature_query_options_default();
   }
@@ -3611,7 +2476,6 @@ class MaplibreNativeC {
       _mln_source_feature_query_options_defaultPtr
           .asFunction<mln_source_feature_query_options Function()>();
 
-  /// Returns a rendered point query geometry descriptor.
   mln_rendered_query_geometry mln_rendered_query_geometry_point(
     mln_screen_point point,
   ) {
@@ -3628,7 +2492,6 @@ class MaplibreNativeC {
       _mln_rendered_query_geometry_pointPtr
           .asFunction<mln_rendered_query_geometry Function(mln_screen_point)>();
 
-  /// Returns a rendered box query geometry descriptor.
   mln_rendered_query_geometry mln_rendered_query_geometry_box(
     mln_screen_box box,
   ) {
@@ -3643,7 +2506,6 @@ class MaplibreNativeC {
       _mln_rendered_query_geometry_boxPtr
           .asFunction<mln_rendered_query_geometry Function(mln_screen_box)>();
 
-  /// Returns a rendered line-string query geometry descriptor.
   mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
     ffi.Pointer<mln_screen_point> points,
     int point_count,
@@ -3669,23 +2531,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Queries rendered features from the latest render session state.
-  ///
-  /// The session renderer must already exist. geometry and options are borrowed
-  /// for the duration of the call. Passing null for options uses default options.
-  /// On success, *out_result receives an owned result handle. Destroy it with
-  /// mln_feature_query_result_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, geometry is
-  /// null or invalid, options are invalid, out_result is null, or *out_result is
-  /// not null.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_query_rendered_features(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_rendered_query_geometry> geometry,
@@ -3724,23 +2569,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Queries source features from the latest render session state.
-  ///
-  /// The session renderer must already exist. source_id and options are borrowed
-  /// for the duration of the call. Passing null for options uses default options.
-  /// On success, *out_result receives an owned result handle. Destroy it with
-  /// mln_feature_query_result_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id is
-  /// invalid or empty, options are invalid, out_result is null, or *out_result
-  /// is not null.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_query_source_features(
     ffi.Pointer<mln_render_session> session,
     mln_string_view source_id,
@@ -3779,24 +2607,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Queries a feature extension from the latest render session state.
-  ///
-  /// The session renderer must already exist. source_id, feature, extension,
-  /// extension_field, and arguments are borrowed for the duration of the call.
-  /// arguments may be null. When non-null, arguments must be a JSON object
-  /// descriptor. On success, *out_result receives an owned result handle. Destroy
-  /// it with mln_feature_extension_result_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id,
-  /// feature, extension, extension_field, or arguments are invalid, out_result
-  /// is null, or *out_result is not null.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_query_feature_extensions(
     ffi.Pointer<mln_render_session> session,
     mln_string_view source_id,
@@ -3847,13 +2657,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Gets the number of features in a query result handle.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when result is null or not live, or out_count
-  /// is null.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_feature_query_result_count(
     ffi.Pointer<mln_feature_query_result> result,
     ffi.Pointer<ffi.Size> out_count,
@@ -3881,16 +2684,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Borrows one feature from a query result handle.
-  ///
-  /// On success, out_feature receives views into result-owned storage. Those views
-  /// remain valid until result is destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when result is null or not live, index is out
-  /// of range, out_feature is null, or out_feature->size is too small.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_feature_query_result_get(
     ffi.Pointer<mln_feature_query_result> result,
     int index,
@@ -3920,7 +2713,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Destroys a feature query result handle. Null is accepted as a no-op.
   void mln_feature_query_result_destroy(
     ffi.Pointer<mln_feature_query_result> result,
   ) {
@@ -3937,16 +2729,6 @@ class MaplibreNativeC {
       _mln_feature_query_result_destroyPtr
           .asFunction<void Function(ffi.Pointer<mln_feature_query_result>)>();
 
-  /// Borrows a feature extension query result view.
-  ///
-  /// On success, out_info receives views into result-owned storage. Those views
-  /// remain valid until result is destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when result is null or not live, out_info is
-  /// null, or out_info->size is too small.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_feature_extension_result_get(
     ffi.Pointer<mln_feature_extension_result> result,
     ffi.Pointer<mln_feature_extension_result_info> out_info,
@@ -3974,7 +2756,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Destroys a feature extension result handle. Null is accepted as a no-op.
   void mln_feature_extension_result_destroy(
     ffi.Pointer<mln_feature_extension_result> result,
   ) {
@@ -3993,23 +2774,6 @@ class MaplibreNativeC {
             void Function(ffi.Pointer<mln_feature_extension_result>)
           >();
 
-  /// Resizes an attached render session.
-  ///
-  /// Width and height are logical map dimensions. The scale_factor value maps
-  /// them to physical backend pixels.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, dimensions
-  /// are zero, scale_factor is non-positive or non-finite, or scaled dimensions
-  /// are too large.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame is
-  /// currently acquired.
-  /// - MLN_STATUS_UNSUPPORTED when resizing is not supported by the session kind
-  /// or mode, such as a caller-owned borrowed texture target.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_resize(
     ffi.Pointer<mln_render_session> session,
     int width,
@@ -4037,19 +2801,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_render_session>, int, int, double)
       >();
 
-  /// Processes the latest map render update for an attached render session.
-  ///
-  /// Surface sessions render and present through their native surface. Texture
-  /// sessions render into their texture target.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when no render update is available or the session
-  /// is detached, or a texture frame is currently acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_render_update(
     ffi.Pointer<mln_render_session> session,
   ) {
@@ -4064,20 +2815,6 @@ class MaplibreNativeC {
       _mln_render_session_render_updatePtr
           .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
 
-  /// Detaches backend-bound render resources from the map while keeping the
-  /// session handle live for destruction.
-  ///
-  /// After detach, resize, render, readback, acquire, and renderer maintenance
-  /// operations return MLN_STATUS_INVALID_STATE.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when already detached or a texture frame is
-  /// acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_detach(
     ffi.Pointer<mln_render_session> session,
   ) {
@@ -4091,17 +2828,6 @@ class MaplibreNativeC {
   late final _mln_render_session_detach = _mln_render_session_detachPtr
       .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
 
-  /// Destroys a render session handle.
-  ///
-  /// If the session is still attached, this function detaches it first.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when a texture frame is acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_destroy(
     ffi.Pointer<mln_render_session> session,
   ) {
@@ -4115,16 +2841,6 @@ class MaplibreNativeC {
   late final _mln_render_session_destroy = _mln_render_session_destroyPtr
       .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
 
-  /// Asks the session renderer to release cached resources where possible.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_reduce_memory_use(
     ffi.Pointer<mln_render_session> session,
   ) {
@@ -4139,16 +2855,6 @@ class MaplibreNativeC {
       _mln_render_session_reduce_memory_usePtr
           .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
 
-  /// Clears renderer data for the session.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_clear_data(
     ffi.Pointer<mln_render_session> session,
   ) {
@@ -4162,16 +2868,6 @@ class MaplibreNativeC {
   late final _mln_render_session_clear_data = _mln_render_session_clear_dataPtr
       .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
 
-  /// Dumps renderer debug logs for the session through MapLibre Native logging.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_dump_debug_logs(
     ffi.Pointer<mln_render_session> session,
   ) {
@@ -4186,25 +2882,6 @@ class MaplibreNativeC {
       _mln_render_session_dump_debug_logsPtr
           .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
 
-  /// Sets per-feature state on a render source for this render session.
-  ///
-  /// The session renderer must already exist; call
-  /// mln_render_session_render_update() once after loading style data before using
-  /// feature state. selector->source_id and selector->feature_id are borrowed for
-  /// the duration of the call. state must be a JSON object descriptor and is
-  /// copied before return. The accepted command requests a map repaint.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
-  /// null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-  /// state is null or not an object, state contains invalid descriptor data, or
-  /// state contains non-finite numbers.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_set_feature_state(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_feature_state_selector> selector,
@@ -4235,25 +2912,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies per-feature state from a render source in this render session.
-  ///
-  /// The session renderer must already exist. selector->source_id and
-  /// selector->feature_id are borrowed for the duration of the call. On success,
-  /// *out_state receives an owned snapshot handle. Use
-  /// mln_json_snapshot_get() to borrow its root JSON object value, and destroy it
-  /// with mln_json_snapshot_destroy(). Missing native source or feature state is
-  /// reported as an empty object snapshot.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
-  /// null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-  /// out_state is null, or *out_state is not null.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_get_feature_state(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_feature_state_selector> selector,
@@ -4284,24 +2942,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Removes per-feature state from a render source in this render session.
-  ///
-  /// The session renderer must already exist. selector->source_id is required.
-  /// selector->feature_id and selector->state_key are optional. Passing both
-  /// removes one state key from one feature. Passing only feature_id removes all
-  /// state for that feature. Passing neither removes all feature state for the
-  /// source/source-layer. The accepted command requests a map repaint.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
-  /// null or invalid, or selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-  /// without MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
-  /// been created for the session yet.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_render_session_remove_feature_state(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_feature_state_selector> selector,
@@ -4329,16 +2969,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Borrows the root JSON value from a snapshot handle.
-  ///
-  /// The returned pointer and all nested pointers remain valid until the snapshot
-  /// is destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when snapshot is null or not live, or out_value
-  /// is null.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_json_snapshot_get(
     ffi.Pointer<mln_json_snapshot> snapshot,
     ffi.Pointer<ffi.Pointer<mln_json_value>> out_value,
@@ -4363,7 +2993,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Destroys a JSON snapshot handle. Null is accepted as a no-op.
   void mln_json_snapshot_destroy(ffi.Pointer<mln_json_snapshot> snapshot) {
     return _mln_json_snapshot_destroy(snapshot);
   }
@@ -4375,7 +3004,6 @@ class MaplibreNativeC {
   late final _mln_json_snapshot_destroy = _mln_json_snapshot_destroyPtr
       .asFunction<void Function(ffi.Pointer<mln_json_snapshot>)>();
 
-  /// Returns default tile source options.
   mln_style_tile_source_options mln_style_tile_source_options_default() {
     return _mln_style_tile_source_options_default();
   }
@@ -4388,7 +3016,6 @@ class MaplibreNativeC {
       _mln_style_tile_source_options_defaultPtr
           .asFunction<mln_style_tile_source_options Function()>();
 
-  /// Returns default custom geometry source options.
   mln_custom_geometry_source_options
   mln_custom_geometry_source_options_default() {
     return _mln_custom_geometry_source_options_default();
@@ -4402,7 +3029,6 @@ class MaplibreNativeC {
       _mln_custom_geometry_source_options_defaultPtr
           .asFunction<mln_custom_geometry_source_options Function()>();
 
-  /// Returns a default premultiplied RGBA8 image descriptor.
   mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default() {
     return _mln_premultiplied_rgba8_image_default();
   }
@@ -4415,7 +3041,6 @@ class MaplibreNativeC {
       _mln_premultiplied_rgba8_image_defaultPtr
           .asFunction<mln_premultiplied_rgba8_image Function()>();
 
-  /// Returns default runtime style image options.
   mln_style_image_options mln_style_image_options_default() {
     return _mln_style_image_options_default();
   }
@@ -4428,7 +3053,6 @@ class MaplibreNativeC {
       _mln_style_image_options_defaultPtr
           .asFunction<mln_style_image_options Function()>();
 
-  /// Returns default runtime style image metadata.
   mln_style_image_info mln_style_image_info_default() {
     return _mln_style_image_info_default();
   }
@@ -4440,13 +3064,6 @@ class MaplibreNativeC {
   late final _mln_style_image_info_default = _mln_style_image_info_defaultPtr
       .asFunction<mln_style_image_info Function()>();
 
-  /// Gets the number of IDs in a style ID list handle.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
-  /// null.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_style_id_list_count(
     ffi.Pointer<mln_style_id_list> list,
     ffi.Pointer<ffi.Size> out_count,
@@ -4468,16 +3085,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_style_id_list>, ffi.Pointer<ffi.Size>)
       >();
 
-  /// Borrows one ID from a style ID list handle.
-  ///
-  /// On success, out_id receives a view into list-owned storage. The view remains
-  /// valid until the list is destroyed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
-  /// range, or out_id is null.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_style_id_list_get(
     ffi.Pointer<mln_style_id_list> list,
     int index,
@@ -4505,7 +3112,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Destroys a style ID list handle. Null is accepted as a no-op.
   void mln_style_id_list_destroy(ffi.Pointer<mln_style_id_list> list) {
     return _mln_style_id_list_destroy(list);
   }
@@ -4517,21 +3123,6 @@ class MaplibreNativeC {
   late final _mln_style_id_list_destroy = _mln_style_id_list_destroyPtr
       .asFunction<void Function(ffi.Pointer<mln_style_id_list>)>();
 
-  /// Adds one style source from a style-spec source JSON object.
-  ///
-  /// source_id and source_json are borrowed for the call. source_json is the
-  /// object that appears under sources[source_id] in a style document. The
-  /// function parses and copies the accepted source into MapLibre Native before
-  /// return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, source_json is null or invalid, the source ID already
-  /// exists, or the source JSON cannot be converted.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_style_source_json(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4561,19 +3152,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Removes one style source by ID.
-  ///
-  /// source_id is borrowed for the call. On success, out_removed reports whether a
-  /// source existed and was removed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, or out_removed is null.
-  /// - MLN_STATUS_INVALID_STATE when the source exists but a layer still uses it.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_remove_style_source(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4603,15 +3181,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Reports whether a style source ID exists.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, or out_exists is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_style_source_exists(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4641,18 +3210,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Gets one style source type.
-  ///
-  /// On success, out_found reports whether source_id exists. When found,
-  /// out_source_type receives one of mln_style_source_type.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, out_source_type is null, or out_found is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_style_source_type(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4690,21 +3247,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies fixed metadata for one style source.
-  ///
-  /// The returned struct contains string lengths, not string contents. Use
-  /// mln_map_copy_style_source_attribution() to copy attribution bytes when
-  /// has_attribution is true. The source ID is the lookup key and is also
-  /// available through style source ID lists.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, out_info is null, out_info->size is too small, or
-  /// out_found is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_style_source_info(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4737,22 +3279,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies one style source attribution string into caller-owned memory.
-  ///
-  /// source_id is borrowed for the call. out_attribution may be null only when
-  /// attribution_capacity is 0. On success, out_attribution_size receives the byte
-  /// length of the attribution, excluding any null terminator. When out_found is
-  /// false or the source has no attribution, out_attribution_size receives 0.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, out_attribution is null with non-zero capacity,
-  /// attribution_capacity is too small for a present attribution,
-  /// out_attribution_size is null, or out_found is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_copy_style_source_attribution(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4799,18 +3325,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies style source IDs in style order.
-  ///
-  /// On success, *out_source_ids receives an owned list handle. Destroy it with
-  /// mln_style_id_list_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_source_ids is
-  /// null, or *out_source_ids is not null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_list_style_source_ids(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Pointer<mln_style_id_list>> out_source_ids,
@@ -4837,18 +3351,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Adds a GeoJSON source with URL data.
-  ///
-  /// source_id and url are borrowed for the call. The source loads GeoJSON from
-  /// url through MapLibre Native's resource system.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_geojson_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4875,18 +3377,6 @@ class MaplibreNativeC {
             int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
           >();
 
-  /// Adds a GeoJSON source with inline data.
-  ///
-  /// source_id and data are borrowed for the call. The accepted GeoJSON descriptor
-  /// is copied into MapLibre Native before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, data is null or invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_geojson_source_data(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4917,18 +3407,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Updates one GeoJSON source to load data from a URL.
-  ///
-  /// source_id and url are borrowed for the call.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, the source does not exist, or the source is not a
-  /// GeoJSON source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_geojson_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4955,19 +3433,6 @@ class MaplibreNativeC {
             int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
           >();
 
-  /// Updates one GeoJSON source with inline data.
-  ///
-  /// source_id and data are borrowed for the call. The accepted GeoJSON descriptor
-  /// is copied into MapLibre Native before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, data is null or invalid, the source does not exist, or
-  /// the source is not a GeoJSON source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_geojson_source_data(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -4998,19 +3463,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a vector source with a TileJSON URL.
-  ///
-  /// source_id and url are borrowed for the call. options may be null for
-  /// defaults. For URL sources, min_zoom, max_zoom, and vector_encoding override
-  /// values from the loaded TileJSON when their field bits are set.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, options is invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_vector_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5043,20 +3495,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Adds a vector source with inline tile URLs.
-  ///
-  /// source_id and tile URL views are borrowed for the call. The function copies
-  /// accepted strings into MapLibre Native before return. options may be null for
-  /// defaults.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, tile URLs are null, empty, or invalid, options is
-  /// invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_vector_source_tiles(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5099,18 +3537,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a raster source with a TileJSON URL.
-  ///
-  /// source_id and url are borrowed for the call. options may be null for
-  /// defaults. For URL sources, only tile_size is used when its field bit is set.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, options is invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_raster_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5143,20 +3569,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Adds a raster source with inline tile URLs.
-  ///
-  /// source_id and tile URL views are borrowed for the call. The function copies
-  /// accepted strings into MapLibre Native before return. options may be null for
-  /// defaults.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, tile URLs are null, empty, or invalid, options is
-  /// invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_raster_source_tiles(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5199,19 +3611,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a raster DEM source with a TileJSON URL.
-  ///
-  /// source_id and url are borrowed for the call. options may be null for
-  /// defaults. For URL sources, tile_size and raster_encoding are used when their
-  /// field bits are set.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, options is invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_raster_dem_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5245,20 +3644,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a raster DEM source with inline tile URLs.
-  ///
-  /// source_id and tile URL views are borrowed for the call. The function copies
-  /// accepted strings into MapLibre Native before return. options may be null for
-  /// defaults.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, tile URLs are null, empty, or invalid, options is
-  /// invalid, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_raster_dem_source_tiles(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5301,35 +3686,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a custom geometry source.
-  ///
-  /// source_id is borrowed for the call. options is borrowed for the call, but the
-  /// callback function pointers and user_data pointer are retained by value. The
-  /// callback functions and user_data must remain valid until the source is
-  /// removed, the style is replaced, or the map is destroyed, and until any
-  /// in-flight callback invocation has returned. For URL loads, style replacement
-  /// occurs when the new style loads, not when the load request is accepted. For
-  /// inline JSON loads, style replacement completes before
-  /// mln_map_set_style_json() returns successfully.
-  ///
-  /// fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
-  /// concurrent with owner-thread map calls, and must not call thread-affine map
-  /// APIs directly. Queue work back to the map owner thread before calling
-  /// mln_map_set_custom_geometry_source_tile_data() or invalidation functions.
-  /// Callbacks must not throw, panic, longjmp, or otherwise unwind through the C
-  /// ABI. cancel_tile is best-effort and may be repeated or race with fetch_tile.
-  ///
-  /// Custom geometry sources belong to the current style. Replacing the style
-  /// drops sources that were added to the previous style.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, options is null or invalid, fetch_tile is null, or the
-  /// source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_custom_geometry_source(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5360,19 +3716,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Sets custom geometry source data for one canonical tile.
-  ///
-  /// source_id and data are borrowed for the call. The accepted GeoJSON descriptor
-  /// is copied into MapLibre Native before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, tile_id is invalid, data is null or invalid, the source
-  /// does not exist, or the source is not a custom geometry source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_custom_geometry_source_tile_data(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5411,16 +3754,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Invalidates custom geometry source data for one canonical tile.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, tile_id is invalid, the source does not exist, or the
-  /// source is not a custom geometry source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_invalidate_custom_geometry_source_tile(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5451,16 +3784,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Invalidates custom geometry source data inside one geographic region.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, bounds is invalid, the source does not exist, or the
-  /// source is not a custom geometry source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_invalidate_custom_geometry_source_region(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5491,23 +3814,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Sets one runtime style image.
-  ///
-  /// image_id, image, and image pixels are borrowed for the call. The function
-  /// copies accepted pixel bytes into the current style before return. If image_id
-  /// already exists, the native image is replaced.
-  ///
-  /// Runtime style images belong to the current style. Loading another style URL
-  /// or JSON document drops images that were added to the previous style.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
-  /// invalid or empty, image or options is invalid, image pixels are null, image
-  /// dimensions or stride are invalid, or image byte_length is too small.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_style_image(
     ffi.Pointer<mln_map> map,
     mln_string_view image_id,
@@ -5540,18 +3846,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Removes one runtime style image by ID.
-  ///
-  /// image_id is borrowed for the call. On success, out_removed reports whether an
-  /// image existed and was removed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
-  /// invalid or empty, or out_removed is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_remove_style_image(
     ffi.Pointer<mln_map> map,
     mln_string_view image_id,
@@ -5581,15 +3875,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Reports whether a runtime style image ID exists.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
-  /// invalid or empty, or out_exists is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_style_image_exists(
     ffi.Pointer<mln_map> map,
     mln_string_view image_id,
@@ -5619,19 +3904,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies fixed metadata for one runtime style image.
-  ///
-  /// On success, out_found reports whether image_id exists. When not found,
-  /// out_info receives default image metadata.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
-  /// invalid or empty, out_info is null, out_info->size is too small, or
-  /// out_found is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_style_image_info(
     ffi.Pointer<mln_map> map,
     mln_string_view image_id,
@@ -5664,24 +3936,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
-  ///
-  /// image_id is borrowed for the call. out_pixels may be null only when
-  /// pixel_capacity is 0. On success, out_byte_length receives the required byte
-  /// length. When out_found is false, out_byte_length receives 0. If
-  /// pixel_capacity is too small for a present image, out_byte_length still
-  /// receives the required byte length and the function returns
-  /// MLN_STATUS_INVALID_ARGUMENT.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
-  /// invalid or empty, out_pixels is null with non-zero capacity, pixel_capacity
-  /// is too small for a present image, out_byte_length is null, or out_found is
-  /// null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_copy_style_image_premultiplied_rgba8(
     ffi.Pointer<mln_map> map,
     mln_string_view image_id,
@@ -5728,25 +3982,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds an image source that loads its image from a URL.
-  ///
-  /// source_id, coordinates, and url are borrowed for the call. coordinates must
-  /// contain exactly four coordinates in top-left, top-right, bottom-right,
-  /// bottom-left order. The function copies accepted strings and coordinates into
-  /// the current style before return. Later URL load or decode failures are
-  /// reported through runtime events.
-  ///
-  /// Image sources belong to the current style. Loading another style URL or JSON
-  /// document drops sources that were added to the previous style.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, coordinates is null or invalid, coordinate_count is
-  /// not 4, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_image_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5788,25 +4023,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Adds an image source with inline image pixels.
-  ///
-  /// source_id, coordinates, image, and image pixels are borrowed for the call.
-  /// coordinates must contain exactly four coordinates in top-left, top-right,
-  /// bottom-right, bottom-left order. The function copies accepted coordinates and
-  /// pixels into the current style before return.
-  ///
-  /// Image sources belong to the current style. Loading another style URL or JSON
-  /// document drops sources that were added to the previous style.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, coordinates is null or invalid, coordinate_count is not
-  /// 4, image is invalid, image pixels are null, image dimensions or stride are
-  /// invalid, image byte_length is too small, or the source ID already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_image_source_image(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5849,19 +4065,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Updates an image source to load its image from a URL.
-  ///
-  /// source_id and url are borrowed for the call. Later URL load or decode
-  /// failures are reported through runtime events.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
-  /// is invalid or empty, the source does not exist, or the source is not an
-  /// image source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_image_source_url(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5887,20 +4090,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
       >();
 
-  /// Updates an image source with inline image pixels.
-  ///
-  /// source_id, image, and image pixels are borrowed for the call. The function
-  /// copies accepted pixels into MapLibre Native before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, image is invalid, image pixels are null, image dimensions
-  /// or stride are invalid, image byte_length is too small, the source does not
-  /// exist, or the source is not an image source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_image_source_image(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5931,20 +4120,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Updates image source coordinates.
-  ///
-  /// coordinates is borrowed for the call and must contain exactly four
-  /// coordinates in top-left, top-right, bottom-right, bottom-left order. The
-  /// function copies accepted coordinates into MapLibre Native before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, coordinates is null or invalid, coordinate_count is not
-  /// 4, the source does not exist, or the source is not an image source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_image_source_coordinates(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -5983,22 +4158,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies image source coordinates.
-  ///
-  /// On success, out_found reports whether source_id exists. When found,
-  /// out_coordinate_count receives 4. If coordinate_capacity is less than 4,
-  /// out_coordinate_count still receives 4 and the function returns
-  /// MLN_STATUS_INVALID_ARGUMENT.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
-  /// invalid or empty, out_coordinates is null with non-zero capacity,
-  /// coordinate_capacity is too small for a found source, out_coordinate_count
-  /// is null, out_found is null, or the source exists and is not an image source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_image_source_coordinates(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
@@ -6045,21 +4204,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a hillshade layer for a raster DEM source.
-  ///
-  /// layer_id, source_id, and before_layer_id are borrowed for the call. Passing
-  /// an empty before_layer_id appends the layer; otherwise the layer is inserted
-  /// before that existing layer.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
-  /// source_id is invalid or empty, before_layer_id is invalid or does not
-  /// exist, layer_id already exists, source_id does not exist, or source_id is not
-  /// a raster DEM source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_hillshade_layer(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6092,22 +4236,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Adds a color-relief layer for a raster DEM source.
-  ///
-  /// layer_id, source_id, and before_layer_id are borrowed for the call. Passing
-  /// an empty before_layer_id appends the layer; otherwise the layer is inserted
-  /// before that existing layer. Use mln_map_set_layer_property() with
-  /// color-relief-color to set the color ramp expression.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
-  /// source_id is invalid or empty, before_layer_id is invalid or does not
-  /// exist, layer_id already exists, source_id does not exist, or source_id is not
-  /// a raster DEM source.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_color_relief_layer(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6146,20 +4274,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds a source-free location indicator layer.
-  ///
-  /// layer_id and before_layer_id are borrowed for the call. Passing an empty
-  /// before_layer_id appends the layer; otherwise the layer is inserted before
-  /// that existing layer.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, before_layer_id is invalid or does not exist, or layer_id
-  /// already exists.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_location_indicator_layer(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6186,19 +4300,6 @@ class MaplibreNativeC {
             int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
           >();
 
-  /// Sets a location indicator layer location.
-  ///
-  /// coordinate uses normal C API latitude/longitude order. The underlying style
-  /// property is written as [longitude, latitude, altitude].
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, coordinate or altitude is invalid, the layer does not
-  /// exist, or the layer is not a location indicator layer.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_location_indicator_location(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6237,16 +4338,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Sets a location indicator layer bearing in degrees.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, bearing is not finite float32, the layer does not exist,
-  /// or the layer is not a location indicator layer.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_location_indicator_bearing(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6269,16 +4360,6 @@ class MaplibreNativeC {
             int Function(ffi.Pointer<mln_map>, mln_string_view, double)
           >();
 
-  /// Sets a location indicator layer accuracy radius in logical pixels.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, radius is negative or not finite float32, the layer does
-  /// not exist, or the layer is not a location indicator layer.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_location_indicator_accuracy_radius(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6301,19 +4382,6 @@ class MaplibreNativeC {
             int Function(ffi.Pointer<mln_map>, mln_string_view, double)
           >();
 
-  /// Sets one location indicator image-name property.
-  ///
-  /// image_id is borrowed for the call and copied into native style storage. The
-  /// named style image does not need to exist when this function is called.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
-  /// image_id is invalid or empty, image_kind is invalid, the layer does not
-  /// exist, or the layer is not a location indicator layer.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_location_indicator_image_name(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6352,20 +4420,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Adds one style layer from a full style-spec layer JSON object.
-  ///
-  /// layer_json and before_layer_id are borrowed for the call. layer_json must
-  /// contain id and type members. Passing an empty before_layer_id appends the
-  /// layer; otherwise the layer is inserted before that existing layer.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_json is
-  /// null or invalid, the layer ID already exists, before_layer_id is invalid or
-  /// does not exist, or the layer JSON cannot be converted.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_add_style_layer_json(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_json_value> layer_json,
@@ -6395,18 +4449,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Removes one style layer by ID.
-  ///
-  /// layer_id is borrowed for the call. On success, out_removed reports whether a
-  /// layer existed and was removed.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, or out_removed is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_remove_style_layer(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6436,15 +4478,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Reports whether a style layer ID exists.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, or out_exists is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_style_layer_exists(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6474,18 +4507,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Borrows one style layer type string.
-  ///
-  /// On success, out_found reports whether layer_id exists. When found,
-  /// out_layer_type receives a view of a static style-spec layer type string.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, out_layer_type is null, or out_found is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_style_layer_type(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6518,18 +4539,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies style layer IDs in style order.
-  ///
-  /// On success, *out_layer_ids receives an owned list handle. Destroy it with
-  /// mln_style_id_list_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_layer_ids is
-  /// null, or *out_layer_ids is not null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_list_style_layer_ids(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<ffi.Pointer<mln_style_id_list>> out_layer_ids,
@@ -6556,19 +4565,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Moves one style layer before another layer or to the top.
-  ///
-  /// layer_id and before_layer_id are borrowed for the call. Passing an empty
-  /// before_layer_id moves the layer to the top of the style order.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, before_layer_id is invalid, layer_id does not exist, or
-  /// before_layer_id is non-empty and does not exist.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_move_style_layer(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6594,19 +4590,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
       >();
 
-  /// Copies one style layer as a full style-spec layer JSON snapshot.
-  ///
-  /// On success, out_found reports whether layer_id exists. When found,
-  /// *out_layer receives an owned snapshot handle.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, out_layer is null, *out_layer is not null, or out_found
-  /// is null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_style_layer_json(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6639,18 +4622,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Sets the style light from a style-spec light JSON object.
-  ///
-  /// light_json is borrowed for the call. The function parses and copies the
-  /// accepted light into MapLibre Native before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, light_json is
-  /// null or invalid, or the light JSON cannot be converted.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_style_light_json(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_json_value> light_json,
@@ -6669,20 +4640,6 @@ class MaplibreNativeC {
         int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_json_value>)
       >();
 
-  /// Sets one style light property using its MapLibre style-spec property name.
-  ///
-  /// property_name and value are borrowed for the call. value is a style-spec JSON
-  /// value descriptor. The function parses and copies the accepted value into
-  /// MapLibre Native's typed light property storage before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
-  /// invalid or empty, value is null or invalid, the property name is unknown,
-  /// or the property value cannot be converted for that property.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_style_light_property(
     ffi.Pointer<mln_map> map,
     mln_string_view property_name,
@@ -6713,20 +4670,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Copies one style light property as a style-spec JSON value snapshot.
-  ///
-  /// On success, *out_value receives an owned snapshot handle. Use
-  /// mln_json_snapshot_get() to borrow its root JSON value. Destroy the snapshot
-  /// with mln_json_snapshot_destroy(). Undefined native style light properties
-  /// return null snapshots.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
-  /// invalid or empty, out_value is null, or *out_value is not null.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_style_light_property(
     ffi.Pointer<mln_map> map,
     mln_string_view property_name,
@@ -6757,22 +4700,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Sets one layer property using its MapLibre style-spec property name.
-  ///
-  /// layer_id, property_name, and value are borrowed for the call. value is a
-  /// style-spec JSON value descriptor. Expressions use style-spec expression JSON
-  /// arrays. The function parses and copies the accepted value into MapLibre
-  /// Native's typed style property storage before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
-  /// property_name is invalid or empty, value is null or invalid, the layer does
-  /// not exist, the property name is unknown for that layer, or the property
-  /// value cannot be converted for that property.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_layer_property(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6805,21 +4732,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies one layer property as a style-spec JSON value snapshot.
-  ///
-  /// On success, *out_value receives an owned snapshot handle. Use
-  /// mln_json_snapshot_get() to borrow its root JSON value. Destroy the snapshot
-  /// with mln_json_snapshot_destroy(). Undefined native style properties return
-  /// null snapshots.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
-  /// property_name is invalid or empty, out_value is null, *out_value is not
-  /// null, or the layer does not exist.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_layer_property(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6852,21 +4764,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Sets or clears one layer filter.
-  ///
-  /// layer_id and filter are borrowed for the call. Passing null for filter clears
-  /// the layer filter. Non-null filters use the MapLibre style-spec filter JSON
-  /// representation. The function parses and copies the accepted filter into
-  /// MapLibre Native's typed filter expression storage before return.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, filter is invalid, the layer does not exist, or the
-  /// filter cannot be converted.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_set_layer_filter(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6896,20 +4793,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Copies one layer filter as a style-spec JSON value snapshot.
-  ///
-  /// On success, *out_filter receives an owned snapshot handle. Use
-  /// mln_json_snapshot_get() to borrow its root JSON value. Destroy the snapshot
-  /// with mln_json_snapshot_destroy(). Missing filters return null snapshots.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
-  /// invalid or empty, out_filter is null, *out_filter is not null, or the layer
-  /// does not exist.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_map_get_layer_filter(
     ffi.Pointer<mln_map> map,
     mln_string_view layer_id,
@@ -6939,7 +4822,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Returns Metal surface descriptor defaults for this C API version.
   mln_metal_surface_descriptor mln_metal_surface_descriptor_default() {
     return _mln_metal_surface_descriptor_default();
   }
@@ -6952,7 +4834,6 @@ class MaplibreNativeC {
       _mln_metal_surface_descriptor_defaultPtr
           .asFunction<mln_metal_surface_descriptor Function()>();
 
-  /// Returns Vulkan surface descriptor defaults for this C API version.
   mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default() {
     return _mln_vulkan_surface_descriptor_default();
   }
@@ -6965,25 +4846,6 @@ class MaplibreNativeC {
       _mln_vulkan_surface_descriptor_defaultPtr
           .asFunction<mln_vulkan_surface_descriptor Function()>();
 
-  /// Attaches a Metal native surface render target to a map.
-  ///
-  /// The map may have at most one live render session. The session and
-  /// every surface-session call are owner-thread affine to the map owner thread.
-  /// The session retains descriptor->layer and optional
-  /// descriptor->context.device. It renders into the layer and presents through
-  /// it. On success, *out_session receives a handle the caller destroys with
-  /// mln_render_session_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-  /// null or invalid, out_session is null, or *out_session is not null.
-  /// - MLN_STATUS_INVALID_STATE when the map already has a render session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_UNSUPPORTED when Metal surface sessions are not supported by
-  /// this build.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_metal_surface_attach(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_metal_surface_descriptor> descriptor,
@@ -7013,27 +4875,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Attaches a Vulkan native surface render target to a map.
-  ///
-  /// The map may have at most one live render session. The session and
-  /// every surface-session call are owner-thread affine to the map owner thread.
-  /// The session renders to descriptor->surface and presents through it. The
-  /// Vulkan device must support VK_KHR_swapchain, and the queue family must
-  /// support graphics and presentation to descriptor->surface. Vulkan handles are
-  /// borrowed and must remain valid until the session is detached or destroyed.
-  /// On success, *out_session receives a handle the caller destroys with
-  /// mln_render_session_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-  /// null or invalid, out_session is null, or *out_session is not null.
-  /// - MLN_STATUS_INVALID_STATE when the map already has a render session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_UNSUPPORTED when Vulkan surface sessions are not supported by
-  /// this build.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_vulkan_surface_attach(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
@@ -7063,7 +4904,6 @@ class MaplibreNativeC {
         )
       >();
 
-  /// Returns Metal owned-texture descriptor defaults for this C API version.
   mln_metal_owned_texture_descriptor
   mln_metal_owned_texture_descriptor_default() {
     return _mln_metal_owned_texture_descriptor_default();
@@ -7077,7 +4917,6 @@ class MaplibreNativeC {
       _mln_metal_owned_texture_descriptor_defaultPtr
           .asFunction<mln_metal_owned_texture_descriptor Function()>();
 
-  /// Returns Metal borrowed-texture descriptor defaults for this C API version.
   mln_metal_borrowed_texture_descriptor
   mln_metal_borrowed_texture_descriptor_default() {
     return _mln_metal_borrowed_texture_descriptor_default();
@@ -7091,7 +4930,6 @@ class MaplibreNativeC {
       _mln_metal_borrowed_texture_descriptor_defaultPtr
           .asFunction<mln_metal_borrowed_texture_descriptor Function()>();
 
-  /// Returns Vulkan owned-texture descriptor defaults for this C API version.
   mln_vulkan_owned_texture_descriptor
   mln_vulkan_owned_texture_descriptor_default() {
     return _mln_vulkan_owned_texture_descriptor_default();
@@ -7105,7 +4943,6 @@ class MaplibreNativeC {
       _mln_vulkan_owned_texture_descriptor_defaultPtr
           .asFunction<mln_vulkan_owned_texture_descriptor Function()>();
 
-  /// Returns Vulkan borrowed-texture descriptor defaults for this C API version.
   mln_vulkan_borrowed_texture_descriptor
   mln_vulkan_borrowed_texture_descriptor_default() {
     return _mln_vulkan_borrowed_texture_descriptor_default();
@@ -7119,7 +4956,6 @@ class MaplibreNativeC {
       _mln_vulkan_borrowed_texture_descriptor_defaultPtr
           .asFunction<mln_vulkan_borrowed_texture_descriptor Function()>();
 
-  /// Returns texture image info defaults for this C API version.
   mln_texture_image_info mln_texture_image_info_default() {
     return _mln_texture_image_info_default();
   }
@@ -7132,24 +4968,6 @@ class MaplibreNativeC {
       _mln_texture_image_info_defaultPtr
           .asFunction<mln_texture_image_info Function()>();
 
-  /// Attaches a Metal texture render target owned by the session to a map.
-  ///
-  /// The map may have at most one live render session. The session and
-  /// every texture-session call are owner-thread affine to the map owner thread.
-  /// The session renders into a session-owned texture created on
-  /// descriptor->context.device. On success, *out_session receives a handle the
-  /// caller destroys with mln_render_session_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-  /// null or invalid, out_session is null, or *out_session is not null.
-  /// - MLN_STATUS_INVALID_STATE when the map already has a render session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_UNSUPPORTED when Metal texture sessions are not supported by
-  /// this build.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_metal_owned_texture_attach(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_metal_owned_texture_descriptor> descriptor,
@@ -7180,25 +4998,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Attaches a Metal caller-owned texture render target to a map.
-  ///
-  /// The map may have at most one live render session. The session and
-  /// every texture-session call are owner-thread affine to the map owner thread.
-  /// The session renders into descriptor->texture. The caller owns the texture,
-  /// keeps it valid until detach or destroy, and synchronizes any use outside this
-  /// session. On success, *out_session receives a handle the caller destroys with
-  /// mln_render_session_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-  /// null or invalid, out_session is null, or *out_session is not null.
-  /// - MLN_STATUS_INVALID_STATE when the map already has a render session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_UNSUPPORTED when Metal borrowed texture sessions are not
-  /// supported by this build.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_metal_borrowed_texture_attach(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
@@ -7229,25 +5028,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Attaches a Vulkan texture render target owned by the session to a map.
-  ///
-  /// The map may have at most one live render session. The session and
-  /// every texture-session call are owner-thread affine to the map owner thread.
-  /// The session renders into a session-owned image created on
-  /// descriptor->context.device. Vulkan handles are borrowed and must remain valid
-  /// until detach or destroy. On success, *out_session receives a handle the
-  /// caller destroys with mln_render_session_destroy().
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-  /// null or invalid, out_session is null, or *out_session is not null.
-  /// - MLN_STATUS_INVALID_STATE when the map already has a render session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_UNSUPPORTED when Vulkan texture sessions are not supported by
-  /// this build.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_vulkan_owned_texture_attach(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
@@ -7278,32 +5058,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Attaches a Vulkan caller-owned texture render target to a map.
-  ///
-  /// The map may have at most one live render session. The session and
-  /// every texture-session call are owner-thread affine to the map owner thread.
-  /// The session renders into descriptor->image through descriptor->image_view.
-  /// The caller owns the image and view, keeps them valid until detach or destroy,
-  /// and handles queue-family ownership and synchronization outside this session.
-  /// On success, *out_session receives a handle the caller destroys with
-  /// mln_render_session_destroy().
-  ///
-  /// Before each mln_render_session_render_update(), make the image available on
-  /// descriptor->context.graphics_queue in descriptor->initial_layout and keep it
-  /// out of concurrent use. The session submits rendering on that queue, waits for
-  /// the submitted work to finish, and leaves the image in
-  /// descriptor->final_layout before mln_render_session_render_update() returns.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-  /// null or invalid, out_session is null, or *out_session is not null.
-  /// - MLN_STATUS_INVALID_STATE when the map already has a render session.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
-  /// thread.
-  /// - MLN_STATUS_UNSUPPORTED when Vulkan borrowed texture sessions are not
-  /// supported by this build.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_vulkan_borrowed_texture_attach(
     ffi.Pointer<mln_map> map,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
@@ -7334,26 +5088,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Reads the most recently rendered session-owned texture frame into
-  /// caller-owned storage.
-  ///
-  /// The copied image is premultiplied RGBA8 in physical pixels. The function
-  /// fills out_info with the required byte length and image layout metadata. When
-  /// out_data is null or out_data_capacity is too small, out_info is still filled
-  /// and the function returns MLN_STATUS_INVALID_ARGUMENT.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_info is
-  /// null, out_info->size is too small, out_data is null, or out_data_capacity
-  /// is too small.
-  /// - MLN_STATUS_INVALID_STATE when no rendered frame is available, the session
-  /// is detached, a frame is currently acquired, or readback produces no image.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_UNSUPPORTED when session is not a texture session or when the
-  /// texture session uses a caller-owned target.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_texture_read_premultiplied_rgba8(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<ffi.Uint8> out_data,
@@ -7392,25 +5126,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Acquires the most recently rendered Metal texture frame.
-  ///
-  /// Use this function with sessions created by mln_metal_owned_texture_attach().
-  ///
-  /// The returned texture and device pointers are borrowed and remain valid only
-  /// until mln_metal_owned_texture_release_frame() is called for the same frame.
-  /// While acquired, resize, render update, detach, destroy, and a
-  /// second acquire return MLN_STATUS_INVALID_STATE.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_frame is
-  /// null, or out_frame->size is too small.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached, no rendered frame is
-  /// available, or a texture frame is already acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_UNSUPPORTED when session cannot expose a Metal texture frame.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_metal_owned_texture_acquire_frame(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
@@ -7438,18 +5153,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Releases a Metal texture frame acquired from a session-owned texture target.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, frame is
-  /// null, frame->size is too small, or frame identity does not match the
-  /// acquired frame.
-  /// - MLN_STATUS_INVALID_STATE when no texture frame is currently acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_UNSUPPORTED when session cannot release a Metal texture frame.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_metal_owned_texture_release_frame(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_metal_owned_texture_frame> frame,
@@ -7477,25 +5180,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Acquires the most recently rendered Vulkan texture frame.
-  ///
-  /// Use this function with sessions created by mln_vulkan_owned_texture_attach().
-  ///
-  /// The returned image, image view, and device pointers are borrowed and remain
-  /// valid only until mln_vulkan_owned_texture_release_frame() is called for the
-  /// same frame. While acquired, resize, render update, detach, destroy, and a
-  /// second acquire return MLN_STATUS_INVALID_STATE.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_frame is
-  /// null, or out_frame->size is too small.
-  /// - MLN_STATUS_INVALID_STATE when the session is detached, no rendered frame is
-  /// available, or a texture frame is already acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_UNSUPPORTED when session cannot expose a Vulkan texture frame.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_vulkan_owned_texture_acquire_frame(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
@@ -7523,18 +5207,6 @@ class MaplibreNativeC {
             )
           >();
 
-  /// Releases a Vulkan texture frame acquired from a session-owned texture target.
-  ///
-  /// Returns:
-  /// - MLN_STATUS_OK on success.
-  /// - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, frame is
-  /// null, frame->size is too small, or frame identity does not match the
-  /// acquired frame.
-  /// - MLN_STATUS_INVALID_STATE when no texture frame is currently acquired.
-  /// - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
-  /// owner thread.
-  /// - MLN_STATUS_UNSUPPORTED when session cannot release a Vulkan texture frame.
-  /// - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
   mln_status mln_vulkan_owned_texture_release_frame(
     ffi.Pointer<mln_render_session> session,
     ffi.Pointer<mln_vulkan_owned_texture_frame> frame,
@@ -7561,25 +5233,254 @@ class MaplibreNativeC {
               ffi.Pointer<mln_vulkan_owned_texture_frame>,
             )
           >();
+
+  ffi.Pointer<ffi.Void> mln_dart_handle_leak_token_create(
+    ffi.Pointer<ffi.Char> type_name,
+    ffi.Pointer<ffi.Void> handle,
+  ) {
+    return _mln_dart_handle_leak_token_create(type_name, handle);
+  }
+
+  late final _mln_dart_handle_leak_token_createPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Pointer<ffi.Void> Function(
+            ffi.Pointer<ffi.Char>,
+            ffi.Pointer<ffi.Void>,
+          )
+        >
+      >('mln_dart_handle_leak_token_create');
+  late final _mln_dart_handle_leak_token_create =
+      _mln_dart_handle_leak_token_createPtr
+          .asFunction<
+            ffi.Pointer<ffi.Void> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Void>,
+            )
+          >();
+
+  void mln_dart_handle_leak_token_destroy(ffi.Pointer<ffi.Void> token) {
+    return _mln_dart_handle_leak_token_destroy(token);
+  }
+
+  late final _mln_dart_handle_leak_token_destroyPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'mln_dart_handle_leak_token_destroy',
+      );
+  late final _mln_dart_handle_leak_token_destroy =
+      _mln_dart_handle_leak_token_destroyPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void mln_dart_handle_leak_report(ffi.Pointer<ffi.Void> token) {
+    return _mln_dart_handle_leak_report(token);
+  }
+
+  late final _mln_dart_handle_leak_reportPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'mln_dart_handle_leak_report',
+      );
+  late final _mln_dart_handle_leak_report = _mln_dart_handle_leak_reportPtr
+      .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  int mln_dart_log_callback(
+    ffi.Pointer<ffi.Void> user_data,
+    int severity,
+    int event,
+    int code,
+    ffi.Pointer<ffi.Char> message,
+  ) {
+    return _mln_dart_log_callback(user_data, severity, event, code, message);
+  }
+
+  late final _mln_dart_log_callbackPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Uint32 Function(
+            ffi.Pointer<ffi.Void>,
+            ffi.Uint32,
+            ffi.Uint32,
+            ffi.Int64,
+            ffi.Pointer<ffi.Char>,
+          )
+        >
+      >('mln_dart_log_callback');
+  late final _mln_dart_log_callback = _mln_dart_log_callbackPtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<ffi.Void>,
+          int,
+          int,
+          int,
+          ffi.Pointer<ffi.Char>,
+        )
+      >();
+
+  void mln_dart_log_record_destroy(ffi.Pointer<ffi.Void> record) {
+    return _mln_dart_log_record_destroy(record);
+  }
+
+  late final _mln_dart_log_record_destroyPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'mln_dart_log_record_destroy',
+      );
+  late final _mln_dart_log_record_destroy = _mln_dart_log_record_destroyPtr
+      .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  mln_status mln_dart_resource_transform_rewrite_callback(
+    ffi.Pointer<ffi.Void> user_data,
+    int kind,
+    ffi.Pointer<ffi.Char> url,
+    ffi.Pointer<mln_resource_transform_response> out_response,
+  ) {
+    return mln_status.fromValue(
+      _mln_dart_resource_transform_rewrite_callback(
+        user_data,
+        kind,
+        url,
+        out_response,
+      ),
+    );
+  }
+
+  late final _mln_dart_resource_transform_rewrite_callbackPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            ffi.Pointer<ffi.Void>,
+            ffi.Uint32,
+            ffi.Pointer<ffi.Char>,
+            ffi.Pointer<mln_resource_transform_response>,
+          )
+        >
+      >('mln_dart_resource_transform_rewrite_callback');
+  late final _mln_dart_resource_transform_rewrite_callback =
+      _mln_dart_resource_transform_rewrite_callbackPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Void>,
+              int,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<mln_resource_transform_response>,
+            )
+          >();
+
+  int mln_dart_resource_provider_rules_callback(
+    ffi.Pointer<ffi.Void> user_data,
+    ffi.Pointer<mln_resource_request> request,
+    ffi.Pointer<mln_resource_request_handle> handle,
+  ) {
+    return _mln_dart_resource_provider_rules_callback(
+      user_data,
+      request,
+      handle,
+    );
+  }
+
+  late final _mln_dart_resource_provider_rules_callbackPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Uint32 Function(
+            ffi.Pointer<ffi.Void>,
+            ffi.Pointer<mln_resource_request>,
+            ffi.Pointer<mln_resource_request_handle>,
+          )
+        >
+      >('mln_dart_resource_provider_rules_callback');
+  late final _mln_dart_resource_provider_rules_callback =
+      _mln_dart_resource_provider_rules_callbackPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<mln_resource_request>,
+              ffi.Pointer<mln_resource_request_handle>,
+            )
+          >();
+
+  int mln_dart_queued_resource_provider_callback(
+    ffi.Pointer<ffi.Void> user_data,
+    ffi.Pointer<mln_resource_request> request,
+    ffi.Pointer<mln_resource_request_handle> handle,
+  ) {
+    return _mln_dart_queued_resource_provider_callback(
+      user_data,
+      request,
+      handle,
+    );
+  }
+
+  late final _mln_dart_queued_resource_provider_callbackPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Uint32 Function(
+            ffi.Pointer<ffi.Void>,
+            ffi.Pointer<mln_resource_request>,
+            ffi.Pointer<mln_resource_request_handle>,
+          )
+        >
+      >('mln_dart_queued_resource_provider_callback');
+  late final _mln_dart_queued_resource_provider_callback =
+      _mln_dart_queued_resource_provider_callbackPtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<ffi.Void>,
+              ffi.Pointer<mln_resource_request>,
+              ffi.Pointer<mln_resource_request_handle>,
+            )
+          >();
+
+  void mln_dart_resource_provider_request_destroy(
+    ffi.Pointer<ffi.Void> request,
+  ) {
+    return _mln_dart_resource_provider_request_destroy(request);
+  }
+
+  late final _mln_dart_resource_provider_request_destroyPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'mln_dart_resource_provider_request_destroy',
+      );
+  late final _mln_dart_resource_provider_request_destroy =
+      _mln_dart_resource_provider_request_destroyPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void mln_dart_test_invoke_custom_geometry_tile_callback(
+    mln_custom_geometry_source_tile_callback callback,
+    ffi.Pointer<ffi.Void> user_data,
+    mln_canonical_tile_id tile_id,
+  ) {
+    return _mln_dart_test_invoke_custom_geometry_tile_callback(
+      callback,
+      user_data,
+      tile_id,
+    );
+  }
+
+  late final _mln_dart_test_invoke_custom_geometry_tile_callbackPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Void Function(
+            mln_custom_geometry_source_tile_callback,
+            ffi.Pointer<ffi.Void>,
+            mln_canonical_tile_id,
+          )
+        >
+      >('mln_dart_test_invoke_custom_geometry_tile_callback');
+  late final _mln_dart_test_invoke_custom_geometry_tile_callback =
+      _mln_dart_test_invoke_custom_geometry_tile_callbackPtr
+          .asFunction<
+            void Function(
+              mln_custom_geometry_source_tile_callback,
+              ffi.Pointer<ffi.Void>,
+              mln_canonical_tile_id,
+            )
+          >();
 }
 
-/// Status values returned by status-returning functions.
 enum mln_status {
   MLN_STATUS_OK(0),
-
-  /// A pointer, size field, mask, or handle argument was invalid.
   MLN_STATUS_INVALID_ARGUMENT(-1),
-
-  /// The object is valid but not currently in a state that permits the call.
   MLN_STATUS_INVALID_STATE(-2),
-
-  /// The handle is thread-affine and the call was made from the wrong thread.
   MLN_STATUS_WRONG_THREAD(-3),
-
-  /// The entry point or requested behavior is unavailable in this build.
   MLN_STATUS_UNSUPPORTED(-4),
-
-  /// A native MapLibre error or C++ exception was converted to status.
   MLN_STATUS_NATIVE_ERROR(-5);
 
   final int value;
@@ -7596,7 +5497,6 @@ enum mln_status {
   };
 }
 
-/// Render backend support flags reported by this native library build.
 enum mln_render_backend_flag {
   MLN_RENDER_BACKEND_FLAG_METAL(1),
   MLN_RENDER_BACKEND_FLAG_VULKAN(2);
@@ -7714,11 +5614,9 @@ enum mln_offline_region_download_state {
       };
 }
 
-/// Offline database operation token. Zero is never a valid operation ID.
 typedef mln_offline_operation_id = ffi.Uint64;
 typedef Dartmln_offline_operation_id = int;
 
-/// Offline database operation kinds reported by completion events.
 enum mln_offline_operation_kind {
   MLN_OFFLINE_OPERATION_AMBIENT_CACHE(1),
   MLN_OFFLINE_OPERATION_REGION_CREATE(2),
@@ -7753,7 +5651,6 @@ enum mln_offline_operation_kind {
   };
 }
 
-/// Offline database operation result kinds reported by completion events.
 enum mln_offline_operation_result_kind {
   MLN_OFFLINE_OPERATION_RESULT_NONE(0),
   MLN_OFFLINE_OPERATION_RESULT_REGION(1),
@@ -7777,12 +5674,10 @@ enum mln_offline_operation_result_kind {
       };
 }
 
-/// Offline region status snapshot.
 final class mln_offline_region_status extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_offline_region_download_state.
   @ffi.Uint32()
   external int download_state;
 
@@ -7811,7 +5706,6 @@ final class mln_offline_region_status extends ffi.Struct {
   external bool complete;
 }
 
-/// Runtime event types returned by mln_runtime_poll_event().
 enum mln_runtime_event_type {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE(1),
   MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING(2),
@@ -7868,7 +5762,6 @@ enum mln_runtime_event_type {
   };
 }
 
-/// Source kinds used by mln_runtime_event.source_type.
 enum mln_runtime_event_source_type {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME(0),
   MLN_RUNTIME_EVENT_SOURCE_MAP(1);
@@ -7885,7 +5778,6 @@ enum mln_runtime_event_source_type {
   };
 }
 
-/// Payload kinds used by mln_runtime_event.payload_type.
 enum mln_runtime_event_payload_type {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE(0),
   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME(1),
@@ -7916,7 +5808,6 @@ enum mln_runtime_event_payload_type {
   };
 }
 
-/// Render modes reported by render observer events.
 enum mln_render_mode {
   MLN_RENDER_MODE_PARTIAL(0),
   MLN_RENDER_MODE_FULL(1);
@@ -7931,7 +5822,6 @@ enum mln_render_mode {
   };
 }
 
-/// Tile operations reported by tile observer events.
 enum mln_tile_operation {
   MLN_TILE_OPERATION_REQUESTED_FROM_CACHE(0),
   MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK(1),
@@ -8115,88 +6005,68 @@ final class mln_runtime_options extends ffi.Struct {
   @ffi.Uint32()
   external int flags;
 
-  /// Filesystem root for asset:// URLs. Copied during runtime creation.
   external ffi.Pointer<ffi.Char> asset_path;
 
-  /// Cache database path. Copied during runtime creation.
   external ffi.Pointer<ffi.Char> cache_path;
 
-  /// Maximum ambient cache size in bytes when the matching flag is set.
   @ffi.Uint64()
   external int maximum_cache_size;
 }
 
-/// Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
 final class mln_rendering_stats extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Frame CPU encoding time in seconds.
   @ffi.Double()
   external double encoding_time;
 
-  /// Frame CPU rendering time in seconds.
   @ffi.Double()
   external double rendering_time;
 
-  /// Number of frames rendered by the native renderer.
   @ffi.Int64()
   external int frame_count;
 
-  /// Draw calls executed during the most recent frame.
   @ffi.Int64()
   external int draw_call_count;
 
-  /// Total draw calls executed by the native renderer.
   @ffi.Int64()
   external int total_draw_call_count;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED.
 final class mln_runtime_event_render_frame extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_render_mode.
   @ffi.Uint32()
   external int mode;
 
-  /// Whether MapLibre needs another frame after this one.
   @ffi.Bool()
   external bool needs_repaint;
 
-  /// Whether symbol placement changed during this frame.
   @ffi.Bool()
   external bool placement_changed;
 
   external mln_rendering_stats stats;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED.
 final class mln_runtime_event_render_map extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_render_mode.
   @ffi.Uint32()
   external int mode;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING.
 final class mln_runtime_event_style_image_missing extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Borrowed image ID bytes. Valid until the next poll for this runtime or
-  /// until the runtime is destroyed.
   external ffi.Pointer<ffi.Char> image_id;
 
-  /// Number of bytes in image_id, excluding the trailing null terminator.
   @ffi.Size()
   external int image_id_size;
 }
 
-/// Overscaled tile identity reported in tile observer events.
 final class mln_tile_id extends ffi.Struct {
   @ffi.Uint32()
   external int overscaled_z;
@@ -8214,27 +6084,21 @@ final class mln_tile_id extends ffi.Struct {
   external int canonical_y;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_MAP_TILE_ACTION.
 final class mln_runtime_event_tile_action extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_tile_operation.
   @ffi.Uint32()
   external int operation;
 
   external mln_tile_id tile_id;
 
-  /// Borrowed source ID bytes. Valid until the next poll for this runtime or
-  /// until the runtime is destroyed.
   external ffi.Pointer<ffi.Char> source_id;
 
-  /// Number of bytes in source_id, excluding the trailing null terminator.
   @ffi.Size()
   external int source_id_size;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED.
 final class mln_runtime_event_offline_region_status extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8245,7 +6109,6 @@ final class mln_runtime_event_offline_region_status extends ffi.Struct {
   external mln_offline_region_status status;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR.
 final class mln_runtime_event_offline_region_response_error extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8253,12 +6116,10 @@ final class mln_runtime_event_offline_region_response_error extends ffi.Struct {
   @mln_offline_region_id()
   external int region_id;
 
-  /// One of mln_resource_error_reason.
   @ffi.Uint32()
   external int reason;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.
 final class mln_runtime_event_offline_region_tile_count_limit
     extends ffi.Struct {
   @ffi.Uint32()
@@ -8271,7 +6132,6 @@ final class mln_runtime_event_offline_region_tile_count_limit
   external int limit;
 }
 
-/// Payload for MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
 final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8279,24 +6139,19 @@ final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
   @mln_offline_operation_id()
   external int operation_id;
 
-  /// One of mln_offline_operation_kind.
   @ffi.Uint32()
   external int operation_kind;
 
-  /// One of mln_offline_operation_result_kind.
   @ffi.Uint32()
   external int result_kind;
 
-  /// Async result status as a mln_status value.
   @ffi.Int32()
   external int result_status;
 
-  /// Meaningful for MLN_OFFLINE_OPERATION_REGION_GET.
   @ffi.Bool()
   external bool found;
 }
 
-/// Event payload returned by mln_runtime_poll_event().
 final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8304,33 +6159,24 @@ final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  /// One of mln_runtime_event_source_type.
   @ffi.Uint32()
   external int source_type;
 
-  /// Source handle for this event. For map-originated events, this is an
-  /// mln_map*. For runtime-originated events, this is an mln_runtime*. Borrowed;
-  /// valid while the source handle remains live.
   external ffi.Pointer<ffi.Void> source;
 
   @ffi.Int32()
   external int code;
 
-  /// One of mln_runtime_event_payload_type.
   @ffi.Uint32()
   external int payload_type;
 
-  /// Borrowed payload selected by payload_type. Null when payload_size is 0.
   external ffi.Pointer<ffi.Void> payload;
 
-  /// Number of bytes in payload.
   @ffi.Size()
   external int payload_size;
 
-  /// Borrowed event message bytes. Null when message_size is 0.
   external ffi.Pointer<ffi.Char> message;
 
-  /// Number of bytes in message, excluding the trailing null terminator.
   @ffi.Size()
   external int message_size;
 }
@@ -8339,7 +6185,6 @@ final class mln_resource_transform_response extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Replacement URL. Null or empty keeps the original URL. Copied on return.
   external ffi.Pointer<ffi.Char> url;
 }
 
@@ -8357,29 +6202,6 @@ typedef Dartmln_resource_transform_callbackFunction =
       ffi.Pointer<ffi.Char> url,
       ffi.Pointer<mln_resource_transform_response> out_response,
     );
-
-/// Rewrites a network resource URL.
-///
-/// This callback can only replace the request URL. It cannot mutate headers,
-/// bodies, cache policy, or convert a request into an error.
-///
-/// Callback invocations follow these rules:
-///
-/// - MapLibre may invoke the callback on a worker or network thread instead of
-/// the runtime owner thread.
-/// - The callback must be thread-safe, return quickly, and must not call this C
-/// API.
-/// - url and out_response are borrowed for the callback duration.
-/// - When a replacement URL is set, out_response->url must point to
-/// null-terminated storage that remains valid after the callback returns until
-/// the C API copies it during the current transform invocation. Bindings
-/// usually keep per-thread response storage alive until the next callback,
-/// transform replacement, transform clear, or runtime teardown.
-/// - A non-OK return status is treated as no rewrite and does not fail the
-/// resource request.
-/// - The callback and user_data must remain valid until the transform is
-/// replaced, cleared, or the runtime is destroyed. Those calls wait for
-/// in-flight transform callbacks before returning.
 typedef mln_resource_transform_callback =
     ffi.Pointer<ffi.NativeFunction<mln_resource_transform_callbackFunction>>;
 
@@ -8452,7 +6274,6 @@ final class mln_resource_response extends ffi.Struct {
   @ffi.Uint32()
   external int error_reason;
 
-  /// Response bytes. May be null only when byte_count is 0.
   external ffi.Pointer<ffi.Uint8> bytes;
 
   @ffi.Size()
@@ -8496,32 +6317,6 @@ typedef Dartmln_resource_provider_callbackFunction =
       ffi.Pointer<mln_resource_request> request,
       ffi.Pointer<mln_resource_request_handle> handle,
     );
-
-/// Intercepts a network resource request.
-///
-/// The callback runs synchronously on the thread that reaches the C API network
-/// file source. That thread may be a MapLibre worker or network thread instead
-/// of the runtime owner thread.
-///
-/// Request handling follows these rules:
-///
-/// - request and its pointed-to fields are borrowed for the callback duration.
-/// - MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH lets native OnlineFileSource
-/// handle the request.
-/// - After returning PASS_THROUGH, the provider must not retain, complete, or
-/// release the handle.
-/// - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
-/// request through the handle inline or later.
-/// - Unknown decision values produce a provider error response. The C API
-/// releases the provided handle and does not pass the request through.
-/// - The C API copies completion data, and mln_resource_request_complete() may
-/// be called from any thread.
-/// - Providers must release handled request handles after they no longer need to
-/// complete or observe cancellation.
-/// - The callback must be thread-safe, return quickly, and must not call map or
-/// runtime C API functions.
-/// - The callback may call resource request handle functions for the provided
-/// handle.
 typedef mln_resource_provider_callback =
     ffi.Pointer<ffi.NativeFunction<mln_resource_provider_callbackFunction>>;
 
@@ -8534,7 +6329,6 @@ final class mln_resource_provider extends ffi.Struct {
   external ffi.Pointer<ffi.Void> user_data;
 }
 
-/// Field mask values for mln_camera_options.
 enum mln_camera_option_field {
   MLN_CAMERA_OPTION_CENTER(1),
   MLN_CAMERA_OPTION_ZOOM(2),
@@ -8565,7 +6359,6 @@ enum mln_camera_option_field {
   };
 }
 
-/// Field mask values for mln_animation_options.
 enum mln_animation_option_field {
   MLN_ANIMATION_OPTION_DURATION(1),
   MLN_ANIMATION_OPTION_VELOCITY(2),
@@ -8586,7 +6379,6 @@ enum mln_animation_option_field {
   };
 }
 
-/// Field mask values for mln_camera_fit_options.
 enum mln_camera_fit_option_field {
   MLN_CAMERA_FIT_OPTION_PADDING(1),
   MLN_CAMERA_FIT_OPTION_BEARING(2),
@@ -8605,7 +6397,6 @@ enum mln_camera_fit_option_field {
   };
 }
 
-/// Field mask values for mln_bound_options.
 enum mln_bound_option_field {
   MLN_BOUND_OPTION_BOUNDS(1),
   MLN_BOUND_OPTION_MIN_ZOOM(2),
@@ -8628,7 +6419,6 @@ enum mln_bound_option_field {
   };
 }
 
-/// Field mask values for mln_free_camera_options.
 enum mln_free_camera_option_field {
   MLN_FREE_CAMERA_OPTION_POSITION(1),
   MLN_FREE_CAMERA_OPTION_ORIENTATION(2);
@@ -8645,7 +6435,6 @@ enum mln_free_camera_option_field {
   };
 }
 
-/// Field mask values for MapLibre axonometric rendering options.
 enum mln_projection_mode_field {
   MLN_PROJECTION_MODE_AXONOMETRIC(1),
   MLN_PROJECTION_MODE_X_SKEW(2),
@@ -8664,7 +6453,6 @@ enum mln_projection_mode_field {
   };
 }
 
-/// Debug overlay mask values for mln_map_set_debug_options().
 enum mln_map_debug_option {
   MLN_MAP_DEBUG_TILE_BORDERS(2),
   MLN_MAP_DEBUG_PARSE_STATUS(4),
@@ -8689,7 +6477,6 @@ enum mln_map_debug_option {
   };
 }
 
-/// Map north orientation values used by mln_map_viewport_options.
 enum mln_north_orientation {
   MLN_NORTH_ORIENTATION_UP(0),
   MLN_NORTH_ORIENTATION_RIGHT(1),
@@ -8708,7 +6495,6 @@ enum mln_north_orientation {
   };
 }
 
-/// Map constraint modes used by mln_map_viewport_options.
 enum mln_constrain_mode {
   MLN_CONSTRAIN_MODE_NONE(0),
   MLN_CONSTRAIN_MODE_HEIGHT_ONLY(1),
@@ -8727,7 +6513,6 @@ enum mln_constrain_mode {
   };
 }
 
-/// Viewport orientation modes used by mln_map_viewport_options.
 enum mln_viewport_mode {
   MLN_VIEWPORT_MODE_DEFAULT(0),
   MLN_VIEWPORT_MODE_FLIPPED_Y(1);
@@ -8742,7 +6527,6 @@ enum mln_viewport_mode {
   };
 }
 
-/// Field mask values for mln_map_viewport_options.
 enum mln_map_viewport_option_field {
   MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION(1),
   MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE(2),
@@ -8763,7 +6547,6 @@ enum mln_map_viewport_option_field {
   };
 }
 
-/// Tile LOD algorithms used by mln_map_tile_options.
 enum mln_tile_lod_mode {
   MLN_TILE_LOD_MODE_DEFAULT(0),
   MLN_TILE_LOD_MODE_DISTANCE(1);
@@ -8778,7 +6561,6 @@ enum mln_tile_lod_mode {
   };
 }
 
-/// Field mask values for mln_map_tile_options.
 enum mln_map_tile_option_field {
   MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA(1),
   MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS(2),
@@ -8803,15 +6585,9 @@ enum mln_map_tile_option_field {
   };
 }
 
-/// Map rendering modes used when creating a map.
 enum mln_map_mode {
-  /// Continuously updates as data arrives and map state changes.
   MLN_MAP_MODE_CONTINUOUS(0),
-
-  /// Produces one-off still images of an arbitrary viewport.
   MLN_MAP_MODE_STATIC(1),
-
-  /// Produces one-off still images for a single tile.
   MLN_MAP_MODE_TILE(2);
 
   final int value;
@@ -8825,7 +6601,6 @@ enum mln_map_mode {
   };
 }
 
-/// Options used when creating a map.
 final class mln_map_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8839,12 +6614,10 @@ final class mln_map_options extends ffi.Struct {
   @ffi.Double()
   external double scale_factor;
 
-  /// One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS.
   @ffi.Uint32()
   external int map_mode;
 }
 
-/// Screen-space point in logical map pixels.
 final class mln_screen_point extends ffi.Struct {
   @ffi.Double()
   external double x;
@@ -8853,7 +6626,6 @@ final class mln_screen_point extends ffi.Struct {
   external double y;
 }
 
-/// Screen-space inset in logical map pixels.
 final class mln_edge_insets extends ffi.Struct {
   @ffi.Double()
   external double top;
@@ -8868,7 +6640,6 @@ final class mln_edge_insets extends ffi.Struct {
   external double right;
 }
 
-/// Camera fields used for snapshots and camera commands.
 final class mln_camera_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8905,7 +6676,6 @@ final class mln_camera_options extends ffi.Struct {
   external double field_of_view;
 }
 
-/// Cubic easing curve for animated camera transitions.
 final class mln_unit_bezier extends ffi.Struct {
   @ffi.Double()
   external double x1;
@@ -8920,7 +6690,6 @@ final class mln_unit_bezier extends ffi.Struct {
   external double y2;
 }
 
-/// Optional animation controls for camera transitions.
 final class mln_animation_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8928,23 +6697,18 @@ final class mln_animation_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Duration in milliseconds. Must be finite and non-negative. Values that
-  /// would overflow MapLibre Native's internal duration are invalid.
   @ffi.Double()
   external double duration_ms;
 
-  /// Average flyTo velocity in screenfuls per second. Must be positive.
   @ffi.Double()
   external double velocity;
 
-  /// Peak zoom for flyTo transitions.
   @ffi.Double()
   external double min_zoom;
 
   external mln_unit_bezier easing;
 }
 
-/// Optional fitting controls for camera-for-viewport queries.
 final class mln_camera_fit_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -8961,7 +6725,6 @@ final class mln_camera_fit_options extends ffi.Struct {
   external double pitch;
 }
 
-/// Three-component vector used by free camera options.
 final class mln_vec3 extends ffi.Struct {
   @ffi.Double()
   external double x;
@@ -8973,7 +6736,6 @@ final class mln_vec3 extends ffi.Struct {
   external double z;
 }
 
-/// Quaternion stored as x, y, z, w components.
 final class mln_quaternion extends ffi.Struct {
   @ffi.Double()
   external double x;
@@ -8988,7 +6750,6 @@ final class mln_quaternion extends ffi.Struct {
   external double w;
 }
 
-/// Free camera position and orientation in MapLibre Native camera space.
 final class mln_free_camera_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9001,46 +6762,35 @@ final class mln_free_camera_options extends ffi.Struct {
   external mln_quaternion orientation;
 }
 
-/// Geographic coordinate in degrees used by map and projection APIs.
 final class mln_lat_lng extends ffi.Struct {
-  /// Latitude in degrees. Input latitude must be finite and within [-90, 90].
   @ffi.Double()
   external double latitude;
 
-  /// Longitude in degrees. Input longitude must be finite.
   @ffi.Double()
   external double longitude;
 }
 
-/// UTF-8 text view. The pointer may be null only when size is 0.
 final class mln_string_view extends ffi.Struct {
-  /// UTF-8 bytes. Null only when size is 0.
   external ffi.Pointer<ffi.Char> data;
 
   @ffi.Size()
   external int size;
 }
 
-/// JSON value array view.
 final class mln_json_array extends ffi.Struct {
-  /// Values. Null only when value_count is 0.
   external ffi.Pointer<mln_json_value> values;
 
   @ffi.Size()
   external int value_count;
 }
 
-/// JSON object member view.
 final class mln_json_member extends ffi.Struct {
   external mln_string_view key;
 
-  /// Value descriptor. Must not be null.
   external ffi.Pointer<mln_json_value> value;
 }
 
-/// JSON object member array view.
 final class mln_json_object extends ffi.Struct {
-  /// Members. Null only when member_count is 0.
   external ffi.Pointer<mln_json_member> members;
 
   @ffi.Size()
@@ -9067,63 +6817,45 @@ final class UnnamedUnion$1 extends ffi.Union {
   external mln_json_object object_value;
 }
 
-/// JSON-like value input descriptor graph used by feature properties/states.
-///
-/// Input functions reject NaN and infinities for double values because JSON and
-/// GeoJSON numbers are finite.
-/// A root JSON value descriptor starts at nesting depth 0. Status-returning
-/// functions reject array/object children past depth 64 with
-/// MLN_STATUS_INVALID_ARGUMENT.
 final class mln_json_value extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_json_value_type.
   @ffi.Uint32()
   external int type;
 
   external UnnamedUnion$1 data;
 }
 
-/// Coordinate array view. Coordinates are latitude/longitude pairs.
 final class mln_coordinate_span extends ffi.Struct {
-  /// Coordinates. Null only when coordinate_count is 0.
   external ffi.Pointer<mln_lat_lng> coordinates;
 
   @ffi.Size()
   external int coordinate_count;
 }
 
-/// Polygon ring array view. Each ring is a coordinate span.
 final class mln_polygon_geometry extends ffi.Struct {
-  /// Rings. Null only when ring_count is 0.
   external ffi.Pointer<mln_coordinate_span> rings;
 
   @ffi.Size()
   external int ring_count;
 }
 
-/// Multi-line geometry view. Each line is a coordinate span.
 final class mln_multi_line_geometry extends ffi.Struct {
-  /// Lines. Null only when line_count is 0.
   external ffi.Pointer<mln_coordinate_span> lines;
 
   @ffi.Size()
   external int line_count;
 }
 
-/// Multi-polygon geometry view. Each polygon contains ring views.
 final class mln_multi_polygon_geometry extends ffi.Struct {
-  /// Polygons. Null only when polygon_count is 0.
   external ffi.Pointer<mln_polygon_geometry> polygons;
 
   @ffi.Size()
   external int polygon_count;
 }
 
-/// Geometry collection view.
 final class mln_geometry_collection extends ffi.Struct {
-  /// Child geometries. Null only when geometry_count is 0.
   external ffi.Pointer<mln_geometry> geometries;
 
   @ffi.Size()
@@ -9146,25 +6878,16 @@ final class UnnamedUnion$2 extends ffi.Union {
   external mln_geometry_collection geometry_collection;
 }
 
-/// MapLibre geometry input descriptor graph.
-///
-/// Geometry coordinates use mln_lat_lng for consistency with the rest of the C
-/// API. They are converted to native geometry points as longitude/latitude.
-/// A root geometry descriptor starts at nesting depth 0. Status-returning
-/// functions reject geometry collection children past depth 64 with
-/// MLN_STATUS_INVALID_ARGUMENT.
 final class mln_geometry extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_geometry_type.
   @ffi.Uint32()
   external int type;
 
   external UnnamedUnion$2 data;
 }
 
-/// Geometry variant tags used by mln_geometry.
 enum mln_geometry_type {
   MLN_GEOMETRY_TYPE_EMPTY(0),
   MLN_GEOMETRY_TYPE_POINT(1),
@@ -9191,7 +6914,6 @@ enum mln_geometry_type {
   };
 }
 
-/// JSON-like value variant tags used by mln_json_value.
 enum mln_json_value_type {
   MLN_JSON_VALUE_TYPE_NULL(0),
   MLN_JSON_VALUE_TYPE_BOOL(1),
@@ -9218,7 +6940,6 @@ enum mln_json_value_type {
   };
 }
 
-/// Optional fields for mln_feature_state_selector.
 enum mln_feature_state_selector_field {
   MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID(1),
   MLN_FEATURE_STATE_SELECTOR_FEATURE_ID(2),
@@ -9238,7 +6959,6 @@ enum mln_feature_state_selector_field {
       };
 }
 
-/// Feature-state source, feature, and key selector.
 final class mln_feature_state_selector extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9246,20 +6966,15 @@ final class mln_feature_state_selector extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Source ID. Required and borrowed for the duration of the call.
   external mln_string_view source_id;
 
-  /// Optional source layer ID. Required for vector-source disambiguation.
   external mln_string_view source_layer_id;
 
-  /// Optional feature ID string. Required by set/get and optional for remove.
   external mln_string_view feature_id;
 
-  /// Optional state key. Used only by remove and requires feature_id.
   external mln_string_view state_key;
 }
 
-/// Feature identifier variant tags used by mln_feature.
 enum mln_feature_identifier_type {
   MLN_FEATURE_IDENTIFIER_TYPE_NULL(0),
   MLN_FEATURE_IDENTIFIER_TYPE_UINT(1),
@@ -9295,29 +7010,23 @@ final class UnnamedUnion$3 extends ffi.Union {
   external mln_string_view string_value;
 }
 
-/// GeoJSON feature input descriptor graph.
 final class mln_feature extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Geometry descriptor. Must not be null. Use MLN_GEOMETRY_TYPE_EMPTY for an
-  /// empty geometry.
   external ffi.Pointer<mln_geometry> geometry;
 
-  /// Property member views. May be null only when property_count is 0.
   external ffi.Pointer<mln_json_member> properties;
 
   @ffi.Size()
   external int property_count;
 
-  /// One of mln_feature_identifier_type.
   @ffi.Uint32()
   external int identifier_type;
 
   external UnnamedUnion$3 identifier;
 }
 
-/// GeoJSON variant tags used by mln_geojson.
 enum mln_geojson_type {
   MLN_GEOJSON_TYPE_GEOMETRY(1),
   MLN_GEOJSON_TYPE_FEATURE(2),
@@ -9334,9 +7043,7 @@ enum mln_geojson_type {
   };
 }
 
-/// Feature collection view.
 final class mln_feature_collection extends ffi.Struct {
-  /// Features. Null only when feature_count is 0.
   external ffi.Pointer<mln_feature> features;
 
   @ffi.Size()
@@ -9344,39 +7051,29 @@ final class mln_feature_collection extends ffi.Struct {
 }
 
 final class UnnamedUnion$4 extends ffi.Union {
-  /// Geometry descriptor selected by MLN_GEOJSON_TYPE_GEOMETRY. Must not be
-  /// null.
   external ffi.Pointer<mln_geometry> geometry;
 
-  /// Feature descriptor selected by MLN_GEOJSON_TYPE_FEATURE. Must not be
-  /// null.
   external ffi.Pointer<mln_feature> feature;
 
   external mln_feature_collection feature_collection;
 }
 
-/// GeoJSON geometry, feature, or feature collection input descriptor graph.
-/// Nested geometry and property descriptors share the 64-depth descriptor limit
-/// documented on mln_geometry and mln_json_value.
 final class mln_geojson extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_geojson_type.
   @ffi.Uint32()
   external int type;
 
   external UnnamedUnion$4 data;
 }
 
-/// Geographic bounds in degrees.
 final class mln_lat_lng_bounds extends ffi.Struct {
   external mln_lat_lng southwest;
 
   external mln_lat_lng northeast;
 }
 
-/// Optional map camera constraint fields.
 final class mln_bound_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9399,12 +7096,10 @@ final class mln_bound_options extends ffi.Struct {
   external double max_pitch;
 }
 
-/// Tile-pyramid offline region definition.
 final class mln_offline_tile_pyramid_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Style URL. Copied during region creation.
   external ffi.Pointer<ffi.Char> style_url;
 
   external mln_lat_lng_bounds bounds;
@@ -9412,8 +7107,6 @@ final class mln_offline_tile_pyramid_region_definition extends ffi.Struct {
   @ffi.Double()
   external double min_zoom;
 
-  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-  /// each tile source use its own maximum zoom.
   @ffi.Double()
   external double max_zoom;
 
@@ -9424,22 +7117,17 @@ final class mln_offline_tile_pyramid_region_definition extends ffi.Struct {
   external bool include_ideographs;
 }
 
-/// Geometry offline region definition.
 final class mln_offline_geometry_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Style URL. Copied during region creation.
   external ffi.Pointer<ffi.Char> style_url;
 
-  /// Geometry descriptor. Borrowed for the duration of region creation.
   external ffi.Pointer<mln_geometry> geometry;
 
   @ffi.Double()
   external double min_zoom;
 
-  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
-  /// each tile source use its own maximum zoom.
   @ffi.Double()
   external double max_zoom;
 
@@ -9456,19 +7144,16 @@ final class UnnamedUnion$5 extends ffi.Union {
   external mln_offline_geometry_region_definition geometry;
 }
 
-/// Tagged offline region definition.
 final class mln_offline_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_offline_region_definition_type.
   @ffi.Uint32()
   external int type;
 
   external UnnamedUnion$5 data;
 }
 
-/// Region data view returned from a snapshot or list handle.
 final class mln_offline_region_info extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9478,31 +7163,20 @@ final class mln_offline_region_info extends ffi.Struct {
 
   external mln_offline_region_definition definition;
 
-  /// Metadata bytes. Valid until the owner snapshot/list is destroyed.
   external ffi.Pointer<ffi.Uint8> metadata;
 
   @ffi.Size()
   external int metadata_size;
 }
 
-/// Lower-level Spherical Mercator projected-meter coordinate.
-///
-/// Map coordinate conversion APIs use mln_lat_lng. This type is only for
-/// Mercator helper functions.
 final class mln_projected_meters extends ffi.Struct {
-  /// Distance measured northward from the equator, in meters.
   @ffi.Double()
   external double northing;
 
-  /// Distance measured eastward from the prime meridian, in meters.
   @ffi.Double()
   external double easting;
 }
 
-/// MapLibre axonometric rendering options used for snapshots and commands.
-///
-/// MapLibre Native names this native type ProjectionMode. It controls the live
-/// map render transform, not the geographic coordinate model.
 final class mln_projection_mode extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9510,20 +7184,16 @@ final class mln_projection_mode extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Enables a non-perspective axonometric render transform.
   @ffi.Bool()
   external bool axonometric;
 
-  /// Native x-skew factor used by the axonometric transform.
   @ffi.Double()
   external double x_skew;
 
-  /// Native y-skew factor used by the axonometric transform.
   @ffi.Double()
   external double y_skew;
 }
 
-/// Live map viewport and render-transform controls.
 final class mln_map_viewport_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9531,22 +7201,18 @@ final class mln_map_viewport_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// One of mln_north_orientation.
   @ffi.Uint32()
   external int north_orientation;
 
-  /// One of mln_constrain_mode.
   @ffi.Uint32()
   external int constrain_mode;
 
-  /// One of mln_viewport_mode.
   @ffi.Uint32()
   external int viewport_mode;
 
   external mln_edge_insets frustum_offset;
 }
 
-/// Tile prefetch and LOD tuning controls.
 final class mln_map_tile_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9554,7 +7220,6 @@ final class mln_map_tile_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Native uint8_t prefetch zoom delta.
   @ffi.Uint32()
   external int prefetch_zoom_delta;
 
@@ -9570,12 +7235,10 @@ final class mln_map_tile_options extends ffi.Struct {
   @ffi.Double()
   external double lod_zoom_shift;
 
-  /// One of mln_tile_lod_mode.
   @ffi.Uint32()
   external int lod_mode;
 }
 
-/// Log severity values emitted by MapLibre Native.
 enum mln_log_severity {
   MLN_LOG_SEVERITY_INFO(1),
   MLN_LOG_SEVERITY_WARNING(2),
@@ -9592,7 +7255,6 @@ enum mln_log_severity {
   };
 }
 
-/// Bitmask values for log severities dispatched asynchronously.
 enum mln_log_severity_mask {
   MLN_LOG_SEVERITY_MASK_INFO(2),
   MLN_LOG_SEVERITY_MASK_WARNING(4),
@@ -9613,7 +7275,6 @@ enum mln_log_severity_mask {
   };
 }
 
-/// Log event categories emitted by MapLibre Native.
 enum mln_log_event {
   MLN_LOG_EVENT_GENERAL(0),
   MLN_LOG_EVENT_SETUP(1),
@@ -9674,12 +7335,6 @@ typedef Dartmln_log_callbackFunction =
       int code,
       ffi.Pointer<ffi.Char> message,
     );
-
-/// Receives a MapLibre Native log record.
-///
-/// The message pointer is borrowed for the callback duration. Returning non-zero
-/// consumes the record. Returning zero lets MapLibre Native's platform logger
-/// handle it.
 typedef mln_log_callback =
     ffi.Pointer<ffi.NativeFunction<mln_log_callbackFunction>>;
 
@@ -9687,7 +7342,6 @@ final class mln_feature_query_result extends ffi.Opaque {}
 
 final class mln_feature_extension_result extends ffi.Opaque {}
 
-/// Rendered feature query geometry variants.
 enum mln_rendered_query_geometry_type {
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT(1),
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX(2),
@@ -9707,16 +7361,13 @@ enum mln_rendered_query_geometry_type {
       };
 }
 
-/// Screen-space box in logical map pixels.
 final class mln_screen_box extends ffi.Struct {
   external mln_screen_point min;
 
   external mln_screen_point max;
 }
 
-/// Screen-space line string in logical map pixels.
 final class mln_screen_line_string extends ffi.Struct {
-  /// Points. Null only when point_count is 0.
   external ffi.Pointer<mln_screen_point> points;
 
   @ffi.Size()
@@ -9731,19 +7382,16 @@ final class UnnamedUnion$6 extends ffi.Union {
   external mln_screen_line_string line_string;
 }
 
-/// Rendered feature query geometry descriptor.
 final class mln_rendered_query_geometry extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_rendered_query_geometry_type.
   @ffi.Uint32()
   external int type;
 
   external UnnamedUnion$6 data;
 }
 
-/// Optional fields for mln_rendered_feature_query_options.
 enum mln_rendered_feature_query_option_field {
   MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS(1);
 
@@ -9759,7 +7407,6 @@ enum mln_rendered_feature_query_option_field {
       };
 }
 
-/// Options for rendered feature queries.
 final class mln_rendered_feature_query_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9767,17 +7414,14 @@ final class mln_rendered_feature_query_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Optional style layer IDs. When absent, all rendered layers are queried.
   external ffi.Pointer<mln_string_view> layer_ids;
 
   @ffi.Size()
   external int layer_id_count;
 
-  /// Optional MapLibre style-spec filter JSON. Null means no filter.
   external ffi.Pointer<mln_json_value> filter;
 }
 
-/// Optional fields for mln_source_feature_query_options.
 enum mln_source_feature_query_option_field {
   MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS(1);
 
@@ -9793,7 +7437,6 @@ enum mln_source_feature_query_option_field {
       };
 }
 
-/// Options for source feature queries.
 final class mln_source_feature_query_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9801,17 +7444,14 @@ final class mln_source_feature_query_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   external ffi.Pointer<mln_string_view> source_layer_ids;
 
   @ffi.Size()
   external int source_layer_id_count;
 
-  /// Optional MapLibre style-spec filter JSON. Null means no filter.
   external ffi.Pointer<mln_json_value> filter;
 }
 
-/// Optional fields returned by mln_queried_feature.
 enum mln_queried_feature_field {
   MLN_QUERIED_FEATURE_SOURCE_ID(1),
   MLN_QUERIED_FEATURE_SOURCE_LAYER_ID(2),
@@ -9830,7 +7470,6 @@ enum mln_queried_feature_field {
   };
 }
 
-/// One copied query result feature.
 final class mln_queried_feature extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -9838,20 +7477,15 @@ final class mln_queried_feature extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// GeoJSON feature descriptor. Nested pointers are result-owned.
   external mln_feature feature;
 
-  /// Native render source ID when available.
   external mln_string_view source_id;
 
-  /// Native source layer ID when available.
   external mln_string_view source_layer_id;
 
-  /// Rendered feature state when available.
   external ffi.Pointer<mln_json_value> state;
 }
 
-/// Feature extension query result variants.
 enum mln_feature_extension_result_type {
   MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE(1),
   MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION(2);
@@ -9870,79 +7504,60 @@ enum mln_feature_extension_result_type {
 }
 
 final class UnnamedUnion extends ffi.Union {
-  /// JSON-like value view selected by
-  /// MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE.
   external ffi.Pointer<mln_json_value> value;
 
-  /// Feature collection view selected by
-  /// MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION.
   external mln_feature_collection feature_collection;
 }
 
-/// Tagged feature extension query result view.
 final class mln_feature_extension_result_info extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_feature_extension_result_type.
   @ffi.Uint32()
   external int type;
 
   external UnnamedUnion data;
 }
 
-/// Logical render target extent in UI pixels.
 final class mln_render_target_extent extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical map width in UI pixels.
   @ffi.Uint32()
   external int width;
 
-  /// Logical map height in UI pixels.
   @ffi.Uint32()
   external int height;
 
-  /// UI-to-device pixel scale. Must be positive and finite.
   @ffi.Double()
   external double scale_factor;
 }
 
-/// Metal backend context fields shared by Metal render targets.
 final class mln_metal_context_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// id<MTLDevice> / MTL::Device*. Retained when the target requires it.
   external ffi.Pointer<ffi.Void> device;
 }
 
-/// Vulkan backend context fields shared by Vulkan render targets.
 final class mln_vulkan_context_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Borrowed VkInstance. Required.
   external ffi.Pointer<ffi.Void> instance;
 
-  /// Borrowed VkPhysicalDevice. Required.
   external ffi.Pointer<ffi.Void> physical_device;
 
-  /// Borrowed VkDevice. Required.
   external ffi.Pointer<ffi.Void> device;
 
-  /// Borrowed graphics VkQueue. Required.
   external ffi.Pointer<ffi.Void> graphics_queue;
 
-  /// Queue family index for graphics_queue. Must support graphics commands.
   @ffi.Uint32()
   external int graphics_queue_family_index;
 }
 
 final class mln_style_id_list extends ffi.Opaque {}
 
-/// Style source type values returned by mln_map_get_style_source_type().
 enum mln_style_source_type {
   MLN_STYLE_SOURCE_TYPE_UNKNOWN(0),
   MLN_STYLE_SOURCE_TYPE_VECTOR(1),
@@ -9971,7 +7586,6 @@ enum mln_style_source_type {
   };
 }
 
-/// Field mask values for mln_style_tile_source_options.
 enum mln_style_tile_source_option_field {
   MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM(1),
   MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM(2),
@@ -10001,7 +7615,6 @@ enum mln_style_tile_source_option_field {
       };
 }
 
-/// Tile URL coordinate scheme values used by mln_style_tile_source_options.
 enum mln_style_tile_scheme {
   MLN_STYLE_TILE_SCHEME_XYZ(0),
   MLN_STYLE_TILE_SCHEME_TMS(1);
@@ -10016,7 +7629,6 @@ enum mln_style_tile_scheme {
   };
 }
 
-/// Vector tile encoding values used by mln_style_tile_source_options.
 enum mln_style_vector_tile_encoding {
   MLN_STYLE_VECTOR_TILE_ENCODING_MVT(0),
   MLN_STYLE_VECTOR_TILE_ENCODING_MLT(1);
@@ -10033,7 +7645,6 @@ enum mln_style_vector_tile_encoding {
   };
 }
 
-/// DEM raster encoding values used by mln_style_tile_source_options.
 enum mln_style_raster_dem_encoding {
   MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX(0),
   MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM(1);
@@ -10050,7 +7661,6 @@ enum mln_style_raster_dem_encoding {
   };
 }
 
-/// Field mask values for mln_custom_geometry_source_options.
 enum mln_custom_geometry_source_option_field {
   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM(1),
   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM(2),
@@ -10078,7 +7688,6 @@ enum mln_custom_geometry_source_option_field {
       };
 }
 
-/// Field mask values for mln_style_image_options.
 enum mln_style_image_option_field {
   MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO(1),
   MLN_STYLE_IMAGE_OPTION_SDF(2);
@@ -10095,7 +7704,6 @@ enum mln_style_image_option_field {
   };
 }
 
-/// Location indicator image-name properties.
 enum mln_location_indicator_image_kind {
   MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP(0),
   MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING(1),
@@ -10115,16 +7723,13 @@ enum mln_location_indicator_image_kind {
       };
 }
 
-/// Fixed source metadata returned by mln_map_get_style_source_info().
 final class mln_style_source_info extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// One of mln_style_source_type.
   @ffi.Uint32()
   external int type;
 
-  /// Source ID byte length, excluding any null terminator.
   @ffi.Size()
   external int id_size;
 
@@ -10134,12 +7739,10 @@ final class mln_style_source_info extends ffi.Struct {
   @ffi.Bool()
   external bool has_attribution;
 
-  /// Attribution byte length, excluding any null terminator.
   @ffi.Size()
   external int attribution_size;
 }
 
-/// Options for vector and raster tile sources.
 final class mln_style_tile_source_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -10155,26 +7758,21 @@ final class mln_style_tile_source_options extends ffi.Struct {
 
   external mln_string_view attribution;
 
-  /// One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ.
   @ffi.Uint32()
   external int scheme;
 
   external mln_lat_lng_bounds bounds;
 
-  /// Raster tile size in pixels. Defaults to 512.
   @ffi.Uint32()
   external int tile_size;
 
-  /// One of mln_style_vector_tile_encoding. Defaults to MVT.
   @ffi.Uint32()
   external int vector_encoding;
 
-  /// One of mln_style_raster_dem_encoding. Defaults to Mapbox.
   @ffi.Uint32()
   external int raster_encoding;
 }
 
-/// Canonical tile identity used by custom geometry source callbacks.
 final class mln_canonical_tile_id extends ffi.Struct {
   @ffi.Uint32()
   external int z;
@@ -10196,14 +7794,11 @@ typedef Dartmln_custom_geometry_source_tile_callbackFunction =
       ffi.Pointer<ffi.Void> user_data,
       mln_canonical_tile_id tile_id,
     );
-
-/// Callback invoked for custom geometry source tile requests and cancels.
 typedef mln_custom_geometry_source_tile_callback =
     ffi.Pointer<
       ffi.NativeFunction<mln_custom_geometry_source_tile_callbackFunction>
     >;
 
-/// Options for custom geometry sources.
 final class mln_custom_geometry_source_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -10211,13 +7806,10 @@ final class mln_custom_geometry_source_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Required tile fetch callback.
   external mln_custom_geometry_source_tile_callback fetch_tile;
 
-  /// Optional best-effort tile cancel callback.
   external mln_custom_geometry_source_tile_callback cancel_tile;
 
-  /// Caller-owned callback context retained by pointer.
   external ffi.Pointer<ffi.Void> user_data;
 
   @ffi.Double()
@@ -10242,7 +7834,6 @@ final class mln_custom_geometry_source_options extends ffi.Struct {
   external bool wrap;
 }
 
-/// Caller-owned premultiplied RGBA8 image pixels.
 final class mln_premultiplied_rgba8_image extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -10253,19 +7844,15 @@ final class mln_premultiplied_rgba8_image extends ffi.Struct {
   @ffi.Uint32()
   external int height;
 
-  /// Bytes per image row. Must be at least width * 4.
   @ffi.Uint32()
   external int stride;
 
-  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
   external ffi.Pointer<ffi.Uint8> pixels;
 
-  /// Available bytes at pixels.
   @ffi.Size()
   external int byte_length;
 }
 
-/// Options for runtime style images.
 final class mln_style_image_options extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -10273,16 +7860,13 @@ final class mln_style_image_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  /// Sprite pixel ratio. Defaults to 1.
   @ffi.Float()
   external double pixel_ratio;
 
-  /// Whether the image is a signed distance field icon. Defaults to false.
   @ffi.Bool()
   external bool sdf;
 }
 
-/// Fixed metadata for one runtime style image.
 final class mln_style_image_info extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -10293,7 +7877,6 @@ final class mln_style_image_info extends ffi.Struct {
   @ffi.Uint32()
   external int height;
 
-  /// Native copied images are exposed as tightly packed premultiplied RGBA8.
   @ffi.Uint32()
   external int stride;
 
@@ -10307,215 +7890,286 @@ final class mln_style_image_info extends ffi.Struct {
   external bool sdf;
 }
 
-/// Metal native surface session attachment options.
 final class mln_metal_surface_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical surface extent.
   external mln_render_target_extent extent;
 
-  /// Metal backend context. device is optional for Metal surfaces.
   external mln_metal_context_descriptor context;
 
-  /// CAMetalLayer* / CA::MetalLayer* retained by the session. Required.
   external ffi.Pointer<ffi.Void> layer;
 }
 
-/// Vulkan native surface session attachment options.
 final class mln_vulkan_surface_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical surface extent.
   external mln_render_target_extent extent;
 
-  /// Borrowed Vulkan context. All handles are required. The device must support
-  /// VK_KHR_swapchain, and the queue family must support graphics and
-  /// presentation to this descriptor's surface.
   external mln_vulkan_context_descriptor context;
 
-  /// Borrowed VkSurfaceKHR. Required.
   external ffi.Pointer<ffi.Void> surface;
 }
 
-/// Metal texture session attachment options for a session-owned target.
 final class mln_metal_owned_texture_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical texture extent.
   external mln_render_target_extent extent;
 
-  /// Metal backend context. device is required.
   external mln_metal_context_descriptor context;
 }
 
-/// Metal caller-owned texture session attachment options.
 final class mln_metal_borrowed_texture_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical texture extent.
   external mln_render_target_extent extent;
 
-  /// Borrowed id<MTLTexture> / MTL::Texture*. Required.
-  ///
-  /// The texture's physical pixel dimensions must match extent, and the texture
-  /// must allow render-target usage. The caller owns the texture and must keep
-  /// it valid until detach or destroy.
   external ffi.Pointer<ffi.Void> texture;
 }
 
-/// Metal frame acquired from a session-owned texture target.
 final class mln_metal_owned_texture_frame extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Session generation that produced this frame.
   @ffi.Uint64()
   external int generation;
 
-  /// Physical Metal texture width in device pixels.
   @ffi.Uint32()
   external int width;
 
-  /// Physical Metal texture height in device pixels.
   @ffi.Uint32()
   external int height;
 
-  /// UI-to-device pixel scale used for this frame.
   @ffi.Double()
   external double scale_factor;
 
-  /// Opaque frame identity used to reject stale releases.
   @ffi.Uint64()
   external int frame_id;
 
-  /// Borrowed id<MTLTexture> / MTL::Texture*. Valid until frame release.
   external ffi.Pointer<ffi.Void> texture;
 
-  /// Borrowed id<MTLDevice> / MTL::Device*. Valid until frame release.
   external ffi.Pointer<ffi.Void> device;
 
-  /// Backend-native pixel format value. Metal uses MTLPixelFormat.
   @ffi.Uint64()
   external int pixel_format;
 }
 
-/// Vulkan texture session attachment options for a session-owned target.
 final class mln_vulkan_owned_texture_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical texture extent.
   external mln_render_target_extent extent;
 
-  /// Borrowed Vulkan context. All handles are required.
   external mln_vulkan_context_descriptor context;
 }
 
-/// Vulkan caller-owned texture session attachment options.
 final class mln_vulkan_borrowed_texture_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Logical texture extent.
   external mln_render_target_extent extent;
 
-  /// Borrowed Vulkan context. All handles are required.
   external mln_vulkan_context_descriptor context;
 
-  /// Borrowed VkImage. Required.
-  ///
-  /// The image must be a 2D, single-sample color image with
-  /// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT. Its physical dimensions must match
-  /// extent. Include VK_IMAGE_USAGE_SAMPLED_BIT when the host will sample from
-  /// the image after rendering.
   external ffi.Pointer<ffi.Void> image;
 
-  /// Borrowed VkImageView for image. Required.
-  ///
-  /// The view must be a 2D color view that matches image and format.
   external ffi.Pointer<ffi.Void> image_view;
 
-  /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
   @ffi.Uint32()
   external int format;
 
-  /// Backend-native VkImageLayout value expected at render-pass begin.
-  ///
-  /// Use VK_IMAGE_LAYOUT_UNDEFINED when the previous image contents may be
-  /// discarded.
   @ffi.Uint32()
   external int initial_layout;
 
-  /// Backend-native VkImageLayout value left after rendering succeeds.
   @ffi.Uint32()
   external int final_layout;
 }
 
-/// Vulkan frame acquired from a session-owned texture target.
 final class mln_vulkan_owned_texture_frame extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Session generation that produced this frame.
   @ffi.Uint64()
   external int generation;
 
-  /// Physical Vulkan image width in device pixels.
   @ffi.Uint32()
   external int width;
 
-  /// Physical Vulkan image height in device pixels.
   @ffi.Uint32()
   external int height;
 
-  /// UI-to-device pixel scale used for this frame.
   @ffi.Double()
   external double scale_factor;
 
-  /// Opaque frame identity used to reject stale releases.
   @ffi.Uint64()
   external int frame_id;
 
-  /// Borrowed VkImage. Valid until frame release.
   external ffi.Pointer<ffi.Void> image;
 
-  /// Borrowed VkImageView. Valid until frame release.
   external ffi.Pointer<ffi.Void> image_view;
 
-  /// Borrowed VkDevice. Valid until frame release.
   external ffi.Pointer<ffi.Void> device;
 
-  /// Backend-native VkFormat value.
   @ffi.Uint32()
   external int format;
 
-  /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
   @ffi.Uint32()
   external int layout;
 }
 
-/// CPU image readback metadata for a texture session frame.
 final class mln_texture_image_info extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  /// Physical image width in device pixels.
   @ffi.Uint32()
   external int width;
 
-  /// Physical image height in device pixels.
   @ffi.Uint32()
   external int height;
 
-  /// Bytes per image row.
   @ffi.Uint32()
   external int stride;
 
-  /// Required output buffer byte length.
   @ffi.Size()
   external int byte_length;
+}
+
+final class mln_dart_resource_rewrite_rule extends ffi.Struct {
+  @ffi.Uint32()
+  external int kind;
+
+  external ffi.Pointer<ffi.Char> url;
+
+  external ffi.Pointer<ffi.Char> replacement_url;
+}
+
+final class mln_dart_resource_rewrite_rules extends ffi.Struct {
+  external ffi.Pointer<mln_dart_resource_rewrite_rule> rules;
+
+  @ffi.Size()
+  external int count;
+}
+
+final class mln_dart_resource_provider_rule extends ffi.Struct {
+  @ffi.Uint32()
+  external int kind;
+
+  external ffi.Pointer<ffi.Char> url;
+
+  external mln_resource_response response;
+}
+
+final class mln_dart_resource_provider_rules extends ffi.Struct {
+  external ffi.Pointer<mln_dart_resource_provider_rule> rules;
+
+  @ffi.Size()
+  external int count;
+}
+
+final class mln_dart_queued_resource_provider_route extends ffi.Struct {
+  @ffi.Uint32()
+  external int kind;
+
+  external ffi.Pointer<ffi.Char> url;
+}
+
+typedef mln_dart_queued_resource_request_listenerFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> request);
+typedef Dartmln_dart_queued_resource_request_listenerFunction =
+    void Function(ffi.Pointer<ffi.Void> request);
+typedef mln_dart_queued_resource_request_listener =
+    ffi.Pointer<
+      ffi.NativeFunction<mln_dart_queued_resource_request_listenerFunction>
+    >;
+
+final class mln_dart_queued_resource_provider extends ffi.Struct {
+  external ffi.Pointer<mln_dart_queued_resource_provider_route> routes;
+
+  @ffi.Size()
+  external int route_count;
+
+  external mln_dart_queued_resource_request_listener listener;
+}
+
+final class mln_dart_queued_resource_request extends ffi.Struct {
+  external ffi.Pointer<ffi.Void> owner;
+
+  external ffi.Pointer<mln_resource_request_handle> handle;
+
+  external ffi.Pointer<ffi.Char> url;
+
+  @ffi.Uint32()
+  external int kind;
+
+  @ffi.Uint32()
+  external int loading_method;
+
+  @ffi.Uint32()
+  external int priority;
+
+  @ffi.Uint32()
+  external int usage;
+
+  @ffi.Uint32()
+  external int storage_policy;
+
+  @ffi.Bool()
+  external bool has_range;
+
+  @ffi.Uint64()
+  external int range_start;
+
+  @ffi.Uint64()
+  external int range_end;
+
+  @ffi.Bool()
+  external bool has_prior_modified;
+
+  @ffi.Int64()
+  external int prior_modified_unix_ms;
+
+  @ffi.Bool()
+  external bool has_prior_expires;
+
+  @ffi.Int64()
+  external int prior_expires_unix_ms;
+
+  external ffi.Pointer<ffi.Char> prior_etag;
+
+  external ffi.Pointer<ffi.Uint8> prior_data;
+
+  @ffi.Size()
+  external int prior_data_size;
+}
+
+typedef mln_dart_log_record_listenerFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> record);
+typedef Dartmln_dart_log_record_listenerFunction =
+    void Function(ffi.Pointer<ffi.Void> record);
+typedef mln_dart_log_record_listener =
+    ffi.Pointer<ffi.NativeFunction<mln_dart_log_record_listenerFunction>>;
+
+final class mln_dart_log_callback_state extends ffi.Struct {
+  external mln_dart_log_record_listener listener;
+
+  @ffi.Uint32()
+  external int consume;
+}
+
+final class mln_dart_log_record extends ffi.Struct {
+  external ffi.Pointer<ffi.Void> owner;
+
+  @ffi.Uint32()
+  external int severity;
+
+  @ffi.Uint32()
+  external int event;
+
+  @ffi.Int64()
+  external int code;
+
+  external ffi.Pointer<ffi.Char> message;
 }
