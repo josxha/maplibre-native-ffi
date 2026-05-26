@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from ._lifecycle import warn_unclosed as _warn_unclosed
+from ._enum import UnknownIntEnum
+from ._lifecycle import NativeHandleMixin
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import IntEnum
-from types import TracebackType
 from typing import Any
 import weakref
 
@@ -13,34 +13,14 @@ from . import _native
 from .resource import ResourceProviderCallback, ResourceTransformCallback
 
 
-class NetworkStatus(IntEnum):
+class NetworkStatus(UnknownIntEnum):
     """Process-global network reachability state."""
 
     ONLINE = 1
     OFFLINE = 2
 
-    @classmethod
-    def _missing_(cls, value: object) -> "NetworkStatus | None":
-        if not isinstance(value, int) or value < 0:
-            return None
 
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this network status."""
-        return int(self)
-
-    @property
-    def is_unknown(self) -> bool:
-        """Return whether this value preserves an unknown native status."""
-        return self.name.startswith("UNKNOWN_")
-
-
-class RuntimeEventType(IntEnum):
+class RuntimeEventType(UnknownIntEnum):
     """Runtime event type values reported by the C API."""
 
     MAP_CAMERA_WILL_CHANGE = 1
@@ -66,66 +46,22 @@ class RuntimeEventType(IntEnum):
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
     OFFLINE_OPERATION_COMPLETED = 22
 
-    @classmethod
-    def _missing_(cls, value: object) -> "RuntimeEventType | None":
-        if not isinstance(value, int) or value < 0:
-            return None
 
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this runtime event type."""
-        return int(self)
-
-    @property
-    def is_unknown(self) -> bool:
-        """Return whether this value preserves an unknown native event type."""
-        return self.name.startswith("UNKNOWN_")
-
-
-class RuntimeEventSourceType(IntEnum):
+class RuntimeEventSourceType(UnknownIntEnum):
     """Runtime event source kind values reported by the C API."""
 
     RUNTIME = 0
     MAP = 1
 
-    @classmethod
-    def _missing_(cls, value: object) -> "RuntimeEventSourceType | None":
-        if not isinstance(value, int) or value < 0:
-            return None
 
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-
-class RenderMode(IntEnum):
+class RenderMode(UnknownIntEnum):
     """Render modes reported by runtime render events."""
 
     PARTIAL = 0
     FULL = 1
 
-    @classmethod
-    def _missing_(cls, value: object) -> "RenderMode | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this render mode."""
-        return int(self)
-
-
-class TileOperation(IntEnum):
+class TileOperation(UnknownIntEnum):
     """Tile operations reported by runtime tile events."""
 
     REQUESTED_FROM_CACHE = 0
@@ -137,20 +73,6 @@ class TileOperation(IntEnum):
     ERROR = 6
     CANCELLED = 7
     NULL = 8
-
-    @classmethod
-    def _missing_(cls, value: object) -> "TileOperation | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this tile operation."""
-        return int(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,8 +225,10 @@ class RuntimeOptions:
     maximum_cache_size: int | None = None
 
 
-class RuntimeHandle:
+class RuntimeHandle(NativeHandleMixin):
     """Owner-thread runtime handle."""
+
+    _handle_name = "RuntimeHandle"
 
     def __init__(self, options: RuntimeOptions | None = None) -> None:
         options = options or RuntimeOptions()
@@ -316,11 +240,6 @@ class RuntimeHandle:
         self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
             weakref.WeakSet()
         )
-
-    @property
-    def closed(self) -> bool:
-        """Return whether this handle has been closed."""
-        return bool(self._native.closed)
 
     def close(self) -> None:
         """Release this runtime handle exactly once."""
@@ -337,63 +256,53 @@ class RuntimeHandle:
         for operation in tuple(self._offline_operations):
             operation._mark_runtime_closed()  # noqa: SLF001
 
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("RuntimeHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
-
     def run_once(self) -> None:
         """Run one pending owner-thread task for this runtime."""
         self._native.run_once()
+
+    def _offline_operation(
+        self, start: Callable[..., int], *args: object
+    ) -> OfflineOperationHandle:
+        from .offline import OfflineOperationHandle
+
+        return OfflineOperationHandle(self, start(*args))
 
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
     ) -> OfflineOperationHandle:
         """Start an ambient cache maintenance operation."""
-        from .offline import AmbientCacheOperation, OfflineOperationHandle
+        from .offline import AmbientCacheOperation
 
-        operation_id = self._native.run_ambient_cache_operation_start(
-            AmbientCacheOperation(operation).native_code
+        return self._offline_operation(
+            self._native.run_ambient_cache_operation_start,
+            AmbientCacheOperation(operation).native_code,
         )
-        return OfflineOperationHandle(self, operation_id)
 
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: bytes = b""
     ) -> OfflineOperationHandle:
         """Start creating an offline region."""
-        from .offline import OfflineOperationHandle, _definition_to_native_wire
-
-        operation_id = self._native.offline_region_create_start(
-            _definition_to_native_wire(definition),
+        return self._offline_operation(
+            self._native.offline_region_create_start,
+            definition,
             metadata,
         )
-        return OfflineOperationHandle(self, operation_id)
 
     def get_offline_region(self, region_id: int) -> OfflineOperationHandle:
         """Start getting an offline region snapshot by ID."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_get_start(region_id),
-        )
+        return self._offline_operation(self._native.offline_region_get_start, region_id)
 
     def list_offline_regions(self) -> OfflineOperationHandle:
         """Start listing offline region snapshots."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(self, self._native.offline_regions_list_start())
+        return self._offline_operation(self._native.offline_regions_list_start)
 
     def merge_offline_regions_database(
         self, side_database_path: str
     ) -> OfflineOperationHandle:
         """Start merging offline regions from another database path."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_regions_merge_database_start(side_database_path),
+        return self._offline_operation(
+            self._native.offline_regions_merge_database_start,
+            side_database_path,
         )
 
     def update_offline_region_metadata(
@@ -402,31 +311,26 @@ class RuntimeHandle:
         metadata: bytes,
     ) -> OfflineOperationHandle:
         """Start updating opaque binary metadata for an offline region."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_update_metadata_start(region_id, metadata),
+        return self._offline_operation(
+            self._native.offline_region_update_metadata_start,
+            region_id,
+            metadata,
         )
 
     def get_offline_region_status(self, region_id: int) -> OfflineOperationHandle:
         """Start getting completed/download status for an offline region."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_get_status_start(region_id),
+        return self._offline_operation(
+            self._native.offline_region_get_status_start, region_id
         )
 
     def set_offline_region_observed(
         self, region_id: int, observed: bool
     ) -> OfflineOperationHandle:
         """Start enabling or disabling runtime events for an offline region."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_set_observed_start(region_id, observed),
+        return self._offline_operation(
+            self._native.offline_region_set_observed_start,
+            region_id,
+            observed,
         )
 
     def set_offline_region_download_state(
@@ -435,32 +339,24 @@ class RuntimeHandle:
         state: OfflineRegionDownloadState,
     ) -> OfflineOperationHandle:
         """Start setting an offline region's native download state."""
-        from .offline import OfflineOperationHandle, OfflineRegionDownloadState
+        from .offline import OfflineRegionDownloadState
 
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_set_download_state_start(
-                region_id,
-                OfflineRegionDownloadState(state).native_code_for_set(),
-            ),
+        return self._offline_operation(
+            self._native.offline_region_set_download_state_start,
+            region_id,
+            OfflineRegionDownloadState(state).native_code_for_set(),
         )
 
     def invalidate_offline_region(self, region_id: int) -> OfflineOperationHandle:
         """Start invalidating cached resources for an offline region."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_invalidate_start(region_id),
+        return self._offline_operation(
+            self._native.offline_region_invalidate_start, region_id
         )
 
     def delete_offline_region(self, region_id: int) -> OfflineOperationHandle:
         """Start deleting an offline region."""
-        from .offline import OfflineOperationHandle
-
-        return OfflineOperationHandle(
-            self,
-            self._native.offline_region_delete_start(region_id),
+        return self._offline_operation(
+            self._native.offline_region_delete_start, region_id
         )
 
     def set_resource_transform(
@@ -507,17 +403,6 @@ class RuntimeHandle:
         from .map import MapHandle
 
         return MapHandle(self, options)
-
-    def __enter__(self) -> "RuntimeHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
 
 
 __all__ = [

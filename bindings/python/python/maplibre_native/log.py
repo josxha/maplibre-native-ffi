@@ -2,33 +2,20 @@
 
 from __future__ import annotations
 
+from ._enum import UnknownIntEnum
 from dataclasses import dataclass
-from enum import IntEnum, IntFlag
+from enum import IntFlag
 from typing import Any
 
 from . import _native
 
 
-class LogSeverity(IntEnum):
+class LogSeverity(UnknownIntEnum):
     """Log severity values emitted by MapLibre Native."""
 
     INFO = 1
     WARNING = 2
     ERROR = 3
-
-    @classmethod
-    def _missing_(cls, value: object) -> "LogSeverity | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this severity."""
-        return int(self)
 
 
 class LogSeverityMask(IntFlag):
@@ -41,7 +28,7 @@ class LogSeverityMask(IntFlag):
     ALL = INFO | WARNING | ERROR
 
 
-class LogEvent(IntEnum):
+class LogEvent(UnknownIntEnum):
     """Log event categories emitted by MapLibre Native."""
 
     GENERAL = 0
@@ -61,20 +48,6 @@ class LogEvent(IntEnum):
     CRASH = 14
     GLYPH = 15
     TIMING = 16
-
-    @classmethod
-    def _missing_(cls, value: object) -> "LogEvent | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this event."""
-        return int(self)
 
 
 @dataclass(frozen=True, slots=True)

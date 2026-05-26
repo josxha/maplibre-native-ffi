@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from ._lifecycle import warn_unclosed as _warn_unclosed
+from ._enum import NativeIntEnum, UnknownIntEnum
+from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import Any, Callable
 
 
-class ResourceKind(IntEnum):
+class ResourceKind(UnknownIntEnum):
     """Network resource kind passed to resource callbacks."""
 
     UNKNOWN = 0
@@ -20,87 +20,37 @@ class ResourceKind(IntEnum):
     SPRITE_JSON = 6
     IMAGE = 7
 
-    @classmethod
-    def _missing_(cls, value: object) -> "ResourceKind | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this resource kind."""
-        return int(self)
-
-
-class ResourceLoadingMethod(IntEnum):
+class ResourceLoadingMethod(UnknownIntEnum):
     """Resource loading method requested by MapLibre Native."""
 
     ALL = 0
     CACHE_ONLY = 1
     NETWORK_ONLY = 2
 
-    @classmethod
-    def _missing_(cls, value: object) -> "ResourceLoadingMethod | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-
-class ResourcePriority(IntEnum):
+class ResourcePriority(UnknownIntEnum):
     """Resource request priority."""
 
     REGULAR = 0
     LOW = 1
 
-    @classmethod
-    def _missing_(cls, value: object) -> "ResourcePriority | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-
-class ResourceUsage(IntEnum):
+class ResourceUsage(UnknownIntEnum):
     """Resource request usage."""
 
     ONLINE = 0
     OFFLINE = 1
 
-    @classmethod
-    def _missing_(cls, value: object) -> "ResourceUsage | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-
-class ResourceStoragePolicy(IntEnum):
+class ResourceStoragePolicy(UnknownIntEnum):
     """Resource cache storage policy."""
 
     PERMANENT = 0
     VOLATILE = 1
 
-    @classmethod
-    def _missing_(cls, value: object) -> "ResourceStoragePolicy | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-
-class ResourceResponseStatus(IntEnum):
+class ResourceResponseStatus(NativeIntEnum):
     """Status for a resource provider response."""
 
     OK = 0
@@ -108,13 +58,8 @@ class ResourceResponseStatus(IntEnum):
     NO_CONTENT = 2
     NOT_MODIFIED = 3
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this response status."""
-        return int(self)
 
-
-class ResourceErrorReason(IntEnum):
+class ResourceErrorReason(UnknownIntEnum):
     """Resource error reason used in provider responses and events."""
 
     NONE = 0
@@ -124,31 +69,12 @@ class ResourceErrorReason(IntEnum):
     RATE_LIMIT = 4
     OTHER = 5
 
-    @classmethod
-    def _missing_(cls, value: object) -> "ResourceErrorReason | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this error reason."""
-        return int(self)
-
-
-class ResourceProviderDecision(IntEnum):
+class ResourceProviderDecision(NativeIntEnum):
     """Decision returned by a resource provider callback."""
 
     PASS_THROUGH = 0
     HANDLE = 1
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this provider decision."""
-        return int(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,8 +191,10 @@ class ResourceResponse:
         }
 
 
-class ResourceRequestHandle:
+class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
     """One-shot handle for a resource provider request selected for handling."""
+
+    _handle_name = "ResourceRequestHandle"
 
     def __init__(self, native: Any) -> None:
         self._native = native
@@ -303,23 +231,6 @@ class ResourceRequestHandle:
             return
         self._native.close()
         self._closed = True
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("ResourceRequestHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
-
-    def __enter__(self) -> "ResourceRequestHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: object | None,
-    ) -> None:
-        self.close()
 
 
 ResourceTransformCallback = Callable[[ResourceTransformRequest], str | None]

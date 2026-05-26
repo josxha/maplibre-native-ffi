@@ -2,30 +2,30 @@
 
 from __future__ import annotations
 
-from ._lifecycle import warn_unclosed as _warn_unclosed
+from ._enum import NativeIntEnum, UnknownIntEnum
+from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import Any
 
 from .geo import LatLngBounds
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
 
-class TileScheme(IntEnum):
+class TileScheme(NativeIntEnum):
     """Tile URL coordinate scheme values."""
 
     XYZ = 0
     TMS = 1
 
 
-class VectorTileEncoding(IntEnum):
+class VectorTileEncoding(NativeIntEnum):
     """Vector tile encoding values."""
 
     MVT = 0
     MLT = 1
 
 
-class RasterDemEncoding(IntEnum):
+class RasterDemEncoding(NativeIntEnum):
     """DEM raster encoding values."""
 
     MAPBOX = 0
@@ -46,7 +46,7 @@ class TileSourceOptions:
     raster_dem_encoding: RasterDemEncoding | None = None
 
 
-class StyleSourceType(IntEnum):
+class StyleSourceType(UnknownIntEnum):
     """Style source type values returned by MapLibre Native."""
 
     UNKNOWN = 0
@@ -58,20 +58,6 @@ class StyleSourceType(IntEnum):
     VIDEO = 6
     ANNOTATIONS = 7
     CUSTOM_VECTOR = 8
-
-    @classmethod
-    def _missing_(cls, value: object) -> "StyleSourceType | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this source type."""
-        return int(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,20 +137,15 @@ class StyleImage:
         )
 
 
-class LocationIndicatorImageKind(IntEnum):
+class LocationIndicatorImageKind(NativeIntEnum):
     """Location indicator image-name properties."""
 
     TOP = 0
     BEARING = 1
     SHADOW = 2
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this image property slot."""
-        return int(self)
 
-
-class CustomGeometrySourceEventType(IntEnum):
+class CustomGeometrySourceEventType(NativeIntEnum):
     """Custom geometry source callback event kind."""
 
     FETCH_TILE = 0
@@ -211,31 +192,18 @@ class CustomGeometrySourceOptions:
     max_queued_events: int = 1024
 
 
-class CustomGeometrySourceHandle:
+class CustomGeometrySourceHandle(NativeHandleMixin):
     """Owner-thread handle for queued custom geometry source callback events."""
+
+    _handle_name = "CustomGeometrySourceHandle"
 
     def __init__(self, native: Any) -> None:
         self._native = native
 
     @property
-    def closed(self) -> bool:
-        """Return whether the native callback state has been released."""
-        return bool(self._native.closed)
-
-    @property
     def dropped_event_count(self) -> int:
         """Return how many callback events were dropped because the queue was full."""
         return self._native.dropped_event_count
-
-    def close(self) -> None:
-        """Release queued callback state for this source handle."""
-        self._native.close()
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("CustomGeometrySourceHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
 
     def poll_event(self) -> CustomGeometrySourceEvent | None:
         """Return one queued fetch/cancel event copied into Python values."""
@@ -243,17 +211,6 @@ class CustomGeometrySourceHandle:
         if event is None:
             return None
         return CustomGeometrySourceEvent.from_native(event)
-
-    def __enter__(self) -> "CustomGeometrySourceHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: object | None,
-    ) -> None:
-        self.close()
 
 
 __all__ = [

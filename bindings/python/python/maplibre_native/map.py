@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from ._lifecycle import warn_unclosed as _warn_unclosed
+from ._enum import NativeIntEnum
+from ._lifecycle import NativeHandleMixin
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import IntEnum, IntFlag
-from types import TracebackType
+from typing import Any
+from enum import IntFlag
 
 from . import _native
 from .camera import (
@@ -57,7 +59,7 @@ class MapDebugOptions(IntFlag):
     DEPTH_BUFFER = 1 << 7
 
 
-class NorthOrientation(IntEnum):
+class NorthOrientation(NativeIntEnum):
     """Map north orientation values."""
 
     UP = 0
@@ -66,7 +68,7 @@ class NorthOrientation(IntEnum):
     LEFT = 3
 
 
-class ConstrainMode(IntEnum):
+class ConstrainMode(NativeIntEnum):
     """Map camera constraint modes."""
 
     NONE = 0
@@ -75,31 +77,26 @@ class ConstrainMode(IntEnum):
     SCREEN = 3
 
 
-class ViewportMode(IntEnum):
+class ViewportMode(NativeIntEnum):
     """Viewport orientation modes."""
 
     DEFAULT = 0
     FLIPPED_Y = 1
 
 
-class TileLodMode(IntEnum):
+class TileLodMode(NativeIntEnum):
     """Tile LOD algorithm values."""
 
     DEFAULT = 0
     DISTANCE = 1
 
 
-class MapMode(IntEnum):
+class MapMode(NativeIntEnum):
     """Map rendering mode used when creating a map."""
 
     CONTINUOUS = 0
     STATIC = 1
     TILE = 2
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this map mode."""
-        return int(self)
 
 
 @dataclass(slots=True)
@@ -345,26 +342,13 @@ def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
     return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
 
-class MapProjectionHandle:
+class MapProjectionHandle(NativeHandleMixin):
     """Standalone projection helper snapshotted from a map transform."""
+
+    _handle_name = "MapProjectionHandle"
 
     def __init__(self, native: object) -> None:
         self._native = native
-
-    @property
-    def closed(self) -> bool:
-        """Return whether this projection helper has been closed."""
-        return bool(self._native.closed)
-
-    def close(self) -> None:
-        """Release this projection helper exactly once."""
-        self._native.close()
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("MapProjectionHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
 
     def get_camera(self) -> CameraOptions:
         """Return the helper's current camera snapshot."""
@@ -389,10 +373,8 @@ class MapProjectionHandle:
 
     def set_visible_geometry(self, geometry: Geometry, padding: EdgeInsets) -> None:
         """Update this helper's camera so geometry coordinates are visible."""
-        from .geo import _geometry_to_native_wire
-
         self._native.set_visible_geometry(
-            _geometry_to_native_wire(geometry),
+            geometry,
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
@@ -413,20 +395,11 @@ class MapProjectionHandle:
         raw = self._native.lat_lng_for_pixel(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
-    def __enter__(self) -> "MapProjectionHandle":
-        return self
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
-
-
-class MapHandle:
+class MapHandle(NativeHandleMixin):
     """Owner-thread map handle."""
+
+    _handle_name = "MapHandle"
 
     def __init__(
         self,
@@ -445,21 +418,6 @@ class MapHandle:
             options.scale_factor,
             map_mode.native_code,
         )
-
-    @property
-    def closed(self) -> bool:
-        """Return whether this handle has been closed."""
-        return bool(self._native.closed)
-
-    def close(self) -> None:
-        """Release this map handle exactly once."""
-        self._native.close()
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("MapHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
 
     def request_repaint(self) -> None:
         """Request a repaint for a continuous map."""
@@ -545,9 +503,7 @@ class MapHandle:
         self, source_id: str, source_json: JsonObjectLike
     ) -> None:
         """Add one style source from a style-spec source JSON object."""
-        from .json import _to_native_wire as _json_to_native_wire
-
-        self._native.add_style_source_json(source_id, _json_to_native_wire(source_json))
+        self._native.add_style_source_json(source_id, source_json)
 
     def add_geojson_source_url(self, source_id: str, url: str) -> None:
         """Add a GeoJSON source that loads data from a URL."""
@@ -555,9 +511,7 @@ class MapHandle:
 
     def add_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
         """Add a GeoJSON source with inline data."""
-        from .geo import _to_native_wire as _geojson_to_native_wire
-
-        self._native.add_geojson_source_data(source_id, _geojson_to_native_wire(data))
+        self._native.add_geojson_source_data(source_id, data)
 
     def set_geojson_source_url(self, source_id: str, url: str) -> None:
         """Update one GeoJSON source to load data from a URL."""
@@ -565,9 +519,25 @@ class MapHandle:
 
     def set_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
         """Update one GeoJSON source with inline data."""
-        from .geo import _to_native_wire as _geojson_to_native_wire
+        self._native.set_geojson_source_data(source_id, data)
 
-        self._native.set_geojson_source_data(source_id, _geojson_to_native_wire(data))
+    def _add_tile_source_url(
+        self,
+        add: Callable[..., None],
+        source_id: str,
+        url: str,
+        options: TileSourceOptions | None,
+    ) -> None:
+        add(source_id, url, *_tile_source_parts(options))
+
+    def _add_tile_source_tiles(
+        self,
+        add: Callable[..., None],
+        source_id: str,
+        tiles: list[str] | tuple[str, ...],
+        options: TileSourceOptions | None,
+    ) -> None:
+        add(source_id, list(tiles), *_tile_source_parts(options))
 
     def add_vector_source_url(
         self,
@@ -576,7 +546,9 @@ class MapHandle:
         options: TileSourceOptions | None = None,
     ) -> None:
         """Add a vector source with a TileJSON URL."""
-        self._native.add_vector_source_url(source_id, url, *_tile_source_parts(options))
+        self._add_tile_source_url(
+            self._native.add_vector_source_url, source_id, url, options
+        )
 
     def add_raster_source_url(
         self,
@@ -585,7 +557,9 @@ class MapHandle:
         options: TileSourceOptions | None = None,
     ) -> None:
         """Add a raster source with a TileJSON URL."""
-        self._native.add_raster_source_url(source_id, url, *_tile_source_parts(options))
+        self._add_tile_source_url(
+            self._native.add_raster_source_url, source_id, url, options
+        )
 
     def add_raster_dem_source_url(
         self,
@@ -594,8 +568,8 @@ class MapHandle:
         options: TileSourceOptions | None = None,
     ) -> None:
         """Add a raster DEM source with a TileJSON URL."""
-        self._native.add_raster_dem_source_url(
-            source_id, url, *_tile_source_parts(options)
+        self._add_tile_source_url(
+            self._native.add_raster_dem_source_url, source_id, url, options
         )
 
     def add_vector_source_tiles(
@@ -605,10 +579,8 @@ class MapHandle:
         options: TileSourceOptions | None = None,
     ) -> None:
         """Add a vector source with inline tile URLs."""
-        self._native.add_vector_source_tiles(
-            source_id,
-            list(tiles),
-            *_tile_source_parts(options),
+        self._add_tile_source_tiles(
+            self._native.add_vector_source_tiles, source_id, tiles, options
         )
 
     def add_raster_source_tiles(
@@ -618,10 +590,8 @@ class MapHandle:
         options: TileSourceOptions | None = None,
     ) -> None:
         """Add a raster source with inline tile URLs."""
-        self._native.add_raster_source_tiles(
-            source_id,
-            list(tiles),
-            *_tile_source_parts(options),
+        self._add_tile_source_tiles(
+            self._native.add_raster_source_tiles, source_id, tiles, options
         )
 
     def add_raster_dem_source_tiles(
@@ -631,10 +601,8 @@ class MapHandle:
         options: TileSourceOptions | None = None,
     ) -> None:
         """Add a raster DEM source with inline tile URLs."""
-        self._native.add_raster_dem_source_tiles(
-            source_id,
-            list(tiles),
-            *_tile_source_parts(options),
+        self._add_tile_source_tiles(
+            self._native.add_raster_dem_source_tiles, source_id, tiles, options
         )
 
     def remove_style_source(self, source_id: str) -> bool:
@@ -758,35 +726,23 @@ class MapHandle:
         before_layer_id: str | None = None,
     ) -> None:
         """Add one style layer from a full style-spec layer JSON object."""
-        from .json import _to_native_wire
-
-        self._native.add_style_layer_json(_to_native_wire(layer_json), before_layer_id)
+        self._native.add_style_layer_json(layer_json, before_layer_id)
 
     def get_style_layer_json(self, layer_id: str) -> JsonValue | None:
         """Return one style layer as a full style-spec layer JSON object."""
-        from .json import _from_native_wire
-
-        raw = self._native.get_style_layer_json(layer_id)
-        return _from_native_wire(raw) if raw is not None else None
+        return self._native.get_style_layer_json(layer_id)
 
     def set_style_light_json(self, light_json: JsonObjectLike) -> None:
         """Set the style light from a style-spec light JSON object."""
-        from .json import _to_native_wire
-
-        self._native.set_style_light_json(_to_native_wire(light_json))
+        self._native.set_style_light_json(light_json)
 
     def set_style_light_property(self, property_name: str, value: JsonLike) -> None:
         """Set one style light property by style-spec property name."""
-        from .json import _to_native_wire
-
-        self._native.set_style_light_property(property_name, _to_native_wire(value))
+        self._native.set_style_light_property(property_name, value)
 
     def get_style_light_property(self, property_name: str) -> JsonValue | None:
         """Return one style light property as a style-spec JSON value."""
-        from .json import _from_native_wire
-
-        raw = self._native.get_style_light_property(property_name)
-        return _from_native_wire(raw) if raw is not None else None
+        return self._native.get_style_light_property(property_name)
 
     def set_layer_property(
         self,
@@ -795,32 +751,19 @@ class MapHandle:
         value: JsonLike,
     ) -> None:
         """Set one layer property by style-spec property name."""
-        from .json import _to_native_wire
-
-        self._native.set_layer_property(layer_id, property_name, _to_native_wire(value))
+        self._native.set_layer_property(layer_id, property_name, value)
 
     def get_layer_property(self, layer_id: str, property_name: str) -> JsonValue | None:
         """Return one layer property as a style-spec JSON value."""
-        from .json import _from_native_wire
-
-        raw = self._native.get_layer_property(layer_id, property_name)
-        return _from_native_wire(raw) if raw is not None else None
+        return self._native.get_layer_property(layer_id, property_name)
 
     def set_layer_filter(self, layer_id: str, filter: JsonLike | None) -> None:
         """Set or clear one layer filter."""
-        from .json import _to_native_wire
-
-        self._native.set_layer_filter(
-            layer_id,
-            _to_native_wire(filter) if filter is not None else None,
-        )
+        self._native.set_layer_filter(layer_id, filter)
 
     def get_layer_filter(self, layer_id: str) -> JsonValue | None:
         """Return one layer filter as a style-spec JSON value."""
-        from .json import _from_native_wire
-
-        raw = self._native.get_layer_filter(layer_id)
-        return _from_native_wire(raw) if raw is not None else None
+        return self._native.get_layer_filter(layer_id)
 
     def set_style_image(
         self,
@@ -989,10 +932,9 @@ class MapHandle:
     ) -> CameraOptions:
         """Compute a camera that fits a geometry in the current viewport."""
         from .camera import CameraOptions
-        from .geo import _geometry_to_native_wire
 
         raw = self._native.camera_for_geometry(
-            _geometry_to_native_wire(geometry),
+            geometry,
             *_fit_parts(fit),
         )
         return CameraOptions.from_native(raw)
@@ -1185,14 +1127,12 @@ class MapHandle:
         data: GeoJson,
     ) -> None:
         """Set custom geometry source data for one canonical tile."""
-        from .geo import _to_native_wire as _geojson_to_native_wire
-
         self._native.set_custom_geometry_source_tile_data(
             source_id,
             tile_id.z,
             tile_id.x,
             tile_id.y,
-            _geojson_to_native_wire(data),
+            data,
         )
 
     def invalidate_custom_geometry_source_tile(
@@ -1220,35 +1160,40 @@ class MapHandle:
             (bounds.northeast.latitude, bounds.northeast.longitude),
         )
 
+    def _attach_render_session(
+        self,
+        attach: Callable[..., object],
+        descriptor: Any,
+        *args: object,
+    ) -> RenderSessionHandle:
+        extent = descriptor.extent
+        native = attach(
+            self._native,
+            extent.width,
+            extent.height,
+            extent.scale_factor,
+            *args,
+        )
+        return RenderSessionHandle(native, self)
+
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor
     ) -> RenderSessionHandle:
         """Attach a Metal native surface render target to this map."""
-        from . import _native
-        from .render import RenderSessionHandle
-
-        native = _native.attach_metal_surface(
-            self._native,
-            descriptor.extent.width,
-            descriptor.extent.height,
-            descriptor.extent.scale_factor,
+        return self._attach_render_session(
+            _native.attach_metal_surface,
+            descriptor,
             descriptor.context.device.address,
             descriptor.layer.address,
         )
-        return RenderSessionHandle(native, self)
 
     def attach_vulkan_surface(
         self, descriptor: VulkanSurfaceDescriptor
     ) -> RenderSessionHandle:
         """Attach a Vulkan native surface render target to this map."""
-        from . import _native
-        from .render import RenderSessionHandle
-
-        native = _native.attach_vulkan_surface(
-            self._native,
-            descriptor.extent.width,
-            descriptor.extent.height,
-            descriptor.extent.scale_factor,
+        return self._attach_render_session(
+            _native.attach_vulkan_surface,
+            descriptor,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1256,72 +1201,48 @@ class MapHandle:
             descriptor.context.graphics_queue_family_index,
             descriptor.surface.address,
         )
-        return RenderSessionHandle(native, self)
 
     def attach_metal_owned_texture(
         self, descriptor: MetalOwnedTextureDescriptor
     ) -> RenderSessionHandle:
         """Attach a Metal session-owned texture render target to this map."""
-        from . import _native
-        from .render import RenderSessionHandle
-
-        native = _native.attach_metal_owned_texture(
-            self._native,
-            descriptor.extent.width,
-            descriptor.extent.height,
-            descriptor.extent.scale_factor,
+        return self._attach_render_session(
+            _native.attach_metal_owned_texture,
+            descriptor,
             descriptor.context.device.address,
         )
-        return RenderSessionHandle(native, self)
 
     def attach_metal_borrowed_texture(
         self, descriptor: MetalBorrowedTextureDescriptor
     ) -> RenderSessionHandle:
         """Attach a Metal caller-owned texture render target to this map."""
-        from . import _native
-        from .render import RenderSessionHandle
-
-        native = _native.attach_metal_borrowed_texture(
-            self._native,
-            descriptor.extent.width,
-            descriptor.extent.height,
-            descriptor.extent.scale_factor,
+        return self._attach_render_session(
+            _native.attach_metal_borrowed_texture,
+            descriptor,
             descriptor.texture.address,
         )
-        return RenderSessionHandle(native, self)
 
     def attach_vulkan_owned_texture(
         self, descriptor: VulkanOwnedTextureDescriptor
     ) -> RenderSessionHandle:
         """Attach a Vulkan session-owned texture render target to this map."""
-        from . import _native
-        from .render import RenderSessionHandle
-
-        native = _native.attach_vulkan_owned_texture(
-            self._native,
-            descriptor.extent.width,
-            descriptor.extent.height,
-            descriptor.extent.scale_factor,
+        return self._attach_render_session(
+            _native.attach_vulkan_owned_texture,
+            descriptor,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
             descriptor.context.graphics_queue.address,
             descriptor.context.graphics_queue_family_index,
         )
-        return RenderSessionHandle(native, self)
 
     def attach_vulkan_borrowed_texture(
         self, descriptor: VulkanBorrowedTextureDescriptor
     ) -> RenderSessionHandle:
         """Attach a Vulkan caller-owned texture render target to this map."""
-        from . import _native
-        from .render import RenderSessionHandle
-
-        native = _native.attach_vulkan_borrowed_texture(
-            self._native,
-            descriptor.extent.width,
-            descriptor.extent.height,
-            descriptor.extent.scale_factor,
+        return self._attach_render_session(
+            _native.attach_vulkan_borrowed_texture,
+            descriptor,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1333,18 +1254,6 @@ class MapHandle:
             descriptor.initial_layout,
             descriptor.final_layout,
         )
-        return RenderSessionHandle(native, self)
-
-    def __enter__(self) -> "MapHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
 
 
 __all__ = [

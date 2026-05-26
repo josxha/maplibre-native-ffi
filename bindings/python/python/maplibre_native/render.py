@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from ._lifecycle import warn_unclosed as _warn_unclosed
+from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
 from enum import IntFlag
-from types import TracebackType
 from typing import Any
 
 from .geo import Feature
@@ -215,65 +214,28 @@ class VulkanOwnedTextureFrame:
         )
 
 
-class DetachedRenderSessionHandle:
+class DetachedRenderSessionHandle(NativeHandleMixin):
     """Close-only render session handle after backend resources detach."""
+
+    _handle_name = "DetachedRenderSessionHandle"
 
     def __init__(self, native: Any) -> None:
         self._native = native
 
-    @property
-    def closed(self) -> bool:
-        """Return whether this detached handle has been closed."""
-        return bool(self._native.closed)
 
-    def close(self) -> None:
-        """Release this detached render session exactly once."""
-        self._native.close()
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("DetachedRenderSessionHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
-
-    def __enter__(self) -> "DetachedRenderSessionHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
-
-
-class RenderSessionHandle:
+class RenderSessionHandle(NativeHandleMixin):
     """Owner-thread render session handle bound to a retained map wrapper."""
+
+    _handle_name = "RenderSessionHandle"
 
     def __init__(self, native: Any, map_handle: MapHandle) -> None:
         self._native = native
         self._map = map_handle
 
     @property
-    def closed(self) -> bool:
-        """Return whether this render session has been closed."""
-        return bool(self._native.closed)
-
-    @property
     def detached(self) -> bool:
         """Return whether backend resources have been detached."""
         return bool(self._native.detached)
-
-    def close(self) -> None:
-        """Release this render session exactly once."""
-        self._native.close()
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("RenderSessionHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
 
     def resize(self, width: int, height: int, scale_factor: float) -> None:
         """Resize this attached render session."""
@@ -371,16 +333,14 @@ class RenderSessionHandle:
         arguments: JsonObjectLike | None = None,
     ) -> FeatureExtensionResult:
         """Query a feature extension from the latest render session state."""
-        from .geo import _feature_to_native_wire
-        from .json import _to_native_wire as _json_to_native_wire
         from .query import FeatureExtensionResult
 
         raw = self._native.query_feature_extensions(
             source_id,
-            _feature_to_native_wire(feature),
+            feature,
             extension,
             extension_field,
-            _json_to_native_wire(arguments) if arguments is not None else None,
+            arguments,
         )
         return FeatureExtensionResult.from_native(raw)
 
@@ -390,27 +350,21 @@ class RenderSessionHandle:
         state: JsonLike,
     ) -> None:
         """Set per-feature state on a render source for this render session."""
-        from .json import _to_native_wire as _json_to_native_wire
-
         self._native.set_feature_state(
             selector.source_id,
             selector.source_layer_id,
             selector.feature_id,
             selector.state_key,
-            _json_to_native_wire(state),
+            state,
         )
 
     def get_feature_state(self, selector: FeatureStateSelector) -> JsonValue:
         """Return copied per-feature state from a render source."""
-        from .json import _from_native_wire as _json_from_native_wire
-
-        return _json_from_native_wire(
-            self._native.get_feature_state(
-                selector.source_id,
-                selector.source_layer_id,
-                selector.feature_id,
-                selector.state_key,
-            )
+        return self._native.get_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
         )
 
     def remove_feature_state(self, selector: FeatureStateSelector) -> None:
@@ -422,28 +376,14 @@ class RenderSessionHandle:
             selector.state_key,
         )
 
-    def __enter__(self) -> "RenderSessionHandle":
-        return self
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
-
-
-class MetalOwnedTextureFrameHandle:
+class MetalOwnedTextureFrameHandle(NativeHandleMixin):
     """Scoped handle for an acquired Metal session-owned texture frame."""
+
+    _handle_name = "MetalOwnedTextureFrameHandle"
 
     def __init__(self, native: Any) -> None:
         self._native = native
-
-    @property
-    def closed(self) -> bool:
-        """Return whether this frame has been released."""
-        return bool(self._native.closed)
 
     @property
     def frame(self) -> MetalOwnedTextureFrame:
@@ -460,40 +400,14 @@ class MetalOwnedTextureFrameHandle:
         """Return the borrowed Metal device pointer while the frame is open."""
         return NativePointer(self._native.device_address())
 
-    def close(self) -> None:
-        """Release this acquired frame exactly once."""
-        self._native.close()
 
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed(
-                "MetalOwnedTextureFrameHandle", getattr(self, "closed", True)
-            )
-        except BaseException:
-            return
-
-    def __enter__(self) -> "MetalOwnedTextureFrameHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
-
-
-class VulkanOwnedTextureFrameHandle:
+class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
     """Scoped handle for an acquired Vulkan session-owned texture frame."""
+
+    _handle_name = "VulkanOwnedTextureFrameHandle"
 
     def __init__(self, native: Any) -> None:
         self._native = native
-
-    @property
-    def closed(self) -> bool:
-        """Return whether this frame has been released."""
-        return bool(self._native.closed)
 
     @property
     def frame(self) -> VulkanOwnedTextureFrame:
@@ -514,29 +428,6 @@ class VulkanOwnedTextureFrameHandle:
     def device(self) -> NativePointer:
         """Return the borrowed Vulkan device pointer while the frame is open."""
         return NativePointer(self._native.device_address())
-
-    def close(self) -> None:
-        """Release this acquired frame exactly once."""
-        self._native.close()
-
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed(
-                "VulkanOwnedTextureFrameHandle", getattr(self, "closed", True)
-            )
-        except BaseException:
-            return
-
-    def __enter__(self) -> "VulkanOwnedTextureFrameHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
 
 
 __all__ = [

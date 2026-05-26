@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from ._lifecycle import warn_unclosed as _warn_unclosed
+from ._enum import NativeIntEnum, UnknownIntEnum
+from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import IntEnum
-from types import TracebackType
 
 from .geo import Geometry, LatLngBounds
 from .resource import ResourceErrorReason
 
 
-class AmbientCacheOperation(IntEnum):
+class AmbientCacheOperation(NativeIntEnum):
     """Ambient cache maintenance operation kinds."""
 
     RESET_DATABASE = 1
@@ -19,52 +19,26 @@ class AmbientCacheOperation(IntEnum):
     INVALIDATE = 3
     CLEAR = 4
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this operation."""
-        return int(self)
 
-
-class OfflineRegionDefinitionType(IntEnum):
+class OfflineRegionDefinitionType(NativeIntEnum):
     """Offline region definition descriptor variants."""
 
     TILE_PYRAMID = 1
     GEOMETRY = 2
 
 
-class OfflineRegionDownloadState(IntEnum):
+class OfflineRegionDownloadState(UnknownIntEnum):
     """Offline region download state values."""
 
     INACTIVE = 0
     ACTIVE = 1
 
-    @classmethod
-    def _missing_(cls, value: object) -> "OfflineRegionDownloadState | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
-
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this download state."""
-        return int(self)
-
     def native_code_for_set(self) -> int:
         """Return the C enum value for setter calls, rejecting unknown values."""
-        if self.name.startswith("UNKNOWN_"):
-            from .errors import InvalidArgumentError
-
-            raise InvalidArgumentError(
-                None,
-                f"unknown offline region download state cannot be set: {int(self)}",
-            )
-        return int(self)
+        return self.known_native_code("offline region download state")
 
 
-class OfflineOperationKind(IntEnum):
+class OfflineOperationKind(UnknownIntEnum):
     """Offline database operation kinds reported by completion events."""
 
     AMBIENT_CACHE = 1
@@ -79,22 +53,8 @@ class OfflineOperationKind(IntEnum):
     REGION_INVALIDATE = 10
     REGION_DELETE = 11
 
-    @classmethod
-    def _missing_(cls, value: object) -> "OfflineOperationKind | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this operation kind."""
-        return int(self)
-
-
-class OfflineOperationResultKind(IntEnum):
+class OfflineOperationResultKind(UnknownIntEnum):
     """Offline database operation result kinds reported by completion events."""
 
     NONE = 0
@@ -103,23 +63,11 @@ class OfflineOperationResultKind(IntEnum):
     REGION_LIST = 3
     REGION_STATUS = 4
 
-    @classmethod
-    def _missing_(cls, value: object) -> "OfflineOperationResultKind | None":
-        if not isinstance(value, int) or value < 0:
-            return None
-        unknown = int.__new__(cls, value)
-        unknown._name_ = f"UNKNOWN_{value}"
-        unknown._value_ = value
-        return unknown
 
-    @property
-    def native_code(self) -> int:
-        """Return the C enum value for this result kind."""
-        return int(self)
-
-
-class OfflineOperationHandle:
+class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
     """Runtime-owned offline database operation token."""
+
+    _handle_name = "OfflineOperationHandle"
 
     def __init__(self, runtime: "RuntimeHandle", operation_id: int) -> None:
         self._runtime = runtime
@@ -159,26 +107,21 @@ class OfflineOperationHandle:
 
             raise InvalidStateError(None, "offline operation handle is already closed")
 
-    def __del__(self, _warn_unclosed=_warn_unclosed) -> None:
-        try:
-            _warn_unclosed("OfflineOperationHandle", getattr(self, "closed", True))
-        except BaseException:
-            return
+    def _take(self, take: Callable[[int], object]) -> object:
+        self._ensure_open()
+        raw = take(self._operation_id)
+        self._mark_closed()
+        return raw
 
     def take_region(self) -> "OfflineRegionInfo":
         """Take a completed region snapshot result."""
-        self._ensure_open()
-        raw = self._runtime._native.offline_region_create_take_result(
-            self._operation_id
-        )  # noqa: SLF001
-        self._mark_closed()
-        return OfflineRegionInfo.from_native(raw)
+        return OfflineRegionInfo.from_native(
+            self._take(self._runtime._native.offline_region_create_take_result)  # noqa: SLF001
+        )
 
     def take_optional_region(self) -> "OfflineRegionInfo | None":
         """Take a completed optional region snapshot result."""
-        self._ensure_open()
-        raw = self._runtime._native.offline_region_get_take_result(self._operation_id)  # noqa: SLF001
-        self._mark_closed()
+        raw = self._take(self._runtime._native.offline_region_get_take_result)  # noqa: SLF001
         return OfflineRegionInfo.from_native(raw) if raw is not None else None
 
     def take_region_list(
@@ -187,46 +130,28 @@ class OfflineOperationHandle:
         merge_result: bool = False,
     ) -> tuple["OfflineRegionInfo", ...]:
         """Take a completed region-list result."""
-        self._ensure_open()
-        if merge_result:
-            raw = self._runtime._native.offline_regions_merge_database_take_result(
-                self._operation_id
-            )  # noqa: SLF001
-        else:
-            raw = self._runtime._native.offline_regions_list_take_result(
-                self._operation_id
-            )  # noqa: SLF001
-        self._mark_closed()
-        return tuple(OfflineRegionInfo.from_native(region) for region in raw)
+        take = (
+            self._runtime._native.offline_regions_merge_database_take_result  # noqa: SLF001
+            if merge_result
+            else self._runtime._native.offline_regions_list_take_result  # noqa: SLF001
+        )
+        return tuple(
+            OfflineRegionInfo.from_native(region) for region in self._take(take)
+        )
 
     def take_updated_region(self) -> "OfflineRegionInfo":
         """Take a completed updated region snapshot result."""
-        self._ensure_open()
-        raw = self._runtime._native.offline_region_update_metadata_take_result(
-            self._operation_id
-        )  # noqa: SLF001
-        self._mark_closed()
-        return OfflineRegionInfo.from_native(raw)
+        return OfflineRegionInfo.from_native(
+            self._take(
+                self._runtime._native.offline_region_update_metadata_take_result  # noqa: SLF001
+            )
+        )
 
     def take_status(self) -> "OfflineRegionStatus":
         """Take a completed offline region status result."""
-        self._ensure_open()
-        raw = self._runtime._native.offline_region_get_status_take_result(
-            self._operation_id
-        )  # noqa: SLF001
-        self._mark_closed()
-        return OfflineRegionStatus.from_native(raw)
-
-    def __enter__(self) -> "OfflineOperationHandle":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        self.close()
+        return OfflineRegionStatus.from_native(
+            self._take(self._runtime._native.offline_region_get_status_take_result)  # noqa: SLF001
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -418,11 +343,9 @@ def _definition_from_native_wire(raw: dict[str, object]) -> OfflineRegionDefinit
             include_ideographs=raw["include_ideographs"],
         )
     if kind == "geometry":
-        from .geo import _geometry_from_native_wire
-
         return OfflineGeometryRegionDefinition(
             style_url=raw["style_url"],
-            geometry=_geometry_from_native_wire(raw["geometry"]),
+            geometry=raw["geometry"],
             min_zoom=raw["min_zoom"],
             max_zoom=raw["max_zoom"],
             pixel_ratio=raw["pixel_ratio"],
@@ -436,45 +359,6 @@ def _lat_lng_from_native_wire(raw: dict[str, object]):
     from .geo import LatLng
 
     return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
-
-
-def _definition_to_native_wire(
-    definition: OfflineRegionDefinition,
-) -> dict[str, object]:
-    """Convert an offline region definition to private native-bridge values."""
-    if isinstance(definition, OfflineTilePyramidRegionDefinition):
-        return {
-            "type": "tile_pyramid",
-            "style_url": definition.style_url,
-            "bounds": (
-                (
-                    definition.bounds.southwest.latitude,
-                    definition.bounds.southwest.longitude,
-                ),
-                (
-                    definition.bounds.northeast.latitude,
-                    definition.bounds.northeast.longitude,
-                ),
-            ),
-            "min_zoom": definition.min_zoom,
-            "max_zoom": definition.max_zoom,
-            "pixel_ratio": definition.pixel_ratio,
-            "include_ideographs": definition.include_ideographs,
-        }
-    if isinstance(definition, OfflineGeometryRegionDefinition):
-        from .geo import _geometry_to_native_wire
-
-        return {
-            "type": "geometry",
-            "style_url": definition.style_url,
-            "geometry": _geometry_to_native_wire(definition.geometry),
-            "min_zoom": definition.min_zoom,
-            "max_zoom": definition.max_zoom,
-            "pixel_ratio": definition.pixel_ratio,
-            "include_ideographs": definition.include_ideographs,
-        }
-    msg = f"unsupported offline region definition: {type(definition).__name__}"
-    raise TypeError(msg)
 
 
 def _payload_int(payload: dict[str, object], key: str) -> int:

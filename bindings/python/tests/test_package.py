@@ -928,7 +928,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
             filter_: object,
         ) -> list[dict[str, object]]:
             self.rendered_call = (geometry, layer_ids, filter_)
-            return [queried_feature_wire()]
+            return [queried_feature_native()]
 
         def query_source_features(
             self,
@@ -937,7 +937,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
             filter_: object,
         ) -> list[dict[str, object]]:
             self.source_call = (source_id, source_layer_ids, filter_)
-            return [queried_feature_wire()]
+            return [queried_feature_native()]
 
         def query_feature_extensions(
             self,
@@ -954,21 +954,18 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
                 extension_field,
                 arguments,
             )
-            return {"type": 1, "value": {"type": "uint", "value": 7}}
+            return {"type": 1, "value": json.JsonUInt(7)}
 
-    def queried_feature_wire() -> dict[str, object]:
+    def queried_feature_native() -> dict[str, object]:
         return {
-            "feature": {
-                "geometry": {
-                    "type": "point",
-                    "coordinate": {"latitude": 1.0, "longitude": 2.0},
-                },
-                "properties": [("name", "one")],
-                "identifier": {"type": "string", "value": "feature-1"},
-            },
+            "feature": geo.Feature(
+                geometry=geo.point(1.0, 2.0),
+                properties=(json.JsonMember("name", "one"),),
+                identifier=geo.FeatureIdentifierString("feature-1"),
+            ),
             "source_id": "points",
             "source_layer_id": None,
-            "state": {"type": "object", "members": [("hover", True)]},
+            "state": json.JsonObject.from_pairs([("hover", True)]),
         }
 
     fake_native = FakeNativeRenderSession()
@@ -1001,14 +998,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     assert fake_native.rendered_call == (
         {"type": "point", "point": (1.0, 2.0)},
         ("circle",),
-        {
-            "type": "array",
-            "values": [
-                "==",
-                {"type": "array", "values": ["get", "kind"]},
-                "park",
-            ],
-        },
+        ["==", ["get", "kind"], "park"],
     )
     assert fake_native.source_call[0] == "points"
     assert fake_native.source_call[1] == ("landuse",)
@@ -1016,19 +1006,15 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     assert source[0].state == json.JsonObject.from_pairs([("hover", True)])
     assert fake_native.extension_call == (
         "points",
-        {
-            "geometry": {"type": "point", "coordinate": (1.0, 2.0)},
-            "properties": [("name", "one")],
-            "identifier": {"type": "string", "value": "feature-1"},
-        },
+        feature,
         "supercluster",
         "leaves",
-        {"type": "object", "members": [("limit", {"type": "int", "value": 10})]},
+        {"limit": 10},
     )
     assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
 
 
-def test_render_session_feature_state_public_api_uses_json_wire_values() -> None:
+def test_render_session_feature_state_public_api_uses_json_values() -> None:
     class FakeNativeRenderSession:
         closed = False
         detached = False
@@ -1066,10 +1052,7 @@ def test_render_session_feature_state_public_api_uses_json_wire_values() -> None
                 "feature-1",
                 "hover",
             )
-            return {
-                "type": "object",
-                "members": [("hover", {"type": "bool", "value": True})],
-            }
+            return json.JsonObject.from_pairs([("hover", True)])
 
         def remove_feature_state(
             self,
@@ -1099,7 +1082,7 @@ def test_render_session_feature_state_public_api_uses_json_wire_values() -> None
         "symbols",
         "feature-1",
         "hover",
-        {"type": "object", "members": [("hover", True)]},
+        {"hover": True},
     )
     assert json.to_python(returned) == [("hover", True)]
     assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")

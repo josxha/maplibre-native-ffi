@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
+from ._enum import NativeIntEnum
 from dataclasses import dataclass
-from enum import IntEnum
 from typing import Any
 
 from .camera import ScreenPoint
 from .geo import Feature
 from .json import JsonLike, JsonValue
-from .json import _from_native_wire as _json_from_native_wire
-from .json import _to_native_wire as _json_to_native_wire
 
 
-class RenderedQueryGeometryType(IntEnum):
+class RenderedQueryGeometryType(NativeIntEnum):
     """Rendered feature query geometry variants."""
 
     POINT = 1
@@ -120,18 +118,15 @@ class QueriedFeature:
     @classmethod
     def from_native(cls, raw: dict[str, Any]) -> "QueriedFeature":
         """Build a queried feature from private native values."""
-        from .geo import _feature_from_native_wire
-
-        state = raw.get("state")
         return cls(
-            feature=_feature_from_native_wire(raw["feature"]),
+            feature=raw["feature"],
             source_id=raw.get("source_id"),
             source_layer_id=raw.get("source_layer_id"),
-            state=_json_from_native_wire(state) if state is not None else None,
+            state=raw.get("state"),
         )
 
 
-class FeatureExtensionResultType(IntEnum):
+class FeatureExtensionResultType(NativeIntEnum):
     """Feature extension query result variants."""
 
     VALUE = 1
@@ -172,18 +167,11 @@ class FeatureExtensionResult:
     @classmethod
     def from_native(cls, raw: dict[str, Any]) -> "FeatureExtensionResult":
         """Build a feature-extension result from private native values."""
-        from .geo import _feature_from_native_wire
-
         raw_type = int(raw["type"])
         if raw_type == FeatureExtensionResultType.VALUE:
-            return cls.value_result(_json_from_native_wire(raw["value"]))
+            return cls.value_result(raw["value"])
         if raw_type == FeatureExtensionResultType.FEATURE_COLLECTION:
-            return cls.feature_collection_result(
-                tuple(
-                    _feature_from_native_wire(feature)
-                    for feature in raw["feature_collection"]
-                )
-            )
+            return cls.feature_collection_result(tuple(raw["feature_collection"]))
         return cls.unknown_result(raw_type)
 
 
@@ -217,10 +205,7 @@ def _rendered_options_to_native_wire(
 ) -> tuple[tuple[str, ...] | None, object]:
     if options is None:
         return (None, None)
-    return (
-        options.layer_ids,
-        _json_to_native_wire(options.filter) if options.filter is not None else None,
-    )
+    return options.layer_ids, options.filter
 
 
 def _source_options_to_native_wire(
@@ -228,10 +213,7 @@ def _source_options_to_native_wire(
 ) -> tuple[tuple[str, ...] | None, object]:
     if options is None:
         return (None, None)
-    return (
-        options.source_layer_ids,
-        _json_to_native_wire(options.filter) if options.filter is not None else None,
-    )
+    return options.source_layer_ids, options.filter
 
 
 __all__ = [
