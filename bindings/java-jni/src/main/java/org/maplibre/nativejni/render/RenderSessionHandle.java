@@ -86,6 +86,32 @@ public final class RenderSessionHandle implements AutoCloseable {
     return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
+  public static RenderSessionHandle attachOpenGLOwnedTexture(
+      MapHandle map, OpenGLOwnedTextureDescriptor descriptor) {
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
+    Status.check(
+        MaplibreNativeC.mln_opengl_owned_texture_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeOpenGLOwnedTextureDescriptor(descriptor),
+            outSession));
+    return new RenderSessionHandle(map, sessionAddress(outSession));
+  }
+
+  public static RenderSessionHandle attachOpenGLBorrowedTexture(
+      MapHandle map, OpenGLBorrowedTextureDescriptor descriptor) {
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
+    Status.check(
+        MaplibreNativeC.mln_opengl_borrowed_texture_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeOpenGLBorrowedTextureDescriptor(descriptor),
+            outSession));
+    return new RenderSessionHandle(map, sessionAddress(outSession));
+  }
+
   public static RenderSessionHandle attachMetalSurface(
       MapHandle map, MetalSurfaceDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
@@ -112,8 +138,29 @@ public final class RenderSessionHandle implements AutoCloseable {
     return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
+  public static RenderSessionHandle attachOpenGLSurface(
+      MapHandle map, OpenGLSurfaceDescriptor descriptor) {
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
+    Status.check(
+        MaplibreNativeC.mln_opengl_surface_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeOpenGLSurfaceDescriptor(descriptor),
+            outSession));
+    return new RenderSessionHandle(map, sessionAddress(outSession));
+  }
+
   public void resize(int width, int height, double scaleFactor) {
     NativeLibrary.ensureLoaded();
+    if (width < 0 || height < 0) {
+      JavaCppSupport.setThreadDiagnostic("render target width and height must be non-negative");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
+      JavaCppSupport.setThreadDiagnostic("render target scale factor must be positive and finite");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
     Status.check(
         MaplibreNativeC.mln_render_session_resize(
             JavaCppSupport.renderSession(state.requireLiveAddress()), width, height, scaleFactor));
@@ -367,6 +414,41 @@ public final class RenderSessionHandle implements AutoCloseable {
             nativeFrame.layout()));
   }
 
+  /**
+   * Acquires an explicit OpenGL session-owned texture frame handle.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned
+   * texture and need to release it after that work completes. The returned handle must be closed on
+   * the render session owner thread after GPU work using {@link OpenGLOwnedTextureFrame#texture()}
+   * has completed. While the handle is open, the native session rejects resize, render, detach,
+   * destroy, and second-acquire operations.
+   */
+  public OpenGLOwnedTextureFrameHandle acquireOpenGLOwnedTextureFrame() {
+    NativeLibrary.ensureLoaded();
+    var nativeFrame = new MaplibreNativeC.mln_opengl_owned_texture_frame();
+    nativeFrame.size(nativeFrame.sizeof());
+    Status.check(
+        MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(
+            JavaCppSupport.renderSession(state.requireLiveAddress()), nativeFrame));
+    var scope = new FrameScope();
+    return new OpenGLOwnedTextureFrameHandle(
+        this,
+        nativeFrame,
+        scope,
+        new OpenGLOwnedTextureFrame(
+            scope,
+            nativeFrame.generation(),
+            nativeFrame.width(),
+            nativeFrame.height(),
+            nativeFrame.scale_factor(),
+            nativeFrame.frame_id(),
+            nativeFrame.texture(),
+            nativeFrame.target(),
+            nativeFrame.internal_format(),
+            nativeFrame.format(),
+            nativeFrame.type()));
+  }
+
   private static long sessionAddress(
       PointerPointer<MaplibreNativeC.mln_render_session> outSession) {
     return JavaCppSupport.outAddress(outSession, MaplibreNativeC.mln_render_session.class);
@@ -448,6 +530,21 @@ public final class RenderSessionHandle implements AutoCloseable {
     try {
       Status.check(
           MaplibreNativeC.mln_vulkan_owned_texture_release_frame(
+              JavaCppSupport.renderSession(state.requireLiveAddress()), frame));
+    } catch (Throwable releaseFailure) {
+      if (callbackFailure != null) {
+        callbackFailure.addSuppressed(releaseFailure);
+      } else {
+        throw releaseFailure;
+      }
+    }
+  }
+
+  void releaseOpenGLFrame(
+      MaplibreNativeC.mln_opengl_owned_texture_frame frame, Throwable callbackFailure) {
+    try {
+      Status.check(
+          MaplibreNativeC.mln_opengl_owned_texture_release_frame(
               JavaCppSupport.renderSession(state.requireLiveAddress()), frame));
     } catch (Throwable releaseFailure) {
       if (callbackFailure != null) {

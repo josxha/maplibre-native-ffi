@@ -11,6 +11,12 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
+const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+    @cInclude("EGL/egl.h");
+}) else struct {};
+
+const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
+
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
 pub fn createRuntime() !*c.mln_runtime {
@@ -37,8 +43,8 @@ pub fn destroyMap(map: *c.mln_map) void {
     testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_destroy(map)) catch @panic("map destroy failed");
 }
 
-pub const OwnedTextureAttachContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) MetalAttachContext else struct {};
-pub const OwnedTextureDescriptor = if (build_options.supports_vulkan) c.mln_vulkan_owned_texture_descriptor else if (build_options.supports_metal) c.mln_metal_owned_texture_descriptor else struct {};
+pub const OwnedTextureAttachContext = if (build_options.supports_opengl) OpenGLAttachContext else if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) MetalAttachContext else struct {};
+pub const OwnedTextureDescriptor = if (build_options.supports_opengl) c.mln_opengl_owned_texture_descriptor else if (build_options.supports_vulkan) c.mln_vulkan_owned_texture_descriptor else if (build_options.supports_metal) c.mln_metal_owned_texture_descriptor else struct {};
 
 pub fn ownedTextureDescriptor(context: *const OwnedTextureAttachContext) OwnedTextureDescriptor {
     var descriptor = defaultOwnedTextureDescriptor();
@@ -47,7 +53,9 @@ pub fn ownedTextureDescriptor(context: *const OwnedTextureAttachContext) OwnedTe
 }
 
 pub fn defaultOwnedTextureDescriptor() OwnedTextureDescriptor {
-    if (build_options.supports_vulkan) {
+    if (build_options.supports_opengl) {
+        return c.mln_opengl_owned_texture_descriptor_default();
+    } else if (build_options.supports_vulkan) {
         return c.mln_vulkan_owned_texture_descriptor_default();
     } else if (build_options.supports_metal) {
         return c.mln_metal_owned_texture_descriptor_default();
@@ -57,7 +65,9 @@ pub fn defaultOwnedTextureDescriptor() OwnedTextureDescriptor {
 }
 
 pub fn configureOwnedTextureDescriptor(descriptor: *OwnedTextureDescriptor, context: *const OwnedTextureAttachContext) void {
-    if (build_options.supports_vulkan) {
+    if (build_options.supports_opengl) {
+        descriptor.context = context.descriptor();
+    } else if (build_options.supports_vulkan) {
         descriptor.context = context.descriptor();
     } else if (build_options.supports_metal) {
         descriptor.context = context.descriptor();
@@ -71,7 +81,9 @@ pub fn attachOwnedTextureSession(map: *c.mln_map, descriptor: *const OwnedTextur
 }
 
 pub fn callOwnedTextureAttach(map: ?*c.mln_map, descriptor: ?*const OwnedTextureDescriptor, out_session: ?*?*c.mln_render_session) c.mln_status {
-    if (build_options.supports_vulkan) {
+    if (build_options.supports_opengl) {
+        return c.mln_opengl_owned_texture_attach(map, descriptor, out_session);
+    } else if (build_options.supports_vulkan) {
         return c.mln_vulkan_owned_texture_attach(map, descriptor, out_session);
     } else if (build_options.supports_metal) {
         return c.mln_metal_owned_texture_attach(map, descriptor, out_session);
@@ -79,6 +91,121 @@ pub fn callOwnedTextureAttach(map: ?*c.mln_map, descriptor: ?*const OwnedTexture
         unreachable;
     }
 }
+
+const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+    context: wgl_test.Context,
+
+    pub fn init() !OpenGLAttachContext {
+        return .{ .context = try wgl_test.Context.initWithClassName("MaplibreNativeCAbiSupportWgl", 8, 8) };
+    }
+
+    pub fn deinit(self: *OpenGLAttachContext) void {
+        self.context.deinit();
+    }
+
+    pub fn descriptor(self: *const OpenGLAttachContext) c.mln_opengl_context_descriptor {
+        return .{
+            .size = @sizeOf(c.mln_opengl_context_descriptor),
+            .platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL,
+            .data = .{ .wgl = .{
+                .size = @sizeOf(c.mln_wgl_context_descriptor),
+                .device_context = self.context.deviceContextPointer(),
+                .share_context = self.context.shareContextPointer(),
+                .get_proc_address = wgl_test.Context.getProcAddressPointer(),
+            } },
+        };
+    }
+} else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    display: egl.EGLDisplay,
+    config: egl.EGLConfig,
+    surface: egl.EGLSurface,
+    share_context: egl.EGLContext,
+
+    pub fn init() !@This() {
+        const display = try initDisplay();
+        errdefer _ = egl.eglTerminate(display);
+
+        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
+
+        const config_attributes = [_]egl.EGLint{
+            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
+            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
+            egl.EGL_RED_SIZE,        8,
+            egl.EGL_GREEN_SIZE,      8,
+            egl.EGL_BLUE_SIZE,       8,
+            egl.EGL_ALPHA_SIZE,      8,
+            egl.EGL_DEPTH_SIZE,      24,
+            egl.EGL_STENCIL_SIZE,    8,
+            egl.EGL_NONE,
+        };
+        var config: egl.EGLConfig = null;
+        var config_count: egl.EGLint = 0;
+        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
+            config_count == 0 or config == null)
+        {
+            return error.EglUnavailable;
+        }
+
+        const context_attributes = [_]egl.EGLint{
+            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
+            egl.EGL_NONE,
+        };
+        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
+        if (share_context == egl.EGL_NO_CONTEXT) return error.EglUnavailable;
+        errdefer _ = egl.eglDestroyContext(display, share_context);
+
+        const surface_attributes = [_]egl.EGLint{
+            egl.EGL_WIDTH,  8,
+            egl.EGL_HEIGHT, 8,
+            egl.EGL_NONE,
+        };
+        const surface = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
+        if (surface == egl.EGL_NO_SURFACE) return error.EglUnavailable;
+        errdefer _ = egl.eglDestroySurface(display, surface);
+
+        if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
+        return .{
+            .display = display,
+            .config = config,
+            .surface = surface,
+            .share_context = share_context,
+        };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
+        _ = egl.eglDestroySurface(self.display, self.surface);
+        _ = egl.eglDestroyContext(self.display, self.share_context);
+        _ = egl.eglTerminate(self.display);
+    }
+
+    fn initDisplay() !egl.EGLDisplay {
+        return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
+    }
+
+    fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
+        if (display == egl.EGL_NO_DISPLAY) return error.EglUnavailable;
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.EglUnavailable;
+        return display;
+    }
+
+    pub fn descriptor(self: *const @This()) c.mln_opengl_context_descriptor {
+        return .{
+            .size = @sizeOf(c.mln_opengl_context_descriptor),
+            .platform = c.MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+            .data = .{ .egl = .{
+                .size = @sizeOf(c.mln_egl_context_descriptor),
+                .display = @ptrCast(self.display.?),
+                .config = @ptrCast(self.config.?),
+                .share_context = @ptrCast(self.share_context.?),
+                .get_proc_address = null,
+            } },
+        };
+    }
+} else struct {};
 
 const MetalAttachContext = struct {
     device: *anyopaque,

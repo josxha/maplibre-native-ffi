@@ -9,6 +9,14 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
+const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+    @cInclude("EGL/egl.h");
+}) else struct {};
+
+const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
+    @cInclude("SDL3/SDL.h");
+}) else struct {};
+
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
@@ -24,7 +32,10 @@ pub fn main(init_args: std.process.Init) !void {
     defer maplibre.setAsyncLogSeverityMask(.default, null) catch {};
     try logAndValidateRenderBackend();
 
-    var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null);
+    var diagnostic_store = maplibre.DiagnosticStore.init(allocator);
+    defer diagnostic_store.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, &diagnostic_store);
     defer runtime.close() catch {};
 
     var map = try maplibre.MapHandle.create(&runtime, .{
@@ -44,34 +55,62 @@ pub fn main(init_args: std.process.Init) !void {
     try setInitialCamera(&map);
     try map.setStyleUrl(allocator, style_url);
     try map.requestStillImage();
-    try renderTexture(init_args.io, &runtime, &map, texture);
+    renderTexture(init_args.io, &runtime, &map, texture) catch |err| {
+        logLatestDiagnostic(&diagnostic_store);
+        return err;
+    };
 
-    var image = try texture.readPremultipliedRgba8(allocator);
+    var image = texture.readPremultipliedRgba8(allocator) catch |err| {
+        logLatestDiagnostic(&diagnostic_store);
+        return err;
+    };
     defer image.deinit();
 
     try writePpm(init_args.io, allocator, output_path, image.data, image.info);
     std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.info.width, image.info.height });
 }
 
+fn logLatestDiagnostic(diagnostic_store: *const maplibre.DiagnosticStore) void {
+    const diagnostic = diagnostic_store.get() orelse return;
+    std.debug.print("native diagnostic", .{});
+    if (diagnostic.raw_status) |raw_status| std.debug.print(" ({d})", .{raw_status});
+    std.debug.print(": {s}\n", .{diagnostic.message});
+}
+
 fn logAndValidateRenderBackend() !void {
     const support = maplibre.supportedRenderBackends();
-    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(support)});
+    var support_label_buffer: [32]u8 = undefined;
+    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(&support_label_buffer, support)});
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
+    if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
-fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 {
-    if (support.metal and support.vulkan) return "metal,vulkan";
-    if (support.metal) return "metal";
-    if (support.vulkan) return "vulkan";
-    return "none";
+fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendSupport) []const u8 {
+    var len: usize = 0;
+    var has_backend = false;
+    if (support.metal) appendBackendLabel(buffer, &len, &has_backend, "metal");
+    if (support.opengl) appendBackendLabel(buffer, &len, &has_backend, "opengl");
+    if (support.vulkan) appendBackendLabel(buffer, &len, &has_backend, "vulkan");
+    if (!has_backend) return "none";
+    return buffer[0..len];
+}
+
+fn appendBackendLabel(buffer: []u8, len: *usize, has_backend: *bool, label: []const u8) void {
+    if (has_backend.*) {
+        buffer[len.*] = ',';
+        len.* += 1;
+    }
+    @memcpy(buffer[len.*..][0..label.len], label);
+    len.* += label.len;
+    has_backend.* = true;
 }
 
 const OwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent,
 };
 
-const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
+const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachContext else if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
     fn init() !@This() {
@@ -94,7 +133,12 @@ const OwnedTextureTarget = struct {
         var context = try OwnedTextureContext.init();
         errdefer context.deinit();
 
-        var session = if (build_options.supports_vulkan)
+        var session = if (build_options.supports_opengl)
+            try maplibre.attachOpenGLOwnedTexture(map, .{
+                .extent = descriptor.extent,
+                .context = context.descriptor(),
+            })
+        else if (build_options.supports_vulkan)
             try maplibre.attachVulkanOwnedTexture(map, .{
                 .extent = descriptor.extent,
                 .context = context.descriptor(),
@@ -120,6 +164,146 @@ const OwnedTextureTarget = struct {
         try self.session.close();
     }
 };
+
+const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+    window: *sdl.SDL_Window,
+    context: sdl.SDL_GLContext,
+    device_context: *anyopaque,
+
+    fn init() !OpenGLAttachContext {
+        // WGL contexts need a Win32 device context with a selected pixel
+        // format. SDL gives us a hidden helper window for that without showing
+        // UI, but this is not truly surfaceless like the Linux EGL pbuffer path.
+        if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
+        errdefer sdl.SDL_Quit();
+
+        const window = sdl.SDL_CreateWindow(
+            "MapLibre Zig Readback WGL",
+            8,
+            8,
+            sdl.SDL_WINDOW_OPENGL | sdl.SDL_WINDOW_HIDDEN,
+        ) orelse return error.WglUnavailable;
+        errdefer sdl.SDL_DestroyWindow(window);
+
+        const context = sdl.SDL_GL_CreateContext(window) orelse return error.WglUnavailable;
+        errdefer _ = sdl.SDL_GL_DestroyContext(context);
+        if (!sdl.SDL_GL_MakeCurrent(window, context)) return error.WglUnavailable;
+
+        const properties = sdl.SDL_GetWindowProperties(window);
+        if (properties == 0) return error.WglUnavailable;
+        const device_context = sdl.SDL_GetPointerProperty(
+            properties,
+            sdl.SDL_PROP_WINDOW_WIN32_HDC_POINTER,
+            null,
+        ) orelse return error.WglUnavailable;
+
+        return .{
+            .window = window,
+            .context = context,
+            .device_context = device_context,
+        };
+    }
+
+    fn deinit(self: *OpenGLAttachContext) void {
+        _ = sdl.SDL_GL_MakeCurrent(self.window, null);
+        _ = sdl.SDL_GL_DestroyContext(self.context);
+        sdl.SDL_DestroyWindow(self.window);
+        sdl.SDL_Quit();
+    }
+
+    fn descriptor(self: *const OpenGLAttachContext) maplibre.OpenGLContextDescriptor {
+        return .{ .wgl = .{
+            .device_context = .{ .ptr = @ptrCast(self.device_context) },
+            .share_context = .{ .ptr = @ptrCast(self.context) },
+            .get_proc_address = .{ .ptr = @ptrCast(@constCast(&sdl.SDL_GL_GetProcAddress)) },
+        } };
+    }
+} else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    display: egl.EGLDisplay,
+    config: egl.EGLConfig,
+    surface: egl.EGLSurface,
+    share_context: egl.EGLContext,
+
+    fn init() !@This() {
+        const display = try initDisplay();
+        errdefer _ = egl.eglTerminate(display);
+
+        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
+
+        const config_attributes = [_]egl.EGLint{
+            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
+            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
+            egl.EGL_RED_SIZE,        8,
+            egl.EGL_GREEN_SIZE,      8,
+            egl.EGL_BLUE_SIZE,       8,
+            egl.EGL_ALPHA_SIZE,      8,
+            egl.EGL_DEPTH_SIZE,      24,
+            egl.EGL_STENCIL_SIZE,    8,
+            egl.EGL_NONE,
+        };
+        var config: egl.EGLConfig = null;
+        var config_count: egl.EGLint = 0;
+        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
+            config_count == 0 or config == null)
+        {
+            return error.EglUnavailable;
+        }
+
+        const context_attributes = [_]egl.EGLint{
+            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
+            egl.EGL_NONE,
+        };
+        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
+        if (share_context == egl.EGL_NO_CONTEXT) return error.EglUnavailable;
+        errdefer _ = egl.eglDestroyContext(display, share_context);
+
+        const surface_attributes = [_]egl.EGLint{
+            egl.EGL_WIDTH,  8,
+            egl.EGL_HEIGHT, 8,
+            egl.EGL_NONE,
+        };
+        const surface = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
+        if (surface == egl.EGL_NO_SURFACE) return error.EglUnavailable;
+        errdefer _ = egl.eglDestroySurface(display, surface);
+
+        if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
+        return .{
+            .display = display,
+            .config = config,
+            .surface = surface,
+            .share_context = share_context,
+        };
+    }
+
+    fn deinit(self: *@This()) void {
+        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
+        _ = egl.eglDestroySurface(self.display, self.surface);
+        _ = egl.eglDestroyContext(self.display, self.share_context);
+        _ = egl.eglTerminate(self.display);
+    }
+
+    fn initDisplay() !egl.EGLDisplay {
+        return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
+    }
+
+    fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
+        if (display == egl.EGL_NO_DISPLAY) return error.EglUnavailable;
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.EglUnavailable;
+        return display;
+    }
+
+    fn descriptor(self: *const @This()) maplibre.OpenGLContextDescriptor {
+        return .{ .egl = .{
+            .display = .{ .ptr = @ptrCast(self.display.?) },
+            .config = .{ .ptr = @ptrCast(self.config.?) },
+            .share_context = .{ .ptr = @ptrCast(self.share_context.?) },
+            .get_proc_address = null,
+        } };
+    }
+} else struct {};
 
 const VulkanAttachContext = if (build_options.supports_vulkan) struct {
     dispatch: VulkanDispatch,
