@@ -1,7 +1,7 @@
 """Process-global entry points for the Python binding."""
 
 from . import _native
-from .render import RenderBackend
+from .render import OpenGLContextProvider, RenderBackend
 from .runtime import NetworkStatus
 
 EXPECTED_C_ABI_VERSION: int = int(_native.expected_c_abi_version())
@@ -15,6 +15,11 @@ def c_version() -> int:
 def supported_render_backends() -> RenderBackend:
     """Return render backends compiled into the linked native library."""
     return RenderBackend(_native.supported_render_backends_raw())
+
+
+def supported_opengl_context_providers() -> OpenGLContextProvider:
+    """Return OpenGL context providers compiled into the linked native library."""
+    return OpenGLContextProvider(_native.supported_opengl_context_providers_raw())
 
 
 def network_status() -> NetworkStatus:

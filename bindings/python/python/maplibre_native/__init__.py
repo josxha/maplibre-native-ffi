@@ -5,6 +5,7 @@ from ._global import (
     c_version,
     network_status,
     set_network_status,
+    supported_opengl_context_providers,
     supported_render_backends,
 )
 from .errors import (
@@ -18,7 +19,7 @@ from .errors import (
     WrongThreadError,
 )
 from .map import MapHandle, MapMode, MapOptions
-from .render import NativePointer, RenderBackend
+from .render import NativePointer, OpenGLContextProvider, RenderBackend
 from .runtime import (
     NetworkStatus,
     RenderFramePayload,
@@ -49,6 +50,7 @@ __all__ = [
     "NativeError",
     "NativePointer",
     "NetworkStatus",
+    "OpenGLContextProvider",
     "RenderBackend",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -70,5 +72,6 @@ __all__ = [
     "c_version",
     "network_status",
     "set_network_status",
+    "supported_opengl_context_providers",
     "supported_render_backends",
 ]

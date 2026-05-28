@@ -31,6 +31,13 @@ def test_c_version_matches_expected_abi_version() -> None:
 
 def test_supported_render_backends_returns_flag_value() -> None:
     assert isinstance(mln.supported_render_backends(), mln.RenderBackend)
+    assert render.RenderBackend.OPENGL.value == 1 << 2
+
+
+def test_supported_opengl_context_providers_returns_flag_value() -> None:
+    assert isinstance(
+        mln.supported_opengl_context_providers(), mln.OpenGLContextProvider
+    )
 
 
 def test_native_pointer_is_opaque_value() -> None:
@@ -90,6 +97,7 @@ def test_public_type_hints_are_resolvable() -> None:
         map_module.MapHandle.__init__,
         map_module.MapHandle.set_style_image,
         render.RenderSessionHandle.__init__,
+        render.RenderSessionHandle.acquire_opengl_owned_texture_frame,
         render.RenderSessionHandle.query_feature_extensions,
         render.RenderSessionHandle.query_rendered_features,
         render.RenderSessionHandle.set_feature_state,
@@ -896,7 +904,11 @@ def test_render_descriptors_are_public_python_values() -> None:
     )
     vulkan = render.VulkanBorrowedTextureDescriptor(
         extent=extent,
-        context=render.VulkanContextDescriptor(graphics_queue_family_index=7),
+        context=render.VulkanContextDescriptor(
+            graphics_queue_family_index=7,
+            get_instance_proc_addr=render.NativePointer(0x1111),
+            get_device_proc_addr=render.NativePointer(0x2222),
+        ),
         image=pointer,
         image_view=render.NativePointer(0x5678),
         format=44,
@@ -906,9 +918,36 @@ def test_render_descriptors_are_public_python_values() -> None:
 
     assert metal.extent == extent
     assert metal.context.device.address == 0x1234
+    opengl_egl = render.OpenGLOwnedTextureDescriptor(
+        extent=extent,
+        context=render.EglContextDescriptor(
+            display=pointer,
+            config=render.NativePointer(0x7777),
+            share_context=render.NativePointer(0x8888),
+            get_proc_address=render.NativePointer(0x9999),
+        ),
+    )
+    opengl_wgl = render.OpenGLBorrowedTextureDescriptor(
+        extent=extent,
+        context=render.WglContextDescriptor(
+            device_context=pointer,
+            share_context=render.NativePointer(0x8888),
+            get_proc_address=render.NativePointer(0x9999),
+        ),
+        texture=5,
+        target=0x0DE1,
+    )
+
     assert vulkan.context.graphics_queue_family_index == 7
+    assert vulkan.context.get_instance_proc_addr.address == 0x1111
+    assert vulkan.context.get_device_proc_addr.address == 0x2222
     assert vulkan.image_view.address == 0x5678
     assert vulkan.format == 44
+    assert opengl_egl.context.display.address == 0x1234
+    assert opengl_egl.context.config.address == 0x7777
+    assert opengl_wgl.context.device_context.address == 0x1234
+    assert opengl_wgl.texture == 5
+    assert opengl_wgl.target == 0x0DE1
 
 
 def test_render_session_query_public_api_uses_query_and_geojson_wire_values() -> None:
@@ -1014,6 +1053,47 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
 
 
+def test_opengl_owned_texture_frame_public_api_uses_native_values() -> None:
+    class FakeNativeFrame:
+        closed = False
+
+        def frame(self) -> dict[str, object]:
+            return {
+                "generation": 1,
+                "width": 64,
+                "height": 32,
+                "scale_factor": 2.0,
+                "frame_id": 3,
+                "target": 0x0DE1,
+                "internal_format": 0x8058,
+                "format": 0x1908,
+                "type": 0x1401,
+            }
+
+        def texture(self) -> int:
+            return 5
+
+        def close(self) -> None:
+            self.closed = True
+
+    frame = render.OpenGLOwnedTextureFrameHandle(FakeNativeFrame())
+
+    assert frame.frame == render.OpenGLOwnedTextureFrame(
+        generation=1,
+        width=64,
+        height=32,
+        scale_factor=2.0,
+        frame_id=3,
+        target=0x0DE1,
+        internal_format=0x8058,
+        format=0x1908,
+        type=0x1401,
+    )
+    assert frame.texture == 5
+    frame.close()
+    assert frame.closed
+
+
 def test_render_session_feature_state_public_api_uses_json_values() -> None:
     class FakeNativeRenderSession:
         closed = False
@@ -1096,6 +1176,22 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
             ) as raised:
                 map_handle.attach_metal_owned_texture(
                     render.MetalOwnedTextureDescriptor()
+                )
+
+            assert raised.value.status in {
+                mln.MaplibreStatus.INVALID_ARGUMENT,
+                mln.MaplibreStatus.UNSUPPORTED,
+            }
+
+
+def test_invalid_opengl_render_target_attach_reports_native_status() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(
+                (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+            ) as raised:
+                map_handle.attach_opengl_owned_texture(
+                    render.OpenGLOwnedTextureDescriptor()
                 )
 
             assert raised.value.status in {

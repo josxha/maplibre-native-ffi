@@ -23,14 +23,19 @@ from .camera import (
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonLike, JsonObjectLike, JsonValue
 from .render import (
+    EglContextDescriptor,
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
     MetalSurfaceDescriptor,
+    OpenGLBorrowedTextureDescriptor,
+    OpenGLOwnedTextureDescriptor,
+    OpenGLSurfaceDescriptor,
     PremultipliedRgba8Image,
     RenderSessionHandle,
     VulkanBorrowedTextureDescriptor,
     VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
+    WglContextDescriptor,
 )
 from .style import (
     CanonicalTileId,
@@ -1199,6 +1204,8 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.device.address,
             descriptor.context.graphics_queue.address,
             descriptor.context.graphics_queue_family_index,
+            descriptor.context.get_instance_proc_addr.address,
+            descriptor.context.get_device_proc_addr.address,
             descriptor.surface.address,
         )
 
@@ -1234,6 +1241,8 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.device.address,
             descriptor.context.graphics_queue.address,
             descriptor.context.graphics_queue_family_index,
+            descriptor.context.get_instance_proc_addr.address,
+            descriptor.context.get_device_proc_addr.address,
         )
 
     def attach_vulkan_borrowed_texture(
@@ -1248,12 +1257,91 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.device.address,
             descriptor.context.graphics_queue.address,
             descriptor.context.graphics_queue_family_index,
+            descriptor.context.get_instance_proc_addr.address,
+            descriptor.context.get_device_proc_addr.address,
             descriptor.image.address,
             descriptor.image_view.address,
             descriptor.format,
             descriptor.initial_layout,
             descriptor.final_layout,
         )
+
+    def attach_opengl_surface(
+        self, descriptor: OpenGLSurfaceDescriptor
+    ) -> RenderSessionHandle:
+        """Attach an OpenGL native surface render target to this map."""
+        platform, first, second, share, get_proc = _opengl_context_parts(
+            descriptor.context
+        )
+        return self._attach_render_session(
+            _native.attach_opengl_surface,
+            descriptor,
+            platform,
+            first,
+            second,
+            share,
+            get_proc,
+            descriptor.surface.address,
+        )
+
+    def attach_opengl_owned_texture(
+        self, descriptor: OpenGLOwnedTextureDescriptor
+    ) -> RenderSessionHandle:
+        """Attach an OpenGL session-owned texture render target to this map."""
+        platform, first, second, share, get_proc = _opengl_context_parts(
+            descriptor.context
+        )
+        return self._attach_render_session(
+            _native.attach_opengl_owned_texture,
+            descriptor,
+            platform,
+            first,
+            second,
+            share,
+            get_proc,
+        )
+
+    def attach_opengl_borrowed_texture(
+        self, descriptor: OpenGLBorrowedTextureDescriptor
+    ) -> RenderSessionHandle:
+        """Attach an OpenGL caller-owned texture render target to this map."""
+        platform, first, second, share, get_proc = _opengl_context_parts(
+            descriptor.context
+        )
+        return self._attach_render_session(
+            _native.attach_opengl_borrowed_texture,
+            descriptor,
+            platform,
+            first,
+            second,
+            share,
+            get_proc,
+            descriptor.texture,
+            descriptor.target,
+        )
+
+
+def _opengl_context_parts(
+    context: EglContextDescriptor | WglContextDescriptor,
+) -> tuple[int, int, int, int, int]:
+    if isinstance(context, WglContextDescriptor):
+        return (
+            1,
+            context.device_context.address,
+            0,
+            context.share_context.address,
+            context.get_proc_address.address,
+        )
+    if isinstance(context, EglContextDescriptor):
+        return (
+            2,
+            context.display.address,
+            context.config.address,
+            context.share_context.address,
+            context.get_proc_address.address,
+        )
+    msg = f"unsupported OpenGL context descriptor: {type(context)!r}"
+    raise TypeError(msg)
 
 
 __all__ = [

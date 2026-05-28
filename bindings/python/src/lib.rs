@@ -220,6 +220,27 @@ struct VulkanOwnedTextureFrameHandle {
     closed: Mutex<bool>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct OpenGLOwnedTextureFrameRaw {
+    generation: u64,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    frame_id: u64,
+    texture: u32,
+    target: u32,
+    internal_format: u32,
+    format: u32,
+    type_: u32,
+}
+
+#[pyclass(name = "_OpenGLOwnedTextureFrameHandle")]
+struct OpenGLOwnedTextureFrameHandle {
+    session: Arc<Mutex<RenderSessionState>>,
+    raw: OpenGLOwnedTextureFrameRaw,
+    closed: Mutex<bool>,
+}
+
 impl RuntimeHandle {
     fn state(&self) -> MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_runtime>> {
         self.state
@@ -3586,6 +3607,27 @@ impl RenderSessionHandle {
         })
     }
 
+    fn acquire_opengl_owned_texture_frame(&self) -> PyResult<OpenGLOwnedTextureFrameHandle> {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        let mut raw = empty_opengl_owned_texture_frame();
+        // SAFETY: raw points to initialized writable frame storage, and the C
+        // API validates the session pointer and texture-session state.
+        maplibre_core::check(unsafe {
+            sys::mln_opengl_owned_texture_acquire_frame(state.as_ptr(), &mut raw)
+        })
+        .map_err(map_error)?;
+        state.frame_acquired = true;
+        Ok(OpenGLOwnedTextureFrameHandle {
+            session: Arc::clone(&self.state),
+            raw: OpenGLOwnedTextureFrameRaw::from_native(&raw),
+            closed: Mutex::new(false),
+        })
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state
@@ -5913,6 +5955,39 @@ impl VulkanOwnedTextureFrameRaw {
     }
 }
 
+impl OpenGLOwnedTextureFrameRaw {
+    fn from_native(raw: &sys::mln_opengl_owned_texture_frame) -> Self {
+        Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            texture: raw.texture,
+            target: raw.target,
+            internal_format: raw.internal_format,
+            format: raw.format,
+            type_: raw.type_,
+        }
+    }
+
+    fn to_native(self) -> sys::mln_opengl_owned_texture_frame {
+        sys::mln_opengl_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32,
+            generation: self.generation,
+            width: self.width,
+            height: self.height,
+            scale_factor: self.scale_factor,
+            frame_id: self.frame_id,
+            texture: self.texture,
+            target: self.target,
+            internal_format: self.internal_format,
+            format: self.format,
+            type_: self.type_,
+        }
+    }
+}
+
 fn empty_metal_owned_texture_frame() -> sys::mln_metal_owned_texture_frame {
     sys::mln_metal_owned_texture_frame {
         size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
@@ -5940,6 +6015,22 @@ fn empty_vulkan_owned_texture_frame() -> sys::mln_vulkan_owned_texture_frame {
         device: std::ptr::null_mut(),
         format: 0,
         layout: 0,
+    }
+}
+
+fn empty_opengl_owned_texture_frame() -> sys::mln_opengl_owned_texture_frame {
+    sys::mln_opengl_owned_texture_frame {
+        size: std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32,
+        generation: 0,
+        width: 0,
+        height: 0,
+        scale_factor: 0.0,
+        frame_id: 0,
+        texture: 0,
+        target: 0,
+        internal_format: 0,
+        format: 0,
+        type_: 0,
     }
 }
 
@@ -6138,6 +6229,85 @@ impl Drop for VulkanOwnedTextureFrameHandle {
     }
 }
 
+#[pymethods]
+impl OpenGLOwnedTextureFrameHandle {
+    fn close(&self) -> PyResult<()> {
+        let mut closed = self
+            .closed
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if *closed {
+            return Ok(());
+        }
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let raw = self.raw.to_native();
+        // SAFETY: raw reconstructs the frame returned by the successful native
+        // acquire call for this session and has not been released yet.
+        maplibre_core::check(unsafe {
+            sys::mln_opengl_owned_texture_release_frame(session.as_ptr(), &raw)
+        })
+        .map_err(map_error)?;
+        session.frame_acquired = false;
+        *closed = true;
+        Ok(())
+    }
+
+    fn frame(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        if *self
+            .closed
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        {
+            return Err(invalid_state_error(
+                "OpenGLOwnedTextureFrameHandle is closed",
+            ));
+        }
+        let dict = PyDict::new(py);
+        dict.set_item("generation", self.raw.generation)?;
+        dict.set_item("width", self.raw.width)?;
+        dict.set_item("height", self.raw.height)?;
+        dict.set_item("scale_factor", self.raw.scale_factor)?;
+        dict.set_item("frame_id", self.raw.frame_id)?;
+        dict.set_item("target", self.raw.target)?;
+        dict.set_item("internal_format", self.raw.internal_format)?;
+        dict.set_item("format", self.raw.format)?;
+        dict.set_item("type", self.raw.type_)?;
+        Ok(dict.into_any().unbind())
+    }
+
+    fn texture(&self) -> PyResult<u32> {
+        if *self
+            .closed
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        {
+            Err(invalid_state_error(
+                "OpenGLOwnedTextureFrameHandle is closed",
+            ))
+        } else {
+            Ok(self.raw.texture)
+        }
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        *self
+            .closed
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+impl Drop for OpenGLOwnedTextureFrameHandle {
+    fn drop(&mut self) {
+        // Python finalization may run off the owner thread, so native frame
+        // release is explicit through close(). The public wrapper reports leaks.
+    }
+}
+
 fn map_error(error: Error) -> PyErr {
     let raw_status = error.raw_status();
     let diagnostic = error.diagnostic().to_owned();
@@ -6181,6 +6351,14 @@ fn supported_render_backends_raw() -> u32 {
     // SAFETY: mln_supported_render_backend_mask takes no arguments and returns
     // a value mask. The Python layer preserves unknown future bits.
     unsafe { sys::mln_supported_render_backend_mask() }
+}
+
+/// Returns the raw OpenGL context-provider support mask reported by the linked library.
+#[pyfunction]
+fn supported_opengl_context_providers_raw() -> u32 {
+    // SAFETY: mln_opengl_supported_context_provider_mask takes no arguments and returns
+    // a value mask. The Python layer preserves unknown future bits.
+    unsafe { sys::mln_opengl_supported_context_provider_mask() }
 }
 
 /// Returns the raw process-global network status reported by the linked library.
@@ -6555,6 +6733,8 @@ fn attach_vulkan_surface(
     device_address: usize,
     graphics_queue_address: usize,
     graphics_queue_family_index: u32,
+    get_instance_proc_addr: usize,
+    get_device_proc_addr: usize,
     surface_address: usize,
 ) -> PyResult<RenderSessionHandle> {
     let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
@@ -6570,6 +6750,8 @@ fn attach_vulkan_surface(
                 device_address,
                 graphics_queue_address,
                 graphics_queue_family_index,
+                get_instance_proc_addr,
+                get_device_proc_addr,
             ),
             surface: surface_address as *mut c_void,
         },
@@ -6644,6 +6826,8 @@ fn attach_vulkan_owned_texture(
     device_address: usize,
     graphics_queue_address: usize,
     graphics_queue_family_index: u32,
+    get_instance_proc_addr: usize,
+    get_device_proc_addr: usize,
 ) -> PyResult<RenderSessionHandle> {
     let descriptor = maplibre_core::render::vulkan_owned_texture_descriptor_to_native(
         maplibre_core::render::VulkanOwnedTextureDescriptorFields {
@@ -6658,6 +6842,8 @@ fn attach_vulkan_owned_texture(
                 device_address,
                 graphics_queue_address,
                 graphics_queue_family_index,
+                get_instance_proc_addr,
+                get_device_proc_addr,
             ),
         },
     );
@@ -6680,6 +6866,8 @@ fn attach_vulkan_borrowed_texture(
     device_address: usize,
     graphics_queue_address: usize,
     graphics_queue_family_index: u32,
+    get_instance_proc_addr: usize,
+    get_device_proc_addr: usize,
     image_address: usize,
     image_view_address: usize,
     format: u32,
@@ -6699,6 +6887,8 @@ fn attach_vulkan_borrowed_texture(
                 device_address,
                 graphics_queue_address,
                 graphics_queue_family_index,
+                get_instance_proc_addr,
+                get_device_proc_addr,
             ),
             image: image_address as *mut c_void,
             image_view: image_view_address as *mut c_void,
@@ -6714,12 +6904,128 @@ fn attach_vulkan_borrowed_texture(
     })
 }
 
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn attach_opengl_surface(
+    map: &MapHandle,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    context_platform: u32,
+    context_address_1: usize,
+    context_address_2: usize,
+    share_context_address: usize,
+    get_proc_address: usize,
+    surface_address: usize,
+) -> PyResult<RenderSessionHandle> {
+    let descriptor = maplibre_core::render::opengl_surface_descriptor_to_native(
+        maplibre_core::render::OpenGLSurfaceDescriptorFields {
+            extent: maplibre_core::render::RenderTargetExtentFields {
+                width,
+                height,
+                scale_factor,
+            },
+            context: opengl_context_fields(
+                context_platform,
+                context_address_1,
+                context_address_2,
+                share_context_address,
+                get_proc_address,
+            )?,
+            surface: surface_address as *mut c_void,
+        },
+    );
+    attach_render_session(map, |map_ptr, out| {
+        // SAFETY: descriptor is fully initialized and lives for this call. The C
+        // API validates the map pointer, descriptor fields, and out pointer.
+        unsafe { sys::mln_opengl_surface_attach(map_ptr, &descriptor, out) }
+    })
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn attach_opengl_owned_texture(
+    map: &MapHandle,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    context_platform: u32,
+    context_address_1: usize,
+    context_address_2: usize,
+    share_context_address: usize,
+    get_proc_address: usize,
+) -> PyResult<RenderSessionHandle> {
+    let descriptor = maplibre_core::render::opengl_owned_texture_descriptor_to_native(
+        maplibre_core::render::OpenGLOwnedTextureDescriptorFields {
+            extent: maplibre_core::render::RenderTargetExtentFields {
+                width,
+                height,
+                scale_factor,
+            },
+            context: opengl_context_fields(
+                context_platform,
+                context_address_1,
+                context_address_2,
+                share_context_address,
+                get_proc_address,
+            )?,
+        },
+    );
+    attach_render_session(map, |map_ptr, out| {
+        // SAFETY: descriptor is fully initialized and lives for this call. The C
+        // API validates the map pointer, descriptor fields, and out pointer.
+        unsafe { sys::mln_opengl_owned_texture_attach(map_ptr, &descriptor, out) }
+    })
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn attach_opengl_borrowed_texture(
+    map: &MapHandle,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    context_platform: u32,
+    context_address_1: usize,
+    context_address_2: usize,
+    share_context_address: usize,
+    get_proc_address: usize,
+    texture: u32,
+    target: u32,
+) -> PyResult<RenderSessionHandle> {
+    let descriptor = maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
+        maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
+            extent: maplibre_core::render::RenderTargetExtentFields {
+                width,
+                height,
+                scale_factor,
+            },
+            context: opengl_context_fields(
+                context_platform,
+                context_address_1,
+                context_address_2,
+                share_context_address,
+                get_proc_address,
+            )?,
+            texture,
+            target,
+        },
+    );
+    attach_render_session(map, |map_ptr, out| {
+        // SAFETY: descriptor is fully initialized and lives for this call. The C
+        // API validates the map pointer, descriptor fields, and out pointer.
+        unsafe { sys::mln_opengl_borrowed_texture_attach(map_ptr, &descriptor, out) }
+    })
+}
+
 fn vulkan_context_fields(
     instance_address: usize,
     physical_device_address: usize,
     device_address: usize,
     graphics_queue_address: usize,
     graphics_queue_family_index: u32,
+    get_instance_proc_addr: usize,
+    get_device_proc_addr: usize,
 ) -> maplibre_core::render::VulkanContextDescriptorFields {
     maplibre_core::render::VulkanContextDescriptorFields {
         instance: instance_address as *mut c_void,
@@ -6727,6 +7033,41 @@ fn vulkan_context_fields(
         device: device_address as *mut c_void,
         graphics_queue: graphics_queue_address as *mut c_void,
         graphics_queue_family_index,
+        get_instance_proc_addr: get_instance_proc_addr as *mut c_void,
+        get_device_proc_addr: get_device_proc_addr as *mut c_void,
+    }
+}
+
+fn opengl_context_fields(
+    context_platform: u32,
+    context_address_1: usize,
+    context_address_2: usize,
+    share_context_address: usize,
+    get_proc_address: usize,
+) -> PyResult<maplibre_core::render::OpenGLContextDescriptorFields> {
+    match context_platform {
+        sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL => {
+            Ok(maplibre_core::render::OpenGLContextDescriptorFields::Wgl(
+                maplibre_core::render::WglContextDescriptorFields {
+                    device_context: context_address_1 as *mut c_void,
+                    share_context: share_context_address as *mut c_void,
+                    get_proc_address: get_proc_address as *mut c_void,
+                },
+            ))
+        }
+        sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL => {
+            Ok(maplibre_core::render::OpenGLContextDescriptorFields::Egl(
+                maplibre_core::render::EglContextDescriptorFields {
+                    display: context_address_1 as *mut c_void,
+                    config: context_address_2 as *mut c_void,
+                    share_context: share_context_address as *mut c_void,
+                    get_proc_address: get_proc_address as *mut c_void,
+                },
+            ))
+        }
+        _ => Err(invalid_argument_error(format!(
+            "unknown OpenGL context platform: {context_platform}"
+        ))),
     }
 }
 
@@ -6743,9 +7084,14 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<DetachedRenderSessionHandle>()?;
     module.add_class::<MetalOwnedTextureFrameHandle>()?;
     module.add_class::<VulkanOwnedTextureFrameHandle>()?;
+    module.add_class::<OpenGLOwnedTextureFrameHandle>()?;
     module.add_function(wrap_pyfunction!(expected_c_abi_version, module)?)?;
     module.add_function(wrap_pyfunction!(c_version, module)?)?;
     module.add_function(wrap_pyfunction!(supported_render_backends_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        supported_opengl_context_providers_raw,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(network_status_raw, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
@@ -6769,5 +7115,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(attach_metal_borrowed_texture, module)?)?;
     module.add_function(wrap_pyfunction!(attach_vulkan_owned_texture, module)?)?;
     module.add_function(wrap_pyfunction!(attach_vulkan_borrowed_texture, module)?)?;
+    module.add_function(wrap_pyfunction!(attach_opengl_surface, module)?)?;
+    module.add_function(wrap_pyfunction!(attach_opengl_owned_texture, module)?)?;
+    module.add_function(wrap_pyfunction!(attach_opengl_borrowed_texture, module)?)?;
     Ok(())
 }

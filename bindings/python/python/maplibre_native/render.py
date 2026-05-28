@@ -25,6 +25,15 @@ class RenderBackend(IntFlag):
     NONE = 0
     METAL = 1 << 0
     VULKAN = 1 << 1
+    OPENGL = 1 << 2
+
+
+class OpenGLContextProvider(IntFlag):
+    """OpenGL context provider support bits reported by the native library."""
+
+    NONE = 0
+    WGL = 1 << 0
+    EGL = 1 << 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +83,30 @@ class VulkanContextDescriptor:
     device: NativePointer = NativePointer(0)
     graphics_queue: NativePointer = NativePointer(0)
     graphics_queue_family_index: int = 0
+    get_instance_proc_addr: NativePointer = NativePointer(0)
+    get_device_proc_addr: NativePointer = NativePointer(0)
+
+
+@dataclass(frozen=True, slots=True)
+class WglContextDescriptor:
+    """Borrowed WGL context values shared by OpenGL render targets."""
+
+    device_context: NativePointer = NativePointer(0)
+    share_context: NativePointer = NativePointer(0)
+    get_proc_address: NativePointer = NativePointer(0)
+
+
+@dataclass(frozen=True, slots=True)
+class EglContextDescriptor:
+    """Borrowed EGL context values shared by OpenGL render targets."""
+
+    display: NativePointer = NativePointer(0)
+    config: NativePointer = NativePointer(0)
+    share_context: NativePointer = NativePointer(0)
+    get_proc_address: NativePointer = NativePointer(0)
+
+
+OpenGLContextDescriptor = WglContextDescriptor | EglContextDescriptor
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +124,15 @@ class VulkanSurfaceDescriptor:
 
     extent: RenderTargetExtent = RenderTargetExtent()
     context: VulkanContextDescriptor = VulkanContextDescriptor()
+    surface: NativePointer = NativePointer(0)
+
+
+@dataclass(frozen=True, slots=True)
+class OpenGLSurfaceDescriptor:
+    """OpenGL native surface attachment descriptor."""
+
+    extent: RenderTargetExtent = RenderTargetExtent()
+    context: OpenGLContextDescriptor = EglContextDescriptor()
     surface: NativePointer = NativePointer(0)
 
 
@@ -129,6 +171,24 @@ class VulkanBorrowedTextureDescriptor:
     format: int = 0
     initial_layout: int = 0
     final_layout: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class OpenGLOwnedTextureDescriptor:
+    """OpenGL session-owned texture attachment descriptor."""
+
+    extent: RenderTargetExtent = RenderTargetExtent()
+    context: OpenGLContextDescriptor = EglContextDescriptor()
+
+
+@dataclass(frozen=True, slots=True)
+class OpenGLBorrowedTextureDescriptor:
+    """OpenGL caller-owned texture attachment descriptor."""
+
+    extent: RenderTargetExtent = RenderTargetExtent()
+    context: OpenGLContextDescriptor = EglContextDescriptor()
+    texture: int = 0
+    target: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +274,36 @@ class VulkanOwnedTextureFrame:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class OpenGLOwnedTextureFrame:
+    """Copied metadata for an acquired OpenGL session-owned texture frame."""
+
+    generation: int
+    width: int
+    height: int
+    scale_factor: float
+    frame_id: int
+    target: int
+    internal_format: int
+    format: int
+    type: int
+
+    @classmethod
+    def from_native(cls, raw: dict[str, Any]) -> "OpenGLOwnedTextureFrame":
+        """Build frame metadata from private native values."""
+        return cls(
+            generation=raw["generation"],
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            frame_id=raw["frame_id"],
+            target=raw["target"],
+            internal_format=raw["internal_format"],
+            format=raw["format"],
+            type=raw["type"],
+        )
+
+
 class DetachedRenderSessionHandle(NativeHandleMixin):
     """Close-only render session handle after backend resources detach."""
 
@@ -287,6 +377,12 @@ class RenderSessionHandle(NativeHandleMixin):
         """Acquire a borrowed Vulkan frame from a session-owned texture target."""
         return VulkanOwnedTextureFrameHandle(
             self._native.acquire_vulkan_owned_texture_frame()
+        )
+
+    def acquire_opengl_owned_texture_frame(self) -> "OpenGLOwnedTextureFrameHandle":
+        """Acquire a borrowed OpenGL frame from a session-owned texture target."""
+        return OpenGLOwnedTextureFrameHandle(
+            self._native.acquire_opengl_owned_texture_frame()
         )
 
     def query_rendered_features(
@@ -430,8 +526,28 @@ class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
         return NativePointer(self._native.device_address())
 
 
+class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
+    """Scoped handle for an acquired OpenGL session-owned texture frame."""
+
+    _handle_name = "OpenGLOwnedTextureFrameHandle"
+
+    def __init__(self, native: Any) -> None:
+        self._native = native
+
+    @property
+    def frame(self) -> OpenGLOwnedTextureFrame:
+        """Return copied frame metadata."""
+        return OpenGLOwnedTextureFrame.from_native(self._native.frame())
+
+    @property
+    def texture(self) -> int:
+        """Return the borrowed OpenGL texture object name while the frame is open."""
+        return int(self._native.texture())
+
+
 __all__ = [
     "DetachedRenderSessionHandle",
+    "EglContextDescriptor",
     "MetalBorrowedTextureDescriptor",
     "MetalContextDescriptor",
     "MetalOwnedTextureDescriptor",
@@ -439,6 +555,13 @@ __all__ = [
     "MetalOwnedTextureFrameHandle",
     "MetalSurfaceDescriptor",
     "NativePointer",
+    "OpenGLBorrowedTextureDescriptor",
+    "OpenGLContextDescriptor",
+    "OpenGLContextProvider",
+    "OpenGLOwnedTextureDescriptor",
+    "OpenGLOwnedTextureFrame",
+    "OpenGLOwnedTextureFrameHandle",
+    "OpenGLSurfaceDescriptor",
     "PremultipliedRgba8Image",
     "RenderBackend",
     "RenderSessionHandle",
@@ -450,6 +573,7 @@ __all__ = [
     "VulkanOwnedTextureFrame",
     "VulkanOwnedTextureFrameHandle",
     "VulkanSurfaceDescriptor",
+    "WglContextDescriptor",
 ]
 
 from .map import MapHandle  # noqa: E402
