@@ -34,6 +34,8 @@ struct VulkanTestContext {
   public void* device;
   public void* graphics_queue;
   public uint32 graphics_queue_family_index;
+  public void* get_instance_proc_addr;
+  public void* get_device_proc_addr;
 }
 
 [SimpleType]
@@ -322,6 +324,20 @@ void compile_texture_backend_wrappers() throws MaplibreNative.Error {
   metal_borrowed.height = 16;
   metal_borrowed.scale_factor = 1.0;
   var vulkan_context = new MaplibreNative.VulkanContextDescriptor(pointer, pointer, pointer, pointer, 0);
+  vulkan_context.get_instance_proc_addr = pointer;
+  vulkan_context.get_device_proc_addr = pointer;
+  var egl_context = new MaplibreNative.EglContextDescriptor(pointer, pointer, pointer);
+  egl_context.get_proc_address = pointer;
+  var wgl_context = new MaplibreNative.WglContextDescriptor(pointer, pointer);
+  wgl_context.get_proc_address = pointer;
+  var opengl_owned = new MaplibreNative.OpenGLOwnedTextureDescriptor(egl_context);
+  opengl_owned.width = 16;
+  opengl_owned.height = 16;
+  opengl_owned.scale_factor = 1.0;
+  var opengl_borrowed = new MaplibreNative.OpenGLBorrowedTextureDescriptor(wgl_context, 1, 0x0DE1);
+  opengl_borrowed.width = 16;
+  opengl_borrowed.height = 16;
+  opengl_borrowed.scale_factor = 1.0;
   var vulkan_owned = new MaplibreNative.VulkanOwnedTextureDescriptor(vulkan_context);
   vulkan_owned.width = 16;
   vulkan_owned.height = 16;
@@ -332,6 +348,10 @@ void compile_texture_backend_wrappers() throws MaplibreNative.Error {
   vulkan_borrowed.final_layout = 1;
   var metal_surface = new MaplibreNative.MetalSurfaceDescriptor(pointer);
   metal_surface.device = pointer;
+  var opengl_surface = new MaplibreNative.OpenGLSurfaceDescriptor(egl_context, pointer);
+  opengl_surface.width = 16;
+  opengl_surface.height = 16;
+  opengl_surface.scale_factor = 1.0;
   var vulkan_surface = new MaplibreNative.VulkanSurfaceDescriptor(vulkan_context, pointer);
   vulkan_surface.width = 16;
   vulkan_surface.height = 16;
@@ -343,6 +363,7 @@ int main() {
     assert(MaplibreNative.c_version() == 0);
     var backends = MaplibreNative.supported_render_backends();
     assert(backends != 0);
+    MaplibreNative.opengl_supported_context_providers();
 
     MaplibreNative.set_log_async_severity_mask(MaplibreNative.LogSeverityMask.ALL);
     MaplibreNative.set_log_async_severity_mask(MaplibreNative.LogSeverityMask.DEFAULT);
@@ -369,6 +390,19 @@ int main() {
     map_options.height = 64;
     map_options.scale_factor = 1.0;
     var map = new MaplibreNative.MapHandle(runtime, map_options);
+
+    if ((backends & MaplibreNative.RenderBackendFlags.OPENGL) == 0) {
+      var pointer = MaplibreNative.NativePointer(1);
+      var egl_context = new MaplibreNative.EglContextDescriptor(pointer, pointer, pointer);
+      var opengl_texture = new MaplibreNative.OpenGLOwnedTextureDescriptor(egl_context);
+      bool opengl_unsupported = false;
+      try {
+        map.attach_opengl_owned_texture(opengl_texture);
+      } catch (MaplibreNative.Error error) {
+        opengl_unsupported = true;
+      }
+      assert(opengl_unsupported);
+    }
 
     bool close_runtime_with_live_map_failed = false;
     try {
@@ -772,6 +806,8 @@ int main() {
           MaplibreNative.NativePointer((size_t) vulkan_context_storage.device),
           MaplibreNative.NativePointer((size_t) vulkan_context_storage.graphics_queue),
           vulkan_context_storage.graphics_queue_family_index);
+        vulkan_context.get_instance_proc_addr = MaplibreNative.NativePointer((size_t) vulkan_context_storage.get_instance_proc_addr);
+        vulkan_context.get_device_proc_addr = MaplibreNative.NativePointer((size_t) vulkan_context_storage.get_device_proc_addr);
         var vulkan_texture = new MaplibreNative.VulkanOwnedTextureDescriptor(vulkan_context);
         vulkan_texture.width = 32;
         vulkan_texture.height = 16;

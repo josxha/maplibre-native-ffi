@@ -74,6 +74,10 @@ jobs:
         run: mise run //bindings/rust:ci
       - name: Test Zig binding
         run: mise run //bindings/zig:ci
+      - name: Test Vala binding
+        # Pixi supplies Vala only for Unix targets in pixi.toml.
+        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
+        run: mise run //bindings/vala:ci
 
       - name: Build LWJGL example
         if: ${{ contains(matrix.mise_env, 'vulkan') }}

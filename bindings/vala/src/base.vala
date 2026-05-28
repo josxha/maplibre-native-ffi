@@ -11,7 +11,20 @@ namespace MaplibreNative {
     [Flags]
     public enum RenderBackendFlags {
         METAL = 1 << 0,
-        VULKAN = 1 << 1
+        VULKAN = 1 << 1,
+        OPENGL = 1 << 2
+    }
+
+    [Flags]
+    public enum OpenGLContextProviderFlags {
+        WGL = 1 << 0,
+        EGL = 1 << 1
+    }
+
+    public enum OpenGLContextPlatform {
+        UNSPECIFIED = 0,
+        WGL = 1,
+        EGL = 2
     }
 
     public enum NetworkStatus {

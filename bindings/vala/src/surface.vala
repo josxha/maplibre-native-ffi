@@ -22,6 +22,27 @@ namespace MaplibreNative {
         }
     }
 
+    public class OpenGLSurfaceDescriptor {
+        public uint32 width { get; set; default = 64; }
+        public uint32 height { get; set; default = 64; }
+        public double scale_factor { get; set; default = 1.0; }
+        public OpenGLContextDescriptor context { get; set; }
+        public NativePointer surface { get; set; }
+
+        public OpenGLSurfaceDescriptor (OpenGLContextDescriptor context, NativePointer surface) {
+            this.context = context;
+            this.surface = surface;
+        }
+
+        internal Raw.OpenGLSurfaceDescriptor to_native () throws Error {
+            Raw.OpenGLSurfaceDescriptor descriptor = Raw.opengl_surface_descriptor_default ();
+            descriptor.extent = render_target_extent (width, height, scale_factor);
+            descriptor.context = context.to_native ();
+            descriptor.surface = surface.to_native ();
+            return descriptor;
+        }
+    }
+
     public class VulkanSurfaceDescriptor {
         public uint32 width { get; set; default = 64; }
         public uint32 height { get; set; default = 64; }

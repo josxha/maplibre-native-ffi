@@ -179,6 +179,19 @@ namespace MaplibreNative {
                 throw error;
             }
         }
+
+        public OpenGLOwnedTextureFrameHandle acquire_opengl_owned_texture_frame () throws Error {
+            begin_frame_borrow ();
+            Raw.OpenGLOwnedTextureFrame frame = {};
+            frame.size = (uint32) sizeof (Raw.OpenGLOwnedTextureFrame);
+            try {
+                check_status (Raw.opengl_owned_texture_acquire_frame (require_live (), &frame));
+                return new OpenGLOwnedTextureFrameHandle (this, frame);
+            } catch (Error error) {
+                finish_frame_borrow ();
+                throw error;
+            }
+        }
     }
 
     public class MetalOwnedTextureFrameHandle {

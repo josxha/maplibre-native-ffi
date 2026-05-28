@@ -21,6 +21,8 @@ typedef struct MlnValaVulkanTestContext {
   void* device;
   void* graphics_queue;
   uint32_t graphics_queue_family_index;
+  void* get_instance_proc_addr;
+  void* get_device_proc_addr;
 } MlnValaVulkanTestContext;
 
 typedef struct MlnValaVulkanBorrowedImage {
@@ -266,6 +268,8 @@ bool mln_vala_vulkan_test_context_create(
       out_context->device = device;
       out_context->graphics_queue = queue;
       out_context->graphics_queue_family_index = queue_family_index;
+      out_context->get_instance_proc_addr = (void*)vkGetInstanceProcAddr;
+      out_context->get_device_proc_addr = (void*)vkGetDeviceProcAddr;
       return true;
     }
   }
@@ -457,4 +461,6 @@ void mln_vala_vulkan_test_context_destroy(MlnValaVulkanTestContext* context) {
   context->physical_device = NULL;
   context->graphics_queue = NULL;
   context->graphics_queue_family_index = 0;
+  context->get_instance_proc_addr = NULL;
+  context->get_device_proc_addr = NULL;
 }

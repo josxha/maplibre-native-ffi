@@ -757,6 +757,10 @@ namespace MaplibreNative {
         return (RenderBackendFlags) Raw.supported_render_backend_mask ();
     }
 
+    public OpenGLContextProviderFlags opengl_supported_context_providers () {
+        return (OpenGLContextProviderFlags) Raw.opengl_supported_context_provider_mask ();
+    }
+
     public NetworkStatus network_status () throws Error {
         uint32 raw_status;
         check_status (Raw.network_status_get (out raw_status));

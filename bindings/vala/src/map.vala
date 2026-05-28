@@ -657,6 +657,20 @@ namespace MaplibreNative {
             return new RenderSessionHandle (this, (owned) session);
         }
 
+        public RenderSessionHandle attach_opengl_owned_texture (OpenGLOwnedTextureDescriptor descriptor) throws Error {
+            var native_descriptor = descriptor.to_native ();
+            Raw.RenderSession session;
+            check_status (Raw.opengl_owned_texture_attach (require_live (), &native_descriptor, out session));
+            return new RenderSessionHandle (this, (owned) session);
+        }
+
+        public RenderSessionHandle attach_opengl_borrowed_texture (OpenGLBorrowedTextureDescriptor descriptor) throws Error {
+            var native_descriptor = descriptor.to_native ();
+            Raw.RenderSession session;
+            check_status (Raw.opengl_borrowed_texture_attach (require_live (), &native_descriptor, out session));
+            return new RenderSessionHandle (this, (owned) session);
+        }
+
         public RenderSessionHandle attach_metal_surface (MetalSurfaceDescriptor descriptor) throws Error {
             var native_descriptor = descriptor.to_native ();
             Raw.RenderSession session;
@@ -668,6 +682,13 @@ namespace MaplibreNative {
             var native_descriptor = descriptor.to_native ();
             Raw.RenderSession session;
             check_status (Raw.vulkan_surface_attach (require_live (), &native_descriptor, out session));
+            return new RenderSessionHandle (this, (owned) session);
+        }
+
+        public RenderSessionHandle attach_opengl_surface (OpenGLSurfaceDescriptor descriptor) throws Error {
+            var native_descriptor = descriptor.to_native ();
+            Raw.RenderSession session;
+            check_status (Raw.opengl_surface_attach (require_live (), &native_descriptor, out session));
             return new RenderSessionHandle (this, (owned) session);
         }
 

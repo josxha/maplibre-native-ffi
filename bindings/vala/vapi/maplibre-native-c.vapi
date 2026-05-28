@@ -16,7 +16,22 @@ namespace MaplibreNative.Raw {
     [Flags]
     public enum RenderBackendFlag {
         METAL,
-        VULKAN
+        VULKAN,
+        OPENGL
+    }
+
+    [CCode (cname = "mln_opengl_context_provider_flag", cprefix = "MLN_OPENGL_CONTEXT_PROVIDER_FLAG_", has_type_id = false)]
+    [Flags]
+    public enum OpenGLContextProviderFlag {
+        WGL,
+        EGL
+    }
+
+    [CCode (cname = "mln_opengl_context_platform", cprefix = "MLN_OPENGL_CONTEXT_PLATFORM_", has_type_id = false)]
+    public enum OpenGLContextPlatform {
+        UNSPECIFIED,
+        WGL,
+        EGL
     }
 
     [CCode (cname = "mln_network_status", cprefix = "MLN_NETWORK_STATUS_", has_type_id = false)]
@@ -1125,6 +1140,38 @@ namespace MaplibreNative.Raw {
         public void* device;
         public void* graphics_queue;
         public uint32 graphics_queue_family_index;
+        public void* get_instance_proc_addr;
+        public void* get_device_proc_addr;
+    }
+
+    [SimpleType]
+    [CCode (cname = "mln_wgl_context_descriptor", has_type_id = false)]
+    public struct WglContextDescriptor {
+        public uint32 size;
+        public void* device_context;
+        public void* share_context;
+        public void* get_proc_address;
+    }
+
+    [SimpleType]
+    [CCode (cname = "mln_egl_context_descriptor", has_type_id = false)]
+    public struct EglContextDescriptor {
+        public uint32 size;
+        public void* display;
+        public void* config;
+        public void* share_context;
+        public void* get_proc_address;
+    }
+
+    [SimpleType]
+    [CCode (cname = "mln_opengl_context_descriptor", has_type_id = false)]
+    public struct OpenGLContextDescriptor {
+        public uint32 size;
+        public OpenGLContextPlatform platform;
+        [CCode (cname = "data.wgl")]
+        public WglContextDescriptor wgl;
+        [CCode (cname = "data.egl")]
+        public EglContextDescriptor egl;
     }
 
     [SimpleType]
@@ -1165,6 +1212,24 @@ namespace MaplibreNative.Raw {
     }
 
     [SimpleType]
+    [CCode (cname = "mln_opengl_owned_texture_descriptor", has_type_id = false)]
+    public struct OpenGLOwnedTextureDescriptor {
+        public uint32 size;
+        public RenderTargetExtent extent;
+        public OpenGLContextDescriptor context;
+    }
+
+    [SimpleType]
+    [CCode (cname = "mln_opengl_borrowed_texture_descriptor", has_type_id = false)]
+    public struct OpenGLBorrowedTextureDescriptor {
+        public uint32 size;
+        public RenderTargetExtent extent;
+        public OpenGLContextDescriptor context;
+        public uint32 texture;
+        public uint32 target;
+    }
+
+    [SimpleType]
     [CCode (cname = "mln_metal_surface_descriptor", has_type_id = false)]
     public struct MetalSurfaceDescriptor {
         public uint32 size;
@@ -1179,6 +1244,15 @@ namespace MaplibreNative.Raw {
         public uint32 size;
         public RenderTargetExtent extent;
         public VulkanContextDescriptor context;
+        public void* surface;
+    }
+
+    [SimpleType]
+    [CCode (cname = "mln_opengl_surface_descriptor", has_type_id = false)]
+    public struct OpenGLSurfaceDescriptor {
+        public uint32 size;
+        public RenderTargetExtent extent;
+        public OpenGLContextDescriptor context;
         public void* surface;
     }
 
@@ -1305,6 +1379,22 @@ namespace MaplibreNative.Raw {
         public void* device;
         public uint32 format;
         public uint32 layout;
+    }
+
+    [SimpleType]
+    [CCode (cname = "mln_opengl_owned_texture_frame", has_type_id = false)]
+    public struct OpenGLOwnedTextureFrame {
+        public uint32 size;
+        public uint64 generation;
+        public uint32 width;
+        public uint32 height;
+        public double scale_factor;
+        public uint64 frame_id;
+        public uint32 texture;
+        public uint32 target;
+        public uint32 internal_format;
+        public uint32 format;
+        public uint32 type;
     }
 
     [CCode (cname = "mln_resource_transform_response", has_type_id = false)]
@@ -1923,6 +2013,12 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_vulkan_borrowed_texture_descriptor_default")]
     public static VulkanBorrowedTextureDescriptor vulkan_borrowed_texture_descriptor_default ();
 
+    [CCode (cname = "mln_opengl_owned_texture_descriptor_default")]
+    public static OpenGLOwnedTextureDescriptor opengl_owned_texture_descriptor_default ();
+
+    [CCode (cname = "mln_opengl_borrowed_texture_descriptor_default")]
+    public static OpenGLBorrowedTextureDescriptor opengl_borrowed_texture_descriptor_default ();
+
     [CCode (cname = "mln_texture_image_info_default")]
     public static TextureImageInfo texture_image_info_default ();
 
@@ -1931,6 +2027,12 @@ namespace MaplibreNative.Raw {
 
     [CCode (cname = "mln_vulkan_surface_descriptor_default")]
     public static VulkanSurfaceDescriptor vulkan_surface_descriptor_default ();
+
+    [CCode (cname = "mln_opengl_surface_descriptor_default")]
+    public static OpenGLSurfaceDescriptor opengl_surface_descriptor_default ();
+
+    [CCode (cname = "mln_opengl_supported_context_provider_mask")]
+    public static uint32 opengl_supported_context_provider_mask ();
 
     [CCode (cname = "mln_metal_owned_texture_attach")]
     public static Status metal_owned_texture_attach (Map map, MetalOwnedTextureDescriptor* descriptor, out RenderSession session);
@@ -1944,11 +2046,20 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_vulkan_borrowed_texture_attach")]
     public static Status vulkan_borrowed_texture_attach (Map map, VulkanBorrowedTextureDescriptor* descriptor, out RenderSession session);
 
+    [CCode (cname = "mln_opengl_owned_texture_attach")]
+    public static Status opengl_owned_texture_attach (Map map, OpenGLOwnedTextureDescriptor* descriptor, out RenderSession session);
+
+    [CCode (cname = "mln_opengl_borrowed_texture_attach")]
+    public static Status opengl_borrowed_texture_attach (Map map, OpenGLBorrowedTextureDescriptor* descriptor, out RenderSession session);
+
     [CCode (cname = "mln_metal_surface_attach")]
     public static Status metal_surface_attach (Map map, MetalSurfaceDescriptor* descriptor, out RenderSession session);
 
     [CCode (cname = "mln_vulkan_surface_attach")]
     public static Status vulkan_surface_attach (Map map, VulkanSurfaceDescriptor* descriptor, out RenderSession session);
+
+    [CCode (cname = "mln_opengl_surface_attach")]
+    public static Status opengl_surface_attach (Map map, OpenGLSurfaceDescriptor* descriptor, out RenderSession session);
 
     [CCode (cname = "mln_render_session_resize")]
     public static Status render_session_resize (RenderSession session, uint32 width, uint32 height, double scale_factor);
@@ -1985,6 +2096,12 @@ namespace MaplibreNative.Raw {
 
     [CCode (cname = "mln_vulkan_owned_texture_release_frame")]
     public static Status vulkan_owned_texture_release_frame (RenderSession session, VulkanOwnedTextureFrame* frame);
+
+    [CCode (cname = "mln_opengl_owned_texture_acquire_frame")]
+    public static Status opengl_owned_texture_acquire_frame (RenderSession session, OpenGLOwnedTextureFrame* out_frame);
+
+    [CCode (cname = "mln_opengl_owned_texture_release_frame")]
+    public static Status opengl_owned_texture_release_frame (RenderSession session, OpenGLOwnedTextureFrame* frame);
 
     [CCode (cname = "mln_map_projection_create")]
     public static Status map_projection_create (Map map, out MapProjection projection);

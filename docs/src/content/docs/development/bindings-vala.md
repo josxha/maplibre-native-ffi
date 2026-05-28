@@ -58,21 +58,21 @@ resource request handles, offline region IDs, offline operation IDs, region
 definitions, and offline snapshot/list handles. `query.vala` contains query
 descriptors, result handles, and feature-extension results.
 `render_session.vala` contains render session lifecycle, maintenance, readback,
-feature-state, query entry points, and Metal frame handles. `geometry.vala`
-contains JSON, GeoJSON, geometry, feature, feature-collection, and feature-state
-selector descriptor graphs with their call-scoped native materialization
-helpers. `style.vala` contains style source metadata values, tile source option
-descriptors, custom geometry source callbacks, image source coordinate
-materialization, runtime style image values, location indicator property enums,
-style layer JSON/property/filter/light wrappers, style layer convenience
-wrappers, and style option materialization helpers. `texture.vala` contains
-texture render-target descriptors, backend context descriptors, readback
-metadata values, and scoped Vulkan frame handles. `surface.vala` contains Metal
-and Vulkan surface render-target descriptors. New or refactored API groups move
-into focused backend-specific files as needed. Keep descriptor materialization
-utilities near the descriptor types they support unless multiple domains use
-them. The Vala build compiles all `src/*.vala` files so a new source file
-participates in build and tests automatically.
+feature-state, query entry points, and Metal, Vulkan, and OpenGL frame handles.
+`geometry.vala` contains JSON, GeoJSON, geometry, feature, feature-collection,
+and feature-state selector descriptor graphs with their call-scoped native
+materialization helpers. `style.vala` contains style source metadata values,
+tile source option descriptors, custom geometry source callbacks, image source
+coordinate materialization, runtime style image values, location indicator
+property enums, style layer JSON/property/filter/light wrappers, style layer
+convenience wrappers, and style option materialization helpers. `texture.vala`
+contains texture render-target descriptors, backend context descriptors,
+readback metadata values, and scoped Vulkan frame handles. `surface.vala`
+contains Metal and Vulkan surface render-target descriptors. New or refactored
+API groups move into focused backend-specific files as needed. Keep descriptor
+materialization utilities near the descriptor types they support unless multiple
+domains use them. The Vala build compiles all `src/*.vala` files so a new source
+file participates in build and tests automatically.
 
 The direct binding preserves practical coverage by wrapping C ABI concepts, not
 by recreating the previous generated GObject surface. Keep compact wrappers for
@@ -108,10 +108,12 @@ not express safely:
   payload copying; and feature-extension result handles with copied JSON value
   or feature-collection payloads. The required extended smoke pass exercises
   feature-extension calls against the available source/extension fixture.
-- Render-target wrappers mirror the C ABI for Metal, Vulkan, borrowed texture,
-  owned texture, and surface sessions. The Vala smoke test exercises the active
-  backend's public attach wrappers, resize/detach lifecycle, CPU readback for
-  owned textures, scoped frame handles, active-frame rejection, and unsupported
+- Render-target wrappers mirror the C ABI for Metal, Vulkan, OpenGL, borrowed
+  texture, owned texture, and surface sessions. Vulkan descriptors carry
+  host-controlled loader procedure addresses. OpenGL descriptors cover EGL and
+  WGL context providers. The Vala smoke test exercises the active backend's
+  public attach wrappers, resize/detach lifecycle, CPU readback for owned
+  textures, scoped frame handles, active-frame rejection, and unsupported
   owned-frame/readback/resize calls on borrowed texture sessions. The macOS
   Vulkan variant creates test-owned Vulkan images and Metal-backed Vulkan
   surfaces so the public Vala wrappers cross the real C ABI.

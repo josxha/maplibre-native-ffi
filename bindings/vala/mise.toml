@@ -81,7 +81,7 @@ MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE=1 \
 '''
 
 [tasks.test]
-depends = [":compile-tests"]
+depends = [":build", ":compile-tests"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = "true"
 
