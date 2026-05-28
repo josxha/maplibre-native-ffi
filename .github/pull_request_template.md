@@ -12,6 +12,5 @@
 
 - **Tools:** <!-- e.g. Codex, OpenCode, Claude Code, Cursor -->
 - **Models:**
-- **Scope:** <!-- what the AI did vs what you verified and own -->
 - **Context:**
   <!-- how AI was used; links to plans, skills, or session exports if any — see AI_POLICY.md -->
