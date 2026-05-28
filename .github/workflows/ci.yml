@@ -65,6 +65,10 @@ jobs:
       - run: mise run configure
       - run: mise run test
 
+      # Go cgo link flags are Unix-style today; run Go CI on Unix variants until Windows linking is wired.
+      - name: Test Go binding
+        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
+        run: mise run //bindings/go:ci
       - name: Build Java FFM binding
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
