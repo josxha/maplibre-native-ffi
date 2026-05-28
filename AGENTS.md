@@ -59,6 +59,12 @@ to run them manually.
 The environment is managed by mise and pixi, so if you need to run a command
 that's not already a mise task, use `mise exec -- pixi run ...`.
 
+## Pull requests
+
+When you open a pull request, write **Summary** and **Test plan** in at most one
+sentence of prose each. I will expand the PR description if more detail is
+needed. More context: [AI_POLICY.md](./AI_POLICY.md).
+
 ## Project Invariants
 
 ### General
