@@ -14,6 +14,7 @@ const {
   latLngForProjectedMeters,
   MaplibreStatus,
   MetalOwnedTextureFrame,
+  OpenGLOwnedTextureFrame,
   NativeBuffer,
   NativePointer,
   OfflineOperationHandle,
@@ -28,6 +29,7 @@ const {
   setLogCallback,
   setNetworkStatus,
   supportedRenderBackends,
+  supportedOpenGLContextProviders,
   threadLastErrorMessage,
 } = require("..");
 const nativeAddon = require("../index.js");
@@ -67,6 +69,8 @@ if (false) {
   session.withMetalOwnedTextureFrame(async (frame) => frame.width);
   // @ts-expect-error texture frame callbacks release native frames synchronously.
   session.withVulkanOwnedTextureFrame(async (frame) => frame.width);
+  // @ts-expect-error texture frame callbacks release native frames synchronously.
+  session.withOpenGLOwnedTextureFrame(async (frame) => frame.width);
 }
 
 test("concept subpath modules expose curated public API groups", () => {
@@ -115,6 +119,13 @@ test("process-global APIs cross the native add-on", () => {
   assert.equal(typeof backends.rawMask, "number");
   assert.equal(typeof backends.metal, "boolean");
   assert.equal(typeof backends.vulkan, "boolean");
+  assert.equal(typeof backends.opengl, "boolean");
+
+  const openglProviders = supportedOpenGLContextProviders();
+  assert.equal(typeof openglProviders.rawMask, "number");
+  assert.equal(typeof openglProviders.wgl, "boolean");
+  assert.equal(typeof openglProviders.egl, "boolean");
+
   assert.equal(typeof threadLastErrorMessage(), "string");
 
   const original = networkStatus();
@@ -242,9 +253,18 @@ test("texture frame scopes expose borrowed pointers only while active", () => {
   assert.throws(() => textureAfterScope.address, InvalidStateError);
 
   assert.equal(typeof VulkanOwnedTextureFrame, "function");
+  assert.equal(typeof OpenGLOwnedTextureFrame, "function");
   assert.throws(
     () =>
       RenderSessionHandle.prototype.withVulkanOwnedTextureFrame.call(
+        { native: {} },
+        /** @type {any} */ (null),
+      ),
+    InvalidArgumentError,
+  );
+  assert.throws(
+    () =>
+      RenderSessionHandle.prototype.withOpenGLOwnedTextureFrame.call(
         { native: {} },
         /** @type {any} */ (null),
       ),
@@ -350,11 +370,11 @@ test("offline operations expose discardable handles", () => {
     operation.close();
     const list = runtime.offlineRegionsList();
     assert.equal(list instanceof OfflineOperationHandle, true);
+    list.close();
     assert.throws(
       () => runtime.offlineRegionsListTakeResult(list),
       InvalidStateError,
     );
-    list.close();
     const get = runtime.offlineRegionGet(1n);
     get.close();
     const status = runtime.offlineRegionGetStatus(1n);

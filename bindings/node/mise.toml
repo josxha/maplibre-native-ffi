@@ -1,15 +1,17 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = "pnpm install --frozen-lockfile && pnpm build"
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "pnpm --filter @maplibre/native-ffi-node build"
 
 [tasks.test]
 depends = [":build"]
-run = "pnpm test"
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "pnpm --filter @maplibre/native-ffi-node test"
 
 [tasks.ci]
 depends = [":test"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = [
-  "pnpm --dir bindings/node typecheck",
+  "pnpm --filter @maplibre/native-ffi-node typecheck",
   "cargo clippy -p maplibre-native-node --all-targets -- -D warnings",
 ]

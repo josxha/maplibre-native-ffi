@@ -68,6 +68,13 @@ export interface RenderBackends {
   rawMask: number;
   metal: boolean;
   vulkan: boolean;
+  opengl: boolean;
+}
+
+export interface OpenGLContextProviders {
+  rawMask: number;
+  wgl: boolean;
+  egl: boolean;
 }
 
 export interface NetworkStatusValue {
@@ -641,7 +648,28 @@ export interface VulkanContextDescriptor {
   device: NativePointer;
   graphicsQueue: NativePointer;
   graphicsQueueFamilyIndex: number;
+  getInstanceProcAddr?: NativePointer | null;
+  getDeviceProcAddr?: NativePointer | null;
 }
+
+export interface WglContextDescriptor {
+  platform: "wgl";
+  deviceContext: NativePointer;
+  shareContext: NativePointer;
+  getProcAddress?: NativePointer | null;
+}
+
+export interface EglContextDescriptor {
+  platform: "egl";
+  display: NativePointer;
+  config: NativePointer;
+  shareContext: NativePointer;
+  getProcAddress?: NativePointer | null;
+}
+
+export type OpenGLContextDescriptor =
+  | WglContextDescriptor
+  | EglContextDescriptor;
 
 export interface VulkanOwnedTextureDescriptor {
   extent: RenderTargetExtent;
@@ -661,6 +689,24 @@ export interface VulkanBorrowedTextureDescriptor {
 export interface VulkanSurfaceDescriptor {
   extent: RenderTargetExtent;
   context: VulkanContextDescriptor;
+  surface: NativePointer;
+}
+
+export interface OpenGLOwnedTextureDescriptor {
+  extent: RenderTargetExtent;
+  context: OpenGLContextDescriptor;
+}
+
+export interface OpenGLBorrowedTextureDescriptor {
+  extent: RenderTargetExtent;
+  context: OpenGLContextDescriptor;
+  texture: number;
+  target: number;
+}
+
+export interface OpenGLSurfaceDescriptor {
+  extent: RenderTargetExtent;
+  context: OpenGLContextDescriptor;
   surface: NativePointer;
 }
 
@@ -700,6 +746,20 @@ export declare class VulkanOwnedTextureFrame {
   readonly device: NativePointer;
   readonly format: number;
   readonly layout: number;
+}
+
+export declare class OpenGLOwnedTextureFrame {
+  private constructor(nativeFrame: unknown);
+  readonly generation: bigint;
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  readonly frameId: bigint;
+  readonly texture: number;
+  readonly target: number;
+  readonly internalFormat: number;
+  readonly format: number;
+  readonly type: number;
 }
 
 export interface FeatureStateSelector {
@@ -765,6 +825,18 @@ export declare class RenderSessionHandle {
     map: MapHandle,
     descriptor: VulkanSurfaceDescriptor,
   ): RenderSessionHandle;
+  static attachOpenGLOwnedTexture(
+    map: MapHandle,
+    descriptor: OpenGLOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  static attachOpenGLBorrowedTexture(
+    map: MapHandle,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  static attachOpenGLSurface(
+    map: MapHandle,
+    descriptor: OpenGLSurfaceDescriptor,
+  ): RenderSessionHandle;
   readonly closed: boolean;
   close(): void;
   resize(width: number, height: number, scaleFactor: number): void;
@@ -796,6 +868,9 @@ export declare class RenderSessionHandle {
   ): TextureFrameCallbackResult<T>;
   withVulkanOwnedTextureFrame<T>(
     callback: (frame: VulkanOwnedTextureFrame) => TextureFrameCallbackResult<T>,
+  ): TextureFrameCallbackResult<T>;
+  withOpenGLOwnedTextureFrame<T>(
+    callback: (frame: OpenGLOwnedTextureFrame) => TextureFrameCallbackResult<T>,
   ): TextureFrameCallbackResult<T>;
   readPremultipliedRgba8(): TextureReadback;
   [Symbol.dispose](): void;
@@ -834,6 +909,13 @@ export declare class MapHandle {
     descriptor: VulkanBorrowedTextureDescriptor,
   ): RenderSessionHandle;
   attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle;
+  attachOpenGLOwnedTexture(
+    descriptor: OpenGLOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachOpenGLBorrowedTexture(
+    descriptor: OpenGLBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle;
   requestRepaint(): void;
   requestStillImage(): void;
   isFullyLoaded(): boolean;
@@ -1082,6 +1164,7 @@ export type LocationIndicatorImageKind = "top" | "bearing" | "shadow";
 
 export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;
+export declare function supportedOpenGLContextProviders(): OpenGLContextProviders;
 export declare function threadLastErrorMessage(): string;
 export declare function networkStatus(): NetworkStatusValue;
 export type LogSeverity = "info" | "warning" | "error";

@@ -79,6 +79,10 @@ function supportedRenderBackends() {
   return native.supportedRenderBackends();
 }
 
+function supportedOpenGLContextProviders() {
+  return native.supportedOpenGLContextProviders();
+}
+
 function threadLastErrorMessage() {
   return native.threadLastErrorMessage();
 }
@@ -394,6 +398,67 @@ class MetalOwnedTextureFrame {
   }
 }
 
+class OpenGLOwnedTextureFrame {
+  #active = true;
+  #raw;
+
+  constructor(token, raw) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "texture frames are only available inside render-session frame scopes",
+      );
+    }
+    this.#raw = raw;
+    Object.freeze(this);
+  }
+
+  get generation() {
+    return this.#read("generation");
+  }
+  get width() {
+    return this.#read("width");
+  }
+  get height() {
+    return this.#read("height");
+  }
+  get scaleFactor() {
+    return this.#read("scaleFactor");
+  }
+  get frameId() {
+    return this.#read("frameId");
+  }
+  get texture() {
+    return this.#read("texture");
+  }
+  get target() {
+    return this.#read("target");
+  }
+  get internalFormat() {
+    return this.#read("internalFormat");
+  }
+  get format() {
+    return this.#read("format");
+  }
+  get type() {
+    return this.#read("type");
+  }
+
+  #read(field) {
+    if (!this.#active) {
+      throw new InvalidStateError(null, "texture frame scope is closed");
+    }
+    return this.#raw[field];
+  }
+
+  [TEXTURE_FRAME_RAW]() {
+    return this.#raw;
+  }
+  [TEXTURE_FRAME_DEACTIVATE]() {
+    this.#active = false;
+  }
+}
+
 class VulkanOwnedTextureFrame {
   #active = true;
   #raw;
@@ -479,6 +544,9 @@ class VulkanOwnedTextureFrame {
 
 function operationIdOf(operation) {
   if (operation instanceof OfflineOperationHandle) {
+    if (operation.closed) {
+      throw new InvalidStateError(null, "offline operation handle is closed");
+    }
     return operation.operationId;
   }
   if (typeof operation === "bigint") {
@@ -943,7 +1011,61 @@ function normalizeVulkanContext(context) {
       "graphicsQueue",
     ),
     graphicsQueueFamilyIndex: context?.graphicsQueueFamilyIndex,
+    getInstanceProcAddrAddress: nullableNativePointerAddress(
+      context?.getInstanceProcAddr,
+      "getInstanceProcAddr",
+    ),
+    getDeviceProcAddrAddress: nullableNativePointerAddress(
+      context?.getDeviceProcAddr,
+      "getDeviceProcAddr",
+    ),
   };
+}
+
+function normalizeOpenGLContext(context) {
+  const platform = context?.platform;
+  if (platform === "wgl") {
+    return {
+      platform,
+      wgl: {
+        deviceContextAddress: nativePointerAddress(
+          context.deviceContext,
+          "deviceContext",
+        ),
+        shareContextAddress: nativePointerAddress(
+          context.shareContext,
+          "shareContext",
+        ),
+        getProcAddressAddress: nullableNativePointerAddress(
+          context.getProcAddress,
+          "getProcAddress",
+        ),
+      },
+      egl: null,
+    };
+  }
+  if (platform === "egl") {
+    return {
+      platform,
+      wgl: null,
+      egl: {
+        displayAddress: nativePointerAddress(context.display, "display"),
+        configAddress: nativePointerAddress(context.config, "config"),
+        shareContextAddress: nativePointerAddress(
+          context.shareContext,
+          "shareContext",
+        ),
+        getProcAddressAddress: nullableNativePointerAddress(
+          context.getProcAddress,
+          "getProcAddress",
+        ),
+      },
+    };
+  }
+  throw new InvalidArgumentError(
+    null,
+    "OpenGL context platform must be 'wgl' or 'egl'",
+  );
 }
 
 function normalizeMetalOwnedTextureDescriptor(descriptor) {
@@ -991,6 +1113,30 @@ function normalizeVulkanSurfaceDescriptor(descriptor) {
   return {
     extent: descriptor?.extent,
     context: normalizeVulkanContext(descriptor?.context),
+    surfaceAddress: nativePointerAddress(descriptor?.surface, "surface"),
+  };
+}
+
+function normalizeOpenGLOwnedTextureDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeOpenGLContext(descriptor?.context),
+  };
+}
+
+function normalizeOpenGLBorrowedTextureDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeOpenGLContext(descriptor?.context),
+    texture: descriptor?.texture,
+    target: descriptor?.target,
+  };
+}
+
+function normalizeOpenGLSurfaceDescriptor(descriptor) {
+  return {
+    extent: descriptor?.extent,
+    context: normalizeOpenGLContext(descriptor?.context),
     surfaceAddress: nativePointerAddress(descriptor?.surface, "surface"),
   };
 }
@@ -1058,6 +1204,33 @@ class RenderSessionHandle {
       native.createVulkanSurfaceRenderSession(
         liveNativeOf(map),
         normalizeVulkanSurfaceDescriptor(descriptor),
+      ),
+    );
+  }
+
+  static attachOpenGLOwnedTexture(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createOpenGLOwnedTextureRenderSession(
+        liveNativeOf(map),
+        normalizeOpenGLOwnedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  static attachOpenGLBorrowedTexture(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createOpenGLBorrowedTextureRenderSession(
+        liveNativeOf(map),
+        normalizeOpenGLBorrowedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  static attachOpenGLSurface(map, descriptor) {
+    return attachRenderSession(map, () =>
+      native.createOpenGLSurfaceRenderSession(
+        liveNativeOf(map),
+        normalizeOpenGLSurfaceDescriptor(descriptor),
       ),
     );
   }
@@ -1222,6 +1395,34 @@ class RenderSessionHandle {
     }
   }
 
+  withOpenGLOwnedTextureFrame(callback) {
+    if (typeof callback !== "function") {
+      throw new InvalidArgumentError(
+        null,
+        "OpenGL texture frame callback must be a function",
+      );
+    }
+    const frame = new OpenGLOwnedTextureFrame(
+      CONSTRUCTION_TOKEN,
+      translateNativeErrors(() =>
+        liveNativeOf(this).acquireOpenGLOwnedTextureFrame(),
+      ),
+    );
+    try {
+      return callback(frame);
+    } finally {
+      try {
+        translateNativeErrors(() =>
+          liveNativeOf(this).releaseOpenGLOwnedTextureFrame(
+            frame[TEXTURE_FRAME_RAW](),
+          ),
+        );
+      } finally {
+        frame[TEXTURE_FRAME_DEACTIVATE]();
+      }
+    }
+  }
+
   readPremultipliedRgba8() {
     return translateNativeErrors(() =>
       liveNativeOf(this).readPremultipliedRgba8(),
@@ -1293,6 +1494,18 @@ class MapHandle {
 
   attachVulkanSurface(descriptor) {
     return RenderSessionHandle.attachVulkanSurface(this, descriptor);
+  }
+
+  attachOpenGLOwnedTexture(descriptor) {
+    return RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor);
+  }
+
+  attachOpenGLBorrowedTexture(descriptor) {
+    return RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor);
+  }
+
+  attachOpenGLSurface(descriptor) {
+    return RenderSessionHandle.attachOpenGLSurface(this, descriptor);
   }
 
   requestRepaint() {
@@ -2001,10 +2214,12 @@ module.exports = {
   RenderSessionHandle,
   MetalOwnedTextureFrame,
   VulkanOwnedTextureFrame,
+  OpenGLOwnedTextureFrame,
   NativePointer,
   NativeBuffer,
   cVersion,
   supportedRenderBackends,
+  supportedOpenGLContextProviders,
   threadLastErrorMessage,
   networkStatus,
   setNetworkStatus,
@@ -2031,10 +2246,13 @@ module.exports.MapProjectionHandle = MapProjectionHandle;
 module.exports.RenderSessionHandle = RenderSessionHandle;
 module.exports.MetalOwnedTextureFrame = MetalOwnedTextureFrame;
 module.exports.VulkanOwnedTextureFrame = VulkanOwnedTextureFrame;
+module.exports.OpenGLOwnedTextureFrame = OpenGLOwnedTextureFrame;
 module.exports.NativePointer = NativePointer;
 module.exports.NativeBuffer = NativeBuffer;
 module.exports.cVersion = cVersion;
 module.exports.supportedRenderBackends = supportedRenderBackends;
+module.exports.supportedOpenGLContextProviders =
+  supportedOpenGLContextProviders;
 module.exports.threadLastErrorMessage = threadLastErrorMessage;
 module.exports.networkStatus = networkStatus;
 module.exports.setNetworkStatus = setNetworkStatus;

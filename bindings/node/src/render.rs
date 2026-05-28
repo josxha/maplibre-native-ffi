@@ -51,6 +51,30 @@ pub struct VulkanContextDescriptor {
     pub device_address: BigInt,
     pub graphics_queue_address: BigInt,
     pub graphics_queue_family_index: u32,
+    pub get_instance_proc_addr_address: Option<BigInt>,
+    pub get_device_proc_addr_address: Option<BigInt>,
+}
+
+#[napi(object)]
+pub struct WglContextDescriptor {
+    pub device_context_address: BigInt,
+    pub share_context_address: BigInt,
+    pub get_proc_address_address: Option<BigInt>,
+}
+
+#[napi(object)]
+pub struct EglContextDescriptor {
+    pub display_address: BigInt,
+    pub config_address: BigInt,
+    pub share_context_address: BigInt,
+    pub get_proc_address_address: Option<BigInt>,
+}
+
+#[napi(object)]
+pub struct OpenGLContextDescriptor {
+    pub platform: String,
+    pub wgl: Option<WglContextDescriptor>,
+    pub egl: Option<EglContextDescriptor>,
 }
 
 #[napi(object)]
@@ -74,6 +98,27 @@ pub struct VulkanBorrowedTextureDescriptor {
 pub struct VulkanSurfaceDescriptor {
     pub extent: RenderTargetExtent,
     pub context: VulkanContextDescriptor,
+    pub surface_address: BigInt,
+}
+
+#[napi(object)]
+pub struct OpenGLOwnedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: OpenGLContextDescriptor,
+}
+
+#[napi(object)]
+pub struct OpenGLBorrowedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: OpenGLContextDescriptor,
+    pub texture: u32,
+    pub target: u32,
+}
+
+#[napi(object)]
+pub struct OpenGLSurfaceDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: OpenGLContextDescriptor,
     pub surface_address: BigInt,
 }
 
@@ -115,6 +160,20 @@ pub struct NativeVulkanOwnedTextureFrame {
     pub device_address: BigInt,
     pub format: u32,
     pub layout: u32,
+}
+
+#[napi(object)]
+pub struct NativeOpenGLOwnedTextureFrame {
+    pub generation: BigInt,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub frame_id: BigInt,
+    pub texture: u32,
+    pub target: u32,
+    pub internal_format: u32,
+    pub format: u32,
+    pub type_: u32,
 }
 
 #[napi(object)]
@@ -241,6 +300,48 @@ pub fn create_vulkan_surface_render_session(
     raw_descriptor.surface = bigint_to_ptr(&descriptor.surface_address, "surfaceAddress")?;
     attach_render_session(map, |out_session| unsafe {
         sys::mln_vulkan_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createOpenGLOwnedTextureRenderSession")]
+pub fn create_opengl_owned_texture_render_session(
+    map: &NativeMapHandle,
+    descriptor: OpenGLOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_opengl_owned_texture_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context = descriptor.context.into_native()?;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_opengl_owned_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createOpenGLBorrowedTextureRenderSession")]
+pub fn create_opengl_borrowed_texture_render_session(
+    map: &NativeMapHandle,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context = descriptor.context.into_native()?;
+    raw_descriptor.texture = descriptor.texture;
+    raw_descriptor.target = descriptor.target;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_opengl_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    })
+}
+
+#[napi(js_name = "createOpenGLSurfaceRenderSession")]
+pub fn create_opengl_surface_render_session(
+    map: &NativeMapHandle,
+    descriptor: OpenGLSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    let mut raw_descriptor = unsafe { sys::mln_opengl_surface_descriptor_default() };
+    raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.context = descriptor.context.into_native()?;
+    raw_descriptor.surface = bigint_to_ptr(&descriptor.surface_address, "surfaceAddress")?;
+    attach_render_session(map, |out_session| unsafe {
+        sys::mln_opengl_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
     })
 }
 
@@ -521,6 +622,44 @@ impl NativeRenderSessionHandle {
         Ok(())
     }
 
+    #[napi(js_name = "acquireOpenGLOwnedTextureFrame")]
+    pub fn acquire_opengl_owned_texture_frame(&self) -> Result<NativeOpenGLOwnedTextureFrame> {
+        self.ensure_no_frame_acquired()?;
+        let mut frame = sys::mln_opengl_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32,
+            generation: 0,
+            width: 0,
+            height: 0,
+            scale_factor: 1.0,
+            frame_id: 0,
+            texture: 0,
+            target: 0,
+            internal_format: 0,
+            format: 0,
+            type_: 0,
+        };
+        core::check(unsafe {
+            sys::mln_opengl_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
+        })
+        .map_err(error::from_core)?;
+        self.frame_acquired.set(true);
+        Ok(NativeOpenGLOwnedTextureFrame::from_native(frame))
+    }
+
+    #[napi(js_name = "releaseOpenGLOwnedTextureFrame")]
+    pub fn release_opengl_owned_texture_frame(
+        &self,
+        frame: NativeOpenGLOwnedTextureFrame,
+    ) -> Result<()> {
+        let raw = frame.into_native()?;
+        core::check(unsafe {
+            sys::mln_opengl_owned_texture_release_frame(self.state.as_ptr(), &raw)
+        })
+        .map_err(error::from_core)?;
+        self.frame_acquired.set(false);
+        Ok(())
+    }
+
     #[napi(js_name = "readPremultipliedRgba8")]
     pub fn read_premultiplied_rgba8(&self) -> Result<TextureReadback> {
         self.ensure_no_frame_acquired()?;
@@ -663,7 +802,78 @@ impl VulkanContextDescriptor {
             device: bigint_to_ptr(&self.device_address, "deviceAddress")?,
             graphics_queue: bigint_to_ptr(&self.graphics_queue_address, "graphicsQueueAddress")?,
             graphics_queue_family_index: self.graphics_queue_family_index,
+            get_instance_proc_addr: optional_bigint_to_ptr(
+                self.get_instance_proc_addr_address.as_ref(),
+                "getInstanceProcAddr",
+            )?,
+            get_device_proc_addr: optional_bigint_to_ptr(
+                self.get_device_proc_addr_address.as_ref(),
+                "getDeviceProcAddr",
+            )?,
         })
+    }
+}
+
+impl OpenGLContextDescriptor {
+    fn into_native(self) -> Result<sys::mln_opengl_context_descriptor> {
+        let mut raw = sys::mln_opengl_context_descriptor {
+            size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
+            platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
+            data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
+                wgl: sys::mln_wgl_context_descriptor {
+                    size: std::mem::size_of::<sys::mln_wgl_context_descriptor>() as u32,
+                    device_context: std::ptr::null_mut(),
+                    share_context: std::ptr::null_mut(),
+                    get_proc_address: std::ptr::null_mut(),
+                },
+            },
+        };
+        match self.platform.as_str() {
+            "wgl" => {
+                let wgl = self.wgl.ok_or_else(|| {
+                    error::invalid_argument("OpenGL WGL context requires wgl fields")
+                })?;
+                raw.platform = sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+                raw.data = sys::mln_opengl_context_descriptor__bindgen_ty_1 {
+                    wgl: sys::mln_wgl_context_descriptor {
+                        size: std::mem::size_of::<sys::mln_wgl_context_descriptor>() as u32,
+                        device_context: bigint_to_ptr(
+                            &wgl.device_context_address,
+                            "deviceContext",
+                        )?,
+                        share_context: bigint_to_ptr(&wgl.share_context_address, "shareContext")?,
+                        get_proc_address: optional_bigint_to_ptr(
+                            wgl.get_proc_address_address.as_ref(),
+                            "getProcAddress",
+                        )?,
+                    },
+                };
+            }
+            "egl" => {
+                let egl = self.egl.ok_or_else(|| {
+                    error::invalid_argument("OpenGL EGL context requires egl fields")
+                })?;
+                raw.platform = sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+                raw.data = sys::mln_opengl_context_descriptor__bindgen_ty_1 {
+                    egl: sys::mln_egl_context_descriptor {
+                        size: std::mem::size_of::<sys::mln_egl_context_descriptor>() as u32,
+                        display: bigint_to_ptr(&egl.display_address, "display")?,
+                        config: bigint_to_ptr(&egl.config_address, "config")?,
+                        share_context: bigint_to_ptr(&egl.share_context_address, "shareContext")?,
+                        get_proc_address: optional_bigint_to_ptr(
+                            egl.get_proc_address_address.as_ref(),
+                            "getProcAddress",
+                        )?,
+                    },
+                };
+            }
+            other => {
+                return Err(error::invalid_argument(format!(
+                    "OpenGL context platform must be 'wgl' or 'egl', got '{other}'"
+                )));
+            }
+        }
+        Ok(raw)
     }
 }
 
@@ -746,6 +956,39 @@ impl NativeVulkanOwnedTextureFrame {
             device: bigint_to_ptr(&self.device_address, "deviceAddress")?,
             format: self.format,
             layout: self.layout,
+        })
+    }
+}
+
+impl NativeOpenGLOwnedTextureFrame {
+    fn from_native(raw: sys::mln_opengl_owned_texture_frame) -> Self {
+        Self {
+            generation: BigInt::from(raw.generation),
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: BigInt::from(raw.frame_id),
+            texture: raw.texture,
+            target: raw.target,
+            internal_format: raw.internal_format,
+            format: raw.format,
+            type_: raw.type_,
+        }
+    }
+
+    fn into_native(self) -> Result<sys::mln_opengl_owned_texture_frame> {
+        Ok(sys::mln_opengl_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32,
+            generation: bigint_to_u64(&self.generation, "generation")?,
+            width: self.width,
+            height: self.height,
+            scale_factor: self.scale_factor,
+            frame_id: bigint_to_u64(&self.frame_id, "frameId")?,
+            texture: self.texture,
+            target: self.target,
+            internal_format: self.internal_format,
+            format: self.format,
+            type_: self.type_,
         })
     }
 }
@@ -905,6 +1148,13 @@ fn ptr_to_bigint(value: *mut c_void) -> BigInt {
 fn bigint_to_ptr(value: &BigInt, field_name: &str) -> Result<*mut c_void> {
     let value = bigint_to_u64(value, field_name)?;
     Ok(value as usize as *mut c_void)
+}
+
+fn optional_bigint_to_ptr(value: Option<&BigInt>, field_name: &str) -> Result<*mut c_void> {
+    value
+        .map(|value| bigint_to_ptr(value, field_name))
+        .transpose()
+        .map(|value| value.unwrap_or(std::ptr::null_mut()))
 }
 
 fn bigint_to_u64(value: &BigInt, field_name: &str) -> Result<u64> {

@@ -15,6 +15,14 @@ pub struct RenderBackends {
     pub raw_mask: u32,
     pub metal: bool,
     pub vulkan: bool,
+    pub opengl: bool,
+}
+
+#[napi(object)]
+pub struct OpenGLContextProviders {
+    pub raw_mask: u32,
+    pub wgl: bool,
+    pub egl: bool,
 }
 
 #[napi(object)]
@@ -66,6 +74,19 @@ pub fn supported_render_backends() -> RenderBackends {
         raw_mask,
         metal: raw_mask & maplibre_native_sys::MLN_RENDER_BACKEND_FLAG_METAL != 0,
         vulkan: raw_mask & maplibre_native_sys::MLN_RENDER_BACKEND_FLAG_VULKAN != 0,
+        opengl: raw_mask & maplibre_native_sys::MLN_RENDER_BACKEND_FLAG_OPENGL != 0,
+    }
+}
+
+#[napi(js_name = "supportedOpenGLContextProviders")]
+pub fn supported_opengl_context_providers() -> OpenGLContextProviders {
+    // SAFETY: mln_opengl_supported_context_provider_mask takes no arguments and
+    // returns a value mask. Unknown future bits are preserved in raw_mask.
+    let raw_mask = unsafe { maplibre_native_sys::mln_opengl_supported_context_provider_mask() };
+    OpenGLContextProviders {
+        raw_mask,
+        wgl: raw_mask & maplibre_native_sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL != 0,
+        egl: raw_mask & maplibre_native_sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL != 0,
     }
 }
 

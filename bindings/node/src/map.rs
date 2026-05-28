@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     ffi::{CString, c_void},
+    panic::{AssertUnwindSafe, catch_unwind},
     sync::{Arc, Mutex},
 };
 
@@ -2211,30 +2212,34 @@ extern "C" fn custom_geometry_source_fetch_tile_callback(
     user_data: *mut c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    if user_data.is_null() {
-        return;
-    }
-    let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
-    state.fetch_tile.call(
-        Ok(CanonicalTileId::from_native(tile_id)),
-        ThreadsafeFunctionCallMode::NonBlocking,
-    );
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if user_data.is_null() {
+            return;
+        }
+        let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
+        state.fetch_tile.call(
+            Ok(CanonicalTileId::from_native(tile_id)),
+            ThreadsafeFunctionCallMode::NonBlocking,
+        );
+    }));
 }
 
 extern "C" fn custom_geometry_source_cancel_tile_callback(
     user_data: *mut c_void,
     tile_id: sys::mln_canonical_tile_id,
 ) {
-    if user_data.is_null() {
-        return;
-    }
-    let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
-    if let Some(cancel_tile) = &state.cancel_tile {
-        cancel_tile.call(
-            Ok(CanonicalTileId::from_native(tile_id)),
-            ThreadsafeFunctionCallMode::NonBlocking,
-        );
-    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if user_data.is_null() {
+            return;
+        }
+        let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
+        if let Some(cancel_tile) = &state.cancel_tile {
+            cancel_tile.call(
+                Ok(CanonicalTileId::from_native(tile_id)),
+                ThreadsafeFunctionCallMode::NonBlocking,
+            );
+        }
+    }));
 }
 
 fn custom_geometry_source_options_to_native(

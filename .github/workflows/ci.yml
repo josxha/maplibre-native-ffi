@@ -72,6 +72,8 @@ jobs:
         run: mise run //bindings/java-jni:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
+      - name: Test Node.js binding
+        run: mise run //bindings/node:ci
       - name: Test Zig binding
         run: mise run //bindings/zig:ci
 

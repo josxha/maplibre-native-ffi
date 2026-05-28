@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -758,6 +759,17 @@ unsafe extern "C" fn resource_provider_trampoline(
     request: *const sys::mln_resource_request,
     handle: *mut sys::mln_resource_request_handle,
 ) -> u32 {
+    catch_unwind(AssertUnwindSafe(|| unsafe {
+        resource_provider_trampoline_inner(user_data, request, handle)
+    }))
+    .unwrap_or(core::resource::UNKNOWN_PROVIDER_DECISION)
+}
+
+unsafe fn resource_provider_trampoline_inner(
+    user_data: *mut c_void,
+    request: *const sys::mln_resource_request,
+    handle: *mut sys::mln_resource_request_handle,
+) -> u32 {
     if user_data.is_null() || request.is_null() || handle.is_null() {
         return core::resource::UNKNOWN_PROVIDER_DECISION;
     }
@@ -805,6 +817,18 @@ unsafe extern "C" fn resource_provider_trampoline(
 }
 
 unsafe extern "C" fn resource_transform_trampoline(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    catch_unwind(AssertUnwindSafe(|| unsafe {
+        resource_transform_trampoline_inner(user_data, kind, url, out_response)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+unsafe fn resource_transform_trampoline_inner(
     user_data: *mut c_void,
     kind: u32,
     url: *const c_char,
