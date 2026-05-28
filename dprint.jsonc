@@ -49,7 +49,7 @@
       { "command": "rustfmt --edition 2024", "exts": ["rs"] },
       { "command": "gofmt", "exts": ["go"] },
       {
-        "command": "pnpm --dir docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
+        "command": "pnpm --filter docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
         "exts": ["mdx"],
       },
     ],
