@@ -19,7 +19,24 @@ void main() {
     'process-global APIs cross the native C ABI',
     () {
       expect(Maplibre.cVersion(), greaterThanOrEqualTo(0));
-      expect(Maplibre.supportedRenderBackends().bits, greaterThanOrEqualTo(0));
+      final backends = Maplibre.supportedRenderBackends();
+      expect(backends.bits, greaterThanOrEqualTo(0));
+      expect(backends.contains(const RenderBackendMask(0)), isTrue);
+      expect(RenderBackendMask.opengl.bits, 1 << 2);
+      final openGLProviders = Maplibre.supportedOpenGLContextProviders();
+      expect(openGLProviders.bits, greaterThanOrEqualTo(0));
+      expect(
+        const OpenGLContextProviderMask(
+          3,
+        ).contains(OpenGLContextProviderMask.wgl),
+        isTrue,
+      );
+      expect(
+        const OpenGLContextProviderMask(
+          3,
+        ).contains(OpenGLContextProviderMask.egl),
+        isTrue,
+      );
 
       final meters = Maplibre.projectedMetersForLatLng(const LatLng(0, 0));
       expect(meters.northing.isFinite, isTrue);
@@ -438,6 +455,61 @@ void main() {
         ),
         throwsA(isA<MaplibreException>()),
       );
+      expect(
+        () => map.attachOpenGLOwnedTexture(
+          const OpenGLOwnedTextureDescriptor(
+            extent: RenderTargetExtent(width: -1, height: 16),
+            context: EglContextDescriptor(
+              display: NativePointer.nullPointer,
+              config: NativePointer.nullPointer,
+              shareContext: NativePointer.nullPointer,
+            ),
+          ),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.attachOpenGLOwnedTexture(
+          const OpenGLOwnedTextureDescriptor(
+            extent: RenderTargetExtent(width: 16, height: 16),
+            context: EglContextDescriptor(
+              display: NativePointer.nullPointer,
+              config: NativePointer.nullPointer,
+              shareContext: NativePointer.nullPointer,
+            ),
+          ),
+        ),
+        throwsA(isA<MaplibreException>()),
+      );
+      expect(
+        () => map.attachOpenGLBorrowedTexture(
+          const OpenGLBorrowedTextureDescriptor(
+            extent: RenderTargetExtent(width: 16, height: 16),
+            context: EglContextDescriptor(
+              display: NativePointer.nullPointer,
+              config: NativePointer.nullPointer,
+              shareContext: NativePointer.nullPointer,
+            ),
+            texture: 0,
+            target: 0,
+          ),
+        ),
+        throwsA(isA<MaplibreException>()),
+      );
+      expect(
+        () => map.attachOpenGLSurface(
+          const OpenGLSurfaceDescriptor(
+            extent: RenderTargetExtent(width: 16, height: 16),
+            context: EglContextDescriptor(
+              display: NativePointer.nullPointer,
+              config: NativePointer.nullPointer,
+              shareContext: NativePointer.nullPointer,
+            ),
+            surface: NativePointer.nullPointer,
+          ),
+        ),
+        throwsA(isA<MaplibreException>()),
+      );
 
       final sourceIds = map.listStyleSourceIds();
       expect(sourceIds, contains('org.maplibre.annotations'));
@@ -594,6 +666,20 @@ void main() {
         () => map.addCustomGeometrySource(
           'dart-custom-invalid-buffer-source',
           CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: 4294967297),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-negative-tile-size-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, tileSize: -1),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(
+        () => map.addCustomGeometrySource(
+          'dart-custom-negative-buffer-source',
+          CustomGeometrySourceOptions(fetchTile: (_) {}, buffer: -1),
         ),
         throwsA(isA<InvalidArgumentException>()),
       );

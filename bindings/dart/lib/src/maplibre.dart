@@ -10,6 +10,7 @@ import 'internal/memory/memory.dart';
 import 'internal/status/status.dart';
 import 'internal/struct/struct.dart' as native_struct;
 import 'log/log.dart';
+import 'render/targets.dart';
 
 final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
@@ -73,6 +74,12 @@ final class Maplibre {
   /// Returns the render backends compiled into the linked native library.
   static RenderBackendMask supportedRenderBackends() =>
       RenderBackendMask(_c.raw.mln_supported_render_backend_mask());
+
+  /// Returns OpenGL context providers compiled into the linked native library.
+  static OpenGLContextProviderMask supportedOpenGLContextProviders() =>
+      OpenGLContextProviderMask(
+        _c.raw.mln_opengl_supported_context_provider_mask(),
+      );
 
   /// Reads MapLibre Native's process-global network status.
   static NetworkStatus networkStatus() {
@@ -166,6 +173,9 @@ final class RenderBackendMask {
 
   /// Vulkan backend support bit.
   static const vulkan = RenderBackendMask(1 << 1);
+
+  /// OpenGL backend support bit.
+  static const opengl = RenderBackendMask(1 << 2);
 
   /// Raw backend mask bits.
   final int bits;

@@ -37,6 +37,8 @@ final class VulkanContextDescriptor {
     required this.device,
     required this.graphicsQueue,
     required this.graphicsQueueFamilyIndex,
+    this.getInstanceProcAddr = NativePointer.nullPointer,
+    this.getDeviceProcAddr = NativePointer.nullPointer,
   });
 
   /// Borrowed VkInstance.
@@ -53,6 +55,82 @@ final class VulkanContextDescriptor {
 
   /// Queue family index for [graphicsQueue].
   final int graphicsQueueFamilyIndex;
+
+  /// Optional `PFN_vkGetInstanceProcAddr` for the host Vulkan loader.
+  final NativePointer getInstanceProcAddr;
+
+  /// Optional `PFN_vkGetDeviceProcAddr` for the host Vulkan loader.
+  final NativePointer getDeviceProcAddr;
+}
+
+/// OpenGL context provider support flag reported by the native library build.
+final class OpenGLContextProviderMask {
+  /// Creates an OpenGL context provider mask from raw C flag bits.
+  const OpenGLContextProviderMask(this.bits);
+
+  /// WGL context provider support bit.
+  static const wgl = OpenGLContextProviderMask(1 << 0);
+
+  /// EGL context provider support bit.
+  static const egl = OpenGLContextProviderMask(1 << 1);
+
+  /// Raw provider mask bits.
+  final int bits;
+
+  /// Returns true when all [provider] bits are present in this mask.
+  bool contains(OpenGLContextProviderMask provider) =>
+      (bits & provider.bits) == provider.bits;
+
+  @override
+  String toString() =>
+      'OpenGLContextProviderMask[bits=0x${bits.toRadixString(16)}]';
+}
+
+/// OpenGL backend context fields shared by OpenGL render targets.
+sealed class OpenGLContextDescriptor {
+  const OpenGLContextDescriptor();
+}
+
+/// WGL context fields shared by OpenGL render targets on Windows.
+final class WglContextDescriptor extends OpenGLContextDescriptor {
+  /// Creates a WGL context descriptor.
+  const WglContextDescriptor({
+    required this.deviceContext,
+    required this.shareContext,
+    this.getProcAddress = NativePointer.nullPointer,
+  });
+
+  /// Borrowed HDC used to create a shared session context.
+  final NativePointer deviceContext;
+
+  /// Borrowed HGLRC whose share group the session context joins.
+  final NativePointer shareContext;
+
+  /// Optional `wglGetProcAddress`-compatible function for the host loader.
+  final NativePointer getProcAddress;
+}
+
+/// EGL context fields shared by OpenGL render targets on Linux.
+final class EglContextDescriptor extends OpenGLContextDescriptor {
+  /// Creates an EGL context descriptor.
+  const EglContextDescriptor({
+    required this.display,
+    required this.config,
+    required this.shareContext,
+    this.getProcAddress = NativePointer.nullPointer,
+  });
+
+  /// Borrowed EGLDisplay.
+  final NativePointer display;
+
+  /// Borrowed EGLConfig used to create a shared session context.
+  final NativePointer config;
+
+  /// Borrowed EGLContext whose share group the session context joins.
+  final NativePointer shareContext;
+
+  /// Optional `eglGetProcAddress`-compatible function for the host loader.
+  final NativePointer getProcAddress;
 }
 
 /// Metal native surface session attachment options.
@@ -90,6 +168,25 @@ final class VulkanSurfaceDescriptor {
   final VulkanContextDescriptor context;
 
   /// Borrowed `VkSurfaceKHR`.
+  final NativePointer surface;
+}
+
+/// OpenGL native surface session attachment options.
+final class OpenGLSurfaceDescriptor {
+  /// Creates an OpenGL surface descriptor.
+  const OpenGLSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    required this.surface,
+  });
+
+  /// Logical surface extent.
+  final RenderTargetExtent extent;
+
+  /// Borrowed OpenGL context.
+  final OpenGLContextDescriptor context;
+
+  /// Borrowed platform surface handle: HDC for WGL, EGLSurface for EGL.
   final NativePointer surface;
 }
 
@@ -171,4 +268,42 @@ final class VulkanBorrowedTextureDescriptor {
 
   /// Backend-native VkImageLayout left after rendering succeeds.
   final int finalLayout;
+}
+
+/// OpenGL texture session attachment options for a session-owned target.
+final class OpenGLOwnedTextureDescriptor {
+  /// Creates an OpenGL owned-texture descriptor.
+  const OpenGLOwnedTextureDescriptor({
+    required this.extent,
+    required this.context,
+  });
+
+  /// Logical texture extent.
+  final RenderTargetExtent extent;
+
+  /// Borrowed OpenGL context.
+  final OpenGLContextDescriptor context;
+}
+
+/// OpenGL caller-owned texture session attachment options.
+final class OpenGLBorrowedTextureDescriptor {
+  /// Creates an OpenGL borrowed-texture descriptor.
+  const OpenGLBorrowedTextureDescriptor({
+    required this.extent,
+    required this.context,
+    required this.texture,
+    required this.target,
+  });
+
+  /// Logical texture extent.
+  final RenderTargetExtent extent;
+
+  /// Borrowed OpenGL context.
+  final OpenGLContextDescriptor context;
+
+  /// Borrowed OpenGL texture name.
+  final int texture;
+
+  /// Backend-native OpenGL texture target, such as `GL_TEXTURE_2D`.
+  final int target;
 }

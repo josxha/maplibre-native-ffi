@@ -592,6 +592,49 @@ raw.mln_vulkan_context_descriptor _vulkanContextDescriptorToNative(
     value.graphicsQueue.address,
   );
   result.graphics_queue_family_index = value.graphicsQueueFamilyIndex;
+  result.get_instance_proc_addr = Pointer<Void>.fromAddress(
+    value.getInstanceProcAddr.address,
+  );
+  result.get_device_proc_addr = Pointer<Void>.fromAddress(
+    value.getDeviceProcAddr.address,
+  );
+  return result;
+}
+
+raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
+  OpenGLContextDescriptor value,
+) {
+  final result = Struct.create<raw.mln_opengl_context_descriptor>();
+  result.size = sizeOf<raw.mln_opengl_context_descriptor>();
+  switch (value) {
+    case WglContextDescriptor():
+      result.platformAsInt =
+          raw.mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL.value;
+      result.data.wgl.size = sizeOf<raw.mln_wgl_context_descriptor>();
+      result.data.wgl.device_context = Pointer<Void>.fromAddress(
+        value.deviceContext.address,
+      );
+      result.data.wgl.share_context = Pointer<Void>.fromAddress(
+        value.shareContext.address,
+      );
+      result.data.wgl.get_proc_address = Pointer<Void>.fromAddress(
+        value.getProcAddress.address,
+      );
+    case EglContextDescriptor():
+      result.platformAsInt =
+          raw.mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL.value;
+      result.data.egl.size = sizeOf<raw.mln_egl_context_descriptor>();
+      result.data.egl.display = Pointer<Void>.fromAddress(
+        value.display.address,
+      );
+      result.data.egl.config = Pointer<Void>.fromAddress(value.config.address);
+      result.data.egl.share_context = Pointer<Void>.fromAddress(
+        value.shareContext.address,
+      );
+      result.data.egl.get_proc_address = Pointer<Void>.fromAddress(
+        value.getProcAddress.address,
+      );
+  }
   return result;
 }
 
@@ -611,6 +654,16 @@ raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
   final result = _c.raw.mln_vulkan_surface_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _vulkanContextDescriptorToNative(value.context);
+  result.surface = Pointer<Void>.fromAddress(value.surface.address);
+  return result;
+}
+
+raw.mln_opengl_surface_descriptor _openglSurfaceDescriptorToNative(
+  OpenGLSurfaceDescriptor value,
+) {
+  final result = _c.raw.mln_opengl_surface_descriptor_default();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _openglContextDescriptorToNative(value.context);
   result.surface = Pointer<Void>.fromAddress(value.surface.address);
   return result;
 }
@@ -653,6 +706,27 @@ _vulkanBorrowedTextureDescriptorToNative(
   result.format = value.format;
   result.initial_layout = value.initialLayout;
   result.final_layout = value.finalLayout;
+  return result;
+}
+
+raw.mln_opengl_owned_texture_descriptor _openglOwnedTextureDescriptorToNative(
+  OpenGLOwnedTextureDescriptor value,
+) {
+  final result = _c.raw.mln_opengl_owned_texture_descriptor_default();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _openglContextDescriptorToNative(value.context);
+  return result;
+}
+
+raw.mln_opengl_borrowed_texture_descriptor
+_openglBorrowedTextureDescriptorToNative(
+  OpenGLBorrowedTextureDescriptor value,
+) {
+  final result = _c.raw.mln_opengl_borrowed_texture_descriptor_default();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _openglContextDescriptorToNative(value.context);
+  result.texture = value.texture;
+  result.target = value.target;
   return result;
 }
 

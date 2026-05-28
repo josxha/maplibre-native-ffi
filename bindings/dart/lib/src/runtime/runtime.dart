@@ -679,6 +679,24 @@ final class MapHandle {
     });
   }
 
+  /// Attaches an OpenGL native surface render target.
+  RenderSessionHandle attachOpenGLSurface(OpenGLSurfaceDescriptor descriptor) {
+    return withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_opengl_surface_descriptor>();
+      nativeDescriptor.ref = _openglSurfaceDescriptorToNative(descriptor);
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.raw.mln_opengl_surface_attach(
+          _pointer,
+          nativeDescriptor,
+          outSession,
+        ),
+      );
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
   /// Attaches a Metal texture render target owned by the render session.
   RenderSessionHandle attachMetalOwnedTexture(
     MetalOwnedTextureDescriptor descriptor,
@@ -756,6 +774,49 @@ final class MapHandle {
       outSession.value = nullptr;
       _check(
         _c.raw.mln_vulkan_borrowed_texture_attach(
+          _pointer,
+          nativeDescriptor,
+          outSession,
+        ),
+      );
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
+  /// Attaches an OpenGL texture render target owned by the render session.
+  RenderSessionHandle attachOpenGLOwnedTexture(
+    OpenGLOwnedTextureDescriptor descriptor,
+  ) {
+    return withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_opengl_owned_texture_descriptor>();
+      nativeDescriptor.ref = _openglOwnedTextureDescriptorToNative(descriptor);
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.raw.mln_opengl_owned_texture_attach(
+          _pointer,
+          nativeDescriptor,
+          outSession,
+        ),
+      );
+      return RenderSessionHandle._(this, outSession.value);
+    });
+  }
+
+  /// Attaches an OpenGL caller-owned texture render target.
+  RenderSessionHandle attachOpenGLBorrowedTexture(
+    OpenGLBorrowedTextureDescriptor descriptor,
+  ) {
+    return withNativeArena((arena) {
+      final nativeDescriptor =
+          arena<raw.mln_opengl_borrowed_texture_descriptor>();
+      nativeDescriptor.ref = _openglBorrowedTextureDescriptorToNative(
+        descriptor,
+      );
+      final outSession = arena<Pointer<raw.mln_render_session>>();
+      outSession.value = nullptr;
+      _check(
+        _c.raw.mln_opengl_borrowed_texture_attach(
           _pointer,
           nativeDescriptor,
           outSession,

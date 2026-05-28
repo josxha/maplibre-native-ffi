@@ -342,6 +342,16 @@ final class RenderSessionHandle {
     });
   }
 
+  /// Acquires the latest OpenGL texture frame until [OpenGLOwnedTextureFrame.close].
+  OpenGLOwnedTextureFrame acquireOpenGLTextureFrame() {
+    return withNativeArena((arena) {
+      final outFrame = arena<raw.mln_opengl_owned_texture_frame>();
+      outFrame.ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
+      _check(_c.raw.mln_opengl_owned_texture_acquire_frame(_pointer, outFrame));
+      return OpenGLOwnedTextureFrame._(this, outFrame.ref);
+    });
+  }
+
   /// Explicitly destroys this render session.
   void close() {
     _state.close(
@@ -585,5 +595,66 @@ final class VulkanOwnedTextureFrame {
     }
     final _ = _session._pointer;
     return NativePointer(pointer.address);
+  }
+}
+
+/// Scoped OpenGL texture frame borrowed from a session-owned texture target.
+final class OpenGLOwnedTextureFrame {
+  OpenGLOwnedTextureFrame._(this._session, this._frame);
+
+  final RenderSessionHandle _session;
+  final raw.mln_opengl_owned_texture_frame _frame;
+  var _closed = false;
+
+  /// Physical texture width in device pixels.
+  int get width => _frame.width;
+
+  /// Physical texture height in device pixels.
+  int get height => _frame.height;
+
+  /// UI-to-device pixel scale used for this frame.
+  double get scaleFactor => _frame.scale_factor;
+
+  /// Borrowed OpenGL texture name.
+  int get texture {
+    _checkOpen();
+    return _frame.texture;
+  }
+
+  /// Backend-native OpenGL texture target.
+  int get target => _frame.target;
+
+  /// Backend-native OpenGL internal format.
+  int get internalFormat => _frame.internal_format;
+
+  /// Backend-native OpenGL pixel format.
+  int get format => _frame.format;
+
+  /// Backend-native OpenGL pixel type.
+  int get type => _frame.type;
+
+  /// Releases this frame. The borrowed texture name becomes invalid.
+  void close() {
+    if (_closed) {
+      return;
+    }
+    withNativeArena((arena) {
+      final nativeFrame = arena<raw.mln_opengl_owned_texture_frame>();
+      nativeFrame.ref = _frame;
+      _check(
+        _c.raw.mln_opengl_owned_texture_release_frame(
+          _session._pointer,
+          nativeFrame,
+        ),
+      );
+    });
+    _closed = true;
+  }
+
+  void _checkOpen() {
+    if (_closed) {
+      throwInvalidArgument('OpenGL texture frame has already been released');
+    }
+    final _ = _session._pointer;
   }
 }
