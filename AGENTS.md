@@ -90,6 +90,17 @@ safety rules, and hard boundaries.
 - Avoid: "This layer should not try to manage execution models for every
   possible host."
 
+### Specifications
+
+For [specification writing](docs/src/content/docs/development/specifications/):
+
+- Standalone and testable: each requirement should be checkable on its own,
+  without pointing at an example or the current tree.
+- Add, don’t restate or hedge: link to other docs instead of copying them; avoid
+  “or equivalent”, unnamed MAYs, and vague outcomes.
+- Scope by constraint: family-wide sections state behavior; platform- or
+  API-specific rules belong in clearly labeled subsections.
+
 ### Testing
 
 - The Zig bindings tests are also the primary integration test suite for the
@@ -109,6 +120,8 @@ safety rules, and hard boundaries.
 
 Read these docs before changing related code:
 
+- [Specifications](docs/src/content/docs/development/specifications/) for
+  example and binding requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for project layout,
   workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
