@@ -132,9 +132,9 @@ trivially shareable and the callback contract allows that restriction.
 
 Resource transforms stay synchronous. Implement public Dart transform APIs as
 native-owned rewrite rules configured from Dart, or as a callback shape that can
-return immediately without Dart user code on a MapLibre network thread. The shim
-copies rule data into native storage and keeps replacement URL storage valid
-until native consumes it.
+return immediately without Dart user code on a MapLibre network thread. Copy
+borrowed request fields before Dart code can retain them, and pass replacement
+URLs through the C API response helper before returning.
 
 Resource provider callbacks use native-owned routing before crossing into Dart.
 Non-matching requests pass through immediately. Matching requests copy request

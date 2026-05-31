@@ -233,8 +233,12 @@ extern "C" MLN_API auto mln_dart_resource_transform_rewrite_callback(
   const auto& table = *static_cast<const DartResourceRewriteRules*>(user_data);
   for (const auto& rule : std::span{table.rules, table.count}) {
     if (matches_rule(rule.kind, kind) && string_equals(rule.url, url)) {
-      out_response->url = rule.replacement_url;
-      break;
+      if (rule.replacement_url == nullptr) {
+        return MLN_STATUS_OK;
+      }
+      return mln_resource_transform_response_set_url(
+        out_response, rule.replacement_url, std::strlen(rule.replacement_url)
+      );
     }
   }
   return MLN_STATUS_OK;
