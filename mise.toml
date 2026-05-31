@@ -19,7 +19,7 @@ unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 activate_aggressive = true
 
 [monorepo]
-config_roots = ["bindings/*", "examples/*", "docs"]
+config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 [tools]
 # General tooling
@@ -74,8 +74,7 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
 postinstall = [
-  "git submodule sync --recursive third_party/maplibre-native",
-  "git submodule update --init --recursive --depth 1 third_party/maplibre-native",
+  { task = "sync-submodules" },
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
   # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.

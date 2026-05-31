@@ -202,6 +202,7 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
     maplibre_core::set_network_status(status)
 }
 
+#[cfg(test)]
 fn set_network_status_raw(raw_status: u32) -> Result<()> {
     maplibre_core::set_network_status_raw(raw_status)
 }
