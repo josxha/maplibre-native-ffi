@@ -23,6 +23,9 @@ interop or the popular MapLibre Android/iOS SDKs.
 # Install/refresh all tools, submodules, and dependencies
 mise install
 
+# List available tasks across the workspace
+mise tasks --all
+
 # Build the native library (also runs configure)
 mise run build
 
@@ -59,6 +62,13 @@ to run them manually.
 The environment is managed by mise and pixi, so if you need to run a command
 that's not already a mise task, use `mise exec -- pixi run ...`.
 
+## Pull requests
+
+When you open a pull request, follow the repository PR template and write
+**Summary** and **Test plan** in at most one sentence each. The user will expand
+the PR description if more detail is needed. More context:
+[AI_POLICY.md](./AI_POLICY.md).
+
 ## Project Invariants
 
 ### General
@@ -69,6 +79,11 @@ that's not already a mise task, use `mise exec -- pixi run ...`.
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
   idioms, in that order.
+- Bindings expose MapLibre Native concepts directly. Add redundant APIs or
+  convenience helpers only when they are strongly justified by target-language
+  safety or ergonomics.
+- Bindings do not reimplement native validation; they validate binding-owned API
+  shape, state, lifetimes, and memory safety.
 - We're currently in a prerelease state, so breaking API changes are allowed and
   encouraged over leaving backwards compatibility shims.
 
@@ -83,14 +98,27 @@ safety rules, and hard boundaries.
 - Avoid: "This layer should not try to manage execution models for every
   possible host."
 
+### Specifications
+
+For [specification writing](docs/src/content/docs/development/specifications/):
+
+- Standalone and testable: each requirement should be checkable on its own,
+  without pointing at an example or the current tree.
+- Add, don’t restate or hedge: link to other docs instead of copying them; avoid
+  “or equivalent”, unnamed MAYs, and vague outcomes.
+- Scope by constraint: family-wide sections state behavior; platform- or
+  API-specific rules belong in clearly labeled subsections.
+
 ### Testing
 
 - The Zig bindings tests are also the primary integration test suite for the
   C/C++ layer.
 - For tests that _must_ reach below the bindings, there are dedicated tests in
   src/c_api/tests.
-- Other bindings (Rust, Java, Swift, etc) avoid writing redundant tests to test
-  the C/C++ layer logic; their tests focus on validating their bindings.
+- Other bindings (Rust, Java, Swift, etc) should include useful integration
+  tests that validate binding behavior through the native C/C++ layer.
+  Incidental native coverage from those integration tests is acceptable; chasing
+  duplicate full C/C++ coverage in every binding is unnecessary.
 - Avoid trivial tests, tests that verify constants, tests that assert a negative
   (unless valuable), tests that simply test third party code; we want to keep
   our test suite robust and high-value.
@@ -102,6 +130,8 @@ safety rules, and hard boundaries.
 
 Read these docs before changing related code:
 
+- [Specifications](docs/src/content/docs/development/specifications/) for
+  example and binding requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for project layout,
   workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
