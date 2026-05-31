@@ -5,7 +5,6 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::thread::{self, ThreadId};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
@@ -263,7 +262,6 @@ struct ResourceTransformRule {
 
 struct ResourceTransformState {
     rules: Vec<ResourceTransformRule>,
-    replacements: Mutex<HashMap<ThreadId, CString>>,
 }
 
 struct ResourceProviderState {
@@ -406,7 +404,6 @@ impl NativeRuntimeHandle {
                 .into_iter()
                 .map(resource_transform_rule_from_input)
                 .collect::<Result<Vec<_>>>()?,
-            replacements: Mutex::new(HashMap::new()),
         });
         let descriptor = core::resource::resource_transform_descriptor(
             Some(resource_transform_trampoline),
@@ -854,10 +851,13 @@ unsafe fn resource_transform_trampoline_inner(
     };
 
     if let Some(replacement) = &rule.replacement_url {
-        unsafe {
-            (*out_response).url = replacement.as_ptr();
-        }
-        return sys::MLN_STATUS_OK;
+        return unsafe {
+            sys::mln_resource_transform_response_set_url(
+                out_response,
+                replacement.as_bytes().as_ptr().cast(),
+                replacement.as_bytes().len(),
+            )
+        };
     }
 
     let Some(replacement_url_prefix) = &rule.replacement_url_prefix else {
@@ -867,20 +867,14 @@ unsafe fn resource_transform_trampoline_inner(
         return sys::MLN_STATUS_OK;
     };
     let suffix = url.strip_prefix(url_prefix).unwrap_or_default();
-    let Ok(replacement) = CString::new(format!("{replacement_url_prefix}{suffix}")) else {
-        return sys::MLN_STATUS_OK;
-    };
-    let Ok(mut replacements) = transform.replacements.lock() else {
-        return sys::MLN_STATUS_OK;
-    };
-    let thread_id = thread::current().id();
-    replacements.insert(thread_id, replacement);
-    if let Some(replacement) = replacements.get(&thread_id) {
-        unsafe {
-            (*out_response).url = replacement.as_ptr();
-        }
+    let replacement = format!("{replacement_url_prefix}{suffix}");
+    unsafe {
+        sys::mln_resource_transform_response_set_url(
+            out_response,
+            replacement.as_bytes().as_ptr().cast(),
+            replacement.len(),
+        )
     }
-    sys::MLN_STATUS_OK
 }
 
 impl RuntimeEvent {
