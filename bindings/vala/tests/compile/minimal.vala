@@ -175,13 +175,12 @@ string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
   return null;
 }
 
-void provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceProviderRequest controller) {
+MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceRequestHandle handle) {
   resource_provider_request_count++;
   if (request.url != "custom://style.json") {
-    return;
+    return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
   }
   try {
-    var handle = controller.handle();
     var response = MaplibreNative.ResourceResponse.data(bytes_from_string("{\"version\":8,\"sources\":{},\"layers\":[]}"));
     if (!handle.cancelled()) {
       handle.complete(response);
@@ -199,6 +198,7 @@ void provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.Res
     }
   } catch (MaplibreNative.Error error) {
   }
+  return MaplibreNative.ResourceProviderDecision.HANDLE;
 }
 
 void fetch_custom_geometry_tile(MaplibreNative.CanonicalTileId tile_id) {

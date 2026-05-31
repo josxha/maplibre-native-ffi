@@ -480,7 +480,7 @@ namespace MaplibreNative {
         }
     }
 
-    public delegate void ResourceProviderCallback (ResourceRequest request, ResourceProviderRequest controller);
+    public delegate ResourceProviderDecision ResourceProviderCallback (ResourceRequest request, ResourceRequestHandle handle);
 
     public class ResourceRequest {
         public string url { get; private set; }
@@ -571,14 +571,14 @@ namespace MaplibreNative {
     }
 
     public class ResourceRequestHandle {
-        private Raw.ResourceRequestHandle? native;
+        private unowned Raw.ResourceRequestHandle? native;
         private bool completed;
 
         public bool released { get { return native == null; } }
         public bool is_completed { get { return completed; } }
 
-        internal ResourceRequestHandle (owned Raw.ResourceRequestHandle native) {
-            this.native = (owned) native;
+        internal ResourceRequestHandle (Raw.ResourceRequestHandle native) {
+            this.native = native;
         }
 
         ~ResourceRequestHandle () {
@@ -623,29 +623,22 @@ namespace MaplibreNative {
             Raw.resource_request_release (native);
             native = null;
         }
-    }
 
-    public class ResourceProviderRequest {
-        private Raw.ResourceRequestHandle? native;
-        private ResourceRequestHandle? claimed_handle;
-
-        public bool handled { get { return claimed_handle != null; } }
-
-        internal ResourceProviderRequest (owned Raw.ResourceRequestHandle native) {
-            this.native = (owned) native;
-        }
-
-        public ResourceRequestHandle handle () throws Error {
-            if (claimed_handle != null) {
-                throw new Error.INVALID_STATE ("resource request handle is already claimed");
-            }
+        internal uint32 finish_provider_decision (ResourceProviderDecision decision) {
             if (native == null) {
-                throw new Error.INVALID_STATE ("resource request handle is not available");
+                return (uint32) Raw.ResourceProviderDecision.HANDLE;
             }
-            claimed_handle = new ResourceRequestHandle ((owned) native);
+            if (completed || decision == ResourceProviderDecision.HANDLE) {
+                if (completed) {
+                    Raw.resource_request_release (native);
+                    native = null;
+                }
+                return (uint32) Raw.ResourceProviderDecision.HANDLE;
+            }
             native = null;
-            return claimed_handle;
+            return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
         }
+
     }
 
     public class RuntimeOptions {
@@ -741,12 +734,12 @@ namespace MaplibreNative {
         return runtime.invoke_resource_transform (kind, url, out_response);
     }
 
-    private uint32 resource_provider_trampoline (void* user_data, Raw.ResourceRequest* request, owned Raw.ResourceRequestHandle handle) {
+    private uint32 resource_provider_trampoline (void* user_data, Raw.ResourceRequest* request, Raw.ResourceRequestHandle handle) {
         if (user_data == null || request == null || handle == null) {
             return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
         }
         unowned RuntimeHandle runtime = (RuntimeHandle) user_data;
-        return runtime.invoke_resource_provider (request, (owned) handle);
+        return runtime.invoke_resource_provider (request, handle);
     }
 
     public uint32 c_version () {
@@ -788,7 +781,6 @@ namespace MaplibreNative {
     public class RuntimeHandle {
         private Raw.Runtime? native;
         private ResourceTransformCallback? resource_transform;
-        private string? resource_transform_url;
         private ResourceProviderCallback? resource_provider;
 
         public bool closed { get { return native == null; } }
@@ -821,7 +813,6 @@ namespace MaplibreNative {
             check_status (Raw.runtime_destroy (closing));
             native = null;
             resource_transform = null;
-            resource_transform_url = null;
             resource_provider = null;
         }
 
@@ -867,7 +858,6 @@ namespace MaplibreNative {
         public void clear_resource_transform () throws Error {
             check_status (Raw.runtime_clear_resource_transform (require_live ()));
             resource_transform = null;
-            resource_transform_url = null;
         }
 
         internal Raw.Status invoke_resource_transform (uint32 raw_kind, string url, Raw.ResourceTransformResponse* out_response) {
@@ -875,20 +865,23 @@ namespace MaplibreNative {
                 return Raw.Status.INVALID_ARGUMENT;
             }
             out_response->size = (uint32) sizeof (Raw.ResourceTransformResponse);
+            out_response->url = null;
+            out_response->context = null;
             var replacement = resource_transform (resource_kind_from_raw (raw_kind), url);
-            resource_transform_url = replacement;
-            out_response->url = resource_transform_url;
+            if (replacement != null && replacement.length > 0) {
+                return Raw.resource_transform_response_set_url (out_response, replacement, replacement.length);
+            }
             return Raw.Status.OK;
         }
 
-        internal uint32 invoke_resource_provider (Raw.ResourceRequest* request, owned Raw.ResourceRequestHandle handle) {
+        internal uint32 invoke_resource_provider (Raw.ResourceRequest* request, Raw.ResourceRequestHandle handle) {
             if (resource_provider == null) {
                 return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
             }
             var copied_request = new ResourceRequest.from_native (request);
-            var controller = new ResourceProviderRequest ((owned) handle);
-            resource_provider (copied_request, controller);
-            return controller.handled ? (uint32) Raw.ResourceProviderDecision.HANDLE : (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
+            var request_handle = new ResourceRequestHandle (handle);
+            var decision = resource_provider (copied_request, request_handle);
+            return request_handle.finish_provider_decision (decision);
         }
 
         public OfflineOperationId run_ambient_cache_operation_start (AmbientCacheOperation operation) throws Error {

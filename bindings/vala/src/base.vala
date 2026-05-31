@@ -159,6 +159,11 @@ namespace MaplibreNative {
         IMAGE = 7
     }
 
+    public enum ResourceProviderDecision {
+        PASS_THROUGH = 0,
+        HANDLE = 1
+    }
+
     public enum RenderedQueryGeometryType {
         POINT = 1,
         BOX = 2,

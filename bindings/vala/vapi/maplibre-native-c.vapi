@@ -1401,6 +1401,7 @@ namespace MaplibreNative.Raw {
     public struct ResourceTransformResponse {
         public uint32 size;
         public unowned string? url;
+        public void* context;
     }
 
     [CCode (cname = "mln_resource_transform_callback", has_target = false)]
@@ -1453,7 +1454,7 @@ namespace MaplibreNative.Raw {
     }
 
     [CCode (cname = "mln_resource_provider_callback", has_target = false)]
-    public delegate uint32 ResourceProviderCallback (void* user_data, ResourceRequest* request, owned ResourceRequestHandle handle);
+    public delegate uint32 ResourceProviderCallback (void* user_data, ResourceRequest* request, ResourceRequestHandle handle);
 
     [CCode (cname = "mln_resource_provider", has_type_id = false)]
     public struct ResourceProvider {
@@ -1520,6 +1521,9 @@ namespace MaplibreNative.Raw {
 
     [CCode (cname = "mln_resource_request_release")]
     public static void resource_request_release (ResourceRequestHandle handle);
+
+    [CCode (cname = "mln_resource_transform_response_set_url")]
+    public static Status resource_transform_response_set_url (ResourceTransformResponse* response, string? url, size_t url_size);
 
     [CCode (cname = "mln_runtime_destroy")]
     public static Status runtime_destroy (Runtime runtime);
