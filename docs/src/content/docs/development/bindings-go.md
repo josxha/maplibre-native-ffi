@@ -115,6 +115,12 @@ data into Go-owned values and release native handles with `defer`, including
 failure paths. Runtime event polling returns copied Go event values independent
 of the next native poll.
 
+JSON and GeoJSON object values use Go `map[string]any` for idiomatic access.
+This is an intentional Go-specific divergence: object member order is not
+preserved, and duplicate object keys collapse to the last copied value. Hosts
+that need byte-for-byte JSON object preservation should keep the original JSON
+text above this low-level binding.
+
 Slices passed for readback or upload remain caller-owned. Methods validate
 length and element size before crossing into C, pass `nil` only where the C API
 accepts null, and call `runtime.KeepAlive(slice)` after C returns.
