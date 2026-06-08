@@ -1,9 +1,16 @@
 part of 'runtime.dart';
 
 final class OfflineOperationHandle {
-  OfflineOperationHandle._(this._runtime, this.id);
+  OfflineOperationHandle._(
+    this._runtime,
+    this.id,
+    this._kind,
+    this._resultKind,
+  );
 
   final RuntimeHandle _runtime;
+  final _OfflineOperationKind _kind;
+  final _OfflineOperationResultKind _resultKind;
 
   /// Native operation identifier copied into Dart.
   final int id;
@@ -15,6 +22,11 @@ final class OfflineOperationHandle {
 
   /// Takes a completed offline region create result.
   OfflineRegionInfo takeCreatedRegion() {
+    _requireResult(
+      _OfflineOperationKind.regionCreate,
+      _OfflineOperationResultKind.region,
+      'takeCreatedRegion',
+    );
     return withNativeArena((arena) {
       final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
       outRegion.value = nullptr;
@@ -32,6 +44,11 @@ final class OfflineOperationHandle {
 
   /// Takes a completed optional offline region get result.
   OfflineRegionInfo? takeOptionalRegion() {
+    _requireResult(
+      _OfflineOperationKind.regionGet,
+      _OfflineOperationResultKind.optionalRegion,
+      'takeOptionalRegion',
+    );
     return withNativeArena((arena) {
       final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
       outRegion.value = nullptr;
@@ -53,6 +70,11 @@ final class OfflineOperationHandle {
 
   /// Takes a completed offline regions list result.
   List<OfflineRegionInfo> takeRegionList() {
+    _requireResult(
+      _OfflineOperationKind.regionsList,
+      _OfflineOperationResultKind.regionList,
+      'takeRegionList',
+    );
     return withNativeArena((arena) {
       final outRegions = arena<Pointer<raw.mln_offline_region_list>>();
       outRegions.value = nullptr;
@@ -70,6 +92,11 @@ final class OfflineOperationHandle {
 
   /// Takes a completed offline regions merge result.
   List<OfflineRegionInfo> takeMergedRegionList() {
+    _requireResult(
+      _OfflineOperationKind.regionsMergeDatabase,
+      _OfflineOperationResultKind.regionList,
+      'takeMergedRegionList',
+    );
     return withNativeArena((arena) {
       final outRegions = arena<Pointer<raw.mln_offline_region_list>>();
       outRegions.value = nullptr;
@@ -87,6 +114,11 @@ final class OfflineOperationHandle {
 
   /// Takes a completed offline region metadata update result.
   OfflineRegionInfo takeUpdatedRegionMetadata() {
+    _requireResult(
+      _OfflineOperationKind.regionUpdateMetadata,
+      _OfflineOperationResultKind.region,
+      'takeUpdatedRegionMetadata',
+    );
     return withNativeArena((arena) {
       final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
       outRegion.value = nullptr;
@@ -104,6 +136,11 @@ final class OfflineOperationHandle {
 
   /// Takes a completed offline region status result.
   OfflineRegionStatus takeRegionStatus() {
+    _requireResult(
+      _OfflineOperationKind.regionGetStatus,
+      _OfflineOperationResultKind.regionStatus,
+      'takeRegionStatus',
+    );
     return withNativeArena((arena) {
       final outStatus = arena<raw.mln_offline_region_status>();
       outStatus.ref.size = sizeOf<raw.mln_offline_region_status>();
@@ -127,6 +164,53 @@ final class OfflineOperationHandle {
     _check(_c.raw.mln_runtime_offline_operation_discard(_runtime._pointer, id));
     _discarded = true;
   }
+
+  void _requireResult(
+    _OfflineOperationKind expectedKind,
+    _OfflineOperationResultKind expected,
+    String accessorName,
+  ) {
+    if (_discarded) {
+      throwInvalidState('offline operation $id has been discarded');
+    }
+    if (_kind != expectedKind || _resultKind != expected) {
+      throwInvalidState(
+        '$accessorName cannot take ${_resultKind.name} result from '
+        '${_kind.name} operation $id; expected ${expected.name} result from '
+        '${expectedKind.name}',
+      );
+    }
+  }
+}
+
+enum _OfflineOperationKind {
+  ambientCache('ambient cache'),
+  regionCreate('region create'),
+  regionGet('region get'),
+  regionsList('regions list'),
+  regionsMergeDatabase('regions merge database'),
+  regionUpdateMetadata('region update metadata'),
+  regionGetStatus('region get status'),
+  regionSetObserved('region set observed'),
+  regionSetDownloadState('region set download state'),
+  regionInvalidate('region invalidate'),
+  regionDelete('region delete');
+
+  const _OfflineOperationKind(this.name);
+
+  final String name;
+}
+
+enum _OfflineOperationResultKind {
+  none('none'),
+  region('region'),
+  optionalRegion('optional region'),
+  regionList('region list'),
+  regionStatus('region status');
+
+  const _OfflineOperationResultKind(this.name);
+
+  final String name;
 }
 
 raw.mln_runtime_options _runtimeOptionsToNative(

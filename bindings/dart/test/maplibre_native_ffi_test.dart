@@ -309,7 +309,15 @@ void main() {
       expect(offlineOperation.isDiscarded, isTrue);
       final offlineListOperation = runtime.listOfflineRegions();
       expect(offlineListOperation.id, isNonZero);
+      expect(
+        () => offlineListOperation.takeRegionStatus(),
+        throwsA(isA<InvalidStateException>()),
+      );
       offlineListOperation.discard();
+      expect(
+        () => offlineListOperation.takeRegionList(),
+        throwsA(isA<InvalidStateException>()),
+      );
       final offlineCreateOperation = runtime.createOfflineRegion(
         const OfflineTilePyramidRegionDefinition(
           styleUrl: 'https://example.com/style.json',
@@ -789,7 +797,72 @@ void main() {
 
     expect(pointer.address, 0x1234);
     expect(pointer.isNull, isFalse);
+    expect(pointer, equals(const NativePointer(0x1234)));
+    expect(pointer.hashCode, equals(const NativePointer(0x1234).hashCode));
+    expect({pointer}, contains(const NativePointer(0x1234)));
     expect(NativePointer.nullPointer.isNull, isTrue);
+  });
+
+  test('scoped native values validate before exposing borrowed values', () {
+    var live = true;
+    void checkLive() {
+      if (!live) {
+        throw StateError('scope closed');
+      }
+    }
+
+    final pointer = ScopedNativePointer(
+      0x1234,
+      checkValid: checkLive,
+      debugName: 'test pointer',
+    );
+    final value = ScopedNativeInt(
+      7,
+      checkValid: checkLive,
+      debugName: 'test value',
+    );
+
+    expect(pointer.address, 0x1234);
+    expect(pointer.toNativePointer(), const NativePointer(0x1234));
+    expect(value.value, 7);
+
+    live = false;
+    expect(() => pointer.address, throwsStateError);
+    expect(() => value.value, throwsStateError);
+  });
+
+  test('native buffer owns reusable native byte storage', () {
+    final buffer = NativeBuffer(4);
+    try {
+      final bytes = buffer.asTypedList();
+      bytes[0] = 42;
+
+      expect(buffer.byteLength, 4);
+      expect(buffer.isClosed, isFalse);
+      expect(buffer.asTypedList(length: 1).single, 42);
+      expect(() => buffer.asTypedList(length: 5), throwsRangeError);
+    } finally {
+      buffer.close();
+    }
+
+    expect(buffer.isClosed, isTrue);
+    expect(() => buffer.unsafePointer, throwsStateError);
+    expect(() => NativeBuffer(0), throwsArgumentError);
+  });
+
+  test('runtime value wrappers preserve unknown raw values', () {
+    final eventType = RuntimeEventType.fromRawValue(0xfeed);
+    final sourceType = RuntimeEventSourceType.fromRawValue(0xbeef);
+    final renderMode = RenderMode.fromRawValue(42);
+    final operationKind = OfflineOperationKind.fromRawValue(99);
+    final resultKind = OfflineOperationResultKind.fromRawValue(100);
+
+    expect(eventType.rawValue, 0xfeed);
+    expect(eventType, RuntimeEventType.fromRawValue(0xfeed));
+    expect(sourceType.rawValue, 0xbeef);
+    expect(renderMode.name, 'unknown(42)');
+    expect(operationKind.rawValue, 99);
+    expect(resultKind.rawValue, 100);
   });
 }
 

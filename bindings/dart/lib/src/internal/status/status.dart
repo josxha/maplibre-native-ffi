@@ -31,6 +31,11 @@ Never throwInvalidArgument(String diagnostic) {
   throw MaplibreException.invalidArgument(diagnostic);
 }
 
+/// Reports a Dart-side invalid state before calling native code.
+Never throwInvalidState(String diagnostic) {
+  throw MaplibreException.invalidState(diagnostic);
+}
+
 /// Reports Dart-side owner-isolate misuse before calling native code.
 Never throwWrongThread(String diagnostic) {
   throw MaplibreException.forNativeStatusCode(

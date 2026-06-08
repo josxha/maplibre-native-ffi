@@ -1,3 +1,8 @@
+import 'dart:ffi';
+import 'dart:typed_data';
+
+import 'package:ffi/ffi.dart';
+
 import 'native_pointer.dart';
 
 /// Logical render target extent in UI pixels.
@@ -17,6 +22,58 @@ final class RenderTargetExtent {
 
   /// UI-to-device pixel scale.
   final double scaleFactor;
+}
+
+/// Closeable native byte buffer for reusable render readback storage.
+final class NativeBuffer {
+  /// Allocates [byteLength] bytes of native memory.
+  NativeBuffer(int byteLength)
+    : this._(byteLength, _allocateNativeBuffer(byteLength));
+
+  NativeBuffer._(this.byteLength, this._pointer);
+
+  /// Allocated byte length.
+  final int byteLength;
+
+  Pointer<Uint8> _pointer;
+
+  /// Whether this buffer has been freed.
+  bool get isClosed => _pointer == nullptr;
+
+  /// Unsafe native pointer to the buffer storage.
+  ///
+  /// The pointer is valid until [close] frees this buffer.
+  Pointer<Uint8> get unsafePointer {
+    if (_pointer == nullptr) {
+      throw StateError('native buffer has been closed');
+    }
+    return _pointer;
+  }
+
+  /// Views the native storage as a Dart typed list.
+  Uint8List asTypedList({int? length}) {
+    final viewLength = length ?? byteLength;
+    if (viewLength < 0 || viewLength > byteLength) {
+      throw RangeError.range(viewLength, 0, byteLength, 'length');
+    }
+    return unsafePointer.asTypedList(viewLength);
+  }
+
+  /// Frees the native storage. The buffer must not be used afterwards.
+  void close() {
+    if (_pointer == nullptr) {
+      return;
+    }
+    calloc.free(_pointer);
+    _pointer = nullptr;
+  }
+}
+
+Pointer<Uint8> _allocateNativeBuffer(int byteLength) {
+  if (byteLength <= 0) {
+    throw ArgumentError.value(byteLength, 'byteLength', 'must be positive');
+  }
+  return calloc<Uint8>(byteLength);
 }
 
 /// Metal backend context fields shared by Metal render targets.

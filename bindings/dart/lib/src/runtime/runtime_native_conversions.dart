@@ -548,9 +548,7 @@ FeatureExtensionResult _copyFeatureExtensionResult(
             info.data.feature_collection,
           ),
         ),
-        _ => throwInvalidArgument(
-          'unknown native feature extension result type: ${info.type}',
-        ),
+        _ => FeatureExtensionUnknown(info.type),
       };
     });
   } finally {

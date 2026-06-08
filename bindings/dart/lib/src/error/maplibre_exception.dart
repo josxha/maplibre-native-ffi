@@ -71,6 +71,10 @@ class MaplibreException implements Exception {
   factory MaplibreException.invalidArgument(String diagnostic) =>
       InvalidArgumentException(null, diagnostic);
 
+  /// Creates a binding-side invalid-state error before native code is called.
+  factory MaplibreException.invalidState(String diagnostic) =>
+      InvalidStateException(null, diagnostic);
+
   /// Stable status category.
   final MaplibreStatus status;
 

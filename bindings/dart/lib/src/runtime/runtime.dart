@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import '../camera/camera.dart';
+import '../error/maplibre_exception.dart';
 import '../geo/geo.dart';
 import '../internal/callback/callback_state.dart';
 import '../internal/c/maplibre_native_c.dart';
@@ -111,7 +112,7 @@ final class RuntimeHandle {
         return null;
       }
 
-      final copiedEvent = RuntimeEvent._fromNative(event.ref);
+      final copiedEvent = RuntimeEvent._fromNative(event.ref, this);
       _handleRuntimeEvent(copiedEvent);
       return copiedEvent;
     });
@@ -213,7 +214,12 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(this, outOperationId.value);
+      return OfflineOperationHandle._(
+        this,
+        outOperationId.value,
+        _OfflineOperationKind.ambientCache,
+        _OfflineOperationResultKind.none,
+      );
     });
   }
 
@@ -239,30 +245,41 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(this, outOperationId.value);
+      return OfflineOperationHandle._(
+        this,
+        outOperationId.value,
+        _OfflineOperationKind.regionCreate,
+        _OfflineOperationResultKind.region,
+      );
     });
   }
 
   /// Starts getting an offline region snapshot by ID.
   OfflineOperationHandle getOfflineRegion(int regionId) =>
-      _startOfflineOperation((outOperationId) {
-        _check(
-          _c.raw.mln_runtime_offline_region_get_start(
-            _pointer,
-            regionId,
-            outOperationId,
-          ),
-        );
-      });
+      _startOfflineOperation(
+        _OfflineOperationKind.regionGet,
+        _OfflineOperationResultKind.optionalRegion,
+        (outOperationId) {
+          _check(
+            _c.raw.mln_runtime_offline_region_get_start(
+              _pointer,
+              regionId,
+              outOperationId,
+            ),
+          );
+        },
+      );
 
   /// Starts listing offline region snapshots.
-  OfflineOperationHandle listOfflineRegions() => _startOfflineOperation((
-    outOperationId,
-  ) {
-    _check(
-      _c.raw.mln_runtime_offline_regions_list_start(_pointer, outOperationId),
-    );
-  });
+  OfflineOperationHandle listOfflineRegions() => _startOfflineOperation(
+    _OfflineOperationKind.regionsList,
+    _OfflineOperationResultKind.regionList,
+    (outOperationId) {
+      _check(
+        _c.raw.mln_runtime_offline_regions_list_start(_pointer, outOperationId),
+      );
+    },
+  );
 
   /// Starts merging offline regions from another database path.
   OfflineOperationHandle mergeOfflineRegionDatabase(String sideDatabasePath) {
@@ -276,7 +293,12 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(this, outOperationId.value);
+      return OfflineOperationHandle._(
+        this,
+        outOperationId.value,
+        _OfflineOperationKind.regionsMergeDatabase,
+        _OfflineOperationResultKind.regionList,
+      );
     });
   }
 
@@ -297,83 +319,115 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(this, outOperationId.value);
+      return OfflineOperationHandle._(
+        this,
+        outOperationId.value,
+        _OfflineOperationKind.regionUpdateMetadata,
+        _OfflineOperationResultKind.region,
+      );
     });
   }
 
   /// Starts getting the current offline region status.
   OfflineOperationHandle getOfflineRegionStatus(int regionId) =>
-      _startOfflineOperation((outOperationId) {
-        _check(
-          _c.raw.mln_runtime_offline_region_get_status_start(
-            _pointer,
-            regionId,
-            outOperationId,
-          ),
-        );
-      });
+      _startOfflineOperation(
+        _OfflineOperationKind.regionGetStatus,
+        _OfflineOperationResultKind.regionStatus,
+        (outOperationId) {
+          _check(
+            _c.raw.mln_runtime_offline_region_get_status_start(
+              _pointer,
+              regionId,
+              outOperationId,
+            ),
+          );
+        },
+      );
 
   /// Starts enabling or disabling offline region observation.
   OfflineOperationHandle setOfflineRegionObserved(
     int regionId,
     bool observed,
-  ) => _startOfflineOperation((outOperationId) {
-    _check(
-      _c.raw.mln_runtime_offline_region_set_observed_start(
-        _pointer,
-        regionId,
-        observed,
-        outOperationId,
-      ),
-    );
-  });
+  ) => _startOfflineOperation(
+    _OfflineOperationKind.regionSetObserved,
+    _OfflineOperationResultKind.none,
+    (outOperationId) {
+      _check(
+        _c.raw.mln_runtime_offline_region_set_observed_start(
+          _pointer,
+          regionId,
+          observed,
+          outOperationId,
+        ),
+      );
+    },
+  );
 
   /// Starts changing an offline region's download state.
   OfflineOperationHandle setOfflineRegionDownloadState(
     int regionId,
     OfflineRegionDownloadState state,
-  ) => _startOfflineOperation((outOperationId) {
-    _check(
-      _c.raw.mln_runtime_offline_region_set_download_state_start(
-        _pointer,
-        regionId,
-        state.rawValue,
-        outOperationId,
-      ),
-    );
-  });
+  ) => _startOfflineOperation(
+    _OfflineOperationKind.regionSetDownloadState,
+    _OfflineOperationResultKind.none,
+    (outOperationId) {
+      _check(
+        _c.raw.mln_runtime_offline_region_set_download_state_start(
+          _pointer,
+          regionId,
+          state.rawValue,
+          outOperationId,
+        ),
+      );
+    },
+  );
 
   /// Starts invalidating cached resources for an offline region.
   OfflineOperationHandle invalidateOfflineRegion(int regionId) =>
-      _startOfflineOperation((outOperationId) {
-        _check(
-          _c.raw.mln_runtime_offline_region_invalidate_start(
-            _pointer,
-            regionId,
-            outOperationId,
-          ),
-        );
-      });
+      _startOfflineOperation(
+        _OfflineOperationKind.regionInvalidate,
+        _OfflineOperationResultKind.none,
+        (outOperationId) {
+          _check(
+            _c.raw.mln_runtime_offline_region_invalidate_start(
+              _pointer,
+              regionId,
+              outOperationId,
+            ),
+          );
+        },
+      );
 
   /// Starts deleting an offline region.
   OfflineOperationHandle deleteOfflineRegion(int regionId) =>
-      _startOfflineOperation((outOperationId) {
-        _check(
-          _c.raw.mln_runtime_offline_region_delete_start(
-            _pointer,
-            regionId,
-            outOperationId,
-          ),
-        );
-      });
+      _startOfflineOperation(
+        _OfflineOperationKind.regionDelete,
+        _OfflineOperationResultKind.none,
+        (outOperationId) {
+          _check(
+            _c.raw.mln_runtime_offline_region_delete_start(
+              _pointer,
+              regionId,
+              outOperationId,
+            ),
+          );
+        },
+      );
 
   OfflineOperationHandle _startOfflineOperation(
+    _OfflineOperationKind kind,
+    _OfflineOperationResultKind resultKind,
     void Function(Pointer<Uint64> outOperationId) start,
   ) {
     return withNativeArena((arena) {
       final outOperationId = arena<Uint64>();
       start(outOperationId);
-      return OfflineOperationHandle._(this, outOperationId.value);
+      return OfflineOperationHandle._(
+        this,
+        outOperationId.value,
+        kind,
+        resultKind,
+      );
     });
   }
 
@@ -427,21 +481,30 @@ final class RuntimeHandle {
 final class RuntimeEvent {
   RuntimeEvent._({
     required this.type,
+    required this.eventType,
     required this.sourceType,
+    required this.source,
     required this.sourceAddress,
     required this.code,
     required this.payloadType,
+    required this.payload,
     required this.payloadSize,
     required this.message,
   });
 
-  factory RuntimeEvent._fromNative(raw.mln_runtime_event event) {
+  factory RuntimeEvent._fromNative(
+    raw.mln_runtime_event event,
+    RuntimeHandle runtime,
+  ) {
     return RuntimeEvent._(
       type: event.type,
+      eventType: RuntimeEventType.fromRawValue(event.type),
       sourceType: event.source_type,
+      source: RuntimeEventSource._fromNative(event, runtime),
       sourceAddress: event.source.address,
       code: event.code,
       payloadType: event.payload_type,
+      payload: RuntimeEventPayload._fromNative(event),
       payloadSize: event.payload_size,
       message: _copyNativeString(event.message, event.message_size),
     );
@@ -450,8 +513,14 @@ final class RuntimeEvent {
   /// Raw native event type.
   final int type;
 
+  /// Typed event type, preserving unknown raw values.
+  final RuntimeEventType eventType;
+
   /// Raw native event source type.
   final int sourceType;
+
+  /// Typed event source, preserving unknown raw values.
+  final RuntimeEventSource source;
 
   /// Borrowed native source handle address copied as an opaque value.
   final int sourceAddress;
@@ -462,11 +531,683 @@ final class RuntimeEvent {
   /// Raw native payload type.
   final int payloadType;
 
+  /// Typed event payload copied into Dart-owned values.
+  final RuntimeEventPayload payload;
+
   /// Native payload byte size.
   final int payloadSize;
 
   /// Copied event message, when one was provided.
   final String? message;
+}
+
+/// Runtime event type with forward-compatible unknown values.
+final class RuntimeEventType {
+  const RuntimeEventType._(this.rawValue, this.name);
+
+  static const mapCameraWillChange = RuntimeEventType._(
+    1,
+    'mapCameraWillChange',
+  );
+  static const mapCameraIsChanging = RuntimeEventType._(
+    2,
+    'mapCameraIsChanging',
+  );
+  static const mapCameraDidChange = RuntimeEventType._(3, 'mapCameraDidChange');
+  static const mapStyleLoaded = RuntimeEventType._(4, 'mapStyleLoaded');
+  static const mapLoadingStarted = RuntimeEventType._(5, 'mapLoadingStarted');
+  static const mapLoadingFinished = RuntimeEventType._(6, 'mapLoadingFinished');
+  static const mapLoadingFailed = RuntimeEventType._(7, 'mapLoadingFailed');
+  static const mapIdle = RuntimeEventType._(8, 'mapIdle');
+  static const mapRenderUpdateAvailable = RuntimeEventType._(
+    9,
+    'mapRenderUpdateAvailable',
+  );
+  static const mapRenderError = RuntimeEventType._(10, 'mapRenderError');
+  static const mapStillImageFinished = RuntimeEventType._(
+    11,
+    'mapStillImageFinished',
+  );
+  static const mapStillImageFailed = RuntimeEventType._(
+    12,
+    'mapStillImageFailed',
+  );
+  static const mapRenderFrameStarted = RuntimeEventType._(
+    13,
+    'mapRenderFrameStarted',
+  );
+  static const mapRenderFrameFinished = RuntimeEventType._(
+    14,
+    'mapRenderFrameFinished',
+  );
+  static const mapRenderMapStarted = RuntimeEventType._(
+    15,
+    'mapRenderMapStarted',
+  );
+  static const mapRenderMapFinished = RuntimeEventType._(
+    16,
+    'mapRenderMapFinished',
+  );
+  static const mapStyleImageMissing = RuntimeEventType._(
+    17,
+    'mapStyleImageMissing',
+  );
+  static const mapTileAction = RuntimeEventType._(18, 'mapTileAction');
+  static const offlineRegionStatusChanged = RuntimeEventType._(
+    19,
+    'offlineRegionStatusChanged',
+  );
+  static const offlineRegionResponseError = RuntimeEventType._(
+    20,
+    'offlineRegionResponseError',
+  );
+  static const offlineRegionTileCountLimitExceeded = RuntimeEventType._(
+    21,
+    'offlineRegionTileCountLimitExceeded',
+  );
+  static const offlineOperationCompleted = RuntimeEventType._(
+    22,
+    'offlineOperationCompleted',
+  );
+
+  factory RuntimeEventType.fromRawValue(int rawValue) => switch (rawValue) {
+    1 => mapCameraWillChange,
+    2 => mapCameraIsChanging,
+    3 => mapCameraDidChange,
+    4 => mapStyleLoaded,
+    5 => mapLoadingStarted,
+    6 => mapLoadingFinished,
+    7 => mapLoadingFailed,
+    8 => mapIdle,
+    9 => mapRenderUpdateAvailable,
+    10 => mapRenderError,
+    11 => mapStillImageFinished,
+    12 => mapStillImageFailed,
+    13 => mapRenderFrameStarted,
+    14 => mapRenderFrameFinished,
+    15 => mapRenderMapStarted,
+    16 => mapRenderMapFinished,
+    17 => mapStyleImageMissing,
+    18 => mapTileAction,
+    19 => offlineRegionStatusChanged,
+    20 => offlineRegionResponseError,
+    21 => offlineRegionTileCountLimitExceeded,
+    22 => offlineOperationCompleted,
+    _ => RuntimeEventType._(rawValue, 'unknown($rawValue)'),
+  };
+
+  final int rawValue;
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RuntimeEventType && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
+/// Runtime event source type with forward-compatible unknown values.
+final class RuntimeEventSourceType {
+  const RuntimeEventSourceType._(this.rawValue, this.name);
+
+  static const runtime = RuntimeEventSourceType._(0, 'runtime');
+  static const map = RuntimeEventSourceType._(1, 'map');
+
+  factory RuntimeEventSourceType.fromRawValue(int rawValue) =>
+      switch (rawValue) {
+        0 => runtime,
+        1 => map,
+        _ => RuntimeEventSourceType._(rawValue, 'unknown($rawValue)'),
+      };
+
+  final int rawValue;
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RuntimeEventSourceType && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
+/// Typed runtime event source copied from the native event.
+sealed class RuntimeEventSource {
+  const RuntimeEventSource(this.sourceType, this.address);
+
+  factory RuntimeEventSource._fromNative(
+    raw.mln_runtime_event event,
+    RuntimeHandle runtime,
+  ) {
+    final sourceType = RuntimeEventSourceType.fromRawValue(event.source_type);
+    final address = event.source.address;
+    if (sourceType == RuntimeEventSourceType.runtime) {
+      return RuntimeRuntimeEventSource(runtime, address: address);
+    }
+    if (sourceType == RuntimeEventSourceType.map) {
+      final map = runtime._maps[address]?.target;
+      return MapRuntimeEventSource(map, address: address);
+    }
+    return UnknownRuntimeEventSource(sourceType, address: address);
+  }
+
+  final RuntimeEventSourceType sourceType;
+  final int address;
+}
+
+/// Runtime-scoped event source.
+final class RuntimeRuntimeEventSource extends RuntimeEventSource {
+  const RuntimeRuntimeEventSource(this.runtime, {required int address})
+    : super(RuntimeEventSourceType.runtime, address);
+
+  final RuntimeHandle runtime;
+}
+
+/// Map-scoped event source.
+final class MapRuntimeEventSource extends RuntimeEventSource {
+  const MapRuntimeEventSource(this.map, {required int address})
+    : super(RuntimeEventSourceType.map, address);
+
+  /// Map handle when still alive in this runtime.
+  final MapHandle? map;
+}
+
+/// Unknown event source type.
+final class UnknownRuntimeEventSource extends RuntimeEventSource {
+  const UnknownRuntimeEventSource(
+    RuntimeEventSourceType sourceType, {
+    required int address,
+  }) : super(sourceType, address);
+}
+
+/// Render mode reported by render event payloads.
+final class RenderMode {
+  const RenderMode._(this.rawValue, this.name);
+
+  static const partial = RenderMode._(0, 'partial');
+  static const full = RenderMode._(1, 'full');
+
+  factory RenderMode.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => partial,
+    1 => full,
+    _ => RenderMode._(rawValue, 'unknown($rawValue)'),
+  };
+
+  final int rawValue;
+  final String name;
+}
+
+/// Renderer timing and count statistics copied from render events.
+final class RenderingStats {
+  const RenderingStats({
+    required this.encodingTime,
+    required this.renderingTime,
+    required this.frameCount,
+    required this.drawCallCount,
+    required this.totalDrawCallCount,
+  });
+
+  factory RenderingStats._fromNative(raw.mln_rendering_stats stats) =>
+      RenderingStats(
+        encodingTime: stats.encoding_time,
+        renderingTime: stats.rendering_time,
+        frameCount: stats.frame_count,
+        drawCallCount: stats.draw_call_count,
+        totalDrawCallCount: stats.total_draw_call_count,
+      );
+
+  final double encodingTime;
+  final double renderingTime;
+  final int frameCount;
+  final int drawCallCount;
+  final int totalDrawCallCount;
+}
+
+/// Tile operation reported by tile-action runtime events.
+final class TileOperation {
+  const TileOperation._(this.rawValue, this.name);
+
+  static const requestedFromCache = TileOperation._(0, 'requestedFromCache');
+  static const requestedFromNetwork = TileOperation._(
+    1,
+    'requestedFromNetwork',
+  );
+  static const loadFromNetwork = TileOperation._(2, 'loadFromNetwork');
+  static const loadFromCache = TileOperation._(3, 'loadFromCache');
+  static const startParse = TileOperation._(4, 'startParse');
+  static const endParse = TileOperation._(5, 'endParse');
+  static const error = TileOperation._(6, 'error');
+  static const cancelled = TileOperation._(7, 'cancelled');
+  static const nullOperation = TileOperation._(8, 'null');
+
+  factory TileOperation.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => requestedFromCache,
+    1 => requestedFromNetwork,
+    2 => loadFromNetwork,
+    3 => loadFromCache,
+    4 => startParse,
+    5 => endParse,
+    6 => error,
+    7 => cancelled,
+    8 => nullOperation,
+    _ => TileOperation._(rawValue, 'unknown($rawValue)'),
+  };
+
+  final int rawValue;
+  final String name;
+}
+
+/// Offline operation kind reported by runtime events.
+final class OfflineOperationKind {
+  const OfflineOperationKind._(this.rawValue, this.name);
+
+  static const ambientCache = OfflineOperationKind._(1, 'ambientCache');
+  static const regionCreate = OfflineOperationKind._(2, 'regionCreate');
+  static const regionGet = OfflineOperationKind._(3, 'regionGet');
+  static const regionsList = OfflineOperationKind._(4, 'regionsList');
+  static const regionsMergeDatabase = OfflineOperationKind._(
+    5,
+    'regionsMergeDatabase',
+  );
+  static const regionUpdateMetadata = OfflineOperationKind._(
+    6,
+    'regionUpdateMetadata',
+  );
+  static const regionGetStatus = OfflineOperationKind._(7, 'regionGetStatus');
+  static const regionSetObserved = OfflineOperationKind._(
+    8,
+    'regionSetObserved',
+  );
+  static const regionSetDownloadState = OfflineOperationKind._(
+    9,
+    'regionSetDownloadState',
+  );
+  static const regionInvalidate = OfflineOperationKind._(
+    10,
+    'regionInvalidate',
+  );
+  static const regionDelete = OfflineOperationKind._(11, 'regionDelete');
+
+  factory OfflineOperationKind.fromRawValue(int rawValue) => switch (rawValue) {
+    1 => ambientCache,
+    2 => regionCreate,
+    3 => regionGet,
+    4 => regionsList,
+    5 => regionsMergeDatabase,
+    6 => regionUpdateMetadata,
+    7 => regionGetStatus,
+    8 => regionSetObserved,
+    9 => regionSetDownloadState,
+    10 => regionInvalidate,
+    11 => regionDelete,
+    _ => OfflineOperationKind._(rawValue, 'unknown($rawValue)'),
+  };
+
+  final int rawValue;
+  final String name;
+}
+
+/// Offline operation result kind reported by runtime events.
+final class OfflineOperationResultKind {
+  const OfflineOperationResultKind._(this.rawValue, this.name);
+
+  static const none = OfflineOperationResultKind._(0, 'none');
+  static const region = OfflineOperationResultKind._(1, 'region');
+  static const optionalRegion = OfflineOperationResultKind._(
+    2,
+    'optionalRegion',
+  );
+  static const regionList = OfflineOperationResultKind._(3, 'regionList');
+  static const regionStatus = OfflineOperationResultKind._(4, 'regionStatus');
+
+  factory OfflineOperationResultKind.fromRawValue(int rawValue) =>
+      switch (rawValue) {
+        0 => none,
+        1 => region,
+        2 => optionalRegion,
+        3 => regionList,
+        4 => regionStatus,
+        _ => OfflineOperationResultKind._(rawValue, 'unknown($rawValue)'),
+      };
+
+  final int rawValue;
+  final String name;
+}
+
+/// Typed runtime event payload copied into Dart-owned values.
+sealed class RuntimeEventPayload {
+  const RuntimeEventPayload(this.rawPayloadType, this.payloadSize);
+
+  factory RuntimeEventPayload._fromNative(raw.mln_runtime_event event) {
+    final rawPayloadType = event.payload_type;
+    final payloadSize = event.payload_size;
+    if (rawPayloadType == 0) {
+      return RuntimeEventPayloadNone(rawPayloadType, payloadSize);
+    }
+    if (event.payload == nullptr) {
+      return RuntimeEventPayloadUnknown(
+        rawPayloadType,
+        payloadSize,
+        Uint8List(0),
+      );
+    }
+    final payload = event.payload;
+    return switch (rawPayloadType) {
+      1 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_render_frame>(),
+        () {
+          final value = payload.cast<raw.mln_runtime_event_render_frame>().ref;
+          return RuntimeEventRenderFrame(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            mode: RenderMode.fromRawValue(value.mode),
+            rawMode: value.mode,
+            needsRepaint: value.needs_repaint,
+            placementChanged: value.placement_changed,
+            stats: RenderingStats._fromNative(value.stats),
+          );
+        },
+      ),
+      2 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_render_map>(),
+        () {
+          final value = payload.cast<raw.mln_runtime_event_render_map>().ref;
+          return RuntimeEventRenderMap(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            mode: RenderMode.fromRawValue(value.mode),
+            rawMode: value.mode,
+          );
+        },
+      ),
+      3 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_style_image_missing>(),
+        () {
+          final value = payload
+              .cast<raw.mln_runtime_event_style_image_missing>()
+              .ref;
+          return RuntimeEventStyleImageMissing(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            imageId: _copyNativeString(value.image_id, value.image_id_size),
+          );
+        },
+      ),
+      4 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_tile_action>(),
+        () {
+          final value = payload.cast<raw.mln_runtime_event_tile_action>().ref;
+          return RuntimeEventTileAction(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            operation: TileOperation.fromRawValue(value.operation),
+            rawOperation: value.operation,
+            tileId: TileId(
+              overscaledZ: value.tile_id.overscaled_z,
+              wrap: value.tile_id.wrap,
+              canonicalZ: value.tile_id.canonical_z,
+              canonicalX: value.tile_id.canonical_x,
+              canonicalY: value.tile_id.canonical_y,
+            ),
+            sourceId: _copyNativeString(value.source_id, value.source_id_size),
+          );
+        },
+      ),
+      5 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_offline_region_status>(),
+        () {
+          final value = payload
+              .cast<raw.mln_runtime_event_offline_region_status>()
+              .ref;
+          return RuntimeEventOfflineRegionStatus(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            regionId: value.region_id,
+            status: _offlineRegionStatusFromNative(value.status),
+          );
+        },
+      ),
+      6 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_offline_region_response_error>(),
+        () {
+          final value = payload
+              .cast<raw.mln_runtime_event_offline_region_response_error>()
+              .ref;
+          return RuntimeEventOfflineRegionResponseError(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            regionId: value.region_id,
+            reason: ResourceErrorReason.fromRawValue(value.reason),
+            rawReason: value.reason,
+          );
+        },
+      ),
+      7 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_offline_region_tile_count_limit>(),
+        () {
+          final value = payload
+              .cast<raw.mln_runtime_event_offline_region_tile_count_limit>()
+              .ref;
+          return RuntimeEventOfflineRegionTileCountLimit(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            regionId: value.region_id,
+            limit: value.limit,
+          );
+        },
+      ),
+      8 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_offline_operation_completed>(),
+        () {
+          final value = payload
+              .cast<raw.mln_runtime_event_offline_operation_completed>()
+              .ref;
+          return RuntimeEventOfflineOperationCompleted(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            operationId: value.operation_id,
+            operationKind: OfflineOperationKind.fromRawValue(
+              value.operation_kind,
+            ),
+            rawOperationKind: value.operation_kind,
+            resultKind: OfflineOperationResultKind.fromRawValue(
+              value.result_kind,
+            ),
+            rawResultKind: value.result_kind,
+            resultStatus: MaplibreStatus.fromNativeStatusCode(
+              value.result_status,
+            ),
+            rawResultStatus: value.result_status,
+            found: value.found,
+          );
+        },
+      ),
+      _ => RuntimeEventPayloadUnknown(
+        rawPayloadType,
+        payloadSize,
+        _copyRuntimePayloadBytes(event),
+      ),
+    };
+  }
+
+  final int rawPayloadType;
+  final int payloadSize;
+}
+
+/// Runtime event with no payload.
+final class RuntimeEventPayloadNone extends RuntimeEventPayload {
+  const RuntimeEventPayloadNone(super.rawPayloadType, super.payloadSize);
+}
+
+/// Render-frame event payload.
+final class RuntimeEventRenderFrame extends RuntimeEventPayload {
+  const RuntimeEventRenderFrame({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.mode,
+    required this.rawMode,
+    required this.needsRepaint,
+    required this.placementChanged,
+    required this.stats,
+  }) : super(rawPayloadType, payloadSize);
+
+  final RenderMode mode;
+  final int rawMode;
+  final bool needsRepaint;
+  final bool placementChanged;
+  final RenderingStats stats;
+}
+
+/// Render-map event payload.
+final class RuntimeEventRenderMap extends RuntimeEventPayload {
+  const RuntimeEventRenderMap({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.mode,
+    required this.rawMode,
+  }) : super(rawPayloadType, payloadSize);
+
+  final RenderMode mode;
+  final int rawMode;
+}
+
+/// Style-image missing event payload.
+final class RuntimeEventStyleImageMissing extends RuntimeEventPayload {
+  const RuntimeEventStyleImageMissing({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.imageId,
+  }) : super(rawPayloadType, payloadSize);
+
+  final String? imageId;
+}
+
+/// Tile-action event payload.
+final class RuntimeEventTileAction extends RuntimeEventPayload {
+  const RuntimeEventTileAction({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.operation,
+    required this.rawOperation,
+    required this.tileId,
+    required this.sourceId,
+  }) : super(rawPayloadType, payloadSize);
+
+  final TileOperation operation;
+  final int rawOperation;
+  final TileId tileId;
+  final String? sourceId;
+}
+
+/// Offline-region status event payload.
+final class RuntimeEventOfflineRegionStatus extends RuntimeEventPayload {
+  const RuntimeEventOfflineRegionStatus({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.regionId,
+    required this.status,
+  }) : super(rawPayloadType, payloadSize);
+
+  final int regionId;
+  final OfflineRegionStatus status;
+}
+
+/// Offline-region response error event payload.
+final class RuntimeEventOfflineRegionResponseError extends RuntimeEventPayload {
+  const RuntimeEventOfflineRegionResponseError({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.regionId,
+    required this.reason,
+    required this.rawReason,
+  }) : super(rawPayloadType, payloadSize);
+
+  final int regionId;
+  final ResourceErrorReason reason;
+  final int rawReason;
+}
+
+/// Offline-region tile-count limit event payload.
+final class RuntimeEventOfflineRegionTileCountLimit
+    extends RuntimeEventPayload {
+  const RuntimeEventOfflineRegionTileCountLimit({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.regionId,
+    required this.limit,
+  }) : super(rawPayloadType, payloadSize);
+
+  final int regionId;
+  final int limit;
+}
+
+/// Offline operation completion event payload.
+final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
+  const RuntimeEventOfflineOperationCompleted({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.operationId,
+    required this.operationKind,
+    required this.rawOperationKind,
+    required this.resultKind,
+    required this.rawResultKind,
+    required this.resultStatus,
+    required this.rawResultStatus,
+    required this.found,
+  }) : super(rawPayloadType, payloadSize);
+
+  final int operationId;
+  final OfflineOperationKind operationKind;
+  final int rawOperationKind;
+  final OfflineOperationResultKind resultKind;
+  final int rawResultKind;
+  final MaplibreStatus resultStatus;
+  final int rawResultStatus;
+  final bool found;
+}
+
+/// Unknown runtime event payload copied as raw bytes.
+final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
+  const RuntimeEventPayloadUnknown(
+    super.rawPayloadType,
+    super.payloadSize,
+    this.bytes,
+  );
+
+  final Uint8List bytes;
+}
+
+RuntimeEventPayload _runtimePayloadOrUnknown(
+  raw.mln_runtime_event event,
+  int expectedPayloadSize,
+  RuntimeEventPayload Function() copy,
+) {
+  if (event.payload_size < expectedPayloadSize) {
+    return RuntimeEventPayloadUnknown(
+      event.payload_type,
+      event.payload_size,
+      _copyRuntimePayloadBytes(event),
+    );
+  }
+  return copy();
+}
+
+Uint8List _copyRuntimePayloadBytes(raw.mln_runtime_event event) {
+  if (event.payload == nullptr || event.payload_size == 0) {
+    return Uint8List(0);
+  }
+  return Uint8List.fromList(
+    event.payload.cast<Uint8>().asTypedList(event.payload_size),
+  );
 }
 
 /// Map rendering mode used when creating a map.

@@ -128,3 +128,12 @@ final class FeatureExtensionFeatureCollection extends FeatureExtensionResult {
   /// Result features.
   final List<FeatureGeoJson> features;
 }
+
+/// Feature extension result type unknown to this Dart binding version.
+final class FeatureExtensionUnknown extends FeatureExtensionResult {
+  /// Creates an unknown result preserving the raw native type.
+  const FeatureExtensionUnknown(this.rawType);
+
+  /// Raw native result type value.
+  final int rawType;
+}
