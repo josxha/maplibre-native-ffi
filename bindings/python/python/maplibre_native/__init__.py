@@ -19,7 +19,12 @@ from .errors import (
     WrongThreadError,
 )
 from .map import MapHandle, MapMode, MapOptions
-from .render import NativePointer, OpenGLContextProvider, RenderBackend
+from .render import (
+    FrameOpenGLTextureName,
+    NativePointer,
+    OpenGLContextProvider,
+    RenderBackend,
+)
 from .runtime import (
     NetworkStatus,
     RenderFramePayload,
@@ -27,6 +32,7 @@ from .runtime import (
     RenderMode,
     RenderingStats,
     RuntimeEvent,
+    RuntimeEventPayload,
     RuntimeEventSource,
     RuntimeEventSourceType,
     RuntimeEventType,
@@ -36,10 +42,12 @@ from .runtime import (
     TileActionPayload,
     TileId,
     TileOperation,
+    UnknownRuntimeEventPayload,
 )
 
 __all__ = [
     "EXPECTED_C_ABI_VERSION",
+    "FrameOpenGLTextureName",
     "InvalidArgumentError",
     "InvalidStateError",
     "MapHandle",
@@ -57,6 +65,7 @@ __all__ = [
     "RenderMode",
     "RenderingStats",
     "RuntimeEvent",
+    "RuntimeEventPayload",
     "RuntimeEventSource",
     "RuntimeEventSourceType",
     "RuntimeEventType",
@@ -66,6 +75,7 @@ __all__ = [
     "TileActionPayload",
     "TileId",
     "TileOperation",
+    "UnknownRuntimeEventPayload",
     "UnknownStatusError",
     "UnsupportedFeatureError",
     "WrongThreadError",

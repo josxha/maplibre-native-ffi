@@ -10,8 +10,11 @@ run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev maturin de
 depends = [":develop"]
 run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev pytest"
 
+[tasks.typecheck]
+run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python"
+
 [tasks.ci]
-depends = [":test"]
+depends = [":test", ":typecheck"]
 run = [
   "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev maturin build",
   'env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev python -c "import importlib.metadata; import maplibre_native; import maplibre_native._native; assert importlib.metadata.version(\"maplibre-native\") == \"0.0.0\""',

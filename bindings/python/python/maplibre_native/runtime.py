@@ -184,11 +184,27 @@ class TileActionPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class UnknownRuntimeEventPayload:
+    """Forward-compatible runtime event payload bytes."""
+
+    raw_type: int
+    data: bytes
+
+    @classmethod
+    def from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "UnknownRuntimeEventPayload":
+        """Build an unknown payload from RuntimeEvent.payload."""
+        return cls(raw_type=payload["raw_type"], data=payload["bytes"])
+
+
+@dataclass(frozen=True, slots=True)
 class RuntimeEventSource:
     """Copied runtime event source metadata."""
 
     source_type: RuntimeEventSourceType
     source_address: int
+    map_handle: MapHandle | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,20 +215,31 @@ class RuntimeEvent:
     source: RuntimeEventSource
     code: int
     message: str | None
-    payload: dict[str, Any]
+    payload: RuntimeEventPayload
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "RuntimeEvent":
+    def from_native(
+        cls,
+        raw: dict[str, Any],
+        runtime: RuntimeHandle | None = None,
+    ) -> "RuntimeEvent":
         """Build a copied Python event from a private native event dictionary."""
+        source_type = RuntimeEventSourceType(raw["source_type"])
+        source_address = raw["source_address"]
         return cls(
             event_type=RuntimeEventType(raw["event_type"]),
             source=RuntimeEventSource(
-                source_type=RuntimeEventSourceType(raw["source_type"]),
-                source_address=raw["source_address"],
+                source_type=source_type,
+                source_address=source_address,
+                map_handle=(
+                    runtime._map_for_source_address(source_address)  # noqa: SLF001
+                    if runtime is not None and source_type == RuntimeEventSourceType.MAP
+                    else None
+                ),
             ),
             code=raw["code"],
             message=raw["message"],
-            payload=dict(raw["payload"]),
+            payload=_runtime_payload_from_native(raw["payload"]),
         )
 
 
@@ -240,6 +267,7 @@ class RuntimeHandle(NativeHandleMixin):
         self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
             weakref.WeakSet()
         )
+        self._maps: dict[int, weakref.ReferenceType[MapHandle]] = {}
 
     def close(self) -> None:
         """Release this runtime handle exactly once."""
@@ -255,6 +283,22 @@ class RuntimeHandle(NativeHandleMixin):
     def _close_offline_operations(self) -> None:
         for operation in tuple(self._offline_operations):
             operation._mark_runtime_closed()  # noqa: SLF001
+
+    def _register_map(self, map_handle: MapHandle) -> None:
+        self._maps[map_handle._native_address()] = weakref.ref(map_handle)  # noqa: SLF001
+
+    def _unregister_map(self, map_handle: MapHandle) -> None:
+        self._maps.pop(map_handle._native_address(), None)  # noqa: SLF001
+
+    def _map_for_source_address(self, source_address: int) -> MapHandle | None:
+        source = self._maps.get(source_address)
+        if source is None:
+            return None
+        map_handle = source()
+        if map_handle is None or map_handle.closed:
+            self._maps.pop(source_address, None)
+            return None
+        return map_handle
 
     def run_once(self) -> None:
         """Run one pending owner-thread task for this runtime."""
@@ -396,13 +440,36 @@ class RuntimeHandle(NativeHandleMixin):
         event = self._native.poll_event()
         if event is None:
             return None
-        return RuntimeEvent.from_native(event)
+        return RuntimeEvent.from_native(event, runtime=self)
 
     def create_map(self, options: MapOptions | None = None) -> MapHandle:
         """Create a map owned by this runtime."""
         from .map import MapHandle
 
         return MapHandle(self, options)
+
+
+def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayload:
+    kind = payload["kind"]
+    if kind == "none":
+        return None
+    if kind == "render_frame":
+        return RenderFramePayload.from_runtime_payload(payload)
+    if kind == "render_map":
+        return RenderMapPayload.from_runtime_payload(payload)
+    if kind == "style_image_missing":
+        return StyleImageMissingPayload.from_runtime_payload(payload)
+    if kind == "tile_action":
+        return TileActionPayload.from_runtime_payload(payload)
+    if kind == "offline_region_status":
+        return OfflineRegionStatusChanged.from_runtime_payload(payload)
+    if kind == "offline_region_response_error":
+        return OfflineRegionResponseError.from_runtime_payload(payload)
+    if kind == "offline_region_tile_count_limit":
+        return OfflineRegionTileCountLimitExceeded.from_runtime_payload(payload)
+    if kind == "offline_operation_completed":
+        return OfflineOperationCompleted.from_runtime_payload(payload)
+    return UnknownRuntimeEventPayload.from_runtime_payload(payload)
 
 
 __all__ = [
@@ -412,6 +479,7 @@ __all__ = [
     "RenderMode",
     "RenderingStats",
     "RuntimeEvent",
+    "RuntimeEventPayload",
     "RuntimeEventSource",
     "RuntimeEventSourceType",
     "RuntimeEventType",
@@ -421,12 +489,30 @@ __all__ = [
     "TileActionPayload",
     "TileId",
     "TileOperation",
+    "UnknownRuntimeEventPayload",
 ]
 
 from .map import MapHandle, MapOptions  # noqa: E402
 from .offline import (  # noqa: E402
     AmbientCacheOperation,
+    OfflineOperationCompleted,
     OfflineOperationHandle,
     OfflineRegionDefinition,
     OfflineRegionDownloadState,
+    OfflineRegionResponseError,
+    OfflineRegionStatusChanged,
+    OfflineRegionTileCountLimitExceeded,
+)
+
+RuntimeEventPayload = (
+    None
+    | RenderFramePayload
+    | RenderMapPayload
+    | StyleImageMissingPayload
+    | TileActionPayload
+    | OfflineRegionStatusChanged
+    | OfflineRegionResponseError
+    | OfflineRegionTileCountLimitExceeded
+    | OfflineOperationCompleted
+    | UnknownRuntimeEventPayload
 )

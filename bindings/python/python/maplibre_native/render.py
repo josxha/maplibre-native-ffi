@@ -6,6 +6,7 @@ from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
 from enum import IntFlag
 from typing import Any
+from collections.abc import Callable
 
 from .geo import Feature
 from .json import JsonLike, JsonObjectLike, JsonValue
@@ -36,16 +37,24 @@ class OpenGLContextProvider(IntFlag):
     EGL = 1 << 1
 
 
-@dataclass(frozen=True, slots=True)
 class NativePointer:
     """Borrowed opaque backend-native address value."""
 
-    address: int
+    __slots__ = ("_address", "_diagnostic_name", "_is_live")
 
-    def __post_init__(self) -> None:
-        if self.address < 0:
+    def __init__(
+        self,
+        address: int,
+        *,
+        _is_live: Callable[[], bool] | None = None,
+        _diagnostic_name: str = "native pointer",
+    ) -> None:
+        if address < 0:
             msg = "native pointer address must be non-negative"
             raise ValueError(msg)
+        self._address = address
+        self._is_live = _is_live
+        self._diagnostic_name = _diagnostic_name
 
     @classmethod
     def null(cls) -> "NativePointer":
@@ -53,9 +62,71 @@ class NativePointer:
         return cls(0)
 
     @property
+    def address(self) -> int:
+        """Return the address while its borrowed scope is still live."""
+        self._require_live()
+        return self._address
+
+    @property
     def is_null(self) -> bool:
         """Return whether this pointer stores the null address."""
         return self.address == 0
+
+    def _require_live(self) -> None:
+        if self._is_live is None or self._is_live():
+            return
+        from .errors import InvalidStateError
+
+        raise InvalidStateError(None, f"{self._diagnostic_name} is no longer live")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, NativePointer):
+            return NotImplemented
+        return self.address == other.address
+
+    def __hash__(self) -> int:
+        return hash(self.address)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(address={self.address!r})"
+
+
+class FrameOpenGLTextureName:
+    """Borrowed OpenGL texture name scoped to a live frame handle."""
+
+    __slots__ = ("_is_live", "_texture")
+
+    def __init__(self, texture: int, *, _is_live: Callable[[], bool]) -> None:
+        if texture < 0:
+            msg = "OpenGL texture name must be non-negative"
+            raise ValueError(msg)
+        self._texture = texture
+        self._is_live = _is_live
+
+    @property
+    def value(self) -> int:
+        """Return the texture object name while its frame is still live."""
+        if self._is_live():
+            return self._texture
+        from .errors import InvalidStateError
+
+        raise InvalidStateError(None, "OpenGL texture is no longer live")
+
+    def __int__(self) -> int:
+        return self.value
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, FrameOpenGLTextureName):
+            return self.value == other.value
+        if isinstance(other, int):
+            return self.value == other
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(value={self.value!r})"
 
 
 @dataclass(frozen=True, slots=True)
@@ -489,12 +560,20 @@ class MetalOwnedTextureFrameHandle(NativeHandleMixin):
     @property
     def texture(self) -> NativePointer:
         """Return the borrowed Metal texture pointer while the frame is open."""
-        return NativePointer(self._native.texture_address())
+        return NativePointer(
+            self._native.texture_address(),
+            _is_live=lambda: not self.closed,
+            _diagnostic_name="Metal texture",
+        )
 
     @property
     def device(self) -> NativePointer:
         """Return the borrowed Metal device pointer while the frame is open."""
-        return NativePointer(self._native.device_address())
+        return NativePointer(
+            self._native.device_address(),
+            _is_live=lambda: not self.closed,
+            _diagnostic_name="Metal device",
+        )
 
 
 class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
@@ -513,17 +592,29 @@ class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
     @property
     def image(self) -> NativePointer:
         """Return the borrowed Vulkan image pointer while the frame is open."""
-        return NativePointer(self._native.image_address())
+        return NativePointer(
+            self._native.image_address(),
+            _is_live=lambda: not self.closed,
+            _diagnostic_name="Vulkan image",
+        )
 
     @property
     def image_view(self) -> NativePointer:
         """Return the borrowed Vulkan image-view pointer while the frame is open."""
-        return NativePointer(self._native.image_view_address())
+        return NativePointer(
+            self._native.image_view_address(),
+            _is_live=lambda: not self.closed,
+            _diagnostic_name="Vulkan image view",
+        )
 
     @property
     def device(self) -> NativePointer:
         """Return the borrowed Vulkan device pointer while the frame is open."""
-        return NativePointer(self._native.device_address())
+        return NativePointer(
+            self._native.device_address(),
+            _is_live=lambda: not self.closed,
+            _diagnostic_name="Vulkan device",
+        )
 
 
 class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
@@ -540,14 +631,18 @@ class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
         return OpenGLOwnedTextureFrame.from_native(self._native.frame())
 
     @property
-    def texture(self) -> int:
+    def texture(self) -> FrameOpenGLTextureName:
         """Return the borrowed OpenGL texture object name while the frame is open."""
-        return int(self._native.texture())
+        return FrameOpenGLTextureName(
+            int(self._native.texture()),
+            _is_live=lambda: not self.closed,
+        )
 
 
 __all__ = [
     "DetachedRenderSessionHandle",
     "EglContextDescriptor",
+    "FrameOpenGLTextureName",
     "MetalBorrowedTextureDescriptor",
     "MetalContextDescriptor",
     "MetalOwnedTextureDescriptor",

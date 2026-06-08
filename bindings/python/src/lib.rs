@@ -424,14 +424,22 @@ impl MapHandle {
     }
 
     fn clear_custom_geometry_sources(&self) {
-        self.custom_geometry_sources
+        for (_, state) in self
+            .custom_geometry_sources
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clear();
-        self.retired_custom_geometry_sources
+            .drain()
+        {
+            state.shared.close();
+        }
+        for state in self
+            .retired_custom_geometry_sources
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clear();
+            .drain(..)
+        {
+            state.shared.close();
+        }
     }
 
     fn retire_custom_geometry_sources(&self) {
@@ -1227,6 +1235,11 @@ impl MapHandle {
         unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)?;
         self.clear_custom_geometry_sources();
         Ok(())
+    }
+
+    fn address(&self) -> PyResult<usize> {
+        let state = self.state();
+        Ok(state.as_ptr() as usize)
     }
 
     fn request_repaint(&self) -> PyResult<()> {
@@ -3487,8 +3500,7 @@ impl RenderSessionHandle {
         // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
         let value =
             unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
-        let value = value
-            .ok_or_else(|| map_error(Error::invalid_argument("missing feature state snapshot")))?;
+        let value = value.unwrap_or_else(|| maplibre_core::json::JsonValue::Object(Vec::new()));
         json_value_to_py(py, &value)
     }
 

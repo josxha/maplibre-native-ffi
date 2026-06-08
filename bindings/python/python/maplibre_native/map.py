@@ -423,6 +423,16 @@ class MapHandle(NativeHandleMixin):
             options.scale_factor,
             map_mode.native_code,
         )
+        self._native_address_value = int(self._native.address())
+        runtime._register_map(self)  # noqa: SLF001
+
+    def _native_address(self) -> int:
+        return self._native_address_value
+
+    def close(self) -> None:
+        """Release this map handle exactly once."""
+        self._native.close()
+        self._runtime._unregister_map(self)  # noqa: SLF001
 
     def request_repaint(self) -> None:
         """Request a repaint for a continuous map."""

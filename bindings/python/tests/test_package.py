@@ -47,6 +47,47 @@ def test_native_pointer_is_opaque_value() -> None:
     assert pointer == mln.NativePointer.null()
 
 
+def test_frame_backend_values_are_scoped_to_open_frame_handle() -> None:
+    class FakeMetalFrame:
+        closed = False
+
+        def texture_address(self) -> int:
+            return 0x1234
+
+        def device_address(self) -> int:
+            return 0x5678
+
+        def close(self) -> None:
+            self.closed = True
+
+    metal = render.MetalOwnedTextureFrameHandle(FakeMetalFrame())
+    texture = metal.texture
+    device = metal.device
+    assert texture.address == 0x1234
+    assert device.address == 0x5678
+    metal.close()
+    with pytest.raises(mln.InvalidStateError):
+        _ = texture.address
+    with pytest.raises(mln.InvalidStateError):
+        _ = device.address
+
+    class FakeOpenGLFrame:
+        closed = False
+
+        def texture(self) -> int:
+            return 42
+
+        def close(self) -> None:
+            self.closed = True
+
+    opengl = render.OpenGLOwnedTextureFrameHandle(FakeOpenGLFrame())
+    opengl_texture = opengl.texture
+    assert int(opengl_texture) == 42
+    opengl.close()
+    with pytest.raises(mln.InvalidStateError):
+        _ = opengl_texture.value
+
+
 def test_network_status_round_trips_through_public_api() -> None:
     original = mln.network_status()
     try:
@@ -848,12 +889,17 @@ def test_poll_event_returns_copied_map_event() -> None:
 
             assert loading_failed.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
             assert loading_failed.source.source_type == mln.RuntimeEventSourceType.MAP
+            assert loading_failed.source.map_handle is map_handle
             assert copied_message == loading_failed.message
             assert loading_failed.message
 
 
 def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     events = _native.runtime_event_payload_wire_shapes_for_test()
+
+    render_frame_event = mln.RuntimeEvent.from_native(events["render_frame"])
+    assert isinstance(render_frame_event.payload, mln.RenderFramePayload)
+    assert render_frame_event.payload.mode == mln.RenderMode.FULL
 
     render_frame_payload = events["render_frame"]["payload"]
     render_frame = mln.RenderFramePayload.from_runtime_payload(render_frame_payload)
@@ -867,6 +913,8 @@ def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     assert render_frame.stats.total_draw_call_count == 5
 
     tile_action_payload = events["tile_action"]["payload"]
+    tile_action_event = mln.RuntimeEvent.from_native(events["tile_action"])
+    assert isinstance(tile_action_event.payload, mln.TileActionPayload)
     tile_action = mln.TileActionPayload.from_runtime_payload(tile_action_payload)
     assert tile_action.operation == mln.TileOperation.LOAD_FROM_NETWORK
     assert tile_action.tile_id.overscaled_z == 6
@@ -1166,6 +1214,32 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
     )
     assert json.to_python(returned) == [("hover", True)]
     assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
+
+
+def test_render_session_feature_state_empty_result_is_empty_object() -> None:
+    class FakeNativeRenderSession:
+        closed = False
+        detached = False
+
+        def get_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+        ) -> object:
+            assert (source_id, source_layer_id, feature_id, state_key) == (
+                "points",
+                None,
+                "feature-1",
+                None,
+            )
+            return json.JsonObject.from_pairs([])
+
+    session = render.RenderSessionHandle(FakeNativeRenderSession(), object())
+    selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
+
+    assert json.to_python(session.get_feature_state(selector)) == []
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:
@@ -1832,12 +1906,16 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     with pytest.raises(mln.InvalidStateError, match="already closed"):
         handle.complete(resource.ResourceResponse.no_content())
     assert native.complete_count == 1
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        handle.is_cancelled()
 
     closed_native = FakeNativeRequest()
     closed = resource.ResourceRequestHandle(closed_native)
     closed.close()
     with pytest.raises(mln.InvalidStateError, match="already closed"):
         closed.complete(resource.ResourceResponse.no_content())
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        closed.is_cancelled()
     assert closed_native.complete_count == 0
     assert closed_native.close_count == 1
 
@@ -1954,6 +2032,23 @@ def test_remove_style_source_releases_custom_geometry_handle() -> None:
             assert source.closed
             source._native.push_fetch_for_test(1, 2, 3)
             assert source.poll_event() is None
+
+
+def test_map_close_releases_custom_geometry_handle() -> None:
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        source = map_handle.add_custom_geometry_source(
+            "custom-close",
+            style.CustomGeometrySourceOptions(max_queued_events=1),
+        )
+
+        map_handle.close()
+
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
+        map_handle.close()
 
 
 def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:

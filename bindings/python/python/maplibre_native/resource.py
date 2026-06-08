@@ -223,6 +223,13 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
 
     def is_cancelled(self) -> bool:
         """Return whether native code has cancelled the request."""
+        if self._closed:
+            from .errors import InvalidStateError
+
+            raise InvalidStateError(
+                None,
+                "resource request handle is already closed",
+            )
         return bool(self._native.is_cancelled())
 
     def close(self) -> None:
