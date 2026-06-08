@@ -265,6 +265,7 @@ namespace MaplibreNative {
         }
 
         private void retain_custom_geometry_source (string source_id, CustomGeometrySourceOptions options) {
+            release_custom_geometry_source (source_id);
             var retained = new CustomGeometrySourceRegistration[custom_geometry_sources.length + 1];
             for (var index = 0; index < custom_geometry_sources.length; index++) {
                 retained[index] = custom_geometry_sources[index];
@@ -313,13 +314,11 @@ namespace MaplibreNative {
         }
 
         public void set_style_url (string url) throws Error {
-            check_status (Raw.map_set_style_url (require_live (), url));
-            clear_custom_geometry_sources ();
+            check_status (Raw.map_set_style_url (require_live (), c_string (url)));
         }
 
         public void set_style_json (string json) throws Error {
-            check_status (Raw.map_set_style_json (require_live (), json));
-            clear_custom_geometry_sources ();
+            check_status (Raw.map_set_style_json (require_live (), c_string (json)));
         }
 
         public void set_debug_options (MapDebugOptions options) throws Error {

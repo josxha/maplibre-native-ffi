@@ -89,7 +89,7 @@ not express safely:
   Vala-owned builders that keep nested storage alive for one C call. Coverage
   includes JSON values, feature and feature-collection descriptors, all geometry
   variants, geometry/feature/feature-collection GeoJSON, GeoJSON URL sources,
-  style values, and query handles.
+  style values, and copied query results.
 - Resource provider callbacks use copied request fields, explicit provider
   decisions, pass-through-by-default behavior, one-shot request handles,
   cancellation checks, and explicit release. Runtime resource transforms keep
@@ -99,15 +99,17 @@ not express safely:
 - Offline region definitions, operation starts, take-result helpers, snapshots,
   lists, statuses, and completion/event payloads are direct wrappers. Snapshot
   and list handles copy `OfflineRegionInfo` values before native handle close.
-  The required Vala test task runs both a baseline smoke pass and an extended
-  smoke pass that enables fixture-dependent offline operations.
+  Offline operations use `OfflineOperationId` value tokens because the C API
+  owns operation lifetime until completion, discard, or take-result calls. The
+  required Vala test task runs both a baseline smoke pass and an extended smoke
+  pass that enables fixture-dependent offline operations.
 - Query coverage includes rendered point, box, and line-string geometries;
-  rendered/source query options with Vala-owned IDs and JSON filters;
-  source-feature query handles; feature-state commands; copied feature-state
-  JSON snapshots; rendered query result handles; counts; indexed queried-feature
-  payload copying; and feature-extension result handles with copied JSON value
-  or feature-collection payloads. The required extended smoke pass exercises
-  feature-extension calls against the available source/extension fixture.
+  rendered/source query options with Vala-owned IDs and JSON filters; copied
+  source-feature and rendered-feature result arrays; feature-state commands;
+  copied feature-state JSON snapshots; queried-feature payload copying; and
+  feature-extension results with copied JSON value or feature-collection
+  payloads. The required extended smoke pass exercises feature-extension calls
+  against the available source/extension fixture.
 - Render-target wrappers mirror the C ABI for Metal, Vulkan, OpenGL, borrowed
   texture, owned texture, and surface sessions. Vulkan descriptors carry
   host-controlled loader procedure addresses. OpenGL descriptors cover EGL and
@@ -213,13 +215,13 @@ keeps the map wrapper alive. Render-target and borrowed-texture descriptors use
 objects valid and synchronized for the C API's documented lifetime.
 
 Session-owned texture targets expose explicit frame handles. A frame handle
-keeps the native frame acquired, exposes copied metadata and scoped
-`NativePointer` values, and releases on `close()`. Access after close reports a
-binding error. The binding prevents nested acquisition and rejects render
-updates, resize, detach, and session destruction while a frame is active.
-Render-session resize, detach, memory-reduction, data-clear, and debug-log
-commands remain direct owner-thread C calls with status-to-error mapping;
-`detach()` records detached state while `close()` still releases the handle.
+keeps the native frame acquired, exposes copied metadata and scoped backend
+resource values, and releases on `close()`. Access after close reports a binding
+error. The binding prevents nested acquisition and rejects render updates,
+resize, detach, and session destruction while a frame is active. Render-session
+resize, detach, memory-reduction, data-clear, and debug-log commands remain
+direct owner-thread C calls with status-to-error mapping; `detach()` records
+detached state while `close()` still releases the handle.
 
 Temporary native storage lives for one adapter call. Native result, snapshot,
 and list handles stay private or sit behind deterministic Vala handle classes;
@@ -238,13 +240,13 @@ Geometry builders cover empty, point, line-string, polygon, multi-point,
 multi-line, multi-polygon, and geometry collection descriptors with Vala-owned
 coordinate lists, polygons, and child geometries. Rendered/source query options
 own layer IDs, source-layer IDs, and JSON filters, and materialize private C
-views for one query call. Query result access copies result-owned feature,
-source ID, source-layer ID, and feature-state views into Vala-owned values
-before the result handle closes. Feature-extension result handles copy borrowed
-JSON value or feature-collection payloads into Vala-owned descriptors before the
-native extension result closes. Public replacements use Vala values such as
-strings, arrays, `GLib.Bytes`, descriptor structs, and handle classes with
-deterministic release.
+views for one query call. Public query methods copy result-owned feature, source
+ID, source-layer ID, and feature-state views into Vala-owned arrays before the
+native result handle closes. Feature-extension queries copy borrowed JSON value
+or feature-collection payloads into Vala-owned descriptors before the native
+extension result closes. Public replacements use Vala values such as strings,
+arrays, `GLib.Bytes`, descriptor structs, and handle classes with deterministic
+release.
 
 ## Testing
 

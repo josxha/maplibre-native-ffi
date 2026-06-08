@@ -41,7 +41,8 @@ namespace MaplibreNative {
 
         ~FeatureExtensionResultHandle () {
             if (native != null) {
-                warning ("FeatureExtensionResultHandle finalized while live; call close()");
+                Raw.feature_extension_result_destroy (native);
+                native = null;
             }
         }
 
@@ -57,6 +58,15 @@ namespace MaplibreNative {
             info.size = (uint32) sizeof (Raw.FeatureExtensionResultInfo);
             check_status (Raw.feature_extension_result_get (require_live (), &info));
             return FeatureExtensionResult.from_native (info);
+        }
+
+        internal static FeatureExtensionResult copy_from_native (owned Raw.FeatureExtensionResult native) throws Error {
+            var handle = new FeatureExtensionResultHandle ((owned) native);
+            try {
+                return handle.get ();
+            } finally {
+                handle.close ();
+            }
         }
 
         public void close () {
@@ -225,7 +235,8 @@ namespace MaplibreNative {
 
         ~FeatureQueryResultHandle () {
             if (native != null) {
-                warning ("FeatureQueryResultHandle finalized while live; call close()");
+                Raw.feature_query_result_destroy (native);
+                native = null;
             }
         }
 
@@ -256,6 +267,24 @@ namespace MaplibreNative {
             feature.size = (uint32) sizeof (Raw.QueriedFeature);
             check_status (Raw.feature_query_result_get (require_live (), index, &feature));
             return QueriedFeature.from_native (feature);
+        }
+
+        public QueriedFeature[] to_array () throws Error {
+            var result_count = count ();
+            QueriedFeature[] features = new QueriedFeature[result_count];
+            for (size_t index = 0; index < result_count; index++) {
+                features[index] = get (index);
+            }
+            return features;
+        }
+
+        internal static QueriedFeature[] copy_from_native (owned Raw.FeatureQueryResult native) throws Error {
+            var handle = new FeatureQueryResultHandle ((owned) native);
+            try {
+                return handle.to_array ();
+            } finally {
+                handle.close ();
+            }
         }
     }
 

@@ -360,6 +360,43 @@ namespace MaplibreNative {
         }
     }
 
+    public delegate void FrameResourceValidator () throws Error;
+
+    public class FrameNativePointer {
+        private size_t bits;
+        private FrameResourceValidator validator;
+
+        internal FrameNativePointer (size_t bits, owned FrameResourceValidator validator) {
+            this.bits = bits;
+            this.validator = (owned) validator;
+        }
+
+        public size_t get_bits () throws Error {
+            validator ();
+            return bits;
+        }
+
+        public bool is_null () throws Error {
+            return get_bits () == 0;
+        }
+
+    }
+
+    public class FrameUInt32 {
+        private uint32 value;
+        private FrameResourceValidator validator;
+
+        internal FrameUInt32 (uint32 value, owned FrameResourceValidator validator) {
+            this.value = value;
+            this.validator = (owned) validator;
+        }
+
+        public uint32 get () throws Error {
+            validator ();
+            return value;
+        }
+    }
+
     public class StringList {
         private string[] values;
 

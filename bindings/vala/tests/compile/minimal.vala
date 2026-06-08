@@ -70,6 +70,7 @@ extern void vulkan_test_context_destroy(ref VulkanTestContext context);
 int log_count = 0;
 int resource_transform_count = 0;
 int resource_provider_request_count = 0;
+int resource_provider_async_complete_count = 0;
 int resource_provider_one_shot_error_count = 0;
 int custom_geometry_fetch_count = 0;
 int custom_geometry_cancel_count = 0;
@@ -177,6 +178,17 @@ string? transform_resource(MaplibreNative.ResourceKind kind, string url) {
 
 MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.ResourceRequest request, MaplibreNative.ResourceRequestHandle handle) {
   resource_provider_request_count++;
+  if (request.url == "custom://async-style.json") {
+    new GLib.Thread<void>("vala-resource-provider", () => {
+      try {
+        var response = MaplibreNative.ResourceResponse.data(bytes_from_string("{\"version\":8,\"sources\":{},\"layers\":[]}"));
+        handle.complete_and_release(response);
+        resource_provider_async_complete_count++;
+      } catch (MaplibreNative.Error error) {
+      }
+    });
+    return MaplibreNative.ResourceProviderDecision.HANDLE;
+  }
   if (request.url != "custom://style.json") {
     return MaplibreNative.ResourceProviderDecision.PASS_THROUGH;
   }
@@ -449,6 +461,9 @@ int main() {
     assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_STYLE_LOADED, 128));
     assert(resource_provider_request_count > 0);
     assert(resource_provider_one_shot_error_count >= 2);
+    map.set_style_url("custom://async-style.json");
+    assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_STYLE_LOADED, 128));
+    assert(resource_provider_async_complete_count > 0);
     if (GLib.Environment.get_variable("MLN_VALA_RUN_STYLE_URL_SMOKE") == "1") {
       map.set_style_url("maplibre://styles/vala-smoke");
     }
@@ -818,15 +833,14 @@ int main() {
         vulkan_session.render_update();
         assert(custom_geometry_fetch_count > 0);
         var vulkan_query_result = vulkan_session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.point(MaplibreNative.ScreenPoint(0.0, 0.0)));
-        vulkan_query_result.count();
-        vulkan_query_result.close();
+        vulkan_query_result.length.to_string();
         uint8[] vulkan_pixels = new uint8[32 * 16 * 4];
         var vulkan_info = vulkan_session.read_premultiplied_rgba8(vulkan_pixels);
         assert(vulkan_info.width == 32);
         assert(vulkan_info.height == 16);
         var vulkan_frame = vulkan_session.acquire_vulkan_owned_texture_frame();
         assert(vulkan_frame.get_width() == 32);
-        vulkan_frame.get_image();
+        var vulkan_frame_image = vulkan_frame.get_image();
         vulkan_frame.get_image_view();
         vulkan_frame.get_device();
         bool vulkan_render_while_acquired_failed = false;
@@ -837,6 +851,13 @@ int main() {
         }
         assert(vulkan_render_while_acquired_failed);
         vulkan_frame.close();
+        bool closed_vulkan_frame_image_failed = false;
+        try {
+          vulkan_frame_image.get_bits();
+        } catch (MaplibreNative.Error error) {
+          closed_vulkan_frame_image_failed = true;
+        }
+        assert(closed_vulkan_frame_image_failed);
         vulkan_session.detach();
         vulkan_session.close();
 
@@ -934,30 +955,24 @@ int main() {
         assert(copied_feature_state.value_type == MaplibreNative.JsonValueType.OBJECT);
         session.remove_feature_state(feature_state_selector);
         var query_result = session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.point(MaplibreNative.ScreenPoint(0.0, 0.0)));
-        query_result.count();
-        query_result.close();
+        query_result.length.to_string();
         var rendered_query_options = new MaplibreNative.RenderedFeatureQueryOptions();
         rendered_query_options.set_filter(MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.string_value("has"), MaplibreNative.JsonValue.string_value("rank") }));
         var box_query_result = session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.box(MaplibreNative.ScreenBox(MaplibreNative.ScreenPoint(0.0, 0.0), MaplibreNative.ScreenPoint(32.0, 16.0))), rendered_query_options);
-        box_query_result.count();
-        box_query_result.close();
+        box_query_result.length.to_string();
         var line_query_result = session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.line_string({ MaplibreNative.ScreenPoint(0.0, 0.0), MaplibreNative.ScreenPoint(32.0, 16.0) }));
-        line_query_result.count();
-        line_query_result.close();
+        line_query_result.length.to_string();
         var source_query_options = new MaplibreNative.SourceFeatureQueryOptions();
         source_query_options.set_source_layer_ids({ "ignored-for-geojson" });
         var source_query_result = session.query_source_features("state-source", source_query_options);
-        var source_query_count = source_query_result.count();
+        var source_query_count = source_query_result.length;
         if (source_query_count > 0) {
-          var queried_feature = source_query_result.get(0);
+          var queried_feature = source_query_result[0];
           assert(queried_feature.feature.property_members.length > 0);
         }
-        source_query_result.close();
         if (GLib.Environment.get_variable("MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE") == "1") {
-          var extension_result = session.query_feature_extensions("state-source", feature, "supercluster", "children");
-          var extension_payload = extension_result.get();
+          var extension_payload = session.query_feature_extensions("state-source", feature, "supercluster", "children");
           extension_payload.result_type.to_string();
-          extension_result.close();
         }
         uint8[] pixels = new uint8[32 * 16 * 4];
         var info = session.read_premultiplied_rgba8(pixels);
@@ -967,6 +982,7 @@ int main() {
 
         var frame = session.acquire_metal_owned_texture_frame();
         assert(frame.get_width() == 32);
+        var frame_texture = frame.get_texture();
         bool render_while_acquired_failed = false;
         try {
           session.render_update();
@@ -989,6 +1005,13 @@ int main() {
         }
         assert(detach_while_acquired_failed);
         frame.close();
+        bool closed_frame_texture_failed = false;
+        try {
+          frame_texture.get_bits();
+        } catch (MaplibreNative.Error error) {
+          closed_frame_texture_failed = true;
+        }
+        assert(closed_frame_texture_failed);
         bool closed_frame_failed = false;
         try {
           frame.get_width();

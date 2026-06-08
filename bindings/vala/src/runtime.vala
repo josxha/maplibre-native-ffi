@@ -169,7 +169,7 @@ namespace MaplibreNative {
             if (definition_type == OfflineRegionDefinitionType.TILE_PYRAMID) {
                 definition.tile_pyramid = Raw.OfflineTilePyramidRegionDefinition () {
                     size = (uint32) sizeof (Raw.OfflineTilePyramidRegionDefinition),
-                    style_url = style_url,
+                    style_url = c_string (style_url),
                     bounds = bounds.to_native (),
                     min_zoom = min_zoom,
                     max_zoom = max_zoom,
@@ -183,7 +183,7 @@ namespace MaplibreNative {
                 geometry_storage = geometry.to_native ();
                 definition.geometry = Raw.OfflineGeometryRegionDefinition () {
                     size = (uint32) sizeof (Raw.OfflineGeometryRegionDefinition),
-                    style_url = style_url,
+                    style_url = c_string (style_url),
                     geometry = &geometry_storage,
                     min_zoom = min_zoom,
                     max_zoom = max_zoom,
@@ -417,7 +417,7 @@ namespace MaplibreNative {
     public class RuntimeEventStyleImageMissing {
         public string image_id { get; private set; }
 
-        internal RuntimeEventStyleImageMissing.from_native (Raw.RuntimeEventStyleImageMissing native) {
+        internal RuntimeEventStyleImageMissing.from_native (Raw.RuntimeEventStyleImageMissing native) throws Error {
             image_id = copy_c_string_bytes (native.image_id, native.image_id_size);
         }
     }
@@ -427,7 +427,7 @@ namespace MaplibreNative {
         public TileId tile_id { get; private set; }
         public string source_id { get; private set; }
 
-        internal RuntimeEventTileAction.from_native (Raw.RuntimeEventTileAction native) {
+        internal RuntimeEventTileAction.from_native (Raw.RuntimeEventTileAction native) throws Error {
             operation = tile_operation_from_raw (native.operation);
             tile_id = TileId.from_native (native.tile_id);
             source_id = copy_c_string_bytes (native.source_id, native.source_id_size);
@@ -550,20 +550,20 @@ namespace MaplibreNative {
             return response;
         }
 
-        internal Raw.ResourceResponse to_native () {
+        internal Raw.ResourceResponse to_native () throws Error {
             Raw.ResourceResponse response = {};
             response.size = (uint32) sizeof (Raw.ResourceResponse);
             response.status = (uint32) status;
             response.error_reason = (uint32) error_reason;
             response.bytes = bytes.length > 0 ? bytes : null;
             response.byte_count = bytes.length;
-            response.error_message = error_message;
+            response.error_message = optional_c_string (error_message);
             response.must_revalidate = must_revalidate;
             response.has_modified = modified_unix_ms != null;
             response.modified_unix_ms = modified_unix_ms ?? 0;
             response.has_expires = expires_unix_ms != null;
             response.expires_unix_ms = expires_unix_ms ?? 0;
-            response.etag = etag;
+            response.etag = optional_c_string (etag);
             response.has_retry_after = retry_after_unix_ms != null;
             response.retry_after_unix_ms = retry_after_unix_ms ?? 0;
             return response;
@@ -572,20 +572,40 @@ namespace MaplibreNative {
 
     public class ResourceRequestHandle {
         private unowned Raw.ResourceRequestHandle? native;
+        private Mutex mutex;
         private bool completed;
 
-        public bool released { get { return native == null; } }
-        public bool is_completed { get { return completed; } }
+        public bool released {
+            get {
+                mutex.lock ();
+                var value = native == null;
+                mutex.unlock ();
+                return value;
+            }
+        }
+
+        public bool is_completed {
+            get {
+                mutex.lock ();
+                var value = completed;
+                mutex.unlock ();
+                return value;
+            }
+        }
 
         internal ResourceRequestHandle (Raw.ResourceRequestHandle native) {
             this.native = native;
         }
 
         ~ResourceRequestHandle () {
-            if (native != null) {
+            mutex.lock ();
+            unowned Raw.ResourceRequestHandle? live = native;
+            native = null;
+            mutex.unlock ();
+
+            if (live != null) {
                 warning ("ResourceRequestHandle finalized while live; call release() after completing or abandoning the request");
-                Raw.resource_request_release (native);
-                native = null;
+                Raw.resource_request_release (live);
             }
         }
 
@@ -597,18 +617,28 @@ namespace MaplibreNative {
         }
 
         public bool cancelled () throws Error {
-            bool is_cancelled;
-            check_status (Raw.resource_request_cancelled (require_live (), out is_cancelled));
+            bool is_cancelled = false;
+            mutex.lock ();
+            try {
+                check_status (Raw.resource_request_cancelled (require_live (), out is_cancelled));
+            } finally {
+                mutex.unlock ();
+            }
             return is_cancelled;
         }
 
         public void complete (ResourceResponse response) throws Error {
-            if (completed) {
-                throw new Error.INVALID_STATE ("resource request is already completed");
-            }
             var native_response = response.to_native ();
-            check_status (Raw.resource_request_complete (require_live (), &native_response));
-            completed = true;
+            mutex.lock ();
+            try {
+                if (completed) {
+                    throw new Error.INVALID_STATE ("resource request is already completed");
+                }
+                check_status (Raw.resource_request_complete (require_live (), &native_response));
+                completed = true;
+            } finally {
+                mutex.unlock ();
+            }
         }
 
         public void complete_and_release (ResourceResponse response) throws Error {
@@ -617,26 +647,39 @@ namespace MaplibreNative {
         }
 
         public void release () {
-            if (native == null) {
-                return;
-            }
-            Raw.resource_request_release (native);
+            mutex.lock ();
+            unowned Raw.ResourceRequestHandle? live = native;
             native = null;
+            mutex.unlock ();
+
+            if (live != null) {
+                Raw.resource_request_release (live);
+            }
         }
 
         internal uint32 finish_provider_decision (ResourceProviderDecision decision) {
+            unowned Raw.ResourceRequestHandle? release_after_unlock = null;
+            uint32 native_decision;
+
+            mutex.lock ();
             if (native == null) {
-                return (uint32) Raw.ResourceProviderDecision.HANDLE;
+                native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
+            } else if (completed) {
+                release_after_unlock = native;
+                native = null;
+                native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
+            } else if (decision == ResourceProviderDecision.HANDLE) {
+                native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
+            } else {
+                native = null;
+                native_decision = (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
             }
-            if (completed || decision == ResourceProviderDecision.HANDLE) {
-                if (completed) {
-                    Raw.resource_request_release (native);
-                    native = null;
-                }
-                return (uint32) Raw.ResourceProviderDecision.HANDLE;
+            mutex.unlock ();
+
+            if (release_after_unlock != null) {
+                Raw.resource_request_release (release_after_unlock);
             }
-            native = null;
-            return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
+            return native_decision;
         }
 
     }
@@ -646,11 +689,11 @@ namespace MaplibreNative {
         public string? cache_path { get; set; }
         public uint64? maximum_cache_size { get; set; }
 
-        internal Raw.RuntimeOptions to_native () {
+        internal Raw.RuntimeOptions to_native () throws Error {
             Raw.RuntimeOptions options = {};
             options.size = (uint32) sizeof (Raw.RuntimeOptions);
-            options.asset_path = asset_path;
-            options.cache_path = cache_path;
+            options.asset_path = optional_c_string (asset_path);
+            options.cache_path = optional_c_string (cache_path);
             if (maximum_cache_size != null) {
                 options.maximum_cache_size = maximum_cache_size;
                 options.flags |= (uint32) Raw.RuntimeOptionFlag.MAXIMUM_CACHE_SIZE;
@@ -674,7 +717,7 @@ namespace MaplibreNative {
         public RuntimeEventOfflineRegionTileCountLimit? offline_region_tile_count_limit { get; private set; }
         public RuntimeEventOfflineOperationCompleted? offline_operation_completed { get; private set; }
 
-        internal RuntimeEvent (Raw.RuntimeEvent native) {
+        internal RuntimeEvent (Raw.RuntimeEvent native) throws Error {
             event_type = runtime_event_type_from_raw (native.type);
             source_type = runtime_event_source_type_from_raw (native.source_type);
             code = native.code;
@@ -765,8 +808,14 @@ namespace MaplibreNative {
     }
 
     public void set_log_callback (owned LogCallback callback) throws Error {
+        var previous = (owned) current_log_callback;
         current_log_callback = (owned) callback;
-        check_status (Raw.log_set_callback (log_trampoline, null));
+        try {
+            check_status (Raw.log_set_callback (log_trampoline, null));
+        } catch (Error error) {
+            current_log_callback = (owned) previous;
+            throw error;
+        }
     }
 
     public void clear_log_callback () throws Error {
@@ -847,12 +896,18 @@ namespace MaplibreNative {
         }
 
         public void set_resource_transform (owned ResourceTransformCallback callback) throws Error {
+            var previous = (owned) resource_transform;
             resource_transform = (owned) callback;
             Raw.ResourceTransform transform = {};
             transform.size = (uint32) sizeof (Raw.ResourceTransform);
             transform.callback = resource_transform_trampoline;
             transform.user_data = this;
-            check_status (Raw.runtime_set_resource_transform (require_live (), &transform));
+            try {
+                check_status (Raw.runtime_set_resource_transform (require_live (), &transform));
+            } catch (Error error) {
+                resource_transform = (owned) previous;
+                throw error;
+            }
         }
 
         public void clear_resource_transform () throws Error {
@@ -922,7 +977,7 @@ namespace MaplibreNative {
 
         public OfflineOperationId offline_regions_merge_database_start (string side_database_path) throws Error {
             uint64 operation_id;
-            check_status (Raw.runtime_offline_regions_merge_database_start (require_live (), side_database_path, out operation_id));
+            check_status (Raw.runtime_offline_regions_merge_database_start (require_live (), c_string (side_database_path), out operation_id));
             return OfflineOperationId (operation_id);
         }
 

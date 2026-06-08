@@ -92,7 +92,7 @@ namespace MaplibreNative {
             return new TextureImageInfo (info);
         }
 
-        public FeatureQueryResultHandle query_rendered_features (RenderedQueryGeometry geometry, RenderedFeatureQueryOptions? options = null) throws Error {
+        public QueriedFeature[] query_rendered_features (RenderedQueryGeometry geometry, RenderedFeatureQueryOptions? options = null) throws Error {
             Raw.RenderedQueryGeometry native_geometry = geometry.to_native ();
             Raw.RenderedFeatureQueryOptions native_options = {};
             Raw.RenderedFeatureQueryOptions* options_ptr = null;
@@ -102,10 +102,10 @@ namespace MaplibreNative {
             }
             Raw.FeatureQueryResult result;
             check_status (Raw.render_session_query_rendered_features (require_live (), &native_geometry, options_ptr, out result));
-            return new FeatureQueryResultHandle ((owned) result);
+            return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
-        public FeatureQueryResultHandle query_source_features (string source_id, SourceFeatureQueryOptions? options = null) throws Error {
+        public QueriedFeature[] query_source_features (string source_id, SourceFeatureQueryOptions? options = null) throws Error {
             Raw.SourceFeatureQueryOptions native_options = {};
             Raw.SourceFeatureQueryOptions* options_ptr = null;
             if (options != null) {
@@ -114,10 +114,10 @@ namespace MaplibreNative {
             }
             Raw.FeatureQueryResult result;
             check_status (Raw.render_session_query_source_features (require_live (), string_view (source_id), options_ptr, out result));
-            return new FeatureQueryResultHandle ((owned) result);
+            return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
-        public FeatureExtensionResultHandle query_feature_extensions (string source_id, Feature feature, string extension, string extension_field, JsonValue? arguments = null) throws Error {
+        public FeatureExtensionResult query_feature_extensions (string source_id, Feature feature, string extension, string extension_field, JsonValue? arguments = null) throws Error {
             Raw.Feature native_feature = feature.to_native ();
             Raw.JsonValue native_arguments = {};
             Raw.JsonValue* arguments_ptr = null;
@@ -127,7 +127,7 @@ namespace MaplibreNative {
             }
             Raw.FeatureExtensionResult result;
             check_status (Raw.render_session_query_feature_extensions (require_live (), string_view (source_id), &native_feature, string_view (extension), string_view (extension_field), arguments_ptr, out result));
-            return new FeatureExtensionResultHandle ((owned) result);
+            return FeatureExtensionResultHandle.copy_from_native ((owned) result);
         }
 
         public void set_feature_state (FeatureStateSelector selector, JsonValue state) throws Error {
@@ -250,14 +250,14 @@ namespace MaplibreNative {
             return frame.frame_id;
         }
 
-        public NativePointer get_texture () throws Error {
+        public FrameNativePointer get_texture () throws Error {
             require_live ();
-            return NativePointer ((size_t) frame.texture);
+            return new FrameNativePointer ((size_t) frame.texture, () => require_live ());
         }
 
-        public NativePointer get_device () throws Error {
+        public FrameNativePointer get_device () throws Error {
             require_live ();
-            return NativePointer ((size_t) frame.device);
+            return new FrameNativePointer ((size_t) frame.device, () => require_live ());
         }
 
         public uint64 get_pixel_format () throws Error {

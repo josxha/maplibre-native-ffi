@@ -32,15 +32,52 @@ namespace MaplibreNative {
         return (string) value;
     }
 
-    internal string copy_c_string_bytes (char* value, size_t size) {
+    internal string copy_c_string_bytes (char* value, size_t size) throws Error {
         if (value == null || size == 0) {
             return "";
         }
-        return ((string) value).substring (0, (long) size);
+        return copy_utf8_bytes ((uint8*) value, size);
     }
 
     internal Raw.StringView string_view (string value) throws Error {
+        reject_embedded_nul (value);
         return Raw.StringView () { data = (char*) value, size = value.length };
+    }
+
+    internal void reject_embedded_nul (string value) throws Error {
+        for (var index = 0; index < value.length; index++) {
+            if (value[index] == '\0') {
+                throw new Error.INVALID_ARGUMENT ("string inputs must not contain embedded NUL bytes");
+            }
+        }
+    }
+
+    internal void reject_optional_embedded_nul (string? value) throws Error {
+        if (value != null) {
+            reject_embedded_nul (value);
+        }
+    }
+
+    internal unowned string c_string (string value) throws Error {
+        reject_embedded_nul (value);
+        return value;
+    }
+
+    internal unowned string? optional_c_string (string? value) throws Error {
+        reject_optional_embedded_nul (value);
+        return value;
+    }
+
+    internal string copy_utf8_bytes (uint8* data, size_t size) throws Error {
+        if (data == null || size == 0) {
+            return "";
+        }
+        uint8[] copied = new uint8[size + 1];
+        for (size_t index = 0; index < size; index++) {
+            copied[index] = data[index];
+        }
+        copied[size] = 0;
+        return ((string) copied).dup ();
     }
 
     internal string copy_string_view (Raw.StringView view) throws Error {
@@ -50,7 +87,7 @@ namespace MaplibreNative {
         if (view.data == null) {
             throw new Error.INVALID_ARGUMENT ("string view data is null");
         }
-        return ((string) view.data).substring (0, (long) view.size);
+        return copy_utf8_bytes ((uint8*) view.data, view.size);
     }
 
     internal uint8[]? copy_bytes (uint8* data, size_t size) {

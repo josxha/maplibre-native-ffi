@@ -301,9 +301,9 @@ namespace MaplibreNative {
             return frame.frame_id;
         }
 
-        public uint32 get_texture () throws Error {
+        public FrameUInt32 get_texture () throws Error {
             require_live ();
-            return frame.texture;
+            return new FrameUInt32 (frame.texture, () => require_live ());
         }
 
         public uint32 get_target () throws Error {
@@ -383,19 +383,19 @@ namespace MaplibreNative {
             return frame.frame_id;
         }
 
-        public NativePointer get_image () throws Error {
+        public FrameNativePointer get_image () throws Error {
             require_live ();
-            return NativePointer ((size_t) frame.image);
+            return new FrameNativePointer ((size_t) frame.image, () => require_live ());
         }
 
-        public NativePointer get_image_view () throws Error {
+        public FrameNativePointer get_image_view () throws Error {
             require_live ();
-            return NativePointer ((size_t) frame.image_view);
+            return new FrameNativePointer ((size_t) frame.image_view, () => require_live ());
         }
 
-        public NativePointer get_device () throws Error {
+        public FrameNativePointer get_device () throws Error {
             require_live ();
-            return NativePointer ((size_t) frame.device);
+            return new FrameNativePointer ((size_t) frame.device, () => require_live ());
         }
 
         public uint32 get_format () throws Error {
