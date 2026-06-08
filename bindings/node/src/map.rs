@@ -2,12 +2,12 @@ use std::{
     collections::HashMap,
     ffi::{CString, c_void},
     panic::{AssertUnwindSafe, catch_unwind},
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
 };
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
-use napi::bindgen_prelude::{Result, Uint8Array};
+use napi::bindgen_prelude::{BigInt, Result, Uint8Array};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -204,6 +204,7 @@ pub fn create_native_map_handle(
 
     core::check(unsafe { sys::mln_map_create(runtime.as_ptr(), &native_options, &mut map) })
         .map_err(error::from_core)?;
+    runtime.mark_map_created();
     let state =
         unsafe { NativeHandleState::from_raw_ptr(map, "MapHandle") }.map_err(error::from_core)?;
     Ok(NativeMapHandle {
@@ -229,6 +230,11 @@ impl NativeMapHandle {
     #[napi(getter)]
     pub fn closed(&self) -> bool {
         self.state.is_closed()
+    }
+
+    #[napi(getter, js_name = "nativeAddress")]
+    pub fn native_address(&self) -> BigInt {
+        BigInt::from(self.state.as_ptr() as usize as u64)
     }
 
     #[napi(js_name = "requestRepaint")]
@@ -1681,11 +1687,19 @@ impl NativeMapHandle {
         self.retire_all_custom_geometry_sources();
         Ok(())
     }
+
+    #[napi(js_name = "releaseDetachedCustomGeometrySources")]
+    pub fn release_detached_custom_geometry_sources(&self) {
+        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
+            retired_sources.clear();
+        }
+    }
 }
 
 impl Drop for NativeMapHandle {
     fn drop(&mut self) {
-        if self.state.leak_for_report().is_some() {
+        if let Some(address) = self.state.leak_for_report() {
+            crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
             if let Ok(mut sources) = self.custom_geometry_sources.lock() {
                 for (_, source) in sources.drain() {
                     Box::leak(source);
@@ -2147,6 +2161,17 @@ type CustomGeometrySourceStateBox = Box<CustomGeometrySourceState>;
 struct CustomGeometrySourceState {
     fetch_tile: Arc<ThreadsafeFunction<CanonicalTileId>>,
     cancel_tile: Option<Arc<ThreadsafeFunction<CanonicalTileId>>>,
+    lifecycle: Mutex<CustomGeometrySourceLifecycle>,
+    idle: Condvar,
+}
+
+struct CustomGeometrySourceLifecycle {
+    closing: bool,
+    active: usize,
+}
+
+struct CustomGeometryUpcallGuard<'a> {
+    state: &'a CustomGeometrySourceState,
 }
 
 impl NativeMapHandle {
@@ -2175,7 +2200,9 @@ impl NativeMapHandle {
                 // If the active-source registry is poisoned, keep the map live
                 // and let Drop leak the native handle rather than free callback
                 // state whose native reachability is no longer knowable.
-                let _ = self.state.leak_for_report();
+                if let Some(address) = self.state.leak_for_report() {
+                    crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
+                }
             }
         }
     }
@@ -2198,7 +2225,58 @@ impl CustomGeometrySourceState {
         fetch_tile.map(|fetch_tile| Self {
             fetch_tile: Arc::new(fetch_tile),
             cancel_tile: cancel_tile.map(Arc::new),
+            lifecycle: Mutex::new(CustomGeometrySourceLifecycle {
+                closing: false,
+                active: 0,
+            }),
+            idle: Condvar::new(),
         })
+    }
+
+    fn enter_callback(&self) -> Option<CustomGeometryUpcallGuard<'_>> {
+        let mut lifecycle = self
+            .lifecycle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if lifecycle.closing {
+            return None;
+        }
+        lifecycle.active += 1;
+        Some(CustomGeometryUpcallGuard { state: self })
+    }
+
+    fn close(&self) {
+        let mut lifecycle = self
+            .lifecycle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        lifecycle.closing = true;
+        while lifecycle.active != 0 {
+            lifecycle = self
+                .idle
+                .wait(lifecycle)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+    }
+}
+
+impl Drop for CustomGeometrySourceState {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+impl Drop for CustomGeometryUpcallGuard<'_> {
+    fn drop(&mut self) {
+        let mut lifecycle = self
+            .state
+            .lifecycle
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        lifecycle.active = lifecycle.active.saturating_sub(1);
+        if lifecycle.active == 0 {
+            self.state.idle.notify_all();
+        }
     }
 }
 
@@ -2217,6 +2295,9 @@ extern "C" fn custom_geometry_source_fetch_tile_callback(
             return;
         }
         let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
+        let Some(_guard) = state.enter_callback() else {
+            return;
+        };
         state.fetch_tile.call(
             Ok(CanonicalTileId::from_native(tile_id)),
             ThreadsafeFunctionCallMode::NonBlocking,
@@ -2233,6 +2314,9 @@ extern "C" fn custom_geometry_source_cancel_tile_callback(
             return;
         }
         let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
+        let Some(_guard) = state.enter_callback() else {
+            return;
+        };
         if let Some(cancel_tile) = &state.cancel_tile {
             cancel_tile.call(
                 Ok(CanonicalTileId::from_native(tile_id)),

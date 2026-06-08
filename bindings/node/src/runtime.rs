@@ -3,7 +3,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
@@ -245,7 +245,7 @@ static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<u64, ResourceRequestRegi
 #[derive(Clone)]
 struct ResourceRequestRegistration {
     handle: Arc<core::resource::ResourceRequestHandleState>,
-    provider: usize,
+    provider: Arc<ResourceProviderState>,
 }
 
 struct ResourceMatcher {
@@ -273,9 +273,9 @@ struct ResourceProviderState {
 #[napi(js_name = "NativeRuntimeHandle")]
 pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
+    has_created_map: AtomicBool,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
-    retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -293,9 +293,9 @@ pub fn create_native_runtime_handle(
         .map_err(error::from_core)?;
     Ok(NativeRuntimeHandle {
         state,
+        has_created_map: AtomicBool::new(false),
         resource_transform: Mutex::new(None),
         resource_provider: Mutex::new(None),
-        retired_resource_providers: Mutex::new(Vec::new()),
     })
 }
 
@@ -367,6 +367,11 @@ impl NativeRuntimeHandle {
         routes: Vec<ResourceRouteInput>,
         callback: ThreadsafeFunction<ResourceProviderRequest>,
     ) -> Result<()> {
+        if self.has_created_map.load(Ordering::Acquire) {
+            return Err(error::invalid_state(
+                "resource provider routes must be configured before creating maps from the runtime",
+            ));
+        }
         let provider = Arc::new(ResourceProviderState {
             routes: routes
                 .into_iter()
@@ -388,9 +393,7 @@ impl NativeRuntimeHandle {
             .lock()
             .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?
             .replace(provider);
-        if let Some(replaced) = replaced {
-            self.retire_resource_provider(replaced);
-        }
+        drop(replaced);
         Ok(())
     }
 
@@ -770,7 +773,12 @@ unsafe fn resource_provider_trampoline_inner(
     if user_data.is_null() || request.is_null() || handle.is_null() {
         return core::resource::UNKNOWN_PROVIDER_DECISION;
     }
-    let provider = unsafe { &*(user_data as *const ResourceProviderState) };
+    let provider_ptr = user_data as *const ResourceProviderState;
+    // SAFETY: user_data was created from Arc::as_ptr and native retains it only
+    // while runtime state owns the provider or a pending request registration
+    // keeps it alive. Increment before from_raw to create an owned clone.
+    unsafe { Arc::increment_strong_count(provider_ptr) };
+    let provider = unsafe { Arc::from_raw(provider_ptr) };
     let raw_request = unsafe { &*request };
     let url = if provider.routes.iter().any(|route| route.needs_url()) {
         if raw_request.url.is_null() {
@@ -800,7 +808,7 @@ unsafe fn resource_provider_trampoline_inner(
         Ok(handle_state) => handle_state,
         Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
     };
-    let handle_id = register_resource_request_handle(handle_state.clone(), provider);
+    let handle_id = register_resource_request_handle(handle_state.clone(), &provider);
     let provider_request = resource_provider_request_from_core(request, handle_id);
     let status = provider.callback.call(
         Ok(provider_request),
@@ -900,7 +908,7 @@ fn resource_request_handles() -> &'static Mutex<HashMap<u64, ResourceRequestRegi
 
 fn register_resource_request_handle(
     handle: Arc<core::resource::ResourceRequestHandleState>,
-    provider: &ResourceProviderState,
+    provider: &Arc<ResourceProviderState>,
 ) -> u64 {
     let handle_id = RESOURCE_REQUEST_HANDLE_IDS.fetch_add(1, Ordering::Relaxed);
     if let Ok(mut handles) = resource_request_handles().lock() {
@@ -908,7 +916,7 @@ fn register_resource_request_handle(
             handle_id,
             ResourceRequestRegistration {
                 handle,
-                provider: provider as *const ResourceProviderState as usize,
+                provider: Arc::clone(provider),
             },
         );
     }
@@ -923,14 +931,10 @@ fn unregister_resource_request_handle(handle_id: u64) -> Option<ResourceRequestR
         .lock()
         .ok()
         .and_then(|mut handles| handles.remove(&handle_id));
-    if let Some(registration) = &registration {
-        // SAFETY: a registration can only remain in the global registry while
-        // its provider state is active or retained in the runtime's retired
-        // provider list. Provider drop drains and removes all its registrations.
-        let provider = unsafe { &*(registration.provider as *const ResourceProviderState) };
-        if let Ok(mut pending) = provider.pending_handle_ids.lock() {
-            pending.remove(&handle_id);
-        }
+    if let Some(registration) = &registration
+        && let Ok(mut pending) = registration.provider.pending_handle_ids.lock()
+    {
+        pending.remove(&handle_id);
     }
     registration
 }
@@ -1468,12 +1472,8 @@ impl NativeRuntimeHandle {
         self.state.as_ptr()
     }
 
-    fn retire_resource_provider(&self, provider: Arc<ResourceProviderState>) {
-        if let Ok(mut retired) = self.retired_resource_providers.lock() {
-            retired.push(provider);
-        } else {
-            std::mem::forget(provider);
-        }
+    pub(crate) fn mark_map_created(&self) {
+        self.has_created_map.store(true, Ordering::Release);
     }
 
     fn release_resource_callback_state(&self) {
@@ -1482,9 +1482,6 @@ impl NativeRuntimeHandle {
         }
         if let Ok(mut provider) = self.resource_provider.lock() {
             *provider = None;
-        }
-        if let Ok(mut retired_providers) = self.retired_resource_providers.lock() {
-            retired_providers.clear();
         }
     }
 }
@@ -1510,7 +1507,8 @@ impl Drop for ResourceProviderState {
 
 impl Drop for NativeRuntimeHandle {
     fn drop(&mut self) {
-        if self.state.leak_for_report().is_some() {
+        if let Some(address) = self.state.leak_for_report() {
+            crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
             if let Ok(mut transform) = self.resource_transform.lock()
                 && let Some(transform) = transform.take()
             {
@@ -1520,11 +1518,6 @@ impl Drop for NativeRuntimeHandle {
                 && let Some(provider) = provider.take()
             {
                 std::mem::forget(provider);
-            }
-            if let Ok(mut retired_providers) = self.retired_resource_providers.lock() {
-                for provider in retired_providers.drain(..) {
-                    std::mem::forget(provider);
-                }
             }
         }
     }

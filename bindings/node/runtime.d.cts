@@ -3,6 +3,7 @@ export {
   cVersion,
   supportedRenderBackends,
   threadLastErrorMessage,
+  takeNativeLeakReports,
   networkStatus,
   setNetworkStatus,
   type RuntimeOptions,
@@ -25,5 +26,6 @@ export {
   type OfflineOperationKind,
   type OfflineOperationResultKind,
   type NetworkStatusValue,
+  type NativeLeakReport,
   type RenderBackends,
 } from "./index.cjs";

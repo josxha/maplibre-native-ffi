@@ -22,4 +22,5 @@ export {
   type OpenGLSurfaceDescriptor,
   type TextureImageInfo,
   type TextureReadback,
+  type TextureReadbackBuffer,
 } from "./index.cjs";

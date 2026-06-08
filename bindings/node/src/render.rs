@@ -690,6 +690,26 @@ impl NativeRenderSessionHandle {
             pixels: Uint8Array::from(pixels),
         })
     }
+
+    #[napi(js_name = "readPremultipliedRgba8Into")]
+    pub fn read_premultiplied_rgba8_into(
+        &self,
+        mut pixels: Uint8Array,
+    ) -> Result<TextureImageInfo> {
+        self.ensure_no_frame_acquired()?;
+        let mut info = unsafe { sys::mln_texture_image_info_default() };
+        let pixels = unsafe { pixels.as_mut() };
+        core::check(unsafe {
+            sys::mln_texture_read_premultiplied_rgba8(
+                self.state.as_ptr(),
+                pixels.as_mut_ptr(),
+                pixels.len(),
+                &mut info,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(TextureImageInfo::from_native(info))
+    }
 }
 
 impl NativeRenderSessionHandle {
@@ -1169,6 +1189,8 @@ fn bigint_to_u64(value: &BigInt, field_name: &str) -> Result<u64> {
 
 impl Drop for NativeRenderSessionHandle {
     fn drop(&mut self) {
-        let _ = self.state.leak_for_report();
+        if let Some(address) = self.state.leak_for_report() {
+            crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
+        }
     }
 }

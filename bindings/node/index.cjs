@@ -87,6 +87,10 @@ function threadLastErrorMessage() {
   return native.threadLastErrorMessage();
 }
 
+function takeNativeLeakReports() {
+  return translateNativeErrors(() => native.nativeTakeLeakReports());
+}
+
 function networkStatus() {
   return translateNativeErrors(() => native.networkStatus());
 }
@@ -120,9 +124,13 @@ function setLogCallback(callback) {
   return translateNativeErrors(() =>
     native.nativeSetLogCallback((error, record) => {
       if (error) {
-        throw error;
+        return;
       }
-      callback(record);
+      try {
+        callback(record);
+      } catch {
+        // User logging callbacks must not escape binding-managed callbacks.
+      }
     }),
   );
 }
@@ -542,20 +550,41 @@ class VulkanOwnedTextureFrame {
   }
 }
 
-function operationIdOf(operation) {
+function requireOfflineOperation(
+  operation,
+  runtime,
+  expectedOperationKind,
+  expectedResultKind,
+) {
   if (operation instanceof OfflineOperationHandle) {
-    if (operation.closed) {
-      throw new InvalidStateError(null, "offline operation handle is closed");
-    }
-    return operation.operationId;
-  }
-  if (typeof operation === "bigint") {
-    return operation;
+    return operation._requireLive(
+      runtime,
+      expectedOperationKind,
+      expectedResultKind,
+    );
   }
   throw new InvalidArgumentError(
     null,
-    "offline operation must be an OfflineOperationHandle or bigint",
+    "offline operation must be an OfflineOperationHandle",
   );
+}
+
+function takeOfflineOperation(
+  operation,
+  runtime,
+  expectedOperationKind,
+  expectedResultKind,
+  take,
+) {
+  const operationId = requireOfflineOperation(
+    operation,
+    runtime,
+    expectedOperationKind,
+    expectedResultKind,
+  );
+  const result = translateNativeErrors(() => take(operationId));
+  operation._markConsumed();
+  return result;
 }
 
 function validateByteLength(byteLength) {
@@ -566,6 +595,22 @@ function validateByteLength(byteLength) {
     );
   }
   return byteLength;
+}
+
+function mutableUint8Array(data, fieldName) {
+  if (data instanceof NativeBuffer) {
+    return data.asUint8Array();
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+  throw new InvalidArgumentError(
+    null,
+    `${fieldName} must be a NativeBuffer, ArrayBuffer, or typed array view`,
+  );
 }
 
 const resourceRequestFinalizer =
@@ -604,6 +649,22 @@ function completeResourceRequestWithProviderError(handle, error) {
       // The request may have been cancelled or completed already.
     }
   }
+}
+
+function customGeometryCallback(callback) {
+  if (callback == null) {
+    return null;
+  }
+  return (error, tileId) => {
+    if (error) {
+      return;
+    }
+    try {
+      callback(tileId);
+    } catch {
+      // Native custom geometry callbacks must not escape into the event loop.
+    }
+  };
 }
 
 class ResourceRequestHandle {
@@ -665,7 +726,12 @@ class ResourceRequestHandle {
 }
 
 class OfflineOperationHandle {
-  constructor(runtime, operationId) {
+  constructor(
+    runtime,
+    operationId,
+    operationKind = "unknown",
+    resultKind = "unknown",
+  ) {
     recordHandleEnvironment(this);
     if (!(runtime instanceof RuntimeHandle)) {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
@@ -678,6 +744,8 @@ class OfflineOperationHandle {
     }
     this.runtime = runtime;
     this.operationId = operationId;
+    this.operationKind = operationKind;
+    this.resultKind = resultKind;
     this.discarded = false;
   }
 
@@ -697,6 +765,34 @@ class OfflineOperationHandle {
     return this.discarded;
   }
 
+  _requireLive(expectedRuntime, expectedOperationKind, expectedResultKind) {
+    assertHandleEnvironment(this);
+    if (this.discarded) {
+      throw new InvalidStateError(null, "offline operation handle is closed");
+    }
+    if (this.runtime !== expectedRuntime) {
+      throw new InvalidStateError(
+        null,
+        "OfflineOperationHandle belongs to a different RuntimeHandle",
+      );
+    }
+    if (
+      this.operationKind !== expectedOperationKind ||
+      this.resultKind !== expectedResultKind
+    ) {
+      throw new InvalidStateError(
+        null,
+        `OfflineOperationHandle has kind ${this.operationKind} and result kind ${this.resultKind}, expected ${expectedOperationKind} and ${expectedResultKind}`,
+      );
+    }
+    return this.operationId;
+  }
+
+  _markConsumed() {
+    assertHandleEnvironment(this);
+    this.discarded = true;
+  }
+
   [Symbol.dispose]() {
     this.close();
   }
@@ -705,6 +801,7 @@ class OfflineOperationHandle {
 class RuntimeHandle {
   constructor(options) {
     recordHandleEnvironment(this);
+    this.mapsByAddress = new Map();
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
@@ -718,7 +815,9 @@ class RuntimeHandle {
   }
 
   close() {
-    return translateNativeErrors(() => nativeOf(this).close());
+    const result = translateNativeErrors(() => nativeOf(this).close());
+    this.mapsByAddress.clear();
+    return result;
   }
 
   get closed() {
@@ -792,60 +891,83 @@ class RuntimeHandle {
     const start = translateNativeErrors(() =>
       liveNativeOf(this).runAmbientCacheOperation(operation),
     );
-    return new OfflineOperationHandle(this, BigInt(start.operationId));
+    return new OfflineOperationHandle(
+      this,
+      BigInt(start.operationId),
+      "ambientCache",
+      "none",
+    );
   }
 
   offlineRegionsList() {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionsList(),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionsList(),
+      "regionsList",
+      "regionList",
     );
   }
 
   offlineRegionGet(regionId) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionGet(regionId),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionGet(regionId),
+      "regionGet",
+      "optionalRegion",
     );
   }
 
   offlineRegionsMergeDatabase(path) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionsMergeDatabase(path),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionsMergeDatabase(path),
+      "regionsMergeDatabase",
+      "regionList",
     );
   }
 
   offlineRegionUpdateMetadata(regionId, metadata = null) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionUpdateMetadata(regionId, metadata),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionUpdateMetadata(regionId, metadata),
+      "regionUpdateMetadata",
+      "region",
     );
   }
 
   offlineRegionGetStatus(regionId) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionGetStatus(regionId),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionGetStatus(regionId),
+      "regionGetStatus",
+      "regionStatus",
     );
   }
 
   offlineRegionSetObserved(regionId, observed) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionSetObserved(regionId, observed),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionSetObserved(regionId, observed),
+      "regionSetObserved",
+      "none",
     );
   }
 
   offlineRegionSetDownloadState(regionId, state) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionSetDownloadState(regionId, state),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionSetDownloadState(regionId, state),
+      "regionSetDownloadState",
+      "none",
     );
   }
 
   offlineRegionInvalidate(regionId) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionInvalidate(regionId),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionInvalidate(regionId),
+      "regionInvalidate",
+      "none",
     );
   }
 
   offlineRegionDelete(regionId) {
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionDelete(regionId),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionDelete(regionId),
+      "regionDelete",
+      "none",
     );
   }
 
@@ -856,62 +978,111 @@ class RuntimeHandle {
     } else {
       nativeDefinition.geometry = stringifyJson(definition.geometry);
     }
-    return this.#offlineOperation(() =>
-      liveNativeOf(this).offlineRegionCreate(nativeDefinition, metadata),
+    return this.#offlineOperation(
+      () => liveNativeOf(this).offlineRegionCreate(nativeDefinition, metadata),
+      "regionCreate",
+      "region",
     );
   }
 
   offlineRegionCreateTakeResult(operation) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).offlineRegionCreateTakeResult(
-        operationIdOf(operation),
-      ),
+    return takeOfflineOperation(
+      operation,
+      this,
+      "regionCreate",
+      "region",
+      (operationId) =>
+        liveNativeOf(this).offlineRegionCreateTakeResult(operationId),
     );
   }
 
   offlineRegionGetTakeResult(operation) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).offlineRegionGetTakeResult(operationIdOf(operation)),
+    return takeOfflineOperation(
+      operation,
+      this,
+      "regionGet",
+      "optionalRegion",
+      (operationId) =>
+        liveNativeOf(this).offlineRegionGetTakeResult(operationId),
     );
   }
 
   offlineRegionsListTakeResult(operation) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).offlineRegionsListTakeResult(operationIdOf(operation)),
+    return takeOfflineOperation(
+      operation,
+      this,
+      "regionsList",
+      "regionList",
+      (operationId) =>
+        liveNativeOf(this).offlineRegionsListTakeResult(operationId),
     );
   }
 
   offlineRegionsMergeDatabaseTakeResult(operation) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).offlineRegionsMergeDatabaseTakeResult(
-        operationIdOf(operation),
-      ),
+    return takeOfflineOperation(
+      operation,
+      this,
+      "regionsMergeDatabase",
+      "regionList",
+      (operationId) =>
+        liveNativeOf(this).offlineRegionsMergeDatabaseTakeResult(operationId),
     );
   }
 
   offlineRegionUpdateMetadataTakeResult(operation) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).offlineRegionUpdateMetadataTakeResult(
-        operationIdOf(operation),
-      ),
+    return takeOfflineOperation(
+      operation,
+      this,
+      "regionUpdateMetadata",
+      "region",
+      (operationId) =>
+        liveNativeOf(this).offlineRegionUpdateMetadataTakeResult(operationId),
     );
   }
 
   offlineRegionGetStatusTakeResult(operation) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).offlineRegionGetStatusTakeResult(
-        operationIdOf(operation),
-      ),
+    return takeOfflineOperation(
+      operation,
+      this,
+      "regionGetStatus",
+      "regionStatus",
+      (operationId) =>
+        liveNativeOf(this).offlineRegionGetStatusTakeResult(operationId),
     );
   }
 
-  #offlineOperation(startOperation) {
+  #offlineOperation(startOperation, operationKind, resultKind) {
     const start = translateNativeErrors(startOperation);
-    return new OfflineOperationHandle(this, BigInt(start.operationId));
+    return new OfflineOperationHandle(
+      this,
+      BigInt(start.operationId),
+      operationKind,
+      resultKind,
+    );
   }
 
   pollEvent() {
-    return translateNativeErrors(() => liveNativeOf(this).pollEvent());
+    const event = translateNativeErrors(() => liveNativeOf(this).pollEvent());
+    if (event?.eventType === "map-style-loaded" && event.sourceType === "map") {
+      this.mapsByAddress
+        .get(event.sourceAddress)
+        ?._releaseDetachedCustomGeometrySources();
+    }
+    return event;
+  }
+
+  _registerMap(map) {
+    assertHandleEnvironment(this);
+    if (map.nativeAddress != null) {
+      this.mapsByAddress.set(map.nativeAddress, map);
+    }
+  }
+
+  _unregisterMap(map) {
+    assertHandleEnvironment(this);
+    if (map.nativeAddress != null) {
+      this.mapsByAddress.delete(map.nativeAddress);
+    }
   }
 
   [Symbol.dispose]() {
@@ -1429,6 +1600,14 @@ class RenderSessionHandle {
     );
   }
 
+  readPremultipliedRgba8Into(data) {
+    return translateNativeErrors(() =>
+      liveNativeOf(this).readPremultipliedRgba8Into(
+        mutableUint8Array(data, "readback buffer"),
+      ),
+    );
+  }
+
   [Symbol.dispose]() {
     this.close();
   }
@@ -1458,10 +1637,14 @@ class MapHandle {
         native.createNativeMapHandle(liveNativeOf(runtime), options ?? {}),
       ),
     );
+    this.nativeAddress = nativeOf(this).nativeAddress;
+    runtime._registerMap(this);
   }
 
   close() {
-    return translateNativeErrors(() => nativeOf(this).close());
+    const result = translateNativeErrors(() => nativeOf(this).close());
+    this.runtime._unregisterMap(this);
+    return result;
   }
 
   get closed() {
@@ -1841,10 +2024,18 @@ class MapHandle {
       liveNativeOf(this).addCustomGeometrySource(
         sourceId,
         nativeOptions,
-        fetchTile ?? null,
-        cancelTile ?? null,
+        customGeometryCallback(fetchTile),
+        customGeometryCallback(cancelTile),
       ),
     );
+  }
+
+  _releaseDetachedCustomGeometrySources() {
+    if (!this.closed) {
+      translateNativeErrors(() =>
+        liveNativeOf(this).releaseDetachedCustomGeometrySources(),
+      );
+    }
   }
 
   setCustomGeometrySourceTileData(sourceId, tileId, data) {
@@ -2221,6 +2412,7 @@ module.exports = {
   supportedRenderBackends,
   supportedOpenGLContextProviders,
   threadLastErrorMessage,
+  takeNativeLeakReports,
   networkStatus,
   setNetworkStatus,
   projectedMetersForLatLng,
@@ -2254,6 +2446,7 @@ module.exports.supportedRenderBackends = supportedRenderBackends;
 module.exports.supportedOpenGLContextProviders =
   supportedOpenGLContextProviders;
 module.exports.threadLastErrorMessage = threadLastErrorMessage;
+module.exports.takeNativeLeakReports = takeNativeLeakReports;
 module.exports.networkStatus = networkStatus;
 module.exports.setNetworkStatus = setNetworkStatus;
 module.exports.projectedMetersForLatLng = projectedMetersForLatLng;

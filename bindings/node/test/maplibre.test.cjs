@@ -30,6 +30,7 @@ const {
   setNetworkStatus,
   supportedRenderBackends,
   supportedOpenGLContextProviders,
+  takeNativeLeakReports,
   threadLastErrorMessage,
 } = require("..");
 const nativeAddon = require("../index.js");
@@ -127,6 +128,7 @@ test("process-global APIs cross the native add-on", () => {
   assert.equal(typeof openglProviders.egl, "boolean");
 
   assert.equal(typeof threadLastErrorMessage(), "string");
+  assert.deepEqual(takeNativeLeakReports(), []);
 
   const original = networkStatus();
   assert.match(original.kind, /^(online|offline|unknown)$/);
@@ -171,6 +173,63 @@ test("log callback copies records through the Node event loop", async () => {
     runtime.close();
     clearLogCallback();
   }
+});
+
+test("binding-managed callbacks contain user exceptions", () => {
+  const originalSetLogCallback = nativeAddon.nativeSetLogCallback;
+  /** @type {undefined | ((error: Error | null, record: import("..").LogRecord) => void)} */
+  let logBridge;
+  /** @param {(error: Error | null, record: import("..").LogRecord) => void} callback */
+  nativeAddon.nativeSetLogCallback = (callback) => {
+    logBridge = callback;
+  };
+
+  try {
+    setLogCallback(() => {
+      throw new Error("log callback failed");
+    });
+    assert.ok(logBridge);
+    assert.doesNotThrow(() =>
+      logBridge?.(
+        null,
+        /** @type {import("..").LogRecord} */ ({ message: "hello" }),
+      ),
+    );
+  } finally {
+    nativeAddon.nativeSetLogCallback = originalSetLogCallback;
+    clearLogCallback();
+  }
+
+  /** @type {{ fetch?: Function | null, cancel?: Function | null }} */
+  const callbacks = {};
+  MapHandle.prototype.addCustomGeometrySource.call(
+    {
+      native: {
+        closed: false,
+        /**
+         * @param {string} _sourceId
+         * @param {unknown} _options
+         * @param {Function | null} fetchTile
+         * @param {Function | null} cancelTile
+         */
+        addCustomGeometrySource(_sourceId, _options, fetchTile, cancelTile) {
+          callbacks.fetch = fetchTile;
+          callbacks.cancel = cancelTile;
+        },
+      },
+    },
+    "custom",
+    {
+      fetchTile() {
+        throw new Error("fetch failed");
+      },
+      cancelTile() {
+        throw new Error("cancel failed");
+      },
+    },
+  );
+  assert.doesNotThrow(() => callbacks.fetch?.(null, { z: 0, x: 0, y: 0 }));
+  assert.doesNotThrow(() => callbacks.cancel?.(null, { z: 0, x: 0, y: 0 }));
 });
 
 test("async log severities map string values and reject unknown values", () => {
@@ -304,6 +363,41 @@ test("native buffer owns byte storage for render interop", () => {
   );
 });
 
+test("texture readback can write into caller-owned storage", () => {
+  const target = new Uint8Array(4);
+  const info = RenderSessionHandle.prototype.readPremultipliedRgba8Into.call(
+    {
+      native: {
+        closed: false,
+        /** @param {Uint8Array} buffer */
+        readPremultipliedRgba8Into(buffer) {
+          buffer.set([1, 2, 3, 4]);
+          return { width: 1, height: 1, stride: 4, byteLength: 4 };
+        },
+      },
+    },
+    target,
+  );
+  assert.deepEqual([...target], [1, 2, 3, 4]);
+  assert.deepEqual(info, { width: 1, height: 1, stride: 4, byteLength: 4 });
+
+  const nativeBuffer = NativeBuffer.allocate(4);
+  RenderSessionHandle.prototype.readPremultipliedRgba8Into.call(
+    {
+      native: {
+        closed: false,
+        /** @param {Uint8Array} buffer */
+        readPremultipliedRgba8Into(buffer) {
+          buffer.set([5, 6, 7, 8]);
+          return { width: 1, height: 1, stride: 4, byteLength: 4 };
+        },
+      },
+    },
+    nativeBuffer,
+  );
+  assert.deepEqual([...nativeBuffer.asUint8Array()], [5, 6, 7, 8]);
+});
+
 test("handles stay local while workers create their own runtime", async () => {
   const worker = new Worker(
     `
@@ -416,6 +510,96 @@ test("offline operations expose discardable handles", () => {
   }
 });
 
+test("offline operation handles validate runtime, kind, and consumption", () => {
+  const fakeRuntime = Object.create(RuntimeHandle.prototype);
+  fakeRuntime.native = {
+    closed: false,
+    /** @param {bigint} operationId */
+    offlineRegionsListTakeResult(operationId) {
+      assert.equal(operationId, 10n);
+      return [];
+    },
+    discardOfflineOperation() {
+      throw new Error("consumed operations must not discard");
+    },
+  };
+  const OfflineOperationHandleForTest =
+    /** @type {new (runtime: object, operationId: bigint, operationKind?: string, resultKind?: string) => OfflineOperationHandle} */ (
+      /** @type {unknown} */ (OfflineOperationHandle)
+    );
+
+  const operation = new OfflineOperationHandleForTest(
+    fakeRuntime,
+    10n,
+    "regionsList",
+    "regionList",
+  );
+  assert.deepEqual(
+    RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
+      fakeRuntime,
+      operation,
+    ),
+    [],
+  );
+  assert.equal(operation.closed, true);
+  operation.close();
+
+  const wrongKind = new OfflineOperationHandleForTest(
+    fakeRuntime,
+    11n,
+    "regionGet",
+    "optionalRegion",
+  );
+  assert.throws(
+    () =>
+      RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
+        fakeRuntime,
+        wrongKind,
+      ),
+    InvalidStateError,
+  );
+
+  const otherRuntime = Object.create(RuntimeHandle.prototype);
+  const wrongRuntime = new OfflineOperationHandleForTest(
+    otherRuntime,
+    12n,
+    "regionsList",
+    "regionList",
+  );
+  assert.throws(
+    () =>
+      RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
+        fakeRuntime,
+        wrongRuntime,
+      ),
+    InvalidStateError,
+  );
+  assert.throws(
+    () =>
+      RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
+        fakeRuntime,
+        /** @type {any} */ (13n),
+      ),
+    InvalidArgumentError,
+  );
+});
+
+test("resource providers must be configured before map creation", () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.close();
+    assert.throws(
+      () => runtime.setResourceProviderRoutes([], () => {}),
+      InvalidStateError,
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
 test("offline operation events expose copied typed payloads", async () => {
   const runtime = new RuntimeHandle();
   try {
@@ -446,6 +630,37 @@ test("offline operation events expose copied typed payloads", async () => {
   } finally {
     runtime.close();
   }
+});
+
+test("style-loaded events release detached custom geometry sources", () => {
+  const fakeRuntime = Object.create(RuntimeHandle.prototype);
+  let releases = 0;
+  fakeRuntime.mapsByAddress = new Map([
+    [
+      0x1234n,
+      {
+        _releaseDetachedCustomGeometrySources() {
+          releases += 1;
+        },
+      },
+    ],
+  ]);
+  fakeRuntime.native = {
+    closed: false,
+    pollEvent() {
+      return {
+        eventType: "map-style-loaded",
+        sourceType: "map",
+        sourceAddress: 0x1234n,
+        payload: { kind: "none" },
+      };
+    },
+  };
+
+  const event = RuntimeHandle.prototype.pollEvent.call(fakeRuntime);
+  assert.ok(event);
+  assert.equal(event.eventType, "map-style-loaded");
+  assert.equal(releases, 1);
 });
 
 test("resource provider routes validate Node handoff shape", async () => {

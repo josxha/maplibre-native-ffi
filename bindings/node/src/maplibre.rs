@@ -4,7 +4,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use napi::bindgen_prelude::{Env, Result};
+use napi::bindgen_prelude::{BigInt, Env, Result};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -41,8 +41,20 @@ pub struct LogRecord {
     pub message: String,
 }
 
+#[napi(object)]
+pub struct NativeLeakReport {
+    pub handle_type: String,
+    pub address: BigInt,
+}
+
+struct NativeLeakReportEntry {
+    handle_type: String,
+    address: usize,
+}
+
 static LOG_CALLBACK: OnceLock<Mutex<Option<LogCallbackState>>> = OnceLock::new();
 static LOG_CALLBACK_IDS: AtomicU64 = AtomicU64::new(1);
+static NATIVE_LEAK_REPORTS: OnceLock<Mutex<Vec<NativeLeakReportEntry>>> = OnceLock::new();
 
 #[derive(Clone)]
 struct LogCallbackState {
@@ -158,6 +170,20 @@ pub fn native_default_async_log_severity_mask() -> u32 {
     maplibre_native_sys::MLN_LOG_SEVERITY_MASK_DEFAULT
 }
 
+#[napi(js_name = "nativeTakeLeakReports")]
+pub fn native_take_leak_reports() -> Result<Vec<NativeLeakReport>> {
+    let reports = native_leak_reports()
+        .lock()
+        .map_err(|_| error::invalid_argument("native leak report lock is poisoned"))?
+        .drain(..)
+        .map(|report| NativeLeakReport {
+            handle_type: report.handle_type,
+            address: BigInt::from(report.address as u64),
+        })
+        .collect();
+    Ok(reports)
+}
+
 #[napi(js_name = "nativeLogSeverityMaskBit")]
 pub fn native_log_severity_mask_bit(severity: String) -> Result<u32> {
     match severity.as_str() {
@@ -197,6 +223,19 @@ extern "C" fn log_trampoline(
         }
     }));
     0
+}
+
+pub(crate) fn report_native_handle_leak(handle_type: &str, address: usize) {
+    if let Ok(mut reports) = native_leak_reports().lock() {
+        reports.push(NativeLeakReportEntry {
+            handle_type: handle_type.to_owned(),
+            address,
+        });
+    }
+}
+
+fn native_leak_reports() -> &'static Mutex<Vec<NativeLeakReportEntry>> {
+    NATIVE_LEAK_REPORTS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
 fn log_callback_slot() -> &'static Mutex<Option<LogCallbackState>> {

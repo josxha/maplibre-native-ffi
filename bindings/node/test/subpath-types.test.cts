@@ -18,6 +18,7 @@ import {
   NativePointer,
   RenderSessionHandle,
   type MetalBorrowedTextureDescriptor,
+  type TextureReadbackBuffer,
 } from "@maplibre/native-ffi-node/render";
 import {
   ResourceRequestHandle,
@@ -29,6 +30,8 @@ import {
 import {
   RuntimeHandle,
   networkStatus,
+  takeNativeLeakReports,
+  type NativeLeakReport,
 } from "@maplibre/native-ffi-node/runtime";
 import { type StyleImageInput } from "@maplibre/native-ffi-node/style";
 
@@ -39,6 +42,8 @@ setLogCallback((record: LogRecord) => {
   void record.message;
 });
 networkStatus();
+const leakReports: NativeLeakReport[] = takeNativeLeakReports();
+void leakReports;
 void InvalidArgumentError;
 void MapHandle;
 void OfflineOperationHandle;
@@ -86,6 +91,10 @@ const transformRule: ResourceTransformRule = {
   urlPrefix: "http://example.test/",
   replacementUrlPrefix: "https://example.test/",
 };
+const readbackBuffer: TextureReadbackBuffer = NativeBuffer.allocate(4);
+declare const runtime: RuntimeHandle;
+// @ts-expect-error offline take-result APIs require typed handles, not raw ids.
+runtime.offlineRegionsListTakeResult(1n);
 // @ts-expect-error prefix replacements require a matched URL prefix.
 const invalidTransformRuleMissingPrefix: ResourceTransformRule = {
   replacementUrlPrefix: "https://example.test/",
@@ -114,6 +123,7 @@ void invalidViewportOptions;
 void invalidTileOptions;
 void invalidProviderCallback;
 void transformRule;
+void readbackBuffer;
 void invalidTransformRuleMissingPrefix;
 void invalidTransformRuleBothReplacements;
 void image;

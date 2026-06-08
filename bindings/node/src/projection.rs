@@ -128,6 +128,8 @@ impl NativeMapProjectionHandle {
 
 impl Drop for NativeMapProjectionHandle {
     fn drop(&mut self) {
-        let _ = self.state.leak_for_report();
+        if let Some(address) = self.state.leak_for_report() {
+            crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
+        }
     }
 }

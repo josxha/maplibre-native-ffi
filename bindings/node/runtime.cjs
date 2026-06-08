@@ -6,5 +6,6 @@ exports.RuntimeHandle = root.RuntimeHandle;
 exports.cVersion = root.cVersion;
 exports.supportedRenderBackends = root.supportedRenderBackends;
 exports.threadLastErrorMessage = root.threadLastErrorMessage;
+exports.takeNativeLeakReports = root.takeNativeLeakReports;
 exports.networkStatus = root.networkStatus;
 exports.setNetworkStatus = root.setNetworkStatus;

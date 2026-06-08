@@ -82,6 +82,11 @@ export interface NetworkStatusValue {
   raw: number;
 }
 
+export interface NativeLeakReport {
+  handleType: string;
+  address: bigint;
+}
+
 export interface RuntimeOptions {
   assetPath?: string | null;
   cachePath?: string | null;
@@ -604,13 +609,20 @@ export interface OfflineRegionStatus {
   complete: boolean;
 }
 
-export type OfflineOperationRef = OfflineOperationHandle | bigint;
+export type OfflineOperationRef = OfflineOperationHandle;
 
 export type OfflineRegionDownloadState = "inactive" | "active";
 
 export declare class OfflineOperationHandle {
-  constructor(runtime: RuntimeHandle, operationId: bigint);
+  private constructor(
+    runtime: RuntimeHandle,
+    operationId: bigint,
+    operationKind: OfflineOperationKind,
+    resultKind: OfflineOperationResultKind,
+  );
   readonly operationId: bigint;
+  readonly operationKind: OfflineOperationKind;
+  readonly resultKind: OfflineOperationResultKind;
   readonly closed: boolean;
   close(): void;
   [Symbol.dispose](): void;
@@ -721,6 +733,11 @@ export interface TextureReadback {
   info: TextureImageInfo;
   pixels: Uint8Array;
 }
+
+export type TextureReadbackBuffer =
+  | NativeBuffer
+  | ArrayBuffer
+  | ArrayBufferView;
 
 export declare class MetalOwnedTextureFrame {
   private constructor(nativeFrame: unknown);
@@ -873,6 +890,7 @@ export declare class RenderSessionHandle {
     callback: (frame: OpenGLOwnedTextureFrame) => TextureFrameCallbackResult<T>,
   ): TextureFrameCallbackResult<T>;
   readPremultipliedRgba8(): TextureReadback;
+  readPremultipliedRgba8Into(data: TextureReadbackBuffer): TextureImageInfo;
   [Symbol.dispose](): void;
 }
 
@@ -1166,6 +1184,7 @@ export declare function cVersion(): number;
 export declare function supportedRenderBackends(): RenderBackends;
 export declare function supportedOpenGLContextProviders(): OpenGLContextProviders;
 export declare function threadLastErrorMessage(): string;
+export declare function takeNativeLeakReports(): NativeLeakReport[];
 export declare function networkStatus(): NetworkStatusValue;
 export type LogSeverity = "info" | "warning" | "error";
 
