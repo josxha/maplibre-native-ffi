@@ -1,5 +1,9 @@
 function(mln_configure_vulkan_backend target)
-  find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan vulkan-1 REQUIRED)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan REQUIRED)
+  else()
+    find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan vulkan-1 REQUIRED)
+  endif()
 
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)

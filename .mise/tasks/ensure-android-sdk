@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#MISE description="Install pinned Android SDK packages for cross-compilation"
+#MISE depends=["//:sync-submodules"]
+set -euo pipefail
+
+: "${ANDROID_SDK_ROOT:?ANDROID_SDK_ROOT is required}"
+: "${MLN_FFI_ANDROID_NDK_VERSION:?MLN_FFI_ANDROID_NDK_VERSION is required}"
+
+sdkmanager() {
+  command sdkmanager "$@"
+}
+
+packages=(
+  "platform-tools"
+  "platforms;android-34"
+  "ndk;${MLN_FFI_ANDROID_NDK_VERSION}"
+)
+
+if ! sdkmanager --list_installed 2>/dev/null | grep -q "ndk;${MLN_FFI_ANDROID_NDK_VERSION}"; then
+  yes | sdkmanager --licenses >/dev/null
+  sdkmanager "${packages[@]}"
+fi
+
+if [[ ! -d "${ANDROID_NDK_ROOT}/build/cmake" ]]; then
+  echo "Android NDK not found at ${ANDROID_NDK_ROOT}" >&2
+  exit 1
+fi

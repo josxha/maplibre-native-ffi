@@ -11,11 +11,20 @@ function(mln_configure_opengl_backend target)
 
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     find_package(OpenGL REQUIRED EGL)
-    list(
-      APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-      ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp
-      ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
-    target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
+    if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+      set(OPENGL_USE_GLES3 TRUE)
+      list(
+        APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+        ${MLN_SOURCE_DIR}/platform/android/src/gl_functions.cpp
+        ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
+      target_link_libraries(${target} PRIVATE EGL GLESv3)
+    else()
+      list(
+        APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+        ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp
+        ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
+      target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
+    endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES

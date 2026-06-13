@@ -44,9 +44,11 @@ function(mln_configure_options)
         FATAL_ERROR
           "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
     endif()
-    if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl"
-       AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-      message(FATAL_ERROR "OpenGL EGL builds require Linux")
+    if(
+      MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl" AND NOT
+      (CMAKE_SYSTEM_NAME STREQUAL "Linux"
+                OR CMAKE_SYSTEM_NAME STREQUAL "Android"))
+      message(FATAL_ERROR "OpenGL EGL builds require Linux or Android")
     endif()
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl" AND NOT WIN32)
       message(FATAL_ERROR "OpenGL WGL builds require Windows")

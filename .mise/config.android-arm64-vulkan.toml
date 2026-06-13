@@ -1,0 +1,17 @@
+[tools]
+"vfox:mise-plugins/vfox-android-sdk" = "9.0"
+
+[env]
+MLN_FFI_VARIANT = "android-arm64-vulkan"
+MLN_FFI_TARGET_TRIPLE = "android-arm64"
+MLN_FFI_RENDER_BACKEND = "vulkan"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/android-arm64-vulkan"
+MLN_FFI_ZIG_TARGET = "aarch64-linux-android"
+MLN_FFI_ANDROID_ABI = "arm64-v8a"
+MLN_FFI_ANDROID_PLATFORM = "android-24"
+MLN_FFI_ANDROID_NDK_VERSION = "28.1.13356709"
+ANDROID_SDK_ROOT = "{{ tools['vfox:mise-plugins/vfox-android-sdk'].path }}"
+ANDROID_NDK_ROOT = "{{ tools['vfox:mise-plugins/vfox-android-sdk'].path }}/ndk/{{ env.MLN_FFI_ANDROID_NDK_VERSION }}"
+ANDROID_NDK = "{{ env.ANDROID_NDK_ROOT }}"
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = ""
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = ""

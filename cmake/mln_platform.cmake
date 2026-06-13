@@ -41,7 +41,12 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/raster_layer_factory.cpp
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/symbol_layer_factory.cpp)
 
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    list(
+      REMOVE_ITEM MLN_FFI_VENDOR_PLATFORM_SOURCES
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/http_file_source.cpp
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/online_file_source.cpp)
+  elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
          ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp)
   endif()
@@ -73,6 +78,9 @@ function(mln_configure_platform_support target)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     include(platform/windows)
     mln_configure_windows_platform(${target})
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    include(platform/android)
+    mln_configure_android_platform(${target})
   else()
     message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
   endif()
