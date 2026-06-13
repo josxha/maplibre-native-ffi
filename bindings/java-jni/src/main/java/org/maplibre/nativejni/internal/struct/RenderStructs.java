@@ -105,19 +105,17 @@ public final class RenderStructs {
 
   public static OpenGLContextValue openglContext(OpenGLContextDescriptor context) {
     Objects.requireNonNull(context, "context");
-    return switch (context) {
-      case WglContextDescriptor wgl ->
-          new WglContextValue(
-              address(wgl.deviceContext()),
-              address(wgl.shareContext()),
-              address(wgl.getProcAddress()));
-      case EglContextDescriptor egl ->
-          new EglContextValue(
-              address(egl.display()),
-              address(egl.config()),
-              address(egl.shareContext()),
-              address(egl.getProcAddress()));
-    };
+    if (context instanceof WglContextDescriptor wgl) {
+      return new WglContextValue(
+          address(wgl.deviceContext()), address(wgl.shareContext()), address(wgl.getProcAddress()));
+    } else if (context instanceof EglContextDescriptor egl) {
+      return new EglContextValue(
+          address(egl.display()),
+          address(egl.config()),
+          address(egl.shareContext()),
+          address(egl.getProcAddress()));
+    }
+    throw new IllegalArgumentException("Unsupported OpenGL context descriptor: " + context);
   }
 
   public static MetalOwnedTextureValue metalOwnedTextureDescriptor(
@@ -312,15 +310,12 @@ public final class RenderStructs {
   private static void setOpenGLContext(
       MaplibreNativeC.mln_opengl_context_descriptor out, OpenGLContextValue context) {
     out.size(out.sizeof());
-    switch (context) {
-      case WglContextValue wgl -> {
-        out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL);
-        setWglContext(out.data_wgl(), wgl);
-      }
-      case EglContextValue egl -> {
-        out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_EGL);
-        setEglContext(out.data_egl(), egl);
-      }
+    if (context instanceof WglContextValue wgl) {
+      out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL);
+      setWglContext(out.data_wgl(), wgl);
+    } else if (context instanceof EglContextValue egl) {
+      out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_EGL);
+      setEglContext(out.data_egl(), egl);
     }
   }
 

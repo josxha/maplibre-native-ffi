@@ -52,7 +52,7 @@ struct OwnedQueriedFeatureDescriptor {
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 #if defined(MLN_RENDER_BACKEND_OPENGL) && defined(_WIN32)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
-#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(__linux__)
+#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_OPENGL_USE_EGL)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
 #else
   return 0;
@@ -74,7 +74,7 @@ auto opengl_context_descriptor_default() noexcept
     .share_context = nullptr,
     .get_proc_address = nullptr,
   };
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   result.data.egl = mln_egl_context_descriptor{
     .size = sizeof(mln_egl_context_descriptor),

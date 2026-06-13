@@ -158,47 +158,40 @@ public final class JavaCppValues {
     private MaplibreNativeC.mln_geometry geometry(Geometry value) {
       var out = own(new MaplibreNativeC.mln_geometry());
       out.size(out.sizeof());
-      switch (value) {
-        case Geometry.Empty ignored -> out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY);
-        case Geometry.Point node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT);
-          out.data_point(coordinate(node.coordinate()));
-        }
-        case Geometry.LineString node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING);
-          out.data_line_string(coordinateSpan(node.coordinates()));
-        }
-        case Geometry.Polygon node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON);
-          out.data_polygon(polygon(node.rings()));
-        }
-        case Geometry.MultiPoint node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT);
-          out.data_multi_point(coordinateSpan(node.coordinates()));
-        }
-        case Geometry.MultiLineString node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING);
-          out.data_multi_line_string(multiLine(node.lines()));
-        }
-        case Geometry.MultiPolygon node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON);
-          out.data_multi_polygon(multiPolygon(node.polygons()));
-        }
-        case Geometry.Collection node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION);
-          var geometries = node.geometries();
-          var collection = own(new MaplibreNativeC.mln_geometry_collection());
-          if (!geometries.isEmpty()) {
-            var nativeGeometries = own(new MaplibreNativeC.mln_geometry(geometries.size()));
-            for (var i = 0; i < geometries.size(); i++) {
-              nativeGeometries.position(i).put(geometry(geometries.get(i)));
-            }
-            nativeGeometries.position(0);
-            collection.geometries(nativeGeometries);
+      if (value instanceof Geometry.Empty) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY);
+      } else if (value instanceof Geometry.Point node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT);
+        out.data_point(coordinate(node.coordinate()));
+      } else if (value instanceof Geometry.LineString node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING);
+        out.data_line_string(coordinateSpan(node.coordinates()));
+      } else if (value instanceof Geometry.Polygon node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON);
+        out.data_polygon(polygon(node.rings()));
+      } else if (value instanceof Geometry.MultiPoint node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT);
+        out.data_multi_point(coordinateSpan(node.coordinates()));
+      } else if (value instanceof Geometry.MultiLineString node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING);
+        out.data_multi_line_string(multiLine(node.lines()));
+      } else if (value instanceof Geometry.MultiPolygon node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON);
+        out.data_multi_polygon(multiPolygon(node.polygons()));
+      } else if (value instanceof Geometry.Collection node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION);
+        var geometries = node.geometries();
+        var collection = own(new MaplibreNativeC.mln_geometry_collection());
+        if (!geometries.isEmpty()) {
+          var nativeGeometries = own(new MaplibreNativeC.mln_geometry(geometries.size()));
+          for (var i = 0; i < geometries.size(); i++) {
+            nativeGeometries.position(i).put(geometry(geometries.get(i)));
           }
-          collection.geometry_count(geometries.size());
-          out.data_geometry_collection(collection);
+          nativeGeometries.position(0);
+          collection.geometries(nativeGeometries);
         }
+        collection.geometry_count(geometries.size());
+        out.data_geometry_collection(collection);
       }
       return out;
     }
@@ -299,36 +292,29 @@ public final class JavaCppValues {
     private MaplibreNativeC.mln_json_value jsonValue(JsonValue value) {
       var out = own(new MaplibreNativeC.mln_json_value());
       out.size(out.sizeof());
-      switch (value) {
-        case JsonValue.Null ignored -> out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL);
-        case JsonValue.Bool node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL);
-          out.data_bool_value(node.value());
-        }
-        case JsonValue.UInt node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT);
-          out.data_uint_value(node.value());
-        }
-        case JsonValue.Int node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT);
-          out.data_int_value(node.value());
-        }
-        case JsonValue.DoubleValue node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE);
-          out.data_double_value(node.value());
-        }
-        case JsonValue.StringValue node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING);
-          out.data_string_value(stringView(node.value()));
-        }
-        case JsonValue.Array node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY);
-          out.data_array_value(jsonArray(node));
-        }
-        case JsonValue.ObjectValue node -> {
-          out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT);
-          out.data_object_value(jsonObject(node));
-        }
+      if (value instanceof JsonValue.Null) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL);
+      } else if (value instanceof JsonValue.Bool node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL);
+        out.data_bool_value(node.value());
+      } else if (value instanceof JsonValue.UInt node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT);
+        out.data_uint_value(node.value());
+      } else if (value instanceof JsonValue.Int node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT);
+        out.data_int_value(node.value());
+      } else if (value instanceof JsonValue.DoubleValue node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE);
+        out.data_double_value(node.value());
+      } else if (value instanceof JsonValue.StringValue node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING);
+        out.data_string_value(stringView(node.value()));
+      } else if (value instanceof JsonValue.Array node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY);
+        out.data_array_value(jsonArray(node));
+      } else if (value instanceof JsonValue.ObjectValue node) {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT);
+        out.data_object_value(jsonObject(node));
       }
       return out;
     }

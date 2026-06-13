@@ -435,70 +435,58 @@ public final class QueryStructs {
     }
 
     private void setIdentifier(MaplibreNativeC.mln_feature out, FeatureIdentifier identifier) {
-      switch (identifier) {
-        case FeatureIdentifier.Null ignored ->
-            out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL);
-        case FeatureIdentifier.UInt node -> {
-          out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT);
-          out.identifier_uint_value(node.value());
-        }
-        case FeatureIdentifier.Int node -> {
-          out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT);
-          out.identifier_int_value(node.value());
-        }
-        case FeatureIdentifier.DoubleValue node -> {
-          out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE);
-          out.identifier_double_value(node.value());
-        }
-        case FeatureIdentifier.StringValue node -> {
-          out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING);
-          out.identifier_string_value(string(node.value()));
-        }
+      if (identifier instanceof FeatureIdentifier.Null) {
+        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL);
+      } else if (identifier instanceof FeatureIdentifier.UInt node) {
+        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT);
+        out.identifier_uint_value(node.value());
+      } else if (identifier instanceof FeatureIdentifier.Int node) {
+        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT);
+        out.identifier_int_value(node.value());
+      } else if (identifier instanceof FeatureIdentifier.DoubleValue node) {
+        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE);
+        out.identifier_double_value(node.value());
+      } else if (identifier instanceof FeatureIdentifier.StringValue node) {
+        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING);
+        out.identifier_string_value(string(node.value()));
       }
     }
 
     private MaplibreNativeC.mln_geometry geometry(Geometry value) {
       var out = own(new MaplibreNativeC.mln_geometry());
       out.size(out.sizeof());
-      switch (value) {
-        case Geometry.Empty ignored -> out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY);
-        case Geometry.Point node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT);
-          out.data_point(coordinate(node.coordinate()));
+      if (value instanceof Geometry.Empty) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY);
+      } else if (value instanceof Geometry.Point node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT);
+        out.data_point(coordinate(node.coordinate()));
+      } else if (value instanceof Geometry.LineString node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING);
+        out.data_line_string(coordinateSpan(node.coordinates()));
+      } else if (value instanceof Geometry.Polygon node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON);
+        out.data_polygon(polygon(node.rings()));
+      } else if (value instanceof Geometry.MultiPoint node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT);
+        out.data_multi_point(coordinateSpan(node.coordinates()));
+      } else if (value instanceof Geometry.MultiLineString node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING);
+        out.data_multi_line_string(multiLine(node.lines()));
+      } else if (value instanceof Geometry.MultiPolygon node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON);
+        out.data_multi_polygon(multiPolygon(node.polygons()));
+      } else if (value instanceof Geometry.Collection node) {
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION);
+        var collection = own(new MaplibreNativeC.mln_geometry_collection());
+        if (!node.geometries().isEmpty()) {
+          var geometries = own(new MaplibreNativeC.mln_geometry(node.geometries().size()));
+          for (var i = 0; i < node.geometries().size(); i++)
+            geometries.position(i).put(geometry(node.geometries().get(i)));
+          geometries.position(0);
+          collection.geometries(geometries);
         }
-        case Geometry.LineString node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING);
-          out.data_line_string(coordinateSpan(node.coordinates()));
-        }
-        case Geometry.Polygon node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON);
-          out.data_polygon(polygon(node.rings()));
-        }
-        case Geometry.MultiPoint node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT);
-          out.data_multi_point(coordinateSpan(node.coordinates()));
-        }
-        case Geometry.MultiLineString node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING);
-          out.data_multi_line_string(multiLine(node.lines()));
-        }
-        case Geometry.MultiPolygon node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON);
-          out.data_multi_polygon(multiPolygon(node.polygons()));
-        }
-        case Geometry.Collection node -> {
-          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION);
-          var collection = own(new MaplibreNativeC.mln_geometry_collection());
-          if (!node.geometries().isEmpty()) {
-            var geometries = own(new MaplibreNativeC.mln_geometry(node.geometries().size()));
-            for (var i = 0; i < node.geometries().size(); i++)
-              geometries.position(i).put(geometry(node.geometries().get(i)));
-            geometries.position(0);
-            collection.geometries(geometries);
-          }
-          collection.geometry_count(node.geometries().size());
-          out.data_geometry_collection(collection);
-        }
+        collection.geometry_count(node.geometries().size());
+        out.data_geometry_collection(collection);
       }
       return out;
     }

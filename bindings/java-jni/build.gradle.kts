@@ -1,88 +1,68 @@
 import org.gradle.api.tasks.compile.JavaCompile
-import org.gradle.api.tasks.testing.Test
-import org.gradle.jvm.toolchain.JavaLanguageVersion
-import org.gradle.jvm.toolchain.JavaToolchainService
+import org.gradle.api.tasks.javadoc.Javadoc
+import org.gradle.external.javadoc.StandardJavadocDocletOptions
+import org.gradle.internal.os.OperatingSystem
 
-plugins { `java-library` }
+plugins { id("com.android.library") }
 
-repositories { mavenCentral() }
-
-val lwjglVersion = "3.4.1"
-
-fun lwjglNativeClassifier(): String {
-  val os = System.getProperty("os.name").lowercase()
-  val arch = System.getProperty("os.arch").lowercase()
-  return when {
-    os.contains("mac") && (arch == "aarch64" || arch == "arm64") -> "natives-macos-arm64"
-    os.contains("mac") -> "natives-macos"
-    os.contains("linux") && (arch == "aarch64" || arch == "arm64") -> "natives-linux-arm64"
-    os.contains("linux") -> "natives-linux"
-    os.contains("windows") -> "natives-windows"
-    else -> throw GradleException("Unsupported LWJGL native platform: $os/$arch")
-  }
+repositories {
+  google()
+  mavenCentral()
 }
 
-val lwjglNative = lwjglNativeClassifier()
+val javaCppPlatformName = "android-arm64"
+val androidAbi = "arm64-v8a"
+val androidApiLevel =
+  providers
+    .environmentVariable("MLN_FFI_ANDROID_PLATFORM")
+    .map { it.removePrefix("android-") }
+    .orElse("30")
+
+android {
+  namespace = "org.maplibre.nativejni"
+  compileSdk = 34
+
+  defaultConfig {
+    minSdk = 30
+    testInstrumentationRunner = "de.mannodermaus.junit5.AndroidJUnit5Runner"
+
+    ndk { abiFilters += androidAbi }
+  }
+
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+  }
+
+  testOptions { animationsDisabled = true }
+
+  packaging { jniLibs { pickFirsts += "**/libc++_shared.so" } }
+}
 
 dependencies {
   implementation("org.bytedeco:javacpp:1.5.11")
 
-  testImplementation(platform("org.junit:junit-bom:6.0.3"))
-  testImplementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
-  testImplementation("org.junit.jupiter:junit-jupiter")
-  testImplementation("org.lwjgl:lwjgl")
-  testImplementation("org.lwjgl:lwjgl-egl")
-  testImplementation("org.lwjgl:lwjgl-glfw")
-  testImplementation("org.lwjgl:lwjgl-opengl")
-  testImplementation("org.lwjgl:lwjgl-opengles")
-  testRuntimeOnly("org.lwjgl:lwjgl::$lwjglNative")
-  testRuntimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
-  testRuntimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNative")
-  testRuntimeOnly("org.lwjgl:lwjgl-opengles::$lwjglNative")
-  testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+  androidTestImplementation(platform("org.junit:junit-bom:6.0.3"))
+  androidTestImplementation("org.junit.jupiter:junit-jupiter")
+  androidTestImplementation("androidx.test:runner:1.6.2")
+  androidTestImplementation("androidx.test:rules:1.6.1")
+  androidTestImplementation("de.mannodermaus.junit5:android-test-core:1.7.0")
+  androidTestRuntimeOnly("de.mannodermaus.junit5:android-test-runner:1.7.0")
 }
 
-val javaToolchains = project.extensions.getByType<JavaToolchainService>()
-val java25Compiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(25) }
-
-tasks.withType<JavaCompile>().configureEach {
-  javaCompiler = java25Compiler
-  options.release = 25
-}
-
-fun javaCppPlatform(): String {
-  var osName = System.getProperty("os.name").lowercase()
-  var osArch = System.getProperty("os.arch").lowercase()
-  osName =
-    when {
-      osName.startsWith("mac") || osName.startsWith("darwin") -> "macosx"
-      osName.startsWith("win") -> "windows"
-      osName.startsWith("linux") -> "linux"
-      else -> throw GradleException("Unsupported JavaCPP platform: $osName")
-    }
-  osArch =
-    when (osArch) {
-      "amd64",
-      "x86_64" -> "x86_64"
-      "aarch64",
-      "arm64" -> "arm64"
-      else -> throw GradleException("Unsupported JavaCPP architecture: $osArch")
-    }
-  return "$osName-$osArch"
-}
-
+val javacppHostClasspath =
+  configurations.detachedConfiguration(dependencies.create("org.bytedeco:javacpp:1.5.11"))
 val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javacpp/main/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
-
-sourceSets.named("main") { java.srcDir(generatedJavaCppSources) }
+val jniLibsRoot = layout.buildDirectory.dir("generated/jniLibs")
+val jniLibsDir = jniLibsRoot.map { it.dir(androidAbi) }
 
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileJavaCppConfig") {
     source("src/main/java/org/maplibre/nativejni/internal/javacpp/MaplibreNativeCConfig.java")
-    classpath = configurations.compileClasspath.get()
+    classpath = javacppHostClasspath
     destinationDirectory = javaCppConfigClasses
-    javaCompiler = java25Compiler
-    options.release = 25
+    options.release = 21
   }
 
 val generateJavaCppBindings =
@@ -90,11 +70,13 @@ val generateJavaCppBindings =
     group = "build"
     description = "Generates JavaCPP declarations for the MapLibre Native C ABI."
     dependsOn(compileJavaCppConfig)
-    classpath = files(javaCppConfigClasses) + configurations.compileClasspath.get()
+    classpath = files(javaCppConfigClasses) + javacppHostClasspath
     mainClass = "org.bytedeco.javacpp.tools.Builder"
     args(
       "-classpath",
       classpath.asPath,
+      "-properties",
+      javaCppPlatformName,
       "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
@@ -110,62 +92,118 @@ val generateJavaCppBindings =
     )
   }
 
-tasks.named<JavaCompile>("compileJava") { dependsOn(generateJavaCppBindings) }
-
 val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
-val javaCppPlatformName = javaCppPlatform()
-val jniBridgeLibrary =
-  layout.buildDirectory.file(
-    "classes/java/main/org/maplibre/nativejni/internal/javacpp/$javaCppPlatformName/${System.mapLibraryName("jniMaplibreNativeC")}"
+val androidNdkRoot = providers.environmentVariable("ANDROID_NDK_ROOT")
+
+fun ndkPrebuiltHost(): String {
+  val os = OperatingSystem.current()
+  return when {
+    os.isLinux -> "linux-x86_64"
+    os.isMacOsX ->
+      if (System.getProperty("os.arch") == "aarch64") "darwin-arm64" else "darwin-x86_64"
+    else -> throw GradleException("Android JNI builds require a Linux or macOS host")
+  }
+}
+
+val debugJavaClasses =
+  layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes")
+val jniBridgeBuildDir =
+  layout.buildDirectory.dir(
+    "intermediates/javacpp/$javaCppPlatformName/org/maplibre/nativejni/internal/javacpp"
   )
+val jniBridgeLibrary = jniBridgeBuildDir.map {
+  it.file(System.mapLibraryName("jniMaplibreNativeC"))
+}
+
+val javaCppCompatInclude = layout.projectDirectory.dir("cpp")
 
 val buildJavaCppNative =
   tasks.register<JavaExec>("buildJavaCppNative") {
     group = "build"
-    description = "Builds the JavaCPP JNI bridge for the MapLibre Native C ABI."
-    dependsOn(tasks.named("classes"))
-    classpath = sourceSets.main.get().runtimeClasspath
+    description = "Builds the JavaCPP JNI bridge for Android arm64."
     mainClass = "org.bytedeco.javacpp.tools.Builder"
-    args(
-      "-classpath",
-      sourceSets.main.get().runtimeClasspath.asPath,
-      "-Dplatform.linkpath=${nativeBuildDir.get()}",
-      "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
-    )
-    inputs.files(sourceSets.main.get().output.classesDirs)
+    doFirst {
+      require(androidNdkRoot.orNull?.isNotBlank() == true) {
+        "ANDROID_NDK_ROOT is required to build the JNI bridge"
+      }
+      require(nativeBuildDir.orNull?.isNotBlank() == true) {
+        "MLN_FFI_BUILD_DIR is required to build the JNI bridge"
+      }
+      classpath = files(debugJavaClasses) + javacppHostClasspath
+      val ndkRoot = androidNdkRoot.get()
+      val compiler =
+        "$ndkRoot/toolchains/llvm/prebuilt/${ndkPrebuiltHost()}/bin/aarch64-linux-android${androidApiLevel.get()}-clang++"
+      args(
+        "-classpath",
+        debugJavaClasses.get().asFile.absolutePath,
+        "-properties",
+        javaCppPlatformName,
+        "-Dplatform.root=$ndkRoot",
+        "-Dplatform.includepath=${javaCppCompatInclude.asFile.absolutePath}",
+        "-Dplatform.linkpath=${nativeBuildDir.get()}",
+        "-Dplatform.compiler=$compiler",
+        "-Dplatform.compiler.default=-O3 -s -include javacpp_char_traits.hpp",
+        "-d",
+        jniBridgeBuildDir.get().asFile.absolutePath,
+        "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
+      )
+    }
+    inputs.dir(debugJavaClasses)
     inputs.dir(rootProject.layout.projectDirectory.dir("include"))
     inputs.dir(nativeBuildDir)
     outputs.file(jniBridgeLibrary)
-    mustRunAfter(tasks.named("compileTestJava"))
   }
 
-tasks.named<Jar>("jar") { dependsOn(buildJavaCppNative) }
-
-tasks.named<Javadoc>("javadoc") {
-  dependsOn(tasks.classes)
-  val main = sourceSets.main.get()
-  source =
-    main.allJava.matching {
-      exclude("org/maplibre/nativejni/internal/**")
-      exclude("module-info.java")
+val packageNativeLibraries =
+  tasks.register<Copy>("packageNativeLibraries") {
+    group = "build"
+    description = "Packages Android JNI libraries for the AAR."
+    dependsOn(buildJavaCppNative)
+    into(jniLibsDir)
+    from(jniBridgeLibrary) { rename { System.mapLibraryName("jniMaplibreNativeC") } }
+    from(nativeBuildDir) {
+      include("libmaplibre-native-c.so")
+      onlyIf { nativeBuildDir.isPresent }
     }
-  classpath = main.compileClasspath + main.output
-  modularity.inferModulePath.set(false)
-  isFailOnError = true
-  options {
-    encoding = "UTF-8"
-    (this as StandardJavadocDocletOptions).apply {
-      links("https://docs.oracle.com/en/java/javase/25/docs/api/")
+    doFirst {
+      require(nativeBuildDir.isPresent) {
+        "MLN_FFI_BUILD_DIR is required to package native libraries"
+      }
+      val coreLibrary = file("${nativeBuildDir.get()}/libmaplibre-native-c.so")
+      require(coreLibrary.isFile) {
+        "Missing ${coreLibrary.absolutePath}; run mise -E android-arm64-egl run build first"
+      }
     }
   }
+
+afterEvaluate {
+  android.sourceSets.named("main") {
+    java.srcDir(generatedJavaCppSources.get().asFile)
+    jniLibs.srcDir(jniLibsRoot.get().asFile)
+  }
+
+  val compileJavaTask = tasks.named("compileDebugJavaWithJavac")
+  compileJavaTask.configure { dependsOn(generateJavaCppBindings) }
+  tasks
+    .matching { it.name.contains("Annotations") }
+    .configureEach { dependsOn(generateJavaCppBindings) }
+  buildJavaCppNative.configure { dependsOn(compileJavaTask) }
+  tasks.named("mergeDebugJniLibFolders").configure { dependsOn(packageNativeLibraries) }
+  tasks.named("mergeReleaseJniLibFolders").configure { dependsOn(packageNativeLibraries) }
 }
 
-val jniLibraryPathProperty = "org.maplibre.nativejni.library.path"
-
-tasks.withType<Test>().configureEach {
-  dependsOn(buildJavaCppNative)
-  useJUnitPlatform()
-  jvmArgs("--enable-native-access=ALL-UNNAMED")
-  systemProperty(jniLibraryPathProperty, jniBridgeLibrary.get().asFile.absolutePath)
-  inputs.file(jniBridgeLibrary).withPropertyName("jniBridgeLibrary")
+tasks.register<Javadoc>("javadoc") {
+  dependsOn(generateJavaCppBindings)
+  val mainSources = layout.projectDirectory.dir("src/main/java")
+  source = fileTree(mainSources) { exclude("org/maplibre/nativejni/internal/**") }
+  doFirst {
+    val sdkRoot =
+      System.getenv("ANDROID_SDK_ROOT")
+        ?: System.getenv("ANDROID_HOME")
+        ?: error("ANDROID_SDK_ROOT or ANDROID_HOME is required for javadoc")
+    classpath = files("$sdkRoot/platforms/android-34/android.jar")
+  }
+  isFailOnError = true
+  options.encoding = "UTF-8"
+  (options as StandardJavadocDocletOptions).links("https://developer.android.com/reference/")
 }

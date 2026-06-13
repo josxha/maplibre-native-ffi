@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(__linux__)
+#if defined(MLN_OPENGL_USE_EGL)
 #include <array>
 #include <cstddef>
 
@@ -36,9 +36,15 @@ inline auto find_egl_client_symbol_in_handles(
 }
 
 inline auto gles_client_library_handles() -> const std::array<void*, 2>& {
+#if defined(__ANDROID__)
+  static const auto handles = open_egl_client_libraries(
+    std::array<const char*, 2>{"libGLESv3.so", "libGLESv2.so"}
+  );
+#else
   static const auto handles = open_egl_client_libraries(
     std::array<const char*, 2>{"libGLESv2.so.2", "libGLESv2.so"}
   );
+#endif
   return handles;
 }
 

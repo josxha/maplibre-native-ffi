@@ -10,6 +10,7 @@ function(mln_configure_opengl_backend target)
     PRIVATE ${MLN_SOURCE_DIR}/vendor/unique_resource)
 
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
+    target_compile_definitions(${target} PRIVATE MLN_OPENGL_USE_EGL=1)
     if(CMAKE_SYSTEM_NAME STREQUAL "Android")
       list(
         APPEND MLN_FFI_VENDOR_OPENGL_SOURCES

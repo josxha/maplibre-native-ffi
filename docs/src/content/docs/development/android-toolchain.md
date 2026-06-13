@@ -36,8 +36,9 @@ is required for `AImageDecoder` image decoding.
 - **Gradle/AGP as the primary native build driver** — rejected for the C API
   library. MapLibre Native's Android SDK uses AGP `externalNativeBuild`; this
   repository keeps CMake+Ninja as the native entrypoint so Android variants stay
-  consistent with desktop mise workflows. Gradle may return when we add Android
-  packaging or JNI bindings.
+  consistent with desktop mise workflows. The Java JNI binding uses Gradle only
+  for Java compilation, JavaCPP JNI bridge packaging, and Android
+  instrumentation tests; CMake still produces `libmaplibre-native-c.so`.
 
 ## Android SDK and NDK
 
@@ -114,7 +115,10 @@ prefix to `CMAKE_FIND_ROOT_PATH` and uses `find_package(curl CONFIG)` with
 `curl::curl_static`, matching the AGP `externalNativeBuild` workflow.
 
 When an Android Gradle module is added for JNI bindings, it can depend on the
-same Maven coordinates and drop the standalone fetch step.
+same Maven coordinates and drop the standalone fetch step. The
+`bindings/java-jni` module is that Gradle surface today: it consumes the
+CMake-built `libmaplibre-native-c.so`, cross-compiles `libjniMaplibreNativeC.so`
+with JavaCPP, and runs instrumentation tests on device or emulator.
 
 ### Rejected alternatives
 
@@ -170,15 +174,19 @@ mise -E android-arm64-vulkan run build
 
 # Configure and build the OpenGL ES/EGL Android variant
 mise -E android-arm64-egl run build
+
+# Build the Android JNI binding (OpenGL/EGL render tests)
+mise -E android-arm64-egl run //bindings/java-jni:build
 ```
 
-Zig binding tests are not wired into `mise run test` for Android yet. The first
-milestone is a successful `libmaplibre-native-c.so` link for each Android
-variant.
+Zig binding tests are not wired into `mise run test` for Android yet. JNI
+instrumentation tests run with
+`mise -E android-arm64-egl run //bindings/java-jni:test` on a connected device
+or emulator.
 
 ## Follow-up work
 
 - Additional ABIs (`armeabi-v7a`, `x86_64`).
-- Android packaging (AAR/Gradle) and JNI bindings using the same Prefab deps.
-- CI job on an Ubuntu host with an external Android SDK.
+- Android AAR publishing for JNI consumers.
+- Vulkan JNI render tests (EGL GLES tests run today).
 - vcpkg migration for cross-target native dependencies (separate change).

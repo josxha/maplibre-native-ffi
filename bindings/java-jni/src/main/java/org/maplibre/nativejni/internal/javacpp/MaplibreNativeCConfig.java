@@ -9,6 +9,7 @@ import org.bytedeco.javacpp.tools.InfoMapper;
 @Properties(
     value =
         @Platform(
+            value = "android-arm64",
             includepath = {"../../include"},
             cinclude = {
               "maplibre_native_c/base.h",

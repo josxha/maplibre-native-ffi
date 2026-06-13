@@ -1,3 +1,23 @@
+[tools]
+java = "temurin-21.0.7+6.0.LTS"
+
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:java-jni:build"
+depends = ["//:build"]
+run = '''
+if [[ "${MLN_FFI_VARIANT:-}" != android-arm64-egl ]]; then
+  echo "Java JNI builds require the android-arm64-egl mise environment." >&2
+  echo "Run: mise -E android-arm64-egl run //bindings/java-jni:build" >&2
+  exit 1
+fi
+source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
+export JAVA_HOME="$(mise where java)"
+"$MLN_FFI_REPO_ROOT/gradlew" --stop >/dev/null 2>&1 || true
+../../gradlew :bindings:java-jni:assembleDebug
+'''
+
+[tasks.test]
+depends = ["build"]
+run = '''
+source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
+../../gradlew :bindings:java-jni:connectedDebugAndroidTest
+'''

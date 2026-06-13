@@ -14,17 +14,34 @@ Resources:
 
 ## Architecture
 
-The Java JNI binding targets Android and JVMs where FFM is unavailable. Modern
-JVMs with FFM support use the
-[Java FFM binding](/maplibre-native-ffi/development/bindings-java-ffm/). JNI is
-a bridge path: generated JavaCPP internals call the public MapLibre Native C
-ABI, and curated Java wrappers present the public binding API.
+The Java JNI binding targets Android. Desktop and server JVMs with FFM support
+use the [Java FFM binding](/maplibre-native-ffi/development/bindings-java-ffm/).
+JNI is the Android bridge: generated JavaCPP internals call the public MapLibre
+Native C ABI, and curated Java wrappers present the public binding API.
+
+Future Kotlin Multiplatform layouts can share `commonMain` with `jvmMain` backed
+by Java FFM and `androidMain` backed by this JNI module.
 
 Keep the public Java API parallel to Java FFM where practical. JNI and FFM use
 compatible handle names, descriptor shapes, event values, exception taxonomy,
 and `NativePointer` semantics. JNI uses its own artifact and package root.
-Kotlin Multiplatform `commonMain` can provide the shared facade for common
-declarations and actual implementations.
+
+## Build and test
+
+The `bindings/java-jni` module is an Android library (`com.android.library`).
+Build and test it from the `android-arm64-egl` mise environment after the C API
+library is configured:
+
+```bash
+export ANDROID_SDK_ROOT=/path/to/Android/Sdk
+mise -E android-arm64-egl run //bindings/java-jni:build
+mise -E android-arm64-egl run //bindings/java-jni:test   # requires a device or emulator
+```
+
+`mise run //bindings/java-jni:build` packages `libmaplibre-native-c.so` from the
+CMake build and cross-compiles the JavaCPP JNI bridge with the pinned NDK.
+Instrumentation tests live under `src/androidTest/` and use Android EGL for
+render-target coverage.
 
 Keep generated JavaCPP details internal. `org.bytedeco.javacpp.Pointer`, JavaCPP
 generated structs, generated C entry-point declarations, implementation handles,

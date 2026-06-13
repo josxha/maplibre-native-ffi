@@ -15,13 +15,13 @@
 #define WIN32_LEAN_AND_MEAN 1
 #endif
 #include <Windows.h>
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
 #include <EGL/egl.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
-#if defined(__linux__)
+#if defined(MLN_OPENGL_USE_EGL)
 #include "render/opengl/egl_common.hpp"
 #endif
 #include "render/opengl/wgl_common.hpp"
@@ -177,7 +177,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     if (SwapBuffers(static_cast<HDC>(descriptor_.surface)) == 0) {
       throw std::runtime_error("Swapping OpenGL WGL surface buffers failed");
     }
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
     if (
       eglSwapBuffers(
         static_cast<EGLDisplay>(descriptor_.context.data.egl.display),
@@ -212,7 +212,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     return reinterpret_cast<mbgl::gl::ProcAddress>(
       mln::core::opengl::get_opengl32_proc_address(name)
     );
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
     using GetProcAddressFunction = void* (*)(const char*);
     auto* loader = reinterpret_cast<GetProcAddressFunction>(
       descriptor_.context.data.egl.get_proc_address
@@ -261,7 +261,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       previous_render_context_ = nullptr;
       throw;
     }
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
     previous_display_ = eglGetCurrentDisplay();
     previous_draw_surface_ = eglGetCurrentSurface(EGL_DRAW);
     previous_read_surface_ = eglGetCurrentSurface(EGL_READ);
@@ -307,7 +307,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     );
     previous_device_context_ = nullptr;
     previous_render_context_ = nullptr;
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
     release_current_egl_context();
     restore_previous_egl_api();
     restore_previous_egl_context();
@@ -342,7 +342,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       render_context_ = nullptr;
     }
   }
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
   void create_egl_context() {
     auto* const display =
       static_cast<EGLDisplay>(descriptor_.context.data.egl.display);
@@ -441,7 +441,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 #if defined(_WIN32)
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
-#elif defined(__linux__)
+#elif defined(MLN_OPENGL_USE_EGL)
   void* previous_display_ = nullptr;
   void* previous_draw_surface_ = nullptr;
   void* previous_read_surface_ = nullptr;
