@@ -46,6 +46,9 @@ Studio:
 
 - mise installs the command-line tools via
   [`vfox-android-sdk`](https://github.com/mise-plugins/vfox-android-sdk).
+- `.mise/bin/android-sdk-env.sh` resolves `ANDROID_SDK_ROOT` and
+  `ANDROID_NDK_ROOT` from `mise where` because mise env templates cannot yet
+  reference vfox tool paths reliably in per-env config files.
 - `mise run //:ensure-android-sdk` accepts licenses and installs pinned
   packages: `platform-tools`, `platforms;android-34`, and `ndk;28.1.13356709`.
 - NDK **28.1.13356709** matches the MapLibre Native Android tree.
@@ -97,8 +100,10 @@ Initial Android platform choices:
   MapLibre Native's Android tree.
 - Collator/number-format test stubs instead of the JNI i18n stack used by the
   MapLibre Android SDK.
-- No `http_file_source` / `online_file_source` until we add a static networking
-  stack or JNI HTTP bridge.
+- No desktop `http_file_source` (libcurl). Instead,
+  `src/platform/android/http_file_source_stub.cpp` satisfies `OnlineFileSource`
+  linkage and returns explicit errors for network requests until we add static
+  curl or a JNI HTTP bridge.
 - `decodeImage` stub in `src/platform/android/image_stub.cpp` until we either
   vendor static libpng/libjpeg/libwebp or adopt the JNI bitmap decoder path.
 

@@ -92,6 +92,7 @@ postinstall = [
 run = [
   '''
   if [[ "$MLN_FFI_VARIANT" == android-* ]]; then
+    source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
     mise run //:ensure-android-sdk
   fi
 

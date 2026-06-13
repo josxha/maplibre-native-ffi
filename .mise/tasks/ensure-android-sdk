@@ -3,8 +3,7 @@
 #MISE depends=["//:sync-submodules"]
 set -euo pipefail
 
-: "${ANDROID_SDK_ROOT:?ANDROID_SDK_ROOT is required}"
-: "${MLN_FFI_ANDROID_NDK_VERSION:?MLN_FFI_ANDROID_NDK_VERSION is required}"
+source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
 
 sdkmanager() {
   command sdkmanager "$@"
