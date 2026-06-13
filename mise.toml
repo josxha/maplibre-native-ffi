@@ -94,6 +94,7 @@ run = [
   if [[ "$MLN_FFI_VARIANT" == android-* ]]; then
     source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
     mise run //:ensure-android-sdk
+    mise run //:fetch-android-prefab
   fi
 
   cmake_args=(
@@ -112,6 +113,7 @@ run = [
       -DANDROID_STL=c++_static
       -DANDROID_TOOLCHAIN=clang
       -DMLN_FFI_ENABLE_CLANG_TIDY=OFF
+      -DMLN_FFI_ANDROID_PREFAB_ROOT="$MLN_FFI_ANDROID_PREFAB_ROOT"
     )
     if [[ -n "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" ]]; then
       cmake_args+=(-DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER")

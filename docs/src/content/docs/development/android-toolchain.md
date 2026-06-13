@@ -8,8 +8,8 @@ sidebar:
 ## Scope
 
 This note records Android toolchain decisions for the maplibre-native-ffi C API
-build. It covers mise environments, SDK/NDK provisioning, Pixi usage, and the
-initial headless platform layer.
+build. It covers mise environments, SDK/NDK provisioning, Pixi usage, Prefab
+native dependencies, and the headless platform layer.
 
 ## Mise environments
 
@@ -20,15 +20,15 @@ Two Android variants follow the existing `<platform>-<arch>-<backend>` naming:
 | `android-arm64-vulkan` | Vulkan            | Primary backend on modern Android devices |
 | `android-arm64-egl`    | OpenGL ES via EGL | GLES3 headless backend                    |
 
-Both target `arm64-v8a` with `android-24` as the minimum platform level,
-matching MapLibre Native's current Android baseline.
+Both target `arm64-v8a` with `android-30` as the minimum platform level. API 30
+is required for `AImageDecoder` image decoding.
 
 ### Rejected alternatives
 
 - **`android-arm64-opengl` without a context provider suffix** — rejected
   because desktop variants distinguish EGL and WGL explicitly (`linux-x64-egl`,
   `windows-x64-wgl`). Android only supports EGL today, but keeping the provider
-  in the env name preserves parity with desktop OpenGL variants.
+  in the name preserves parity with desktop OpenGL variants.
 - **Per-ABI mise envs (`android-armv7-vulkan`, etc.)** — deferred. MapLibre
   Native still builds multiple ABIs, but this repository starts with `arm64-v8a`
   only to keep the first cross-compile path small. Additional ABIs can share the
@@ -44,17 +44,19 @@ matching MapLibre Native's current Android baseline.
 The Android SDK is treated as an **external platform SDK**, like Xcode or Visual
 Studio:
 
-- mise installs the command-line tools via
-  [`vfox-android-sdk`](https://github.com/mise-plugins/vfox-android-sdk).
-- `.mise/bin/android-sdk-env.sh` resolves `ANDROID_SDK_ROOT` and
-  `ANDROID_NDK_ROOT` from `mise where` because mise env templates cannot yet
-  reference vfox tool paths reliably in per-env config files.
-- `mise run //:ensure-android-sdk` accepts licenses and installs pinned
-  packages: `platform-tools`, `platforms;android-34`, and `ndk;28.1.13356709`.
+- Contributors install the Android SDK command-line tools or Android Studio and
+  export `ANDROID_SDK_ROOT` or `ANDROID_HOME`.
+- `.mise/bin/android-sdk-env.sh` resolves `ANDROID_NDK_ROOT` from the pinned NDK
+  version under that SDK.
+- `mise run //:ensure-android-sdk` is an optional helper: when `sdkmanager` is
+  on `PATH`, it installs `platform-tools`, `platforms;android-34`, and
+  `ndk;28.1.13356709`.
 - NDK **28.1.13356709** matches the MapLibre Native Android tree.
 
 ### Rejected alternatives
 
+- **mise-managed Android SDK in committed config** — rejected. The SDK is large,
+  license-gated, and already installed by most Android contributors via Studio.
 - **System-wide `apt install android-sdk`** — rejected. It conflicts with the
   repository policy of locally managed, pinned toolchains and is harder to
   reproduce across hosts.
@@ -72,11 +74,12 @@ target libraries.
 Android cross-compiles set `MLN_FFI_DEPENDENCY_INCLUDE_DIR` and
 `MLN_FFI_DEPENDENCY_LIBRARY_DIR` to empty values. Target dependencies come from:
 
-- the NDK (`z`, `log`, `android`, `EGL`, `GLESv3`, `vulkan`),
+- the NDK (`z`, `log`, `android`, `EGL`, `GLESv3`, `vulkan`, `jnigraphics`),
 - MapLibre Native vendored libraries (`mbgl-vendor-icu`, `mbgl-vendor-sqlite`,
   …),
 - MapLibre Native platform sources under
-  `third_party/maplibre-native/platform/android/`.
+  `third_party/maplibre-native/platform/android/`,
+- Maven Prefab packages fetched into `build/android-prefab/` (see below).
 
 ### Rejected alternatives
 
@@ -87,6 +90,40 @@ Android cross-compiles set `MLN_FFI_DEPENDENCY_INCLUDE_DIR` and
   pinned CMake/Ninja/glslang; skipping Pixi would fork the contributor workflow.
 - **Reusing desktop Pixi libraries with `-DCMAKE_FIND_ROOT_PATH`** — rejected.
   Linux `.so` artifacts are not link-compatible with Android targets.
+- **vcpkg for Android target deps** — deferred to a separate change. vcpkg may
+  replace Pixi on all targets later; for now Maven Prefab matches MapLibre
+  Native's existing Android test app.
+
+## Maven Prefab dependencies (`platform/android-deps/`)
+
+Standalone `mise run build` for Android does not use Gradle. Instead,
+`fetch-prefab.sh` downloads Prefab AARs from Maven Central and runs Google's
+Prefab CLI to generate CMake package configs:
+
+| Package   | Maven coordinate                      | Purpose                         |
+| --------- | ------------------------------------- | ------------------------------- |
+| curl      | `io.github.vvb2060.ndk:curl:8.8.0`    | HTTP via `http_file_source.cpp` |
+| boringssl | `io.github.vvb2060.ndk:boringssl:4.0` | curl transitive dependency      |
+
+Versions are pinned in `platform/android-deps/dep-versions.toml`, aligned with
+`third_party/maplibre-native/test/android/app/build.gradle.kts`.
+
+The configure task runs `mise run //:fetch-android-prefab` automatically. Output
+lands in `build/android-prefab/<abi>/lib/<ndk-triple>/cmake/`. CMake adds that
+prefix to `CMAKE_FIND_ROOT_PATH` and uses `find_package(curl CONFIG)` with
+`curl::curl_static`, matching the AGP `externalNativeBuild` workflow.
+
+When an Android Gradle module is added for JNI bindings, it can depend on the
+same Maven coordinates and drop the standalone fetch step.
+
+### Rejected alternatives
+
+- **JNI OkHttp HTTP bridge** — rejected for the headless C API layer. The
+  default `http_file_source.cpp` plus static curl keeps behavior aligned with
+  other platforms.
+- **HTTP stub returning errors** — rejected once Prefab curl was viable.
+- **Pixi linux-aarch64 curl** — rejected. Host libc artifacts are not
+  link-compatible with Android targets.
 
 ## CMake and platform code
 
@@ -94,18 +131,15 @@ Android builds pass the NDK's `android.toolchain.cmake` from the `configure`
 task. `MLN_WITH_CORE_ONLY` stays enabled for MapLibre Native; the C API wrapper
 continues to own platform sources through `cmake/platform/android.cmake`.
 
-Initial Android platform choices:
+Android platform choices:
 
 - Android event-loop sources (`run_loop`, `timer`, `thread`, `async_task`) from
   MapLibre Native's Android tree.
 - Collator/number-format test stubs instead of the JNI i18n stack used by the
   MapLibre Android SDK.
-- No desktop `http_file_source` (libcurl). Instead,
-  `src/platform/android/http_file_source_stub.cpp` satisfies `OnlineFileSource`
-  linkage and returns explicit errors for network requests until we add static
-  curl or a JNI HTTP bridge.
-- `decodeImage` stub in `src/platform/android/image_stub.cpp` until we either
-  vendor static libpng/libjpeg/libwebp or adopt the JNI bitmap decoder path.
+- Default `http_file_source.cpp` linked against Prefab `curl::curl_static`.
+- `decodeImage` in `src/platform/android/image.cpp` using `AImageDecoder` and
+  `libjnigraphics` (requires minSdk 30).
 
 ### Rejected alternatives
 
@@ -113,6 +147,8 @@ Initial Android platform choices:
   wholesale** — rejected for now. That file also defines SDK/test/benchmark
   targets and JNI-centric HTTP/image paths that are out of scope for the
   headless C API library.
+- **JNI `BitmapFactory` image decode** — rejected. `AImageDecoder` is available
+  from API 30 without JNI and fits the headless C API model.
 - **Using desktop Linux platform sources with Pixi sysroots** — rejected.
   Android is not Linux for dependency discovery even though the NDK uses a Linux
   host toolchain triple.
@@ -120,8 +156,14 @@ Initial Android platform choices:
 ## Commands
 
 ```bash
-# Install host tools, hooks, and the Android command-line SDK package
+# Install host tools and hooks
 mise install
+
+# Point at your Android SDK (Studio default shown)
+export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+
+# Optional: install the pinned NDK when sdkmanager is available
+mise run //:ensure-android-sdk
 
 # Configure and build the Vulkan Android variant
 mise -E android-arm64-vulkan run build
@@ -136,7 +178,7 @@ variant.
 
 ## Follow-up work
 
-- Static or JNI-backed HTTP and image decoding.
 - Additional ABIs (`armeabi-v7a`, `x86_64`).
-- Android packaging (AAR/Gradle) and JNI bindings.
-- CI job on an Ubuntu host with the mise-managed SDK.
+- Android packaging (AAR/Gradle) and JNI bindings using the same Prefab deps.
+- CI job on an Ubuntu host with an external Android SDK.
+- vcpkg migration for cross-target native dependencies (separate change).
