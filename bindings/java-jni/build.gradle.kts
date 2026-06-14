@@ -1,8 +1,6 @@
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.compile.JavaCompile
-import org.gradle.api.tasks.javadoc.Javadoc
-import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
 plugins { id("com.android.library") version "9.1.1" }
 
@@ -255,17 +253,4 @@ afterEvaluate {
   }
   tasks.named("mergeDebugJniLibFolders").configure { dependsOn(packageNativeLibraries) }
   tasks.named("mergeReleaseJniLibFolders").configure { dependsOn(packageNativeLibraries) }
-}
-
-tasks.register<Javadoc>("javadoc") {
-  dependsOn(generateJavaCppBindings)
-  val mainSources = layout.projectDirectory.dir("src/main/java")
-  source = fileTree(mainSources) { exclude("org/maplibre/nativejni/internal/**") }
-  doFirst {
-    val sdkRoot = android.sdkComponents.sdkDirectory.get().asFile
-    classpath = files(sdkRoot.resolve("platforms/android-34/android.jar"))
-  }
-  isFailOnError = true
-  options.encoding = "UTF-8"
-  (options as StandardJavadocDocletOptions).links("https://developer.android.com/reference/")
 }
