@@ -1,3 +1,19 @@
+# http_file_source.cpp includes <dlfcn.h>; MSVC has no native dlopen shim.
+if(MSVC AND NOT TARGET dlfcn-win32::dl)
+  include(FetchContent)
+
+  fetchcontent_declare(
+    dlfcn_win32
+    GIT_REPOSITORY
+    https://github.com/dlfcn-win32/dlfcn-win32.git
+    GIT_TAG
+    v1.4.2
+    GIT_SHALLOW
+    TRUE)
+
+  fetchcontent_makeavailable(dlfcn_win32)
+endif()
+
 function(mln_configure_windows_platform target)
   find_package(CURL REQUIRED)
   find_package(JPEG REQUIRED)
@@ -43,6 +59,11 @@ function(mln_configure_windows_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      mbgl-vendor-icu CURL::libcurl JPEG::JPEG PNG::PNG WebP::webp
+      mbgl-vendor-icu
+      CURL::libcurl
+      dlfcn-win32::dl
+      JPEG::JPEG
+      PNG::PNG
+      WebP::webp
       $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>)
 endfunction()
