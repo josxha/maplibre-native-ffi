@@ -1,15 +1,8 @@
 [env]
 ANDROID_HOME = { required = true }
 
-[tools]
-java = "temurin-21.0.7+6.0.LTS"
-
 [tasks.build]
-run = '''
-export JAVA_HOME="$(mise where java)"
-"$MLN_FFI_REPO_ROOT/gradlew" --stop >/dev/null 2>&1 || true
-../../gradlew :bindings:java-jni:assembleDebug
-'''
+run = "../../gradlew :bindings:java-jni:assembleDebug"
 
 [tasks.test]
 depends = ["build"]
