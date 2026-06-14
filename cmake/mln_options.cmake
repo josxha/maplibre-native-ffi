@@ -77,6 +77,9 @@ function(mln_configure_options)
         CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
   endif()
 
+  set(MLN_USE_BUILTIN_ICU ON
+      CACHE BOOL "Use MapLibre vendored ICU subset" FORCE)
+
   set(MLN_WITH_WERROR OFF
       CACHE BOOL "Do not fail wrapper builds on MapLibre Native warnings" FORCE)
 

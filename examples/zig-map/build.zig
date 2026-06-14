@@ -63,6 +63,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         root_module.addLibraryPath(dependency_library_dir);
         root_module.addRPath(dependency_library_dir);
     }
+    maplibre_build.addSdl3Paths(root_module, b);
     root_module.linkSystemLibrary("SDL3", .{});
     maplibre_build.linkRenderBackend(b, root_module, .{
         .target = options.target,

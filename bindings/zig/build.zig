@@ -77,6 +77,15 @@ pub fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
     );
 }
 
+pub fn addSdl3Paths(module: *std.Build.Module, b: *std.Build) void {
+    const prefix = b.graph.environ_map.get("MLN_FFI_SDL3_PREFIX") orelse return;
+    if (prefix.len == 0) return;
+
+    module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ prefix, "include" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ prefix, "lib" }) });
+    module.addRPath(.{ .cwd_relative = b.pathJoin(&.{ prefix, "lib" }) });
+}
+
 pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;

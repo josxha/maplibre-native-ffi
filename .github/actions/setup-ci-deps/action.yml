@@ -53,13 +53,12 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-gradle-
 
-    - name: Trim Windows PATH before Pixi activation
+    - name: Trim Windows PATH before mise activation
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        # Pixi's Windows activation uses cmd.exe and emits a single PATH update
-        # line; the default GitHub Actions Path can make that line exceed cmd's
-        # limit. See https://github.com/prefix-dev/pixi/issues/1108.
+        # Keep the default GitHub Actions PATH small so MSVC activation stays
+        # under cmd.exe limits during native builds.
         $paths = @(
           $(if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }),
           "C:\Program Files\Git\bin",
@@ -78,7 +77,7 @@ runs:
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
         cache: true
-        cache_key_prefix: mise-v2
+        cache_key_prefix: mise-v3
         install: true
 
     - name: Wire sccache into CMake
@@ -94,17 +93,20 @@ runs:
 
     - name: Register Windows CI software graphics drivers
       if: ${{ runner.os == 'Windows' }}
+      shell: bash
+      run: mise run setup-graphics
+
+    - name: Register Windows Mesa WGL driver
+      if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        $pixiLibrary = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library"
-
-        # Register Pixi's Mesa WGL driver so system opengl32.dll can load llvmpipe.
-        $mesaWglDriver = Join-Path $pixiLibrary "bin\libgallium_wgl.dll"
+        $graphicsRoot = Join-Path $env:GITHUB_WORKSPACE "build/graphics/windows-x64/mesa/Library"
+        $mesaWglDriver = Join-Path $graphicsRoot "bin/libgallium_wgl.dll"
         if (-not (Test-Path $mesaWglDriver)) {
           throw "Missing Mesa WGL driver: $mesaWglDriver"
         }
 
-        $mesaWglSystemDriver = Join-Path $env:WINDIR "System32\mesadrv.dll"
+        $mesaWglSystemDriver = Join-Path $env:WINDIR "System32/mesadrv.dll"
         Copy-Item $mesaWglDriver $mesaWglSystemDriver -Force
 
         $openglDriverKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL"
@@ -114,8 +116,7 @@ runs:
         New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
         New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
 
-        # Register Pixi's lavapipe ICD so the Vulkan loader finds software Vulkan.
-        $driverManifest = Join-Path $pixiLibrary "share\vulkan\icd.d\lvp_icd.x86_64.json"
+        $driverManifest = Join-Path $graphicsRoot "share/vulkan/icd.d/lvp_icd.x86_64.json"
         if (-not (Test-Path $driverManifest)) {
           throw "Missing lavapipe Vulkan ICD manifest: $driverManifest"
         }
@@ -124,17 +125,32 @@ runs:
         New-Item -Path $driverKey -Force | Out-Null
         New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
 
-    - name: Diagnose EGL setup
+    - name: Install Linux native packages
       if: ${{ runner.os == 'Linux' }}
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install --no-install-recommends --yes libegl-mesa0 libgl1-mesa-dri mesa-utils
-        mise exec -- pixi run --locked bash -euo pipefail -c '
-          env | sort | grep -E "^(EGL|LIBGL|MESA|LD_LIBRARY_PATH|__EGL|CONDA|PIXI)" || true
-          command -v eglinfo
-          EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
-        '
+        sudo apt-get install --no-install-recommends --yes \
+          libclang-dev \
+          libegl1-mesa-dev \
+          libegl-mesa0 \
+          libgl1-mesa-dri \
+          libgles2-mesa-dev \
+          libvulkan1 \
+          mesa-utils \
+          mesa-vulkan-drivers \
+          pkg-config \
+          glslang-tools \
+          vulkan-tools \
+          doxygen
+
+    - name: Diagnose EGL setup
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        env | sort | grep -E "^(EGL|LIBGL|MESA|LD_LIBRARY_PATH|__EGL|MLN_FFI|VK_)" || true
+        command -v eglinfo
+        EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
 
     - name: Diagnose Vulkan setup
       if: ${{ contains(env.MISE_ENV, 'vulkan') }}

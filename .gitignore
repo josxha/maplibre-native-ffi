@@ -1,5 +1,7 @@
 .cache/
 build/
+CMakeUserPresets.json
+
 target/
 bindings/*/bin/
 docs/doxygen/gen/

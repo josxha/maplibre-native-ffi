@@ -2,6 +2,12 @@
 _.path = ["{{config_root}}/build/windows-x64-vulkan"]
 MLN_FFI_VARIANT = "windows-x64-vulkan"
 MLN_FFI_TARGET_TRIPLE = "windows-x64"
+MLN_FFI_CONAN_PROFILE = "windows-x64"
 MLN_FFI_RENDER_BACKEND = "vulkan"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/windows-x64-vulkan"
 MLN_FFI_ZIG_TARGET = "x86_64-windows-msvc"
+MLN_FFI_DEPENDENCY_ROOT = "{{config_root}}/build/deps/windows-x64"
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/build/deps/windows-x64/include"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/build/graphics/windows-x64/mesa/Library/bin"
+MLN_FFI_SDL3_PREFIX = "{{config_root}}/build/deps/windows-x64/sdl3"
+VK_ADD_DRIVER_FILES = "{{config_root}}/build/graphics/windows-x64/mesa/Library/share/vulkan/icd.d/lvp_icd.x86_64.json"

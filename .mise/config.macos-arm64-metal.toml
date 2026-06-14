@@ -1,6 +1,12 @@
 [env]
 MLN_FFI_VARIANT = "macos-arm64-metal"
 MLN_FFI_TARGET_TRIPLE = "macos-arm64"
+MLN_FFI_CONAN_PROFILE = "macos-arm64"
 MLN_FFI_RENDER_BACKEND = "metal"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/macos-arm64-metal"
 MLN_FFI_ZIG_TARGET = "aarch64-macos"
+MLN_FFI_DEPENDENCY_ROOT = "{{config_root}}/build/deps/macos-arm64"
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/build/deps/macos-arm64/include"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/build/deps/macos-arm64/lib"
+MLN_FFI_SDL3_PREFIX = "{{config_root}}/build/deps/macos-arm64/sdl3"
+MLN_FFI_SYSTEM_ROOT = "{{env.SDKROOT}}"

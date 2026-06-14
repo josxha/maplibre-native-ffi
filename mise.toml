@@ -10,10 +10,10 @@ lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "windows-x64"]
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
-windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
+windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
+windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
+unix_default_inline_shell_args = "bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
@@ -32,7 +32,11 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 
 # C/C++ ecosystem
-"github:prefix-dev/pixi" = "0.68.1"
+"pipx:conan" = "2.29.1"
+"cmake" = "4.3.3"
+"ninja" = "1.13.2"
+"clang" = "22.1.7"
+"clang-format" = "22.1.7"
 "github:cmakefmt/cmakefmt" = "1.3.0"
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
@@ -64,11 +68,16 @@ UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_VARIANT = { required = true }
 MLN_FFI_TARGET_TRIPLE = { required = true }
+MLN_FFI_CONAN_PROFILE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
 MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+MLN_FFI_DEPENDENCY_ROOT = { required = true }
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = { required = true }
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = { required = true }
+MLN_FFI_SDL3_PREFIX = { required = true }
 MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
@@ -76,11 +85,7 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 postinstall = [
   { task = "sync-submodules" },
   "hk install --mise --quiet",
-  "pixi install --locked --quiet",
-  # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
-  # https://github.com/KyleMayes/clang-sys/issues/213
-  # https://github.com/conda-forge/llvmdev-feedstock/issues/376
-  "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
+  { task = "install-native-tools" },
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
   "cd bindings/dotnet && dotnet tool restore --verbosity quiet",
@@ -88,17 +93,54 @@ postinstall = [
   "pnpm --filter docs exec astro sync",
 ]
 
+[tasks.install-native-tools]
+hide = true
+
+[tasks.conan-install]
+hide = true
+
+[tasks.install-sdl3]
+hide = true
+
+[tasks.setup-graphics]
+hide = true
+
+[tasks.install-deps]
+description = "Install Conan link-time dependencies, SDL3, and software graphics drivers."
+
 [tasks.configure]
+depends = ["//:install-deps", "//:setup-graphics"]
 run = [
   '''
+  conan_output="$MLN_FFI_REPO_ROOT/build/conan/$MLN_FFI_TARGET_TRIPLE"
   cmake_args=(
     -S .
     -B "$MLN_FFI_BUILD_DIR"
     -G Ninja
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
+    -DCMAKE_TOOLCHAIN_FILE="$conan_output/conan_toolchain.cmake"
+    -DCMAKE_PREFIX_PATH="$conan_output"
   )
 
+  if [[ -n "${CC:-}" ]]; then
+    cmake_args+=(-DCMAKE_C_COMPILER="$CC")
+  fi
+  if [[ -n "${CXX:-}" ]]; then
+    cmake_args+=(-DCMAKE_CXX_COMPILER="$CXX")
+  fi
+
+  if [[ -n "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" ]]; then
+    cmake_args+=(-DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER")
+  fi
+
+  cmake_args+=(
+    -DCMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO=Release
+    -DCMAKE_MAP_IMPORTED_CONFIG_DEBUG=Release
+    -DCMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL=Release
+  )
+
+  # shellcheck disable=SC2086
   cmake "${cmake_args[@]}"
   ''',
   '''
@@ -160,8 +202,8 @@ run = [
   "hk fix --all",
   "git update-index -q --refresh",
   # Lockfile drift is common across different mise builds
-  "git diff --exit-code -- . ':(exclude)mise.lock'",
-  "git diff --cached --exit-code -- . ':(exclude)mise.lock'",
+  "git diff --exit-code -- . ':(exclude)mise.lock' ':(exclude)conan.lock'",
+  "git diff --cached --exit-code -- . ':(exclude)mise.lock' ':(exclude)conan.lock'",
 ]
 
 [tasks."ci:vulkan-info"]

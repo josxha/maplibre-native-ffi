@@ -1,28 +1,9 @@
 function(mln_configure_windows_platform target)
   find_package(CURL REQUIRED)
-  find_package(dlfcn-win32 REQUIRED)
-  find_package(ICU COMPONENTS i18n uc data REQUIRED)
   find_package(JPEG REQUIRED)
   find_package(libuv REQUIRED)
   find_package(PNG REQUIRED)
   find_package(WebP REQUIRED)
-
-  get_filename_component(MLN_FFI_ICU_ROOT "${ICU_INCLUDE_DIR}" DIRECTORY)
-  find_library(
-    MLN_FFI_ICU_I18N_LIBRARY
-    NAMES icuin
-    PATHS "${MLN_FFI_ICU_ROOT}/lib"
-    REQUIRED NO_DEFAULT_PATH)
-  find_library(
-    MLN_FFI_ICU_UC_LIBRARY
-    NAMES icuuc
-    PATHS "${MLN_FFI_ICU_ROOT}/lib"
-    REQUIRED NO_DEFAULT_PATH)
-  find_library(
-    MLN_FFI_ICU_DATA_LIBRARY
-    NAMES icudt
-    PATHS "${MLN_FFI_ICU_ROOT}/lib"
-    REQUIRED NO_DEFAULT_PATH)
 
   set(MLN_FFI_VENDOR_WINDOWS_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
@@ -44,12 +25,16 @@ function(mln_configure_windows_platform target)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
 
+  set_source_files_properties(
+    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
+
   target_include_directories(
     ${target}
     SYSTEM
     PRIVATE
-      ${MLN_SOURCE_DIR}/platform/windows/include ${CURL_INCLUDE_DIRS}
-      ${JPEG_INCLUDE_DIRS} ${WEBP_INCLUDE_DIRS})
+      ${MLN_SOURCE_DIR}/platform/windows/include
+      ${MLN_SOURCE_DIR}/vendor/icu/include)
 
   target_compile_definitions(
     ${target}
@@ -58,13 +43,6 @@ function(mln_configure_windows_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      ${CURL_LIBRARIES}
-      dlfcn-win32::dl
-      ${JPEG_LIBRARIES}
-      WebP::webp
-      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
-      ${MLN_FFI_ICU_I18N_LIBRARY}
-      ${MLN_FFI_ICU_UC_LIBRARY}
-      ${MLN_FFI_ICU_DATA_LIBRARY}
-      PNG::PNG)
+      mbgl-vendor-icu CURL::libcurl JPEG::JPEG PNG::PNG WebP::webp
+      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>)
 endfunction()

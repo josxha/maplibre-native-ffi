@@ -1,12 +1,20 @@
 function(mln_add_maplibre_native)
   set(MLN_SOURCE_DIR "${PROJECT_SOURCE_DIR}/third_party/maplibre-native")
 
+  if(WIN32 AND MSVC)
+    include("${CMAKE_CURRENT_LIST_DIR}/dlfcn_win32.cmake")
+  endif()
+
   if(WIN32)
     add_compile_definitions(NOMINMAX GHC_WIN_DISABLE_WSTRING_STORAGE_TYPE
                             _USE_MATH_DEFINES)
   endif()
 
   add_subdirectory("${MLN_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/maplibre-native")
+
+  if(MLN_USE_BUILTIN_ICU AND NOT TARGET mbgl-vendor-icu)
+    include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
+  endif()
 
   include("${MLN_SOURCE_DIR}/vendor/nunicode.cmake")
   include("${MLN_SOURCE_DIR}/vendor/sqlite.cmake")

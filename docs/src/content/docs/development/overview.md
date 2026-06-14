@@ -82,26 +82,23 @@ This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
 model.
 
-Project-managed dependency state keeps builds reproducible. Pixi supplies native
-build dependencies instead of Homebrew, apt, or other machine-global package
-managers. Platform SDKs such as Xcode, Visual Studio, and the Android SDK remain
+Project-managed dependency state keeps builds reproducible. Conan supplies
+link-time native libraries, while mise pins build tools and orchestrates install
+tasks. Platform SDKs such as Xcode, Visual Studio, and the Android SDK remain
 pragmatic external exceptions.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
 tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
 common workflows: build, test, check, fix, and examples. Mise also provides
-ecosystem entrypoints such as Pixi, Zig, Python, uv, Node, and pnpm.
+ecosystem entrypoints such as Conan, Zig, Python, uv, Node, and pnpm.
 
-[`pixi`](https://pixi.sh/) owns the C and C++ native build environment. It
-supplies native packages from [`conda-forge`](https://conda-forge.org/):
-libraries, C/C++ tooling, and build tools that participate in CMake
-configuration or native package discovery. CMake, Ninja, pkg-config, shader
-tools, and clang tooling live in Pixi for that reason. Pixi runs
-[CMake](https://cmake.org/), and CMake builds the native C/C++ library.
+[`Conan`](https://conan.io/) owns the C and C++ link-time dependency graph for
+curl, zlib, png, jpeg, webp, and libuv. Mise runs `conan install` before CMake
+configuration, and CMake consumes the generated toolchain and package metadata.
 
 Mise profiles select dependency environments and backend variants. Inner build
 files such as CMake, Cargo, Gradle, and Zig build scripts consume the resulting
-environment values and paths; keep Pixi and mise policy at the repository task
+environment values and paths; keep Conan and mise policy at the repository task
 layer.
 
 Language package managers own dependencies inside their ecosystems. For example,

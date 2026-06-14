@@ -47,6 +47,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
             example.root_module.addLibraryPath(dependency_library_dir);
             example.root_module.addRPath(dependency_library_dir);
         }
+        maplibre_build.addSdl3Paths(example.root_module, b);
         example.root_module.linkSystemLibrary("SDL3", .{});
     }
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));

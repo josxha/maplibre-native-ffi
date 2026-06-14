@@ -7,14 +7,23 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes \
     bash \
+    build-essential \
     ca-certificates \
     curl \
     git \
+    libclang-dev \
+    libegl1-mesa-dev \
     libegl-mesa0 \
     libgl1-mesa-dri \
-    libicu72 \
+    libgles2-mesa-dev \
+    libvulkan-dev \
+    libicu-dev \
     mesa-utils \
+    mesa-vulkan-drivers \
+    ninja-build \
+    pkg-config \
     sudo \
+    vulkan-tools \
   && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 --shell /bin/bash dev \

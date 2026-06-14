@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#MISE description="Install Conan native dependencies for the active variant."
+#MISE depends=["//:install-native-tools"]
+set -euo pipefail
+
+: "${MLN_FFI_REPO_ROOT:?}"
+: "${MLN_FFI_TARGET_TRIPLE:?}"
+: "${MLN_FFI_CONAN_PROFILE:?}"
+
+conan_output="$MLN_FFI_REPO_ROOT/build/conan/$MLN_FFI_TARGET_TRIPLE"
+deploy_root="$conan_output/deploy"
+dependency_root="$MLN_FFI_REPO_ROOT/build/deps/$MLN_FFI_TARGET_TRIPLE"
+
+mkdir -p "$conan_output" "$dependency_root"
+
+conan_args=(
+  install "$MLN_FFI_REPO_ROOT/conanfile.txt"
+  --lockfile="$MLN_FFI_REPO_ROOT/conan.lock"
+  --output-folder="$conan_output"
+  --deployer=full_deploy
+  --deployer-folder="$deploy_root"
+  --build=missing
+  --profile:host="$MLN_FFI_REPO_ROOT/.conan/profiles/$MLN_FFI_CONAN_PROFILE"
+  --profile:build=default
+)
+
+conan "${conan_args[@]}"
+
+"$MLN_FFI_REPO_ROOT/.mise/bin/flatten-conan-deploy.sh" "$deploy_root" "$dependency_root"

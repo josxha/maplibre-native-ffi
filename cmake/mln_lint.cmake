@@ -3,7 +3,13 @@ function(mln_configure_source_linting target)
     return()
   endif()
 
-  find_program(MLN_FFI_CLANG_TIDY clang-tidy REQUIRED)
+  find_program(MLN_FFI_CLANG_TIDY clang-tidy)
+  if(NOT MLN_FFI_CLANG_TIDY)
+    message(
+      STATUS
+        "clang-tidy not found; skipping wrapper source linting for ${target}")
+    return()
+  endif()
 
   set(MLN_FFI_CLANG_TIDY_COMMAND ${MLN_FFI_CLANG_TIDY} --quiet
       --config-file=${PROJECT_SOURCE_DIR}/.clang-tidy)

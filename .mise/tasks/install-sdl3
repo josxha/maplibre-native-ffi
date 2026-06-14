@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#MISE description="Build SDL3 into the shared example dependency prefix."
+#MISE depends=["//:install-native-tools"]
+set -euo pipefail
+
+: "${MLN_FFI_REPO_ROOT:?}"
+: "${MLN_FFI_TARGET_TRIPLE:?}"
+
+sdl_version="3.4.4"
+sdl_prefix="$MLN_FFI_REPO_ROOT/build/deps/$MLN_FFI_TARGET_TRIPLE/sdl3"
+sdl_build="$MLN_FFI_REPO_ROOT/build/sdl3/$MLN_FFI_TARGET_TRIPLE"
+sdl_source="$MLN_FFI_REPO_ROOT/build/sdl3/src/SDL3-$sdl_version"
+
+if [[ -f "$sdl_prefix/lib/libSDL3.a" || -f "$sdl_prefix/lib/SDL3.lib" ]]; then
+  exit 0
+fi
+
+mkdir -p "$(dirname "$sdl_source")" "$sdl_build" "$sdl_prefix"
+
+if [[ ! -d "$sdl_source" ]]; then
+  curl -fsSL "https://github.com/libsdl-org/SDL/releases/download/release-$sdl_version/SDL3-$sdl_version.tar.gz" \
+    | tar -xz -C "$(dirname "$sdl_source")"
+fi
+
+cmake_args=(
+  -S "$sdl_source"
+  -B "$sdl_build"
+  -G Ninja
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_INSTALL_PREFIX="$sdl_prefix"
+  -DSDL_SHARED=OFF
+  -DSDL_STATIC=ON
+  -DSDL_TEST_LIBRARY=OFF
+  -DSDL_UNIX_CONSOLE_BUILD=ON
+)
+
+cmake "${cmake_args[@]}"
+cmake --build "$sdl_build" --parallel
+cmake --install "$sdl_build"
