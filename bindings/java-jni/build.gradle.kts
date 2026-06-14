@@ -1,6 +1,6 @@
 import org.gradle.api.tasks.compile.JavaCompile
 
-plugins { id("com.android.library") version "9.1.1" }
+plugins { id("com.android.library") }
 
 repositories {
   google()

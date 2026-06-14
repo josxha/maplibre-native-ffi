@@ -1,6 +1,6 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
-plugins { kotlin("multiplatform") version "2.2.21" }
+plugins { kotlin("multiplatform") }
 
 repositories { mavenCentral() }
 
