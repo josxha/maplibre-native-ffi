@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Fetch Android Prefab native deps for standalone CMake builds"
-set -euo pipefail
-
-exec bash "$MLN_FFI_REPO_ROOT/platform/android-deps/fetch-prefab.sh"

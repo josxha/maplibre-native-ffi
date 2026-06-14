@@ -20,17 +20,22 @@ val androidAbis =
     AndroidJniAbi("x86_64", "android-x86_64", "x86_64-linux-android"),
   )
 
-val androidNativeProject = project(":bindings:android-native")
+val curlVersion = "8.8.0"
+val androidNativeApiLevel = "30"
+val androidNdkVersion = "28.1.13356709"
 
 val androidApiLevel =
   providers
     .environmentVariable("MLN_FFI_ANDROID_PLATFORM")
     .map { it.removePrefix("android-") }
-    .orElse("30")
+    .orElse(androidNativeApiLevel)
 
 android {
   namespace = "org.maplibre.nativejni"
   compileSdk = 34
+  ndkVersion = androidNdkVersion
+
+  buildFeatures { prefab = true }
 
   defaultConfig {
     minSdk = 33
@@ -39,6 +44,27 @@ android {
       "de.mannodermaus.junit5.AndroidJUnit5Builder"
 
     ndk { abiFilters += androidAbis.map { it.abi } }
+
+    externalNativeBuild {
+      cmake {
+        arguments +=
+          listOf(
+            "-DANDROID_STL=c++_static",
+            "-DANDROID_PLATFORM=android-$androidNativeApiLevel",
+            "-DMLN_FFI_RENDER_BACKEND=opengl",
+            "-DMLN_FFI_OPENGL_CONTEXT_PROVIDER=egl",
+            "-DMLN_FFI_ENABLE_CLANG_TIDY=OFF",
+          )
+        targets += "maplibre_native_c"
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      version = "3.24.0+"
+      path = rootProject.file("CMakeLists.txt")
+    }
   }
 
   compileOptions {
@@ -60,7 +86,7 @@ android {
 val javacppVersion = "1.5.13"
 
 dependencies {
-  implementation(project(":bindings:android-native"))
+  implementation("io.github.vvb2060.ndk:curl:$curlVersion")
   implementation("org.bytedeco:javacpp:$javacppVersion")
 
   androidTestImplementation(platform("org.junit:junit-bom:5.11.4"))
@@ -79,7 +105,7 @@ val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val jniLibsRoot = layout.buildDirectory.dir("generated/jniLibs")
 
 fun coreNativeLibDir(abi: String): Provider<Directory> =
-  androidNativeProject.layout.buildDirectory.dir(
+  layout.buildDirectory.dir(
     "intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/$abi"
   )
 
@@ -153,7 +179,7 @@ androidAbis.forEach { abiConfig ->
     tasks.register<JavaExec>("buildJavaCppNative${abiConfig.abi}") {
       group = "build"
       description = "Builds the JavaCPP JNI bridge for ${abiConfig.abi}."
-      dependsOn(":bindings:android-native:mergeDebugNativeLibs")
+      dependsOn("mergeDebugNativeLibs")
       mainClass = "org.bytedeco.javacpp.tools.Builder"
       doFirst {
         require(androidNdkRoot.orNull?.isNotBlank() == true) {
@@ -162,7 +188,7 @@ androidAbis.forEach { abiConfig ->
         val coreBuildDir = coreNativeLibDir(abiConfig.abi).get()
         val coreLibrary = coreBuildDir.file("libmaplibre-native-c.so").asFile
         require(coreLibrary.isFile) {
-          "Missing ${coreLibrary.absolutePath}; run :bindings:android-native:assembleDebug first"
+          "Missing ${coreLibrary.absolutePath}; run :bindings:java-jni:assembleDebug first"
         }
         classpath = files(debugJavaClasses) + javacppHostClasspath
         val ndkRoot = androidNdkRoot.get()
@@ -200,8 +226,6 @@ androidAbis.forEach { abiConfig ->
 }
 
 afterEvaluate {
-  tasks.named("preBuild").configure { dependsOn(":bindings:android-native:assembleDebug") }
-
   android.sourceSets.named("main") {
     java.srcDir(generatedJavaCppSources.get().asFile)
     jniLibs.srcDir(jniLibsRoot.get().asFile)

@@ -91,12 +91,6 @@ postinstall = [
 [tasks.configure]
 run = [
   '''
-  if [[ "$MLN_FFI_VARIANT" == android-* ]]; then
-    source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
-    mise run //:ensure-android-sdk
-    mise run //:fetch-android-prefab
-  fi
-
   cmake_args=(
     -S .
     -B "$MLN_FFI_BUILD_DIR"
@@ -104,21 +98,6 @@ run = [
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
   )
-
-  if [[ "$MLN_FFI_VARIANT" == android-* ]]; then
-    cmake_args+=(
-      -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake"
-      -DANDROID_ABI="$MLN_FFI_ANDROID_ABI"
-      -DANDROID_PLATFORM="$MLN_FFI_ANDROID_PLATFORM"
-      -DANDROID_STL=c++_static
-      -DANDROID_TOOLCHAIN=clang
-      -DMLN_FFI_ENABLE_CLANG_TIDY=OFF
-      -DMLN_FFI_ANDROID_PREFAB_ROOT="$MLN_FFI_ANDROID_PREFAB_ROOT"
-    )
-    if [[ -n "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" ]]; then
-      cmake_args+=(-DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER")
-    fi
-  fi
 
   cmake "${cmake_args[@]}"
   ''',

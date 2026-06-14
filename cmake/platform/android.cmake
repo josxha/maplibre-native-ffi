@@ -1,6 +1,5 @@
 function(mln_configure_android_platform target)
   include(${MLN_SOURCE_DIR}/vendor/icu.cmake)
-  include(android_prefab)
 
   set(MLN_FFI_VENDOR_ANDROID_SOURCES
       ${MLN_SOURCE_DIR}/platform/android/src/async_task.cpp
@@ -29,7 +28,8 @@ function(mln_configure_android_platform target)
       ${MLN_SOURCE_DIR}/platform/android/src
       ${MLN_SOURCE_DIR}/vendor/icu/include)
 
-  mln_android_configure_prefab(${target})
+  find_package(curl CONFIG REQUIRED)
+  target_link_libraries(${target} PRIVATE curl::curl_static)
 
   target_link_libraries(
     ${target}

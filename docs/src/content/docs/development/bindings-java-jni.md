@@ -30,9 +30,9 @@ and `NativePointer` semantics. JNI uses its own artifact and package root.
 
 The `bindings/java-jni` module is an Android library (`com.android.library`)
 with `minSdk 33`. The native C API continues to compile against `android-30` for
-`AImageDecoder`; lowering the JNI floor is follow-up work. Native libraries are
-built by the sibling `bindings/android-native` Gradle module and packaged into
-one multi-ABI AAR:
+`AImageDecoder`; lowering the JNI floor is follow-up work. Gradle builds the
+native C API and JavaCPP JNI bridge in the same module and packages both ABIs
+into one AAR:
 
 ```bash
 export ANDROID_SDK_ROOT=/path/to/Android/Sdk
@@ -40,12 +40,13 @@ mise run //bindings/java-jni:build
 mise run //bindings/java-jni:test   # requires a device or emulator
 ```
 
-`mise run //bindings/java-jni:build` runs Gradle to compile
-`libmaplibre-native-c.so` for `arm64-v8a` and `x86_64`, cross-compiles the
-JavaCPP JNI bridge for each ABI, and assembles a multi-architecture debug AAR.
-Instrumentation tests live under `src/androidTest/` and use Android EGL for
-render-target coverage. An `x86_64` emulator is enough for local testing; CI
-uses the same ABI.
+`mise run //bindings/java-jni:build` compiles `libmaplibre-native-c.so` for
+`arm64-v8a` and `x86_64`, cross-compiles the JavaCPP JNI bridge for each ABI,
+and assembles a multi-architecture debug AAR. Native curl dependencies resolve
+through Maven Prefab in `bindings/java-jni/build.gradle.kts`. Instrumentation
+tests live under `src/androidTest/` and use Android EGL for render-target
+coverage. An `x86_64` emulator is enough for local testing; CI uses the same
+ABI.
 
 Keep generated JavaCPP details internal. `org.bytedeco.javacpp.Pointer`, JavaCPP
 generated structs, generated C entry-point declarations, implementation handles,
