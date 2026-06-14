@@ -1,3 +1,6 @@
+[env]
+MLN_FFI_ANDROID_NDK_VERSION = "28.1.13356709"
+
 [tools]
 java = "temurin-21.0.7+6.0.LTS"
 
@@ -5,10 +8,8 @@ java = "temurin-21.0.7+6.0.LTS"
 run = '''
 source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
 export JAVA_HOME="$(mise where java)"
-mise -E android-arm64-egl run //:build
-mise -E android-x64-egl run //:build
 "$MLN_FFI_REPO_ROOT/gradlew" --stop >/dev/null 2>&1 || true
-../../gradlew :bindings:java-jni:assembleDebug
+../../gradlew :bindings:android-native:assembleDebug :bindings:java-jni:assembleDebug
 '''
 
 [tasks.test]

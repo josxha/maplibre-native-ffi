@@ -15,6 +15,8 @@ rootProject.name = "maplibre-native-ffi"
 
 include(":bindings:java-ffm")
 
+include(":bindings:android-native")
+
 include(":bindings:java-jni")
 
 include(":bindings:kotlin-native")

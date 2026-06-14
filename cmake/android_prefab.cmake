@@ -4,6 +4,12 @@ function(mln_android_configure_prefab target)
       FATAL_ERROR "ANDROID_ABI is required for Android Prefab dependency lookup")
   endif()
 
+  find_package(curl CONFIG)
+  if(curl_FOUND)
+    target_link_libraries(${target} PRIVATE curl::curl_static)
+    return()
+  endif()
+
   if(NOT MLN_FFI_ANDROID_PREFAB_ROOT)
     set(MLN_FFI_ANDROID_PREFAB_ROOT "${PROJECT_SOURCE_DIR}/build/android-prefab")
   endif()

@@ -1,4 +1,5 @@
 import org.gradle.api.file.Directory
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
@@ -11,18 +12,15 @@ repositories {
   mavenCentral()
 }
 
-data class AndroidJniAbi(
-  val abi: String,
-  val javaCppPlatform: String,
-  val ndkClangTriple: String,
-  val nativeBuildDirName: String,
-)
+data class AndroidJniAbi(val abi: String, val javaCppPlatform: String, val ndkClangTriple: String)
 
 val androidAbis =
   listOf(
-    AndroidJniAbi("arm64-v8a", "android-arm64", "aarch64-linux-android", "android-arm64-egl"),
-    AndroidJniAbi("x86_64", "android-x86_64", "x86_64-linux-android", "android-x64-egl"),
+    AndroidJniAbi("arm64-v8a", "android-arm64", "aarch64-linux-android"),
+    AndroidJniAbi("x86_64", "android-x86_64", "x86_64-linux-android"),
   )
+
+val androidNativeProject = project(":bindings:android-native")
 
 val androidApiLevel =
   providers
@@ -62,6 +60,7 @@ android {
 val javacppVersion = "1.5.13"
 
 dependencies {
+  implementation(project(":bindings:android-native"))
   implementation("org.bytedeco:javacpp:$javacppVersion")
 
   androidTestImplementation(platform("org.junit:junit-bom:5.11.4"))
@@ -79,8 +78,10 @@ val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javac
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val jniLibsRoot = layout.buildDirectory.dir("generated/jniLibs")
 
-fun nativeBuildDir(config: AndroidJniAbi): Directory =
-  rootProject.layout.projectDirectory.dir("build/${config.nativeBuildDirName}")
+fun coreNativeLibDir(abi: String): Provider<Directory> =
+  androidNativeProject.layout.buildDirectory.dir(
+    "intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/$abi"
+  )
 
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileJavaCppConfig") {
@@ -152,18 +153,16 @@ androidAbis.forEach { abiConfig ->
     tasks.register<JavaExec>("buildJavaCppNative${abiConfig.abi}") {
       group = "build"
       description = "Builds the JavaCPP JNI bridge for ${abiConfig.abi}."
+      dependsOn(":bindings:android-native:mergeDebugNativeLibs")
       mainClass = "org.bytedeco.javacpp.tools.Builder"
       doFirst {
         require(androidNdkRoot.orNull?.isNotBlank() == true) {
           "ANDROID_NDK_ROOT is required to build the JNI bridge"
         }
-        val coreBuildDir = nativeBuildDir(abiConfig)
-        require(coreBuildDir.asFile.isDirectory) {
-          "Missing ${coreBuildDir.asFile.absolutePath}; run mise -E ${abiConfig.nativeBuildDirName} run build first"
-        }
+        val coreBuildDir = coreNativeLibDir(abiConfig.abi).get()
         val coreLibrary = coreBuildDir.file("libmaplibre-native-c.so").asFile
         require(coreLibrary.isFile) {
-          "Missing ${coreLibrary.absolutePath}; run mise -E ${abiConfig.nativeBuildDirName} run build first"
+          "Missing ${coreLibrary.absolutePath}; run :bindings:android-native:assembleDebug first"
         }
         classpath = files(debugJavaClasses) + javacppHostClasspath
         val ndkRoot = androidNdkRoot.get()
@@ -184,24 +183,25 @@ androidAbis.forEach { abiConfig ->
       }
       inputs.dir(debugJavaClasses)
       inputs.dir(rootProject.layout.projectDirectory.dir("include"))
-      inputs.dir(nativeBuildDir(abiConfig))
+      inputs.dir(coreNativeLibDir(abiConfig.abi))
       outputs.file(jniBridgeLibrary)
     }
 
   val packageAbiNativeLibraries =
     tasks.register<Copy>("packageNativeLibraries${abiConfig.abi}") {
       group = "build"
-      description = "Packages ${abiConfig.abi} JNI libraries for the AAR."
+      description = "Packages ${abiConfig.abi} JNI bridge libraries for the AAR."
       dependsOn(buildJavaCppNative)
       into(jniLibsDir)
       from(jniBridgeLibrary) { rename { System.mapLibraryName("jniMaplibreNativeC") } }
-      from(nativeBuildDir(abiConfig)) { include("libmaplibre-native-c.so") }
     }
 
   packageNativeLibraries.configure { dependsOn(packageAbiNativeLibraries) }
 }
 
 afterEvaluate {
+  tasks.named("preBuild").configure { dependsOn(":bindings:android-native:assembleDebug") }
+
   android.sourceSets.named("main") {
     java.srcDir(generatedJavaCppSources.get().asFile)
     jniLibs.srcDir(jniLibsRoot.get().asFile)

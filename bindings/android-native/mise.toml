@@ -1,0 +1,8 @@
+[env]
+MLN_FFI_ANDROID_NDK_VERSION = "28.1.13356709"
+
+[tasks.build]
+run = '''
+source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
+../../gradlew :bindings:android-native:assembleDebug
+'''
