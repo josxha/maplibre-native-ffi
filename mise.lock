@@ -263,9 +263,9 @@ url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.61.1/swif
 url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/406639796"
 
 [tools."github:nicklockwood/SwiftFormat"."platforms.macos-arm64"]
-checksum = "sha256:92f6417197ace057f81563cd9fd8eb5428462013aa5ec5ee12f4a88331f9b7c3"
-url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.61.1/SwiftFormat.for.Xcode.app.zip"
-url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/406642771"
+checksum = "sha256:b990400779aceb7d7020796eb9ba814d4480543f671d38fc0ff48cb72f04c584"
+url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.61.1/swiftformat.zip"
+url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/406639783"
 
 [tools."github:nicklockwood/SwiftFormat"."platforms.windows-x64"]
 checksum = "sha256:709779781c37d0f4020b5e3fa8ade4070340c37b980f3826b84d61c35ccb6a25"
@@ -419,6 +419,10 @@ provenance = "github-attestations"
 [[tools.rust]]
 version = "1.95.0"
 backend = "core:rust"
+
+[tools.rust.options]
+components = "clippy,rustfmt"
+profile = "minimal"
 
 [[tools.swift]]
 version = "6.3.1"
