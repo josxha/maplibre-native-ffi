@@ -5,7 +5,7 @@ import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 import org.gradle.internal.os.OperatingSystem
 
-plugins { id("com.android.library") }
+plugins { id("com.android.library") version "9.1.1" }
 
 repositories {
   google()
