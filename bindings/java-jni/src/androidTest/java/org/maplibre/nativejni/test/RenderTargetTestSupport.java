@@ -249,7 +249,7 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       var error = GLES20.glGetError();
       if (error != GLES20.GL_NO_ERROR) {
         throw new IllegalStateException(
-            operation + " failed with OpenGL error 0x%x".formatted(error));
+            String.format("%s failed with OpenGL error 0x%x", operation, error));
       }
     }
 

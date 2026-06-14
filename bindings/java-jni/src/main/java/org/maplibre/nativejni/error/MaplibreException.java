@@ -42,6 +42,6 @@ public class MaplibreException extends RuntimeException {
   private static String message(MaplibreStatus status, int nativeStatusCode, String diagnostic) {
     var detail =
         diagnostic == null || diagnostic.isBlank() ? "No native diagnostic available." : diagnostic;
-    return "%s (%d): %s".formatted(status, nativeStatusCode, detail);
+    return String.format("%s (%d): %s", status, nativeStatusCode, detail);
   }
 }

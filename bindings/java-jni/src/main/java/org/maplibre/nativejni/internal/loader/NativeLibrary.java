@@ -90,8 +90,9 @@ public final class NativeLibrary {
     if (version != EXPECTED_C_ABI_VERSION) {
       throw new NativeErrorException(
           0,
-          "Unsupported Maplibre C ABI version %d; expected %d"
-              .formatted(version, EXPECTED_C_ABI_VERSION));
+          String.format(
+              "Unsupported Maplibre C ABI version %d; expected %d",
+              version, EXPECTED_C_ABI_VERSION));
     }
   }
 
