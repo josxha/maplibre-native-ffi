@@ -1,12 +1,11 @@
 [env]
-MLN_FFI_ANDROID_NDK_VERSION = "28.1.13356709"
+ANDROID_HOME = { required = true }
 
 [tools]
 java = "temurin-21.0.7+6.0.LTS"
 
 [tasks.build]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
 export JAVA_HOME="$(mise where java)"
 "$MLN_FFI_REPO_ROOT/gradlew" --stop >/dev/null 2>&1 || true
 ../../gradlew :bindings:java-jni:assembleDebug
@@ -15,7 +14,6 @@ export JAVA_HOME="$(mise where java)"
 [tasks.test]
 depends = ["build"]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/android-sdk-env.sh"
-export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/emulator:$PATH"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 ../../gradlew :bindings:java-jni:connectedDebugAndroidTest
 '''

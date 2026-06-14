@@ -35,7 +35,7 @@ native C API and JavaCPP JNI bridge in the same module and packages both ABIs
 into one AAR:
 
 ```bash
-export ANDROID_SDK_ROOT=/path/to/Android/Sdk
+export ANDROID_HOME=/path/to/Android/Sdk
 mise run //bindings/java-jni:build
 mise run //bindings/java-jni:test   # requires a device or emulator
 ```

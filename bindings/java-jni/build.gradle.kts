@@ -144,7 +144,7 @@ val generateJavaCppBindings =
     )
   }
 
-val androidNdkRoot = providers.environmentVariable("ANDROID_NDK_ROOT")
+val androidNdkRoot = android.sdkComponents.ndkDirectory
 
 fun ndkPrebuiltHost(): String {
   val os = OperatingSystem.current()
@@ -182,16 +182,13 @@ androidAbis.forEach { abiConfig ->
       dependsOn("mergeDebugNativeLibs")
       mainClass = "org.bytedeco.javacpp.tools.Builder"
       doFirst {
-        require(androidNdkRoot.orNull?.isNotBlank() == true) {
-          "ANDROID_NDK_ROOT is required to build the JNI bridge"
-        }
         val coreBuildDir = coreNativeLibDir(abiConfig.abi).get()
         val coreLibrary = coreBuildDir.file("libmaplibre-native-c.so").asFile
         require(coreLibrary.isFile) {
           "Missing ${coreLibrary.absolutePath}; run :bindings:java-jni:assembleDebug first"
         }
         classpath = files(debugJavaClasses) + javacppHostClasspath
-        val ndkRoot = androidNdkRoot.get()
+        val ndkRoot = androidNdkRoot.get().asFile.absolutePath
         val compiler =
           "$ndkRoot/toolchains/llvm/prebuilt/${ndkPrebuiltHost()}/bin/${abiConfig.ndkClangTriple}${androidApiLevel.get()}-clang++"
         args(
@@ -208,6 +205,7 @@ androidAbis.forEach { abiConfig ->
         )
       }
       inputs.dir(debugJavaClasses)
+      inputs.dir(androidNdkRoot)
       inputs.dir(rootProject.layout.projectDirectory.dir("include"))
       inputs.dir(coreNativeLibDir(abiConfig.abi))
       outputs.file(jniBridgeLibrary)
@@ -248,11 +246,8 @@ tasks.register<Javadoc>("javadoc") {
   val mainSources = layout.projectDirectory.dir("src/main/java")
   source = fileTree(mainSources) { exclude("org/maplibre/nativejni/internal/**") }
   doFirst {
-    val sdkRoot =
-      System.getenv("ANDROID_SDK_ROOT")
-        ?: System.getenv("ANDROID_HOME")
-        ?: error("ANDROID_SDK_ROOT or ANDROID_HOME is required for javadoc")
-    classpath = files("$sdkRoot/platforms/android-34/android.jar")
+    val sdkRoot = android.sdkComponents.sdkDirectory.get().asFile
+    classpath = files(sdkRoot.resolve("platforms/android-34/android.jar"))
   }
   isFailOnError = true
   options.encoding = "UTF-8"
