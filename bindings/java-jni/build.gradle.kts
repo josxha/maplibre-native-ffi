@@ -155,14 +155,27 @@ val generateJavaCppBindings =
 
 val androidNdkRoot = android.sdkComponents.ndkDirectory
 
-fun ndkPrebuiltHost(): String {
+fun ndkHostTag(ndkRoot: java.io.File): String {
+  val prebuilt = ndkRoot.resolve("toolchains/llvm/prebuilt")
+  val tags = prebuilt.listFiles { file -> file.isDirectory }?.map { it.name }?.toSet().orEmpty()
+  check(tags.isNotEmpty()) { "No NDK host toolchains under $prebuilt" }
+
   val os = OperatingSystem.current()
-  return when {
-    os.isLinux -> "linux-x86_64"
-    os.isMacOsX ->
-      if (System.getProperty("os.arch") == "aarch64") "darwin-arm64" else "darwin-x86_64"
-    else -> throw GradleException("Android JNI builds require a Linux or macOS host")
+  val arch = System.getProperty("os.arch").lowercase()
+  val preferred =
+    when {
+      os.isWindows -> "windows-x86_64"
+      os.isMacOsX && arch in setOf("aarch64", "arm64") -> "darwin-arm64"
+      os.isMacOsX -> "darwin-x86_64"
+      os.isLinux && arch in setOf("aarch64", "arm64") -> "linux-aarch64"
+      os.isLinux -> "linux-x86_64"
+      else -> null
+    }
+  if (preferred != null && preferred in tags) return preferred
+  check(tags.size == 1) {
+    "Could not select an NDK host toolchain from $tags for host ${os.name}/$arch"
   }
+  return tags.single()
 }
 
 val debugJavaClasses =
@@ -197,9 +210,13 @@ androidAbis.forEach { abiConfig ->
           "Missing ${coreLibrary.absolutePath}; run :bindings:java-jni:assembleDebug first"
         }
         classpath = files(debugJavaClasses) + javacppHostClasspath
-        val ndkRoot = androidNdkRoot.get().asFile.absolutePath
+        val ndkRootFile = androidNdkRoot.get().asFile
+        val ndkRoot = ndkRootFile.absolutePath
         val compiler =
-          "$ndkRoot/toolchains/llvm/prebuilt/${ndkPrebuiltHost()}/bin/${abiConfig.ndkClangTriple}${androidApiLevel.get()}-clang++"
+          ndkRootFile
+            .resolve("toolchains/llvm/prebuilt/${ndkHostTag(ndkRootFile)}/bin")
+            .resolve("${abiConfig.ndkClangTriple}${androidApiLevel.get()}-clang++")
+            .absolutePath
         args(
           "-classpath",
           debugJavaClasses.get().asFile.absolutePath,
