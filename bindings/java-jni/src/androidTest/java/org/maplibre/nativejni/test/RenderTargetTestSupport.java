@@ -291,6 +291,16 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     }
 
     private static long eglConfigHandle(EGLConfig config) {
+      if (config instanceof EGLObjectHandle) {
+        return ((EGLObjectHandle) config).getNativeHandle();
+      }
+      try {
+        var method = config.getClass().getDeclaredMethod("get");
+        method.setAccessible(true);
+        return ((Long) method.invoke(config)).longValue();
+      } catch (ReflectiveOperationException ignored) {
+        // Fall through to legacy field lookup.
+      }
       try {
         var field = config.getClass().getDeclaredField("mEGLConfig");
         field.setAccessible(true);

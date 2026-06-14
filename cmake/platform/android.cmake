@@ -16,7 +16,8 @@ function(mln_configure_android_platform target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/android/image.cpp)
+      ${PROJECT_SOURCE_DIR}/src/platform/android/image.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/jvm.cpp)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})
 

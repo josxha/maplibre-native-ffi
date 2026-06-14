@@ -74,6 +74,7 @@ public final class NativeLibrary {
   }
 
   private static void loadJavaCppBridge() {
+    System.loadLibrary("maplibre-native-c");
     checkCAbiVersion(false);
     loaded = true;
   }

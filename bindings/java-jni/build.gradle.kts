@@ -100,6 +100,8 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
+      "-properties",
+      "android-arm64",
       "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,

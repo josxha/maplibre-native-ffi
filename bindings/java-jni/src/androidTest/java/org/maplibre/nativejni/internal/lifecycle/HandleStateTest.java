@@ -38,11 +38,11 @@ class HandleStateTest {
     var previous = System.err;
     var bytes = new ByteArrayOutputStream();
     try {
-      System.setErr(new PrintStream(bytes, true, StandardCharsets.UTF_8));
+      System.setErr(new PrintStream(bytes, true));
       runnable.run();
     } finally {
       System.setErr(previous);
     }
-    return bytes.toString(StandardCharsets.UTF_8);
+    return new String(bytes.toByteArray(), StandardCharsets.UTF_8);
   }
 }
