@@ -133,8 +133,11 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
+      // Header parsing uses one Android preset; native code is built per ABI in
+      // buildJavaCppNative*. MaplibreNativeCConfig defines identical headers for
+      // every Android @Platform, so the choice does not affect generated Java.
       "-properties",
-      "android-arm64",
+      androidAbis.first().javaCppPlatform,
       "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
