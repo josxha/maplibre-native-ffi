@@ -77,7 +77,6 @@ runs:
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
-        # v2026.6.7 published incomplete GitHub release assets (no linux-x64).
         version: 2026.6.6
         cache: true
         cache_key_prefix: mise-v2
