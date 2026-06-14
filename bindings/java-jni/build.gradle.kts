@@ -39,8 +39,10 @@ android {
   packaging { jniLibs { pickFirsts += "**/libc++_shared.so" } }
 }
 
+val javacppVersion = "1.5.13"
+
 dependencies {
-  implementation("org.bytedeco:javacpp:1.5.11")
+  implementation("org.bytedeco:javacpp:$javacppVersion")
 
   androidTestImplementation(platform("org.junit:junit-bom:6.0.3"))
   androidTestImplementation("org.junit.jupiter:junit-jupiter")
@@ -51,7 +53,7 @@ dependencies {
 }
 
 val javacppHostClasspath =
-  configurations.detachedConfiguration(dependencies.create("org.bytedeco:javacpp:1.5.11"))
+  configurations.detachedConfiguration(dependencies.create("org.bytedeco:javacpp:$javacppVersion"))
 val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javacpp/main/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val jniLibsRoot = layout.buildDirectory.dir("generated/jniLibs")
@@ -115,8 +117,6 @@ val jniBridgeLibrary = jniBridgeBuildDir.map {
   it.file(System.mapLibraryName("jniMaplibreNativeC"))
 }
 
-val javaCppCompatInclude = layout.projectDirectory.dir("cpp")
-
 val buildJavaCppNative =
   tasks.register<JavaExec>("buildJavaCppNative") {
     group = "build"
@@ -139,10 +139,8 @@ val buildJavaCppNative =
         "-properties",
         javaCppPlatformName,
         "-Dplatform.root=$ndkRoot",
-        "-Dplatform.includepath=${javaCppCompatInclude.asFile.absolutePath}",
         "-Dplatform.linkpath=${nativeBuildDir.get()}",
         "-Dplatform.compiler=$compiler",
-        "-Dplatform.compiler.default=-O3 -s -include javacpp_char_traits.hpp",
         "-d",
         jniBridgeBuildDir.get().asFile.absolutePath,
         "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
