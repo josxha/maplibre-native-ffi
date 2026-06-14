@@ -1,8 +1,8 @@
 function(mln_configure_vulkan_backend target)
   set(_vulkan_search_paths)
-  if(DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}
-     AND NOT "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}" STREQUAL "")
-    list(APPEND _vulkan_search_paths "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
+  if(DEFINED ENV{MLN_FFI_GRAPHICS_LIBRARY_DIR}
+     AND NOT "$ENV{MLN_FFI_GRAPHICS_LIBRARY_DIR}" STREQUAL "")
+    list(APPEND _vulkan_search_paths "$ENV{MLN_FFI_GRAPHICS_LIBRARY_DIR}")
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

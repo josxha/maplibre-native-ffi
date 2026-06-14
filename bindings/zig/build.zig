@@ -7,6 +7,7 @@ const BuildOptions = struct {
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
+    graphics_library_dir: ?std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -22,6 +23,7 @@ pub const LinkOptions = struct {
     render_backend: RenderBackend,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath = null,
+    graphics_library_dir: ?std.Build.LazyPath = null,
 };
 
 pub const DependencyOptions = struct {
@@ -31,12 +33,14 @@ pub const DependencyOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     dependency_library_dir: ?std.Build.LazyPath = null,
+    graphics_library_dir: ?std.Build.LazyPath = null,
 };
 
 pub const RenderBackendLinkOptions = struct {
     target: std.Build.ResolvedTarget,
     render_backend: RenderBackend,
     dependency_library_dir: ?std.Build.LazyPath = null,
+    graphics_library_dir: ?std.Build.LazyPath = null,
 };
 
 pub fn renderBackend(b: *std.Build) RenderBackend {
@@ -73,7 +77,15 @@ pub fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
     return b.option(
         std.Build.LazyPath,
         "dependency-library-dir",
-        "Directory containing backend dependency libraries such as Vulkan",
+        "Directory containing Conan link-time dependency libraries",
+    );
+}
+
+pub fn graphicsLibraryDir(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(
+        std.Build.LazyPath,
+        "graphics-library-dir",
+        "Directory containing host graphics runtime libraries such as the Vulkan loader",
     );
 }
 
@@ -154,9 +166,9 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             else => unreachable,
         },
         .vulkan => {
-            if (options.dependency_library_dir) |dependency_library_dir| {
-                module.addLibraryPath(dependency_library_dir);
-                module.addRPath(dependency_library_dir);
+            if (options.graphics_library_dir) |graphics_library_dir| {
+                module.addLibraryPath(graphics_library_dir);
+                module.addRPath(graphics_library_dir);
             }
             module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
         },
@@ -170,6 +182,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
     @"include-dir": []const std.Build.LazyPath,
     @"render-backend": RenderBackend,
     @"dependency-library-dir": ?std.Build.LazyPath,
+    @"graphics-library-dir": ?std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
@@ -178,6 +191,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
         .@"include-dir" = options.include_dirs,
         .@"render-backend" = options.render_backend,
         .@"dependency-library-dir" = options.dependency_library_dir,
+        .@"graphics-library-dir" = options.graphics_library_dir,
     };
 }
 
@@ -196,6 +210,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
         .dependency_library_dir = options.dependency_library_dir,
+        .graphics_library_dir = options.graphics_library_dir,
     };
 }
 
@@ -226,6 +241,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dir = options.dependency_library_dir,
+        .graphics_library_dir = options.graphics_library_dir,
     });
 }
 
@@ -341,6 +357,7 @@ pub fn build(b: *std.Build) void {
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = include_dirs,
         .dependency_library_dir = dependencyLibraryDir(b),
+        .graphics_library_dir = graphicsLibraryDir(b),
         .render_backend = backend,
     };
     checkSupportedTarget(options.target, options.render_backend);

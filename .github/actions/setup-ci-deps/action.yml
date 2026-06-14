@@ -100,8 +100,12 @@ runs:
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        $graphicsRoot = Join-Path $env:GITHUB_WORKSPACE "build/graphics/windows-x64/mesa/Library"
-        $mesaWglDriver = Join-Path $graphicsRoot "bin/libgallium_wgl.dll"
+        if (-not $env:MLN_FFI_GRAPHICS_ROOT) {
+          throw "MLN_FFI_GRAPHICS_ROOT is not set; run setup-graphics with the active mise variant first"
+        }
+
+        $mesaPrefix = Join-Path $env:MLN_FFI_GRAPHICS_ROOT "mesa/Library"
+        $mesaWglDriver = Join-Path $mesaPrefix "bin/libgallium_wgl.dll"
         if (-not (Test-Path $mesaWglDriver)) {
           throw "Missing Mesa WGL driver: $mesaWglDriver"
         }
@@ -116,7 +120,7 @@ runs:
         New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
         New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
 
-        $driverManifest = Join-Path $graphicsRoot "share/vulkan/icd.d/lvp_icd.x86_64.json"
+        $driverManifest = Join-Path $mesaPrefix "share/vulkan/icd.d/lvp_icd.x86_64.json"
         if (-not (Test-Path $driverManifest)) {
           throw "Missing lavapipe Vulkan ICD manifest: $driverManifest"
         }
@@ -125,10 +129,12 @@ runs:
         New-Item -Path $driverKey -Force | Out-Null
         New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
 
-    - name: Install Linux native packages
+    - name: Install Linux host graphics packages
       if: ${{ runner.os == 'Linux' }}
       shell: bash
       run: |
+        # build-essential supplies gcc/g++/make only. Mise pins glslang and doxygen.
+        # Mesa/Vulkan packages are host graphics drivers for headless CI rendering.
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
           libclang-dev \
@@ -140,9 +146,7 @@ runs:
           mesa-utils \
           mesa-vulkan-drivers \
           pkg-config \
-          glslang-tools \
-          vulkan-tools \
-          doxygen
+          vulkan-tools
 
     - name: Diagnose EGL setup
       if: ${{ runner.os == 'Linux' }}

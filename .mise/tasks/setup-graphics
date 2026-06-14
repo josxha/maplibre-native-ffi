@@ -6,7 +6,11 @@ set -euo pipefail
 : "${MLN_FFI_TARGET_TRIPLE:?}"
 : "${MLN_FFI_RENDER_BACKEND:?}"
 
-graphics_root="$MLN_FFI_REPO_ROOT/build/graphics/$MLN_FFI_TARGET_TRIPLE"
+graphics_root="${MLN_FFI_GRAPHICS_ROOT:-}"
+if [[ -z "$graphics_root" ]]; then
+  exit 0
+fi
+
 mkdir -p "$graphics_root"
 
 case "$MLN_FFI_TARGET_TRIPLE" in

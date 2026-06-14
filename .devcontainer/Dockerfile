@@ -4,6 +4,9 @@ LABEL org.opencontainers.image.source="https://github.com/maplibre/maplibre-nati
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
+# build-essential supplies gcc, g++, make, and libc6-dev only. Mise pins ninja,
+# clang, glslang, and doxygen. ICU is vendored (MLN_USE_BUILTIN_ICU). The Mesa
+# and Vulkan packages below are host graphics drivers for headless CI rendering.
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes \
     bash \
@@ -17,10 +20,8 @@ RUN apt-get update \
     libgl1-mesa-dri \
     libgles2-mesa-dev \
     libvulkan-dev \
-    libicu-dev \
     mesa-utils \
     mesa-vulkan-drivers \
-    ninja-build \
     pkg-config \
     sudo \
     vulkan-tools \

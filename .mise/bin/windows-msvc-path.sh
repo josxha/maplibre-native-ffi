@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Pixi activates MSVC, but Git Bash puts /usr/bin before MSVC. Keep mise-managed
-# tool paths first and move MSVC's bin ahead of Git so plain link.exe resolves
-# to MSVC's linker.
+# MSVC activation puts its bin on PATH, but Git Bash prepends /usr/bin. Keep
+# mise-managed tool paths first and move MSVC's bin ahead of Git so plain
+# link.exe resolves to MSVC's linker.
 
 append_unique() {
   local -n list="$1"

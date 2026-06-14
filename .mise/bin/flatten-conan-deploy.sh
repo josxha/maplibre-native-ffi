@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Flatten Conan full_deploy output into a single prefix for runtime search paths.
+# Conan full_deploy lays out one directory per package (curl, zlib, png, …).
+# CMake and Zig tests expect a single prefix with merged include/, lib/, and
+# bin/ trees — the same layout the old pixi/conda CONDA_PREFIX provided for
+# MLN_FFI_DEPENDENCY_* paths and runtime search paths.
 set -euo pipefail
 
 deploy_root="${1:?usage: flatten-conan-deploy.sh <deploy-root> <output-root>}"

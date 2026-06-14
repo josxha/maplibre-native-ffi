@@ -60,6 +60,13 @@ function(mln_add_c_api_library target)
       APPEND
       PROPERTY BUILD_RPATH "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
   endif()
+  if(DEFINED ENV{MLN_FFI_GRAPHICS_LIBRARY_DIR}
+     AND NOT "$ENV{MLN_FFI_GRAPHICS_LIBRARY_DIR}" STREQUAL "")
+    set_property(
+      TARGET ${target}
+      APPEND
+      PROPERTY BUILD_RPATH "$ENV{MLN_FFI_GRAPHICS_LIBRARY_DIR}")
+  endif()
 
   set_target_properties(
     ${target}

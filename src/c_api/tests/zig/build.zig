@@ -8,6 +8,7 @@ const BuildOptions = struct {
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
+    graphics_library_dir: ?std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
 
@@ -42,6 +43,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
         .dependency_library_dir = options.dependency_library_dir,
+        .graphics_library_dir = options.graphics_library_dir,
     });
     return c_tests;
 }
@@ -56,6 +58,7 @@ pub fn build(b: *std.Build) void {
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = maplibre_build.includeDirs(b),
         .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
+        .graphics_library_dir = maplibre_build.graphicsLibraryDir(b),
         .render_backend = render_backend,
     };
 
