@@ -45,6 +45,12 @@ android {
 
     ndk { abiFilters += androidAbis.map { it.abi } }
 
+    // TODO(android): JNI hardcodes EGL/OpenGL here because Android is not wired into the
+    // root mise variant matrix yet. Long term, android-* mise envs should drive
+    // MLN_FFI_RENDER_BACKEND and related CMake args, root `mise run build` should
+    // compile the shared native library for Android, and multiple bindings (not only
+    // JNI) should consume that output instead of each Gradle module pinning backend
+    // flags inline.
     externalNativeBuild {
       cmake {
         arguments +=
