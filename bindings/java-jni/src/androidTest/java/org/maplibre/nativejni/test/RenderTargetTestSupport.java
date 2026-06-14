@@ -375,8 +375,11 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       try {
         GLES20.glFramebufferTexture2D(
             GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-        if (GLES20.glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-          throw new IllegalStateException("OpenGL ES borrowed texture framebuffer incomplete");
+        var framebufferStatus = GLES20.glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE) {
+          throw new IllegalStateException(
+              "OpenGL ES borrowed texture framebuffer incomplete: status 0x"
+                  + Integer.toHexString(framebufferStatus));
         }
         GLES20.glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
       } finally {

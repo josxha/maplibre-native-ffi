@@ -242,14 +242,7 @@ class RenderSessionHandleTest {
             UnsupportedFeatureException.class, () -> activeSession.readPremultipliedRgba8(buffer));
       }
       assertThrows(UnsupportedFeatureException.class, () -> activeSession.resize(128, 128, 1.0));
-      try {
-        assertTrue(hasNonZeroByte(target.readOpenGLBorrowedTextureRgba()));
-      } catch (IllegalStateException error) {
-        Assumptions.assumeFalse(
-            error.getMessage() != null && error.getMessage().contains("framebuffer incomplete"),
-            "OpenGL ES framebuffer incomplete on this device: " + error.getMessage());
-        throw error;
-      }
+      assertTrue(hasNonZeroByte(target.readOpenGLBorrowedTextureRgba()));
     } finally {
       map.close();
       runtime.close();
@@ -356,9 +349,6 @@ class RenderSessionHandleTest {
       return RenderTargetTestSupport.attachOpenGLBorrowedTexture(
           map, new RenderTargetExtent(128, 128, 1.0));
     } catch (MaplibreException | IllegalStateException error) {
-      Assumptions.assumeFalse(
-          error.getMessage() != null && error.getMessage().contains("framebuffer incomplete"),
-          "OpenGL ES framebuffer incomplete on this device: " + error.getMessage());
       return fail("OpenGL borrowed texture unavailable: " + error.getMessage(), error);
     }
   }
