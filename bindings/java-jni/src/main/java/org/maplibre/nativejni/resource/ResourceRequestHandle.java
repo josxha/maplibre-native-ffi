@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.resource;
 
-import java.lang.ref.Cleaner;
 import java.util.Objects;
 import java.util.function.Consumer;
 import org.maplibre.nativejni.error.InvalidStateException;
@@ -8,6 +7,7 @@ import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.lifecycle.NativeCleaner;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.internal.struct.ResourceStructs;
 
@@ -19,11 +19,11 @@ import org.maplibre.nativejni.internal.struct.ResourceStructs;
  * reference, so a completed handle rejects further use. Closing is harmless after completion.
  */
 public final class ResourceRequestHandle implements AutoCloseable {
-  private static final Cleaner CLEANER = Cleaner.create();
+  private static final NativeCleaner CLEANER = NativeCleaner.create();
 
   private final long handle;
   private final NativeReference nativeReference;
-  private final Cleaner.Cleanable cleanable;
+  private final NativeCleaner.Cleanable cleanable;
   private boolean decisionFinalized;
   private boolean closed;
   private boolean completed;

@@ -44,7 +44,6 @@ android {
   }
 
   compileOptions {
-    isCoreLibraryDesugaringEnabled = true
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
   }
@@ -63,7 +62,6 @@ android {
 val javacppVersion = "1.5.13"
 
 dependencies {
-  coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
   implementation("org.bytedeco:javacpp:$javacppVersion")
 
   androidTestImplementation(platform("org.junit:junit-bom:5.11.4"))

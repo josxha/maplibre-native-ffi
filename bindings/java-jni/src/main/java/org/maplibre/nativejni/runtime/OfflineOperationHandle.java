@@ -1,20 +1,20 @@
 package org.maplibre.nativejni.runtime;
 
-import java.lang.ref.Cleaner;
 import java.util.Objects;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.error.MaplibreStatus;
+import org.maplibre.nativejni.internal.lifecycle.NativeCleaner;
 
 /** Owner-thread offline database operation that must be taken or discarded. */
 public final class OfflineOperationHandle<T> implements AutoCloseable {
-  private static final Cleaner CLEANER = Cleaner.create();
+  private static final NativeCleaner CLEANER = NativeCleaner.create();
 
   private final RuntimeHandle runtime;
   private final long id;
   private final OfflineOperationKind kind;
   private final OfflineOperationResultKind resultKind;
   private final LeakReport leakReport;
-  private final Cleaner.Cleanable cleanable;
+  private final NativeCleaner.Cleanable cleanable;
   private boolean closed;
 
   OfflineOperationHandle(

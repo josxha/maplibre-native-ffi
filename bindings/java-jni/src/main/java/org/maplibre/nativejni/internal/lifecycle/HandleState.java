@@ -1,17 +1,16 @@
 package org.maplibre.nativejni.internal.lifecycle;
 
-import java.lang.ref.Cleaner;
 import java.util.Objects;
 import org.maplibre.nativejni.internal.status.Status;
 
 /** Shared released-state bookkeeping for JNI native handles. */
 public final class HandleState {
-  private static final Cleaner CLEANER = Cleaner.create();
+  private static final NativeCleaner CLEANER = NativeCleaner.create();
 
   private final String typeName;
   private final long address;
   private final LeakReport leakReport;
-  private final Cleaner.Cleanable cleanable;
+  private final NativeCleaner.Cleanable cleanable;
 
   @SuppressWarnings("unused")
   private final Object[] parents;

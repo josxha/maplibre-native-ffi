@@ -1,9 +1,9 @@
 package org.maplibre.nativejni.render;
 
-import java.lang.ref.Cleaner;
+import org.maplibre.nativejni.internal.lifecycle.NativeCleaner;
 
 final class FrameHandleLeakReport implements Runnable {
-  private static final Cleaner CLEANER = Cleaner.create();
+  private static final NativeCleaner CLEANER = NativeCleaner.create();
 
   private final String typeName;
   private volatile boolean closed;
@@ -30,5 +30,5 @@ final class FrameHandleLeakReport implements Runnable {
     }
   }
 
-  record Registration(FrameHandleLeakReport report, Cleaner.Cleanable cleanable) {}
+  record Registration(FrameHandleLeakReport report, NativeCleaner.Cleanable cleanable) {}
 }
