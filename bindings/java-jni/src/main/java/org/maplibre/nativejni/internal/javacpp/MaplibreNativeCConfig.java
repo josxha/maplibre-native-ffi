@@ -7,26 +7,46 @@ import org.bytedeco.javacpp.tools.InfoMap;
 import org.bytedeco.javacpp.tools.InfoMapper;
 
 @Properties(
-    value =
-        @Platform(
-            value = "android-arm64",
-            includepath = {"../../include"},
-            cinclude = {
-              "maplibre_native_c/base.h",
-              "maplibre_native_c/diagnostics.h",
-              "maplibre_native_c/logging.h",
-              "maplibre_native_c/runtime.h",
-              "maplibre_native_c/camera.h",
-              "maplibre_native_c/render_target.h",
-              "maplibre_native_c/texture.h",
-              "maplibre_native_c/surface.h",
-              "maplibre_native_c/render_session.h",
-              "maplibre_native_c/projection.h",
-              "maplibre_native_c/query.h",
-              "maplibre_native_c/style.h",
-              "maplibre_native_c/map.h"
-            },
-            link = {"maplibre-native-c"}),
+    value = {
+      @Platform(
+          value = "android-arm64",
+          includepath = {"../../include"},
+          cinclude = {
+            "maplibre_native_c/base.h",
+            "maplibre_native_c/diagnostics.h",
+            "maplibre_native_c/logging.h",
+            "maplibre_native_c/runtime.h",
+            "maplibre_native_c/camera.h",
+            "maplibre_native_c/render_target.h",
+            "maplibre_native_c/texture.h",
+            "maplibre_native_c/surface.h",
+            "maplibre_native_c/render_session.h",
+            "maplibre_native_c/projection.h",
+            "maplibre_native_c/query.h",
+            "maplibre_native_c/style.h",
+            "maplibre_native_c/map.h"
+          },
+          link = {"maplibre-native-c"}),
+      @Platform(
+          value = "android-x86_64",
+          includepath = {"../../include"},
+          cinclude = {
+            "maplibre_native_c/base.h",
+            "maplibre_native_c/diagnostics.h",
+            "maplibre_native_c/logging.h",
+            "maplibre_native_c/runtime.h",
+            "maplibre_native_c/camera.h",
+            "maplibre_native_c/render_target.h",
+            "maplibre_native_c/texture.h",
+            "maplibre_native_c/surface.h",
+            "maplibre_native_c/render_session.h",
+            "maplibre_native_c/projection.h",
+            "maplibre_native_c/query.h",
+            "maplibre_native_c/style.h",
+            "maplibre_native_c/map.h"
+          },
+          link = {"maplibre-native-c"})
+    },
     target = "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC")
 public class MaplibreNativeCConfig implements InfoMapper {
   @Override

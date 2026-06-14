@@ -100,8 +100,6 @@ jobs:
     name: android-jni
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    env:
-      MISE_ENV: android-arm64-egl
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: ./.github/actions/setup-ci-deps
@@ -119,16 +117,16 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Build Java JNI binding
-        run: mise -E android-arm64-egl run //bindings/java-jni:build
+        run: mise run //bindings/java-jni:build
 
       - name: Run Java JNI instrumentation tests
         uses: reactivecircus/android-emulator-runner@b530d96654c385303d652368551fb075bc2f0b6b # v2.35.0
         with:
           api-level: 30
-          arch: arm64-v8a
-          target: google_apis
+          arch: x86_64
+          target: default
           disable-animations: true
-          script: mise -E android-arm64-egl run //bindings/java-jni:test
+          script: mise run //bindings/java-jni:test
 
   required:
     name: ci-required

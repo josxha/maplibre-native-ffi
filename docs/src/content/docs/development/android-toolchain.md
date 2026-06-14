@@ -13,15 +13,17 @@ native dependencies, and the headless platform layer.
 
 ## Mise environments
 
-Two Android variants follow the existing `<platform>-<arch>-<backend>` naming:
+Four Android variants follow the existing `<platform>-<arch>-<backend>` naming:
 
-| Variant                | Render backend    | Notes                                     |
-| ---------------------- | ----------------- | ----------------------------------------- |
-| `android-arm64-vulkan` | Vulkan            | Primary backend on modern Android devices |
-| `android-arm64-egl`    | OpenGL ES via EGL | GLES3 headless backend                    |
+| Variant                | Render backend    | NDK ABI     | Notes                                     |
+| ---------------------- | ----------------- | ----------- | ----------------------------------------- |
+| `android-arm64-vulkan` | Vulkan            | `arm64-v8a` | Primary backend on modern Android devices |
+| `android-arm64-egl`    | OpenGL ES via EGL | `arm64-v8a` | GLES3 headless backend                    |
+| `android-x64-vulkan`   | Vulkan            | `x86_64`    | Emulator and x86_64 Android targets       |
+| `android-x64-egl`      | OpenGL ES via EGL | `x86_64`    | JNI tests on x86_64 emulators             |
 
-Both target `arm64-v8a` with `android-30` as the minimum platform level. API 30
-is required for `AImageDecoder` image decoding.
+All use `android-30` as the minimum platform level. API 30 is required for
+`AImageDecoder` image decoding.
 
 ### Rejected alternatives
 
@@ -29,10 +31,11 @@ is required for `AImageDecoder` image decoding.
   because desktop variants distinguish EGL and WGL explicitly (`linux-x64-egl`,
   `windows-x64-wgl`). Android only supports EGL today, but keeping the provider
   in the name preserves parity with desktop OpenGL variants.
-- **Per-ABI mise envs (`android-armv7-vulkan`, etc.)** — deferred. MapLibre
-  Native still builds multiple ABIs, but this repository starts with `arm64-v8a`
-  only to keep the first cross-compile path small. Additional ABIs can share the
-  same env with a task argument later.
+- **`android-egl` envs without arch in the name** — rejected. Desktop Linux uses
+  separate `linux-x64-*` and `linux-arm64-*` envs; Android follows the same
+  model instead of building multiple ABIs from one misleadingly named env.
+- **Per-ABI task arguments on a single `android-arm64-*` env** — rejected for
+  the same reason: arch belongs in the variant name.
 - **Gradle/AGP as the primary native build driver** — rejected for the C API
   library. MapLibre Native's Android SDK uses AGP `externalNativeBuild`; this
   repository keeps CMake+Ninja as the native entrypoint so Android variants stay
@@ -174,19 +177,20 @@ mise -E android-arm64-vulkan run build
 
 # Configure and build the OpenGL ES/EGL Android variant
 mise -E android-arm64-egl run build
+mise -E android-x64-egl run build
 
-# Build the Android JNI binding (OpenGL/EGL render tests)
-mise -E android-arm64-egl run //bindings/java-jni:build
+# Build the Android JNI binding (packages arm64-v8a and x86_64)
+mise run //bindings/java-jni:build
 ```
 
 Zig binding tests are not wired into `mise run test` for Android yet. JNI
-instrumentation tests run with
-`mise -E android-arm64-egl run //bindings/java-jni:test` on a connected device
-or emulator.
+instrumentation tests run with `mise run //bindings/java-jni:test` on a
+connected device or emulator. Use an `x86_64` emulator for local software-mode
+testing, or `arm64-v8a` on a KVM-capable host.
 
 ## Follow-up work
 
-- Additional ABIs (`armeabi-v7a`, `x86_64`).
+- Additional ABIs (`armeabi-v7a`, `x86`).
 - Android AAR publishing for JNI consumers.
 - Vulkan JNI render tests (EGL GLES tests run today).
 - vcpkg migration for cross-target native dependencies (separate change).

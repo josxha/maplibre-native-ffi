@@ -1,0 +1,13 @@
+[env]
+MLN_FFI_VARIANT = "android-x64-egl"
+MLN_FFI_TARGET_TRIPLE = "android-x64"
+MLN_FFI_RENDER_BACKEND = "opengl"
+MLN_FFI_OPENGL_CONTEXT_PROVIDER = "egl"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/android-x64-egl"
+MLN_FFI_ZIG_TARGET = "x86_64-linux-android"
+MLN_FFI_ANDROID_ABI = "x86_64"
+MLN_FFI_ANDROID_PLATFORM = "android-30"
+MLN_FFI_ANDROID_NDK_VERSION = "28.1.13356709"
+MLN_FFI_ANDROID_PREFAB_ROOT = "{{config_root}}/build/android-prefab"
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = ""
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = ""

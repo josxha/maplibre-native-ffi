@@ -1,3 +1,4 @@
+import org.gradle.api.file.Directory
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
@@ -10,8 +11,19 @@ repositories {
   mavenCentral()
 }
 
-val javaCppPlatformName = "android-arm64"
-val androidAbi = "arm64-v8a"
+data class AndroidJniAbi(
+  val abi: String,
+  val javaCppPlatform: String,
+  val ndkClangTriple: String,
+  val nativeBuildDirName: String,
+)
+
+val androidAbis =
+  listOf(
+    AndroidJniAbi("arm64-v8a", "android-arm64", "aarch64-linux-android", "android-arm64-egl"),
+    AndroidJniAbi("x86_64", "android-x86_64", "x86_64-linux-android", "android-x64-egl"),
+  )
+
 val androidApiLevel =
   providers
     .environmentVariable("MLN_FFI_ANDROID_PLATFORM")
@@ -24,9 +36,11 @@ android {
 
   defaultConfig {
     minSdk = 30
-    testInstrumentationRunner = "de.mannodermaus.junit5.AndroidJUnit5Runner"
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    testInstrumentationRunnerArguments["runnerBuilder"] =
+      "de.mannodermaus.junit5.AndroidJUnit5Builder"
 
-    ndk { abiFilters += androidAbi }
+    ndk { abiFilters += androidAbis.map { it.abi } }
   }
 
   compileOptions {
@@ -36,7 +50,13 @@ android {
 
   testOptions { animationsDisabled = true }
 
-  packaging { jniLibs { pickFirsts += "**/libc++_shared.so" } }
+  packaging {
+    jniLibs { pickFirsts += "**/libc++_shared.so" }
+    resources {
+      excludes += "/META-INF/LICENSE.md"
+      excludes += "/META-INF/LICENSE-notice.md"
+    }
+  }
 }
 
 val javacppVersion = "1.5.13"
@@ -44,8 +64,9 @@ val javacppVersion = "1.5.13"
 dependencies {
   implementation("org.bytedeco:javacpp:$javacppVersion")
 
-  androidTestImplementation(platform("org.junit:junit-bom:6.0.3"))
+  androidTestImplementation(platform("org.junit:junit-bom:5.11.4"))
   androidTestImplementation("org.junit.jupiter:junit-jupiter")
+  androidTestRuntimeOnly("org.junit.platform:junit-platform-launcher")
   androidTestImplementation("androidx.test:runner:1.6.2")
   androidTestImplementation("androidx.test:rules:1.6.1")
   androidTestImplementation("de.mannodermaus.junit5:android-test-core:1.7.0")
@@ -57,7 +78,9 @@ val javacppHostClasspath =
 val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javacpp/main/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val jniLibsRoot = layout.buildDirectory.dir("generated/jniLibs")
-val jniLibsDir = jniLibsRoot.map { it.dir(androidAbi) }
+
+fun nativeBuildDir(config: AndroidJniAbi): Directory =
+  rootProject.layout.projectDirectory.dir("build/${config.nativeBuildDirName}")
 
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileJavaCppConfig") {
@@ -77,8 +100,6 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
-      "-properties",
-      javaCppPlatformName,
       "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
@@ -94,7 +115,6 @@ val generateJavaCppBindings =
     )
   }
 
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
 val androidNdkRoot = providers.environmentVariable("ANDROID_NDK_ROOT")
 
 fun ndkPrebuiltHost(): String {
@@ -109,70 +129,75 @@ fun ndkPrebuiltHost(): String {
 
 val debugJavaClasses =
   layout.buildDirectory.dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes")
-val jniBridgeBuildDir =
-  layout.buildDirectory.dir(
-    "intermediates/javacpp/$javaCppPlatformName/org/maplibre/nativejni/internal/javacpp"
-  )
-val jniBridgeLibrary = jniBridgeBuildDir.map {
-  it.file(System.mapLibraryName("jniMaplibreNativeC"))
-}
-
-val buildJavaCppNative =
-  tasks.register<JavaExec>("buildJavaCppNative") {
-    group = "build"
-    description = "Builds the JavaCPP JNI bridge for Android arm64."
-    mainClass = "org.bytedeco.javacpp.tools.Builder"
-    doFirst {
-      require(androidNdkRoot.orNull?.isNotBlank() == true) {
-        "ANDROID_NDK_ROOT is required to build the JNI bridge"
-      }
-      require(nativeBuildDir.orNull?.isNotBlank() == true) {
-        "MLN_FFI_BUILD_DIR is required to build the JNI bridge"
-      }
-      classpath = files(debugJavaClasses) + javacppHostClasspath
-      val ndkRoot = androidNdkRoot.get()
-      val compiler =
-        "$ndkRoot/toolchains/llvm/prebuilt/${ndkPrebuiltHost()}/bin/aarch64-linux-android${androidApiLevel.get()}-clang++"
-      args(
-        "-classpath",
-        debugJavaClasses.get().asFile.absolutePath,
-        "-properties",
-        javaCppPlatformName,
-        "-Dplatform.root=$ndkRoot",
-        "-Dplatform.linkpath=${nativeBuildDir.get()}",
-        "-Dplatform.compiler=$compiler",
-        "-d",
-        jniBridgeBuildDir.get().asFile.absolutePath,
-        "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
-      )
-    }
-    inputs.dir(debugJavaClasses)
-    inputs.dir(rootProject.layout.projectDirectory.dir("include"))
-    inputs.dir(nativeBuildDir)
-    outputs.file(jniBridgeLibrary)
-  }
 
 val packageNativeLibraries =
-  tasks.register<Copy>("packageNativeLibraries") {
+  tasks.register("packageNativeLibraries") {
     group = "build"
-    description = "Packages Android JNI libraries for the AAR."
-    dependsOn(buildJavaCppNative)
-    into(jniLibsDir)
-    from(jniBridgeLibrary) { rename { System.mapLibraryName("jniMaplibreNativeC") } }
-    from(nativeBuildDir) {
-      include("libmaplibre-native-c.so")
-      onlyIf { nativeBuildDir.isPresent }
-    }
-    doFirst {
-      require(nativeBuildDir.isPresent) {
-        "MLN_FFI_BUILD_DIR is required to package native libraries"
-      }
-      val coreLibrary = file("${nativeBuildDir.get()}/libmaplibre-native-c.so")
-      require(coreLibrary.isFile) {
-        "Missing ${coreLibrary.absolutePath}; run mise -E android-arm64-egl run build first"
-      }
-    }
+    description = "Packages Android JNI libraries for all ABIs into the AAR."
   }
+
+androidAbis.forEach { abiConfig ->
+  val jniBridgeBuildDir =
+    layout.buildDirectory.dir(
+      "intermediates/javacpp/${abiConfig.javaCppPlatform}/org/maplibre/nativejni/internal/javacpp"
+    )
+  val jniBridgeLibrary = jniBridgeBuildDir.map {
+    it.file(System.mapLibraryName("jniMaplibreNativeC"))
+  }
+  val jniLibsDir = jniLibsRoot.map { it.dir(abiConfig.abi) }
+
+  val buildJavaCppNative =
+    tasks.register<JavaExec>("buildJavaCppNative${abiConfig.abi}") {
+      group = "build"
+      description = "Builds the JavaCPP JNI bridge for ${abiConfig.abi}."
+      mainClass = "org.bytedeco.javacpp.tools.Builder"
+      doFirst {
+        require(androidNdkRoot.orNull?.isNotBlank() == true) {
+          "ANDROID_NDK_ROOT is required to build the JNI bridge"
+        }
+        val coreBuildDir = nativeBuildDir(abiConfig)
+        require(coreBuildDir.asFile.isDirectory) {
+          "Missing ${coreBuildDir.asFile.absolutePath}; run mise -E ${abiConfig.nativeBuildDirName} run build first"
+        }
+        val coreLibrary = coreBuildDir.file("libmaplibre-native-c.so").asFile
+        require(coreLibrary.isFile) {
+          "Missing ${coreLibrary.absolutePath}; run mise -E ${abiConfig.nativeBuildDirName} run build first"
+        }
+        classpath = files(debugJavaClasses) + javacppHostClasspath
+        val ndkRoot = androidNdkRoot.get()
+        val compiler =
+          "$ndkRoot/toolchains/llvm/prebuilt/${ndkPrebuiltHost()}/bin/${abiConfig.ndkClangTriple}${androidApiLevel.get()}-clang++"
+        args(
+          "-classpath",
+          debugJavaClasses.get().asFile.absolutePath,
+          "-properties",
+          abiConfig.javaCppPlatform,
+          "-Dplatform.root=$ndkRoot",
+          "-Dplatform.linkpath=${coreBuildDir.asFile.absolutePath}",
+          "-Dplatform.compiler=$compiler",
+          "-d",
+          jniBridgeBuildDir.get().asFile.absolutePath,
+          "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
+        )
+      }
+      inputs.dir(debugJavaClasses)
+      inputs.dir(rootProject.layout.projectDirectory.dir("include"))
+      inputs.dir(nativeBuildDir(abiConfig))
+      outputs.file(jniBridgeLibrary)
+    }
+
+  val packageAbiNativeLibraries =
+    tasks.register<Copy>("packageNativeLibraries${abiConfig.abi}") {
+      group = "build"
+      description = "Packages ${abiConfig.abi} JNI libraries for the AAR."
+      dependsOn(buildJavaCppNative)
+      into(jniLibsDir)
+      from(jniBridgeLibrary) { rename { System.mapLibraryName("jniMaplibreNativeC") } }
+      from(nativeBuildDir(abiConfig)) { include("libmaplibre-native-c.so") }
+    }
+
+  packageNativeLibraries.configure { dependsOn(packageAbiNativeLibraries) }
+}
 
 afterEvaluate {
   android.sourceSets.named("main") {
@@ -185,7 +210,9 @@ afterEvaluate {
   tasks
     .matching { it.name.contains("Annotations") }
     .configureEach { dependsOn(generateJavaCppBindings) }
-  buildJavaCppNative.configure { dependsOn(compileJavaTask) }
+  androidAbis.forEach { abiConfig ->
+    tasks.named("buildJavaCppNative${abiConfig.abi}").configure { dependsOn(compileJavaTask) }
+  }
   tasks.named("mergeDebugJniLibFolders").configure { dependsOn(packageNativeLibraries) }
   tasks.named("mergeReleaseJniLibFolders").configure { dependsOn(packageNativeLibraries) }
 }
