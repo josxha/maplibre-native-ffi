@@ -28,9 +28,11 @@ and `NativePointer` semantics. JNI uses its own artifact and package root.
 
 ## Build and test
 
-The `bindings/java-jni` module is an Android library (`com.android.library`).
-Its `build` task compiles the native C API for `android-arm64-egl` and
-`android-x64-egl`, then packages both ABIs into one AAR:
+The `bindings/java-jni` module is an Android library (`com.android.library`)
+with `minSdk 33`. The native C API continues to compile against `android-30` for
+`AImageDecoder`; lowering the JNI floor is follow-up work. Its `build` task
+compiles the native C API for `android-arm64-egl` and `android-x64-egl`, then
+packages both ABIs into one AAR:
 
 ```bash
 export ANDROID_SDK_ROOT=/path/to/Android/Sdk

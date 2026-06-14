@@ -122,7 +122,7 @@ jobs:
       - name: Run Java JNI instrumentation tests
         uses: reactivecircus/android-emulator-runner@b530d96654c385303d652368551fb075bc2f0b6b # v2.35.0
         with:
-          api-level: 30
+          api-level: 33
           arch: x86_64
           target: default
           disable-animations: true

@@ -35,7 +35,7 @@ android {
   compileSdk = 34
 
   defaultConfig {
-    minSdk = 30
+    minSdk = 33
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     testInstrumentationRunnerArguments["runnerBuilder"] =
       "de.mannodermaus.junit5.AndroidJUnit5Builder"
