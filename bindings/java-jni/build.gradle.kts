@@ -1,5 +1,3 @@
-import org.gradle.api.file.Directory
-import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.compile.JavaCompile
 
 plugins { id("com.android.library") version "9.1.1" }
@@ -65,7 +63,7 @@ android {
 
   externalNativeBuild {
     cmake {
-      version = "3.24.0+"
+      version = "4.0.2"
       path = rootProject.file("CMakeLists.txt")
     }
   }
@@ -107,10 +105,7 @@ val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javac
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val jniLibsRoot = layout.buildDirectory.dir("generated/jniLibs")
 
-fun coreNativeLibDir(abi: String): Provider<Directory> =
-  layout.buildDirectory.dir(
-    "intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/$abi"
-  )
+fun cmakeBuildTaskName(abi: String): String = "buildCMakeDebug[$abi][maplibre_native_c]"
 
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileJavaCppConfig") {
@@ -124,6 +119,7 @@ val generateJavaCppBindings =
   tasks.register<JavaExec>("generateJavaCppBindings") {
     group = "build"
     description = "Generates JavaCPP declarations for the MapLibre Native C ABI."
+    notCompatibleWithConfigurationCache("JavaCPP binding generation runs a host JavaExec")
     dependsOn(compileJavaCppConfig)
     classpath = files(javaCppConfigClasses) + javacppHostClasspath
     mainClass = "org.bytedeco.javacpp.tools.Builder"
@@ -149,8 +145,6 @@ val generateJavaCppBindings =
       }
     )
   }
-
-val androidNdkRoot = android.sdkComponents.ndkDirectory
 
 // AGP wires externalNativeBuild/cmake itself. JavaCPP compiles the JNI bridge in a
 // separate JavaExec, so we point it at the NDK LLVM bin directory from the same
@@ -190,16 +184,40 @@ androidAbis.forEach { abiConfig ->
     tasks.register<JavaExec>("buildJavaCppNative${abiConfig.abi}") {
       group = "build"
       description = "Builds the JavaCPP JNI bridge for ${abiConfig.abi}."
-      dependsOn("mergeDebugNativeLibs")
+      notCompatibleWithConfigurationCache(
+        "JavaCPP JNI bridge builds resolve NDK and CMake outputs at execution time"
+      )
+      dependsOn(cmakeBuildTaskName(abiConfig.abi))
       mainClass = "org.bytedeco.javacpp.tools.Builder"
       doFirst {
-        val coreBuildDir = coreNativeLibDir(abiConfig.abi).get()
-        val coreLibrary = coreBuildDir.file("libmaplibre-native-c.so").asFile
-        require(coreLibrary.isFile) {
-          "Missing ${coreLibrary.absolutePath}; run :bindings:java-jni:assembleDebug first"
+        val cxxRoot = project.layout.buildDirectory.get().dir("intermediates/cxx/Debug").asFile
+        val coreLibrary =
+          cxxRoot
+            .walkTopDown()
+            .filter {
+              it.isFile &&
+                it.name == "libmaplibre-native-c.so" &&
+                it.parentFile.name == abiConfig.abi
+            }
+            .toList()
+            .singleOrNull()
+        require(coreLibrary != null) {
+          "Expected one libmaplibre-native-c.so for ${abiConfig.abi} under $cxxRoot"
         }
+        val coreBuildDir = coreLibrary.parentFile
         classpath = files(debugJavaClasses) + javacppHostClasspath
-        val ndkRootFile = androidNdkRoot.get().asFile
+        val ndkHome = System.getenv("ANDROID_NDK_HOME")
+        val sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+        val ndkRootFile =
+          when {
+            ndkHome != null && project.file(ndkHome).isDirectory -> project.file(ndkHome)
+            sdkRoot != null && project.file("$sdkRoot/ndk/$androidNdkVersion").isDirectory ->
+              project.file("$sdkRoot/ndk/$androidNdkVersion")
+            else ->
+              error(
+                "NDK $androidNdkVersion not found; install it under ANDROID_HOME/ndk or set ANDROID_NDK_HOME"
+              )
+          }
         val ndkRoot = ndkRootFile.absolutePath
         val compiler =
           ndkLlvmBinDir(ndkRootFile)
@@ -211,7 +229,7 @@ androidAbis.forEach { abiConfig ->
           "-properties",
           abiConfig.javaCppPlatform,
           "-Dplatform.root=$ndkRoot",
-          "-Dplatform.linkpath=${coreBuildDir.asFile.absolutePath}",
+          "-Dplatform.linkpath=${coreBuildDir.absolutePath}",
           "-Dplatform.compiler=$compiler",
           "-d",
           jniBridgeBuildDir.get().asFile.absolutePath,
@@ -219,9 +237,7 @@ androidAbis.forEach { abiConfig ->
         )
       }
       inputs.dir(debugJavaClasses)
-      inputs.dir(androidNdkRoot)
       inputs.dir(rootProject.layout.projectDirectory.dir("include"))
-      inputs.dir(coreNativeLibDir(abiConfig.abi))
       outputs.file(jniBridgeLibrary)
     }
 

@@ -112,6 +112,7 @@ jobs:
             platforms;android-34
             build-tools;34.0.0
             ndk;28.1.13356709
+            cmake;4.0.2
 
       - name: Enable KVM
         run: |

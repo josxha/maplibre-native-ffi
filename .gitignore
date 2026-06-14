@@ -20,5 +20,8 @@ yarn-error.log*
 pnpm-debug.log*
 .gradle
 .kotlin
+local.properties
+**/.cxx/
+.android-sdk/
 .devcontainer/mise-oci/
 .devcontainer/mise-oci.tar
