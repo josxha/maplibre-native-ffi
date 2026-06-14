@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Install Conan link-time dependencies and SDL3 for examples."
-#MISE depends=["//:conan-install", "//:install-sdl3"]
-set -euo pipefail
-
-true

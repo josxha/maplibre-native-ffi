@@ -108,7 +108,8 @@ hide = true
 hide = true
 
 [tasks.install-deps]
-description = "Install Conan link-time dependencies, SDL3, and software graphics drivers."
+description = "Install Conan link-time dependencies and SDL3 for examples."
+depends = ["//:conan-install", "//:install-sdl3"]
 
 [tasks.configure]
 depends = ["//:install-deps", "//:setup-graphics"]
