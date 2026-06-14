@@ -100,15 +100,12 @@ hide = true
 [tasks.install-sdl3]
 hide = true
 
-[tasks.setup-graphics]
-hide = true
-
 [tasks.install-deps]
 description = "Install Conan link-time dependencies and SDL3 for examples."
 depends = ["//:conan-install", "//:install-sdl3"]
 
 [tasks.configure]
-depends = ["//:install-deps", "//:setup-graphics"]
+depends = ["//:install-deps"]
 run = [
   '''
   conan_output="$MLN_FFI_REPO_ROOT/build/conan/$MLN_FFI_TARGET_TRIPLE"

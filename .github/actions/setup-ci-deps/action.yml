@@ -93,17 +93,22 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
 
-    - name: Register Windows CI software graphics drivers
+    - name: Install Windows CI software graphics drivers
       if: ${{ runner.os == 'Windows' }}
       shell: bash
-      run: mise run setup-graphics
+      run: .github/scripts/install-ci-software-graphics.sh
+
+    - name: Install macOS CI software graphics drivers
+      if: ${{ runner.os == 'macOS' && contains(env.MISE_ENV, 'vulkan') }}
+      shell: bash
+      run: .github/scripts/install-ci-software-graphics.sh
 
     - name: Register Windows Mesa WGL driver
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
         if (-not $env:MLN_FFI_GRAPHICS_ROOT) {
-          throw "MLN_FFI_GRAPHICS_ROOT is not set; run setup-graphics with the active mise variant first"
+          throw "MLN_FFI_GRAPHICS_ROOT is not set; install-ci-software-graphics.sh must run first"
         }
 
         $mesaPrefix = Join-Path $env:MLN_FFI_GRAPHICS_ROOT "mesa/Library"
