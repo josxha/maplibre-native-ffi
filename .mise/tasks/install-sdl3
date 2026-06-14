@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 #MISE description="Build SDL3 into the shared example dependency prefix."
-#MISE depends=["//:install-native-tools"]
 set -euo pipefail
 
 : "${MLN_FFI_REPO_ROOT:?}"

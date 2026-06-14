@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 #MISE description="Install Conan native dependencies for the active variant."
-#MISE depends=["//:install-native-tools"]
 set -euo pipefail
 
 : "${MLN_FFI_REPO_ROOT:?}"

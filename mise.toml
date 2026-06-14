@@ -87,16 +87,12 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 postinstall = [
   { task = "sync-submodules" },
   "hk install --mise --quiet",
-  { task = "install-native-tools" },
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
   "cd bindings/dotnet && dotnet tool restore --verbosity quiet",
   # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
   "pnpm --filter docs exec astro sync",
 ]
-
-[tasks.install-native-tools]
-hide = true
 
 [tasks.conan-install]
 hide = true
