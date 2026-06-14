@@ -1,11 +1,5 @@
 package org.maplibre.nativeffi.examples.lwjglmap;
 
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
-import static org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowContentScaleCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback;
-import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
-
 import org.maplibre.nativeffi.Maplibre;
 import org.maplibre.nativeffi.render.RenderBackend;
 
@@ -14,76 +8,70 @@ public final class Main {
 
   public static void main(String[] args) throws Exception {
     var mode = parseArgs(args);
-    if (!Maplibre.supportedRenderBackends().contains(RenderBackend.VULKAN)) {
-      throw new IllegalStateException("The loaded MapLibre native library does not support Vulkan");
+    if (mode == null) {
+      return;
     }
-    System.out.println("lwjgl-map render target: " + mode.cliName());
-    System.out.println("render target status: " + mode.status());
+    var backends = Maplibre.supportedRenderBackends();
+    System.out.println("native render backends: " + backends);
+    if (!supportsUsableBackend(backends)) {
+      throw new IllegalStateException(
+          "The loaded MapLibre native library does not support a backend usable by lwjgl-map on"
+              + " this platform");
+    }
+    Maplibre.setLogCallback(
+        record -> {
+          System.err.printf(
+              "MapLibre %s %s %d: %s%n",
+              record.severity(), record.event(), record.code(), record.message());
+          return true;
+        });
     var propertyPath = System.getProperty("org.maplibre.nativeffi.library.path");
     if (propertyPath != null) {
       System.out.println("MapLibre native library: " + propertyPath);
     }
 
-    try (var vulkan = VulkanContext.create("MapLibre LWJGL Map", 1280, 720)) {
-      var viewport = new ViewportHolder(Viewport.read(vulkan.window()));
-      try (var mapState = MapState.create(vulkan, viewport.value, mode);
-          var input = new InputController(vulkan.window(), mapState.map())) {
-        InputController.printControls();
-        installResizeCallbacks(vulkan.window(), viewport);
-        while (!glfwWindowShouldClose(vulkan.window())) {
-          glfwPollEvents();
-          if (viewport.consumeChanged()) {
-            mapState.resize(viewport.value);
-          }
-          var rendered = mapState.step();
-          if (!rendered) {
-            Thread.sleep(4);
-          }
-        }
-      }
+    try {
+      Shell.run(mode, backends);
+    } finally {
+      Maplibre.clearLogCallback();
     }
   }
 
   private static RenderTargetMode parseArgs(String[] args) {
-    var mode = RenderTargetMode.OWNED_TEXTURE;
-    for (var arg : args) {
-      if (arg.startsWith("--render-target=")) {
-        mode = RenderTargetMode.parse(arg.substring("--render-target=".length()));
-      } else if (!arg.startsWith("-")) {
-        mode = RenderTargetMode.parse(arg);
-      } else {
-        throw new IllegalArgumentException("unknown argument: " + arg);
-      }
+    if (args.length == 1 && args[0].equals("--help")) {
+      printUsage();
+      return null;
     }
-    return mode;
+    if (args.length != 1 || args[0].startsWith("-")) {
+      printUsage();
+      System.exit(1);
+    }
+    try {
+      return RenderTargetMode.parse(args[0]);
+    } catch (IllegalArgumentException error) {
+      System.err.println(error.getMessage());
+      printUsage();
+      System.exit(1);
+      throw error;
+    }
   }
 
-  private static void installResizeCallbacks(long window, ViewportHolder viewport) {
-    glfwSetWindowSizeCallback(window, (ignored, width, height) -> viewport.update(window));
-    glfwSetFramebufferSizeCallback(window, (ignored, width, height) -> viewport.update(window));
-    glfwSetWindowContentScaleCallback(window, (ignored, xScale, yScale) -> viewport.update(window));
+  private static void printUsage() {
+    System.err.println(
+        """
+        Usage: lwjgl-map <mode>
+
+        Modes:
+          owned-texture     session-owned texture render target
+          borrowed-texture  caller-owned texture render target
+          native-surface    native surface render target
+        """);
   }
 
-  private static final class ViewportHolder {
-    private Viewport value;
-    private boolean changed;
-
-    ViewportHolder(Viewport value) {
-      this.value = value;
+  private static boolean supportsUsableBackend(java.util.Set<RenderBackend> backends) {
+    if (GraphicsContext.isMac()) {
+      return backends.contains(RenderBackend.METAL) || backends.contains(RenderBackend.VULKAN);
     }
-
-    void update(long window) {
-      var next = Viewport.read(window);
-      if (!next.equals(value)) {
-        value = next;
-        changed = true;
-      }
-    }
-
-    boolean consumeChanged() {
-      var result = changed;
-      changed = false;
-      return result;
-    }
+    return backends.contains(RenderBackend.OPENGL) || backends.contains(RenderBackend.VULKAN);
   }
 }

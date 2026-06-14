@@ -20,9 +20,10 @@ language bindings and render-target integrations through a focused map demo.
 - Initial style URL and camera per [Shared defaults](#shared-defaults).
 - Camera controls per [Input](#input).
 - Support for the three render-target modes on every graphics API the example
-  ships (see [Render-target modes](#render-target-modes)).
-- Every graphics API the window toolkit and target platform can support (Vulkan,
-  Metal, OpenGL/EGL as applicable).
+  ships, either in one binary or across configured native render-backend
+  variants (see [Render-target modes](#render-target-modes)).
+- Every graphics API the window toolkit and target platform can support across
+  configured variants (Vulkan, Metal, OpenGL/EGL as applicable).
 - Graceful process exit when the user closes the window.
 - Startup logging that identifies the selected render-target mode and which
   native render backends the loaded library supports.
@@ -39,9 +40,14 @@ packaging/installer UX.
 | Example              | Binding  | Toolkit         | Platforms             | Backends              |
 | -------------------- | -------- | --------------- | --------------------- | --------------------- |
 | `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan                |
-| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan                |
+| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+
+For examples built by native render-backend variant, “Backends” is the union of
+supported configured variants. A binary that selects one native render backend
+exposes that graphics API for that binary; the example as a whole exposes the
+union across configured variants.
 
 ---
 
@@ -136,7 +142,7 @@ flowchart TB
   subgraph mapstate["Map state"]
     RT[Runtime]
     MP[Map]
-    RS[Render-target session]
+    RS[Render target]
   end
   subgraph gfx["Graphics host"]
     BE[Backend context]
@@ -152,36 +158,36 @@ flowchart TB
 
 ### Logical modules
 
-| Module                | Responsibility                                                                                                       |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| App shell             | Process entry, argument parsing, window creation, main event loop, idle pacing, shutdown ordering.                   |
-| Viewport              | Map logical size, physical drawable size, and `scale_factor` for `RenderTargetExtent`.                               |
-| Map state             | Owns runtime, map, and render session; loads style and initial camera; attaches render target for the selected mode. |
-| Render-target session | Thin wrapper over `RenderSessionHandle`: resize, `render_update`, close; dispatches by texture vs surface.           |
-| Backend               | Host-owned device context and window presentation for the active graphics API.                                       |
-| Compositor            | Host pass that draws a map-owned or borrowed texture into the swapchain.                                             |
-| Input                 | Pointer and keyboard → map camera APIs; prints control help once at startup.                                         |
-| Diagnostics           | Optional log callback and consistent error messages on failed setup or camera commands.                              |
+| Module           | Responsibility                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| App shell        | Process entry, argument parsing, toolkit lifecycle, main event loop, idle pacing, shutdown ordering.                    |
+| Viewport         | Map logical size, physical drawable size, and `scale_factor` for `RenderTargetExtent`.                                  |
+| Map state        | Owns runtime, map, and active render target; loads style and initial camera.                                            |
+| Graphics context | Creates/configures the top-level window and owns host graphics API context and presentation resources.                  |
+| Render target    | Owns the render session and mode-specific resources such as compositors, borrowed textures/images, and acquired frames. |
+| Compositor       | Host pass that draws a map-owned or borrowed texture into the swapchain.                                                |
+| Input            | Pointer and keyboard → map camera APIs; prints control help once at startup.                                            |
+| Diagnostics      | Optional log callback and consistent error messages on failed setup or camera commands.                                 |
 
 Implementations SHOULD mirror this layout in the source tree (separate files or
 packages per module).
 
-### Backend and mode matrix
+### Graphics API and mode matrix
 
-The backend module MUST be a discriminated implementation per render-target mode
-(union, sealed hierarchy, or sum type). Adding a mode or backend MUST require a
-localized change (new enum variant and dedicated module). Keep each graphics API
-and each render-target mode in its own variant or submodule rather than
-branching ad hoc through shared draw code.
+The example architecture MUST model the active graphics API separately from the
+active render-target mode. Graphics context code owns API-level resources
+(Vulkan, Metal, OpenGL/EGL/WGL as applicable). Render target code owns the
+attached `RenderSessionHandle`, mode-specific resources, resize behavior,
+`render_update`, and close behavior.
 
-Each backend variant implements, at minimum:
+When a build variant selects a single native render backend, the example SHOULD
+compile only the matching graphics API implementation and its platform glue.
+Backend selection can happen at build time; render-target mode selection remains
+a runtime CLI choice.
 
-- `init` / `deinit`
-- `resize(viewport)`
-- `attachRenderTarget(map, viewport) → session`
-- `finishFrame()` (window presentation upkeep each pump iteration)
-- `drawTexture(session, viewport)` for texture modes
-- `needsRenderTargetReattachOnResize() → bool` (see [Resize](#resize))
+Adding a graphics API or render-target mode MUST require localized changes. Keep
+each graphics API and render-target mode in its own variant, class, or submodule
+rather than branching ad hoc through shared draw code.
 
 ---
 
@@ -196,27 +202,27 @@ Order MUST be:
    `mln_supported_render_backend_mask()`, then validate that the loaded native
    library supports the graphics backend(s) this binary targets; fail fast with
    a readable message if not.
-3. Create the window (initial size [Window](#window)).
-4. Initialize the graphics backend for the selected mode.
-5. Create runtime (`:memory:` cache).
-6. Create map with extent from the initial viewport and continuous mode.
-7. Load style and apply initial camera.
-8. Attach render session for the selected mode.
-9. Print startup information:
+3. Create the top-level window and initialize the graphics backend for the
+   selected graphics API.
+4. Create runtime (`:memory:` cache).
+5. Create map with extent from the initial viewport and continuous mode.
+6. Load style and apply initial camera.
+7. Attach render target for the selected mode.
+8. Print startup information:
    - active render-target mode CLI value
    - active render-target status line
    - control help
 
 On failure after partial setup, release already-created handles in reverse order
-(session → map → runtime → graphics).
+(render target → map → runtime → graphics).
 
 ### Shutdown
 
 On window close or fatal error, close resources in order:
 
 1. Finish or wait on in-flight GPU work if the backend requires it.
-2. Render session (compositor first when it owns GPU objects separate from the
-   session).
+2. Render target (compositor and borrowed texture/image before or with the
+   session, according to graphics API lifetime rules).
 3. Map
 4. Runtime
 5. Graphics context and window.
@@ -225,9 +231,9 @@ On window close or fatal error, close resources in order:
 
 - One runtime per process (owner thread drives `run_once` / pump).
 - One map per runtime for the demo.
-- One live render session per map at a time.
+- One live render target per map at a time.
 - Map configuration (style, camera) uses the map handle; render-target extent
-  and present use the render session.
+  and present use the render target.
 
 ---
 
@@ -333,7 +339,8 @@ map-specific setup.
 - Create map with current viewport extent and continuous mode.
 - Load [style URL](#style).
 - Apply [initial camera](#initial-camera).
-- Delegate render-session attachment to the backend for the CLI-selected mode.
+- Attach a render target by dispatching on active graphics API and CLI-selected
+  mode.
 
 ### Event drain
 
@@ -344,19 +351,18 @@ map-specific setup.
 
 ### Resize API
 
-Expose `resize(viewport)` that forwards to the render-target session. For
-texture modes, also resize the compositor. When the backend reports
-`needsRenderTargetReattachOnResize`, expose
-`resizeWithReattachedTarget(viewport, backend)` that destroys the session,
-resizes backend-owned textures/surfaces, and re-attaches.
+Expose `resize(viewport)` for the active render target. Resize API-level
+resources separately when the graphics context requires it. When the active
+render target reports `needsReattachOnResize`, destroy it and attach a
+replacement for the same graphics context, map, and mode.
 
 ---
 
 ## Render-target modes
 
 Three modes MUST be modeled in every example’s architecture (CLI parsing,
-backend discriminant, and attach paths). Each example MUST implement all three
-modes on every graphics API the example binary exposes.
+render-target discriminant/class, and attach paths). Each example MUST implement
+all three modes on every graphics API the example binary exposes.
 
 ### Mode comparison
 
@@ -393,14 +399,13 @@ table:
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
 - On resize, recreate the host texture and re-attach the session (see
-  [Resize](#resize); `needsRenderTargetReattachOnResize` is `true` for this
-  mode).
+  [Resize](#resize); `needsReattachOnResize` is `true` for this mode).
 
 ### `native-surface`
 
 - Attach with the C API surface descriptor for window presentation (see
   [Graphics API](#graphics-api)).
-- `render_update` presents through the surface session directly.
+- `render_update` presents through the surface render target directly.
 - `drawTexture` MUST NOT be called for this mode.
 - On resize, call session `resize` and rebuild host presentation; reattach when
   the window toolkit supplies a new surface handle.
@@ -412,14 +417,14 @@ table:
 - Subscribe to window size, framebuffer size, and display-scale / content-scale
   events (as available on the platform).
 - Recompute viewport; skip rendering if extent is empty.
-- `needsRenderTargetReattachOnResize()` is a backend method. It returns `true`
-  for `borrowed-texture` because the host-owned exportable texture is fixed to
-  the viewport size: resize destroys the session, recreates the texture, and
+- `needsReattachOnResize()` is a render-target method. It returns `true` for
+  `borrowed-texture` because the host-owned exportable texture is fixed to the
+  viewport size: resize destroys the render target, recreates the texture, and
   attaches again. It returns `false` for `owned-texture` and `native-surface`,
-  where resize updates the swapchain or surface and calls session `resize` (and
-  resizes the compositor for texture modes).
-- When it returns `true`, use the full reattach path; otherwise resize backend,
-  compositor (texture modes), and session in place.
+  where resize updates graphics-context resources, compositor resources for
+  texture modes, and session extent in place.
+- When it returns `true`, use the full reattach path; otherwise resize the
+  graphics context and active render target in place.
 - Set `render_pending` after any resize.
 
 ---
@@ -473,7 +478,7 @@ Input handlers return whether the camera changed so the frame loop can set
 - SHOULD register a native log callback during startup and clear it on shutdown.
 - On setup or camera failure, print a short message including the native status
   and diagnostic strings returned by the C API.
-- On startup, print the three items listed in [Startup](#startup) step 9.
+- On startup, print the three items listed in [Startup](#startup) step 8.
 
 ---
 
@@ -501,9 +506,9 @@ Attach descriptors and shared context handles:
 - `borrowed-texture`: exportable Metal texture sized to the viewport;
   borrowed-texture descriptor.
 
-### OpenGL / EGL
+### OpenGL / EGL / WGL
 
-- `native-surface`: OpenGL or EGL surface descriptor for the window’s platform
+- `native-surface`: OpenGL/EGL/WGL surface descriptor for the window’s platform
   GL surface.
 - `owned-texture`: OpenGL owned-texture descriptor; shared GL context handles
   required by the C API.
