@@ -3,3 +3,7 @@
 	url = https://github.com/maplibre/maplibre-native.git
 	shallow = true
 	ignore = dirty
+[submodule "third_party/sdl"]
+	path = third_party/sdl
+	url = https://github.com/libsdl-org/SDL.git
+	shallow = true

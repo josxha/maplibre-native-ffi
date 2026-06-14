@@ -4,8 +4,12 @@ set -euo pipefail
 
 repo_root="${MLN_FFI_REPO_ROOT:-$(git rev-parse --show-toplevel)}"
 mln_path="third_party/maplibre-native"
+sdl_path="third_party/sdl"
 
 cd "$repo_root"
+
+git -c submodule.recurse=false submodule sync "$sdl_path"
+git -c submodule.recurse=false submodule update --init --depth 1 "$sdl_path"
 
 # Paths relative to the maplibre-native submodule (not the FFI repo root).
 # Nested test/mason/glfw trees inside these repos are not fetched (submodule.recurse=false).

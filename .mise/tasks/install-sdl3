@@ -5,21 +5,20 @@ set -euo pipefail
 : "${MLN_FFI_REPO_ROOT:?}"
 : "${MLN_FFI_TARGET_TRIPLE:?}"
 
-sdl_version="3.4.4"
+sdl_source="$MLN_FFI_REPO_ROOT/third_party/sdl"
 sdl_prefix="$MLN_FFI_REPO_ROOT/build/deps/$MLN_FFI_TARGET_TRIPLE/sdl3"
 sdl_build="$MLN_FFI_REPO_ROOT/build/sdl3/$MLN_FFI_TARGET_TRIPLE"
-sdl_source="$MLN_FFI_REPO_ROOT/build/sdl3/src/SDL3-$sdl_version"
+
+if [[ ! -f "$sdl_source/CMakeLists.txt" ]]; then
+  echo "missing SDL source tree: $sdl_source (run mise run sync-submodules)" >&2
+  exit 1
+fi
 
 if [[ -f "$sdl_prefix/lib/libSDL3.a" || -f "$sdl_prefix/lib/SDL3.lib" ]]; then
   exit 0
 fi
 
-mkdir -p "$(dirname "$sdl_source")" "$sdl_build" "$sdl_prefix"
-
-if [[ ! -d "$sdl_source" ]]; then
-  curl -fsSL "https://github.com/libsdl-org/SDL/releases/download/release-$sdl_version/SDL3-$sdl_version.tar.gz" \
-    | tar -xz -C "$(dirname "$sdl_source")"
-fi
+mkdir -p "$sdl_build" "$sdl_prefix"
 
 cmake_args=(
   -S "$sdl_source"

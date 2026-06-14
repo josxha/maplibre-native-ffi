@@ -14,8 +14,10 @@ runs:
       with:
         path: |
           third_party/maplibre-native
+          third_party/sdl
           .git/modules/third_party/maplibre-native
-        key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+          .git/modules/third_party/sdl
+        key: mln-src-v3-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
 
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
