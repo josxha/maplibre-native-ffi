@@ -3,7 +3,6 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
-import org.gradle.internal.os.OperatingSystem
 
 plugins { id("com.android.library") version "9.1.1" }
 
@@ -155,27 +154,19 @@ val generateJavaCppBindings =
 
 val androidNdkRoot = android.sdkComponents.ndkDirectory
 
-fun ndkHostTag(ndkRoot: java.io.File): String {
+// AGP wires externalNativeBuild/cmake itself. JavaCPP compiles the JNI bridge in a
+// separate JavaExec, so we point it at the NDK LLVM bin directory from the same
+// install AGP selected (one host toolchain per NDK package).
+fun ndkLlvmBinDir(ndkRoot: java.io.File): java.io.File {
   val prebuilt = ndkRoot.resolve("toolchains/llvm/prebuilt")
-  val tags = prebuilt.listFiles { file -> file.isDirectory }?.map { it.name }?.toSet().orEmpty()
-  check(tags.isNotEmpty()) { "No NDK host toolchains under $prebuilt" }
-
-  val os = OperatingSystem.current()
-  val arch = System.getProperty("os.arch").lowercase()
-  val preferred =
-    when {
-      os.isWindows -> "windows-x86_64"
-      os.isMacOsX && arch in setOf("aarch64", "arm64") -> "darwin-arm64"
-      os.isMacOsX -> "darwin-x86_64"
-      os.isLinux && arch in setOf("aarch64", "arm64") -> "linux-aarch64"
-      os.isLinux -> "linux-x86_64"
-      else -> null
-    }
-  if (preferred != null && preferred in tags) return preferred
-  check(tags.size == 1) {
-    "Could not select an NDK host toolchain from $tags for host ${os.name}/$arch"
+  val hostToolchains =
+    prebuilt.listFiles { file -> file.isDirectory }?.sortedBy { it.name }.orEmpty()
+  check(hostToolchains.size == 1) {
+    "Expected one NDK host toolchain under $prebuilt, found: ${hostToolchains.map { it.name }}"
   }
-  return tags.single()
+  val bin = hostToolchains.single().resolve("bin")
+  check(bin.isDirectory) { "Missing NDK LLVM bin directory: $bin" }
+  return bin
 }
 
 val debugJavaClasses =
@@ -213,8 +204,7 @@ androidAbis.forEach { abiConfig ->
         val ndkRootFile = androidNdkRoot.get().asFile
         val ndkRoot = ndkRootFile.absolutePath
         val compiler =
-          ndkRootFile
-            .resolve("toolchains/llvm/prebuilt/${ndkHostTag(ndkRootFile)}/bin")
+          ndkLlvmBinDir(ndkRootFile)
             .resolve("${abiConfig.ndkClangTriple}${androidApiLevel.get()}-clang++")
             .absolutePath
         args(
