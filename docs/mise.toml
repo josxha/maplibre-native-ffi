@@ -24,18 +24,8 @@ run = [
   "cp -a bindings/java-ffm/build/docs/javadoc/. docs/public/reference/java-ffm/",
 ]
 
-[tasks."api:java-jni"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = [
-  "rm -rf docs/public/reference/java-jni",
-  "mkdir -p docs/public/reference",
-  "mise run //bindings/java-jni:build",
-  "./gradlew :bindings:java-jni:javadoc -q",
-  "cp -a bindings/java-jni/build/docs/javadoc/. docs/public/reference/java-jni/",
-]
-
 [tasks."api:java"]
-depends = ["api:java-ffm", "api:java-jni"]
+depends = ["api:java-ffm"]
 
 [tasks."api:zig"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
