@@ -6,7 +6,4 @@ run = "../../gradlew :bindings:java-jni:assembleDebug"
 
 [tasks.test]
 depends = ["build"]
-run = '''
-export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
-../../gradlew :bindings:java-jni:connectedDebugAndroidTest
-'''
+run = "../../gradlew :bindings:java-jni:connectedDebugAndroidTest"
