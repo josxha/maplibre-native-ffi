@@ -98,6 +98,7 @@ postinstall = [
 ]
 
 [tasks.configure]
+depends = ["//:deps"]
 run = [
   '''
   cmake_args=(
@@ -106,6 +107,8 @@ run = [
     -G Ninja
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
+    -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
+    -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
   )
 
   cmake "${cmake_args[@]}"
@@ -113,8 +116,11 @@ run = [
   '''
   if [[ -f "$MLN_FFI_BUILD_DIR/compile_commands.json" ]]; then
     mkdir -p build/clangd
-    ln -sfn "$MLN_FFI_BUILD_DIR/compile_commands.json" \
-      build/clangd/compile_commands.json
+    compile_commands_link="build/clangd/compile_commands.json"
+    compile_commands_tmp="${compile_commands_link}.tmp"
+    rm -f "$compile_commands_tmp"
+    ln -s "$MLN_FFI_BUILD_DIR/compile_commands.json" "$compile_commands_tmp"
+    mv -f "$compile_commands_tmp" "$compile_commands_link"
   fi
   ''',
 ]
@@ -132,16 +138,24 @@ cmake "${build_args[@]}"'''
 [tasks.clean]
 run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 
+[tasks.deps]
+description = "Install variant-specific managed dependencies."
+run = '''
+if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
+  mise run deps:angle
+fi
+'''
+
 [tasks.test]
 depends = ["//:build"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 (
   cd bindings/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 
