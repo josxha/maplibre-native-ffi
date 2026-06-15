@@ -92,7 +92,8 @@ postinstall = [
   "{% if os() == \"windows\" %}cp \"$MLN_FFI_DEPS_PREFIX/bin/libclang-13.dll\" \"$MLN_FFI_DEPS_PREFIX/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
-  "cd bindings/dotnet && dotnet tool restore --verbosity quiet",
+  "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
+  "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet",
   # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
   "pnpm --filter docs exec astro sync",
 ]
