@@ -634,3 +634,16 @@ is being implemented.
   library before `NativeLibraryTest`, making the existing missing-path assertion
   order-dependent. JVM tests that load the native library need isolation before
   they can be added freely.
+
+### Common Logging Facade Milestone
+
+- Promoted process-global log callback and async log severity controls into the
+  common `Maplibre` facade.
+- Converted the Kotlin/Native log callback and severity implementations into
+  native actuals, added JVM FFM and Android JNI actuals for async severity
+  masks, and left explicit JVM/Android placeholders for log callback
+  registration until callback trampolines are migrated.
+- Discovery: callback registration should move as a dedicated bridge milestone
+  because JVM FFM and Android JavaCPP need platform-specific native callback
+  lifetime management, while async severity masks are plain status-returning C
+  calls.
