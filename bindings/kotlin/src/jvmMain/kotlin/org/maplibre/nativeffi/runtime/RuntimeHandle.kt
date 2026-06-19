@@ -43,7 +43,12 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<OfflineRegionInfo> =
+    offlineOperation(
+      NativeAccess.startCreateOfflineRegion(requireLiveHandle(), definition, metadata),
+      OfflineOperationKind.REGION_CREATE,
+      OfflineOperationResultKind.REGION,
+    )
 
   public actual fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> =
     offlineOperation(
@@ -127,23 +132,75 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   public actual fun takeCreateOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo = unsupportedRuntimeHandle()
+  ): OfflineRegionInfo {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_CREATE,
+        OfflineOperationResultKind.REGION,
+      )
+    val region = NativeAccess.takeCreateOfflineRegionResult(requireLiveHandle(), operationId)
+    operation.markConsumed()
+    return region
+  }
 
   public actual fun takeOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo?>
-  ): OfflineRegionInfo? = unsupportedRuntimeHandle()
+  ): OfflineRegionInfo? {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_GET,
+        OfflineOperationResultKind.OPTIONAL_REGION,
+      )
+    val region = NativeAccess.takeOfflineRegionResult(requireLiveHandle(), operationId)
+    operation.markConsumed()
+    return region
+  }
 
   public actual fun takeOfflineRegionsResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): List<OfflineRegionInfo> {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGIONS_LIST,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    val regions = NativeAccess.takeOfflineRegionsResult(requireLiveHandle(), operationId)
+    operation.markConsumed()
+    return regions
+  }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): List<OfflineRegionInfo> {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGIONS_MERGE_DATABASE,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    val regions =
+      NativeAccess.takeMergeOfflineRegionsDatabaseResult(requireLiveHandle(), operationId)
+    operation.markConsumed()
+    return regions
+  }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo = unsupportedRuntimeHandle()
+  ): OfflineRegionInfo {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_UPDATE_METADATA,
+        OfflineOperationResultKind.REGION,
+      )
+    val region =
+      NativeAccess.takeUpdateOfflineRegionMetadataResult(requireLiveHandle(), operationId)
+    operation.markConsumed()
+    return region
+  }
 
   public actual fun takeOfflineRegionStatusResult(
     operation: OfflineOperationHandle<OfflineRegionStatus>

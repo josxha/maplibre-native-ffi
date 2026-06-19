@@ -753,3 +753,18 @@ is being implemented.
 - Discovery: payload decoding can reach parity before map handle migration, but
   map-originated events still cannot attach a live `MapHandle` source until the
   JVM and Android map handle registries exist.
+
+### JVM and Android Offline Snapshot/List Result Milestone
+
+- Implemented JVM and Android `startCreateOfflineRegion` for tile-pyramid
+  definitions and implemented the create/get/list/merge/update metadata
+  take-result methods.
+- Added JVM FFM snapshot and list readers that copy `OfflineRegionInfo` and
+  destroy returned `mln_offline_region_snapshot`/`mln_offline_region_list`
+  owners on every path.
+- Added Android JavaCPP snapshot and list readers with matching owner cleanup
+  and copied tile-pyramid definition materialization.
+- Discovery: offline result ownership is the first runtime area where the JVM
+  bridge needs reusable value-struct materialization. Tile-pyramid definitions
+  can migrate directly, while geometry offline definitions remain an explicit
+  follow-up because the JVM/Android geometry bridge is not consolidated yet.

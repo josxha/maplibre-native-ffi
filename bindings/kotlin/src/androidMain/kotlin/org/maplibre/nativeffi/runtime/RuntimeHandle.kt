@@ -1,11 +1,15 @@
 package org.maplibre.nativeffi.runtime
 
 import java.nio.charset.StandardCharsets
+import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
+import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
@@ -56,7 +60,25 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<OfflineRegionInfo> {
+    val outOperationId = longArrayOf(0L)
+    OfflineRegionDefinitionScope(definition).use { nativeDefinition ->
+      Status.check(
+        MaplibreNativeC.mln_runtime_offline_region_create_start(
+          runtime(requireLiveAddress()),
+          nativeDefinition.definition,
+          metadata,
+          metadata.size.toLong(),
+          outOperationId,
+        )
+      )
+    }
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.REGION_CREATE,
+      OfflineOperationResultKind.REGION,
+    )
+  }
 
   public actual fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> =
     offlineOperation(
@@ -177,23 +199,101 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   public actual fun takeCreateOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo = unsupportedRuntimeHandle()
+  ): OfflineRegionInfo {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_CREATE,
+        OfflineOperationResultKind.REGION,
+      )
+    val region =
+      takeOfflineRegionSnapshot(
+        operationId,
+        MaplibreNativeC::mln_runtime_offline_region_create_take_result,
+      )
+    operation.markConsumed()
+    return region
+  }
 
   public actual fun takeOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo?>
-  ): OfflineRegionInfo? = unsupportedRuntimeHandle()
+  ): OfflineRegionInfo? {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_GET,
+        OfflineOperationResultKind.OPTIONAL_REGION,
+      )
+    PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1).use { outSnapshot ->
+      outSnapshot.put(0, null as Pointer?)
+      BoolPointer(1).use { outFound ->
+        Status.check(
+          MaplibreNativeC.mln_runtime_offline_region_get_take_result(
+            runtime(requireLiveAddress()),
+            operationId,
+            outSnapshot,
+            outFound,
+          )
+        )
+        operation.markConsumed()
+        return if (outFound.get()) offlineRegionSnapshot(outSnapshot) else null
+      }
+    }
+  }
 
   public actual fun takeOfflineRegionsResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): List<OfflineRegionInfo> {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGIONS_LIST,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    val regions =
+      takeOfflineRegionList(
+        operationId,
+        MaplibreNativeC::mln_runtime_offline_regions_list_take_result,
+      )
+    operation.markConsumed()
+    return regions
+  }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): List<OfflineRegionInfo> {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGIONS_MERGE_DATABASE,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    val regions =
+      takeOfflineRegionList(
+        operationId,
+        MaplibreNativeC::mln_runtime_offline_regions_merge_database_take_result,
+      )
+    operation.markConsumed()
+    return regions
+  }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo = unsupportedRuntimeHandle()
+  ): OfflineRegionInfo {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_UPDATE_METADATA,
+        OfflineOperationResultKind.REGION,
+      )
+    val region =
+      takeOfflineRegionSnapshot(
+        operationId,
+        MaplibreNativeC::mln_runtime_offline_region_update_metadata_take_result,
+      )
+    operation.markConsumed()
+    return region
+  }
 
   public actual fun takeOfflineRegionStatusResult(
     operation: OfflineOperationHandle<OfflineRegionStatus>
@@ -374,6 +474,34 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       else -> RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
     }
   }
+
+  private fun takeOfflineRegionSnapshot(
+    operationId: Long,
+    take:
+      (
+        MaplibreNativeC.mln_runtime,
+        Long,
+        PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>,
+      ) -> Int,
+  ): OfflineRegionInfo =
+    PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1).use { outSnapshot ->
+      outSnapshot.put(0, null as Pointer?)
+      Status.check(take(runtime(requireLiveAddress()), operationId, outSnapshot))
+      offlineRegionSnapshot(outSnapshot)
+    }
+
+  private fun takeOfflineRegionList(
+    operationId: Long,
+    take:
+      (
+        MaplibreNativeC.mln_runtime, Long, PointerPointer<MaplibreNativeC.mln_offline_region_list>,
+      ) -> Int,
+  ): List<OfflineRegionInfo> =
+    PointerPointer<MaplibreNativeC.mln_offline_region_list>(1).use { outList ->
+      outList.put(0, null as Pointer?)
+      Status.check(take(runtime(requireLiveAddress()), operationId, outList))
+      offlineRegionList(outList)
+    }
 }
 
 private fun hasPayloadSize(event: MaplibreNativeC.mln_runtime_event, requiredSize: Long): Boolean =
@@ -451,6 +579,89 @@ private fun offlineRegionStatus(
     status.required_resource_count_is_precise(),
     status.complete(),
   )
+
+private fun offlineRegionSnapshot(
+  outSnapshot: PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>
+): OfflineRegionInfo {
+  val snapshot = outSnapshot.get(MaplibreNativeC.mln_offline_region_snapshot::class.java, 0)
+  require(snapshot != null && !snapshot.isNull) { "offline operation returned a null snapshot" }
+  return try {
+    MaplibreNativeC.mln_offline_region_info().use { info ->
+      info.size(info.sizeof())
+      Status.check(MaplibreNativeC.mln_offline_region_snapshot_get(snapshot, info))
+      offlineRegionInfo(info)
+    }
+  } finally {
+    MaplibreNativeC.mln_offline_region_snapshot_destroy(snapshot)
+  }
+}
+
+private fun offlineRegionList(
+  outList: PointerPointer<MaplibreNativeC.mln_offline_region_list>
+): List<OfflineRegionInfo> {
+  val list = outList.get(MaplibreNativeC.mln_offline_region_list::class.java, 0)
+  require(list != null && !list.isNull) { "offline operation returned a null region list" }
+  return try {
+    SizeTPointer(1).use { outCount ->
+      Status.check(MaplibreNativeC.mln_offline_region_list_count(list, outCount))
+      val count = Math.toIntExact(outCount.get())
+      List(count) { index ->
+        MaplibreNativeC.mln_offline_region_info().use { info ->
+          info.size(info.sizeof())
+          Status.check(MaplibreNativeC.mln_offline_region_list_get(list, index.toLong(), info))
+          offlineRegionInfo(info)
+        }
+      }
+    }
+  } finally {
+    MaplibreNativeC.mln_offline_region_list_destroy(list)
+  }
+}
+
+private fun offlineRegionInfo(info: MaplibreNativeC.mln_offline_region_info): OfflineRegionInfo =
+  OfflineRegionInfo(
+    info.id(),
+    offlineRegionDefinition(info.definition()),
+    byteArray(info.metadata(), info.metadata_size()),
+  )
+
+private fun offlineRegionDefinition(
+  definition: MaplibreNativeC.mln_offline_region_definition
+): OfflineRegionDefinition =
+  when (definition.type()) {
+    MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID ->
+      offlineTilePyramidDefinition(definition.data_tile_pyramid())
+    else -> OfflineRegionDefinition.Unknown(definition.type(), definition.size())
+  }
+
+private fun offlineTilePyramidDefinition(
+  definition: MaplibreNativeC.mln_offline_tile_pyramid_region_definition
+): OfflineRegionDefinition.TilePyramid =
+  OfflineRegionDefinition.TilePyramid(
+    byteString(definition.style_url(), cStringLength(definition.style_url())),
+    latLngBounds(definition.bounds()),
+    definition.min_zoom(),
+    definition.max_zoom(),
+    definition.pixel_ratio(),
+    definition.include_ideographs(),
+  )
+
+private fun latLngBounds(bounds: MaplibreNativeC.mln_lat_lng_bounds): LatLngBounds =
+  LatLngBounds(
+    LatLng(bounds.southwest().latitude(), bounds.southwest().longitude()),
+    LatLng(bounds.northeast().latitude(), bounds.northeast().longitude()),
+  )
+
+private fun cStringLength(pointer: BytePointer?): Long {
+  if (pointer == null || pointer.isNull) {
+    return 0
+  }
+  var length = 0L
+  while (pointer.get(length) != 0.toByte()) {
+    length++
+  }
+  return length
+}
 
 private fun offlineRegionStatusPayload(
   payload: Pointer
@@ -546,6 +757,68 @@ private class RuntimeOptionsScope(options: RuntimeOptions) : AutoCloseable {
 private fun optionalCString(value: String?): BytePointer? = value?.let {
   require('\u0000' !in it) { "C string inputs must not contain embedded NUL characters" }
   BytePointer(it, StandardCharsets.UTF_8)
+}
+
+private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : AutoCloseable {
+  private val owned = mutableListOf<Pointer>()
+
+  val definition: MaplibreNativeC.mln_offline_region_definition =
+    own(MaplibreNativeC.mln_offline_region_definition())
+
+  init {
+    definition.size(definition.sizeof())
+    when (value) {
+      is OfflineRegionDefinition.TilePyramid -> {
+        definition.type(MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID)
+        definition.data_tile_pyramid(tilePyramid(value))
+      }
+      is OfflineRegionDefinition.GeometryRegion ->
+        throw UnsupportedOperationException(
+          "Geometry offline region definitions are not available until the Android geometry bridge is migrated"
+        )
+      is OfflineRegionDefinition.Unknown ->
+        throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
+    }
+  }
+
+  override fun close() {
+    for (index in owned.lastIndex downTo 0) {
+      owned[index].close()
+    }
+  }
+
+  private fun tilePyramid(
+    value: OfflineRegionDefinition.TilePyramid
+  ): MaplibreNativeC.mln_offline_tile_pyramid_region_definition {
+    val out = own(MaplibreNativeC.mln_offline_tile_pyramid_region_definition())
+    out.size(out.sizeof())
+    out.style_url(utf8(value.styleUrl))
+    out.bounds(bounds(value.bounds))
+    out.min_zoom(value.minZoom)
+    out.max_zoom(value.maxZoom)
+    out.pixel_ratio(value.pixelRatio)
+    out.include_ideographs(value.includeIdeographs)
+    return out
+  }
+
+  private fun bounds(value: LatLngBounds): MaplibreNativeC.mln_lat_lng_bounds {
+    val out = own(MaplibreNativeC.mln_lat_lng_bounds())
+    out.southwest().latitude(value.southwest.latitude)
+    out.southwest().longitude(value.southwest.longitude)
+    out.northeast().latitude(value.northeast.latitude)
+    out.northeast().longitude(value.northeast.longitude)
+    return out
+  }
+
+  private fun utf8(value: String): BytePointer {
+    require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
+    return own(BytePointer(value, StandardCharsets.UTF_8))
+  }
+
+  private fun <T : Pointer> own(pointer: T): T {
+    owned.add(pointer)
+    return pointer
+  }
 }
 
 private fun unsupportedRuntimeHandle(): Nothing =

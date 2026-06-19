@@ -13,12 +13,15 @@ import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
+import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
+import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
@@ -175,6 +178,26 @@ internal object NativeAccess {
       outOperationId.get(ValueLayout.JAVA_LONG, 0)
     }
 
+  internal fun startCreateOfflineRegion(
+    runtime: MemorySegment,
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeOfflineRegionCreateStartFunction()
+          .invokeWithArguments(
+            runtime,
+            offlineRegionDefinition(definition, arena),
+            nativeBytes(arena, metadata),
+            metadata.size.toLong(),
+            outOperationId,
+          ) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
   internal fun startOfflineRegion(runtime: MemorySegment, regionId: Long): Long =
     startRuntimeLongOperation("mln_runtime_offline_region_get_start", runtime, regionId)
 
@@ -271,6 +294,57 @@ internal object NativeAccess {
       offlineRegionStatus(status)
     }
 
+  internal fun takeCreateOfflineRegionResult(
+    runtime: MemorySegment,
+    operationId: Long,
+  ): OfflineRegionInfo =
+    takeOfflineRegionSnapshot(runtime, operationId, runtimeOfflineRegionCreateTakeResultFunction())
+
+  internal fun takeOfflineRegionResult(
+    runtime: MemorySegment,
+    operationId: Long,
+  ): OfflineRegionInfo? =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      outFound.set(ValueLayout.JAVA_BOOLEAN, 0, false)
+      Status.check(
+        runtimeOfflineRegionGetTakeResultFunction()
+          .invokeWithArguments(runtime, operationId, outSnapshot, outFound) as Int
+      )
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return@use null
+      }
+      offlineRegionSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+    }
+
+  internal fun takeOfflineRegionsResult(
+    runtime: MemorySegment,
+    operationId: Long,
+  ): List<OfflineRegionInfo> =
+    takeOfflineRegionList(runtime, operationId, runtimeOfflineRegionsListTakeResultFunction())
+
+  internal fun takeMergeOfflineRegionsDatabaseResult(
+    runtime: MemorySegment,
+    operationId: Long,
+  ): List<OfflineRegionInfo> =
+    takeOfflineRegionList(
+      runtime,
+      operationId,
+      runtimeOfflineRegionsMergeDatabaseTakeResultFunction(),
+    )
+
+  internal fun takeUpdateOfflineRegionMetadataResult(
+    runtime: MemorySegment,
+    operationId: Long,
+  ): OfflineRegionInfo =
+    takeOfflineRegionSnapshot(
+      runtime,
+      operationId,
+      runtimeOfflineRegionUpdateMetadataTakeResultFunction(),
+    )
+
   internal fun pollRuntimeEvent(runtime: MemorySegment): NativeRuntimeEvent? =
     Arena.ofConfined().use { arena ->
       val event = arena.allocate(RUNTIME_EVENT_SIZE)
@@ -337,6 +411,19 @@ internal object NativeAccess {
       ),
     )
 
+  private fun runtimeOfflineRegionCreateStartFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_offline_region_create_start",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun runtimeOfflineOperationDiscardFunction(): MethodHandle =
     downcall(
       "mln_runtime_offline_operation_discard",
@@ -353,6 +440,79 @@ internal object NativeAccess {
         ValueLayout.ADDRESS,
       ),
     )
+
+  private fun runtimeOfflineRegionCreateTakeResultFunction(): MethodHandle =
+    runtimeOfflineOperationSnapshotTakeResultFunction(
+      "mln_runtime_offline_region_create_take_result"
+    )
+
+  private fun runtimeOfflineRegionGetTakeResultFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_offline_region_get_take_result",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun runtimeOfflineRegionsListTakeResultFunction(): MethodHandle =
+    runtimeOfflineOperationListTakeResultFunction("mln_runtime_offline_regions_list_take_result")
+
+  private fun runtimeOfflineRegionsMergeDatabaseTakeResultFunction(): MethodHandle =
+    runtimeOfflineOperationListTakeResultFunction(
+      "mln_runtime_offline_regions_merge_database_take_result"
+    )
+
+  private fun runtimeOfflineRegionUpdateMetadataTakeResultFunction(): MethodHandle =
+    runtimeOfflineOperationSnapshotTakeResultFunction(
+      "mln_runtime_offline_region_update_metadata_take_result"
+    )
+
+  private fun runtimeOfflineOperationSnapshotTakeResultFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun runtimeOfflineOperationListTakeResultFunction(name: String): MethodHandle =
+    runtimeOfflineOperationSnapshotTakeResultFunction(name)
+
+  private fun offlineRegionSnapshotGetFunction(): MethodHandle =
+    downcall(
+      "mln_offline_region_snapshot_get",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun offlineRegionSnapshotDestroyFunction(): MethodHandle =
+    downcall("mln_offline_region_snapshot_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+
+  private fun offlineRegionListCountFunction(): MethodHandle =
+    downcall(
+      "mln_offline_region_list_count",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun offlineRegionListGetFunction(): MethodHandle =
+    downcall(
+      "mln_offline_region_list_get",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun offlineRegionListDestroyFunction(): MethodHandle =
+    downcall("mln_offline_region_list_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
 
   private fun runtimePollEventFunction(): MethodHandle =
     downcall(
@@ -515,6 +675,224 @@ internal object NativeAccess {
       ),
       status.get(ValueLayout.JAVA_BOOLEAN, OFFLINE_REGION_STATUS_COMPLETE_OFFSET),
     )
+
+  private fun offlineRegionDefinition(value: OfflineRegionDefinition, arena: Arena): MemorySegment {
+    val segment = arena.allocate(OFFLINE_REGION_DEFINITION_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      OFFLINE_REGION_DEFINITION_SIZE_OFFSET,
+      OFFLINE_REGION_DEFINITION_SIZE.toInt(),
+    )
+    when (value) {
+      is OfflineRegionDefinition.TilePyramid -> {
+        segment.set(
+          ValueLayout.JAVA_INT,
+          OFFLINE_REGION_DEFINITION_TYPE_OFFSET,
+          OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID,
+        )
+        offlineTilePyramidDefinition(
+          value,
+          segment.asSlice(OFFLINE_REGION_DEFINITION_DATA_OFFSET),
+          arena,
+        )
+      }
+      is OfflineRegionDefinition.GeometryRegion ->
+        throw UnsupportedOperationException(
+          "Geometry offline region definitions are not available until the JVM geometry bridge is migrated"
+        )
+      is OfflineRegionDefinition.Unknown ->
+        throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
+    }
+    return segment
+  }
+
+  private fun offlineTilePyramidDefinition(
+    value: OfflineRegionDefinition.TilePyramid,
+    segment: MemorySegment,
+    arena: Arena,
+  ) {
+    segment.set(
+      ValueLayout.JAVA_INT,
+      OFFLINE_TILE_PYRAMID_DEFINITION_SIZE_OFFSET,
+      OFFLINE_TILE_PYRAMID_DEFINITION_SIZE.toInt(),
+    )
+    segment.set(
+      ValueLayout.ADDRESS,
+      OFFLINE_TILE_PYRAMID_DEFINITION_STYLE_URL_OFFSET,
+      cString(arena, value.styleUrl),
+    )
+    latLngBounds(value.bounds, segment.asSlice(OFFLINE_TILE_PYRAMID_DEFINITION_BOUNDS_OFFSET))
+    segment.set(
+      ValueLayout.JAVA_DOUBLE,
+      OFFLINE_TILE_PYRAMID_DEFINITION_MIN_ZOOM_OFFSET,
+      value.minZoom,
+    )
+    segment.set(
+      ValueLayout.JAVA_DOUBLE,
+      OFFLINE_TILE_PYRAMID_DEFINITION_MAX_ZOOM_OFFSET,
+      value.maxZoom,
+    )
+    segment.set(
+      ValueLayout.JAVA_FLOAT,
+      OFFLINE_TILE_PYRAMID_DEFINITION_PIXEL_RATIO_OFFSET,
+      value.pixelRatio,
+    )
+    segment.set(
+      ValueLayout.JAVA_BOOLEAN,
+      OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET,
+      value.includeIdeographs,
+    )
+  }
+
+  private fun latLngBounds(bounds: LatLngBounds, segment: MemorySegment) {
+    segment.set(
+      ValueLayout.JAVA_DOUBLE,
+      LAT_LNG_BOUNDS_SOUTHWEST_LATITUDE_OFFSET,
+      bounds.southwest.latitude,
+    )
+    segment.set(
+      ValueLayout.JAVA_DOUBLE,
+      LAT_LNG_BOUNDS_SOUTHWEST_LONGITUDE_OFFSET,
+      bounds.southwest.longitude,
+    )
+    segment.set(
+      ValueLayout.JAVA_DOUBLE,
+      LAT_LNG_BOUNDS_NORTHEAST_LATITUDE_OFFSET,
+      bounds.northeast.latitude,
+    )
+    segment.set(
+      ValueLayout.JAVA_DOUBLE,
+      LAT_LNG_BOUNDS_NORTHEAST_LONGITUDE_OFFSET,
+      bounds.northeast.longitude,
+    )
+  }
+
+  private fun latLngBounds(segment: MemorySegment): LatLngBounds =
+    LatLngBounds(
+      LatLng(
+        segment.get(ValueLayout.JAVA_DOUBLE, LAT_LNG_BOUNDS_SOUTHWEST_LATITUDE_OFFSET),
+        segment.get(ValueLayout.JAVA_DOUBLE, LAT_LNG_BOUNDS_SOUTHWEST_LONGITUDE_OFFSET),
+      ),
+      LatLng(
+        segment.get(ValueLayout.JAVA_DOUBLE, LAT_LNG_BOUNDS_NORTHEAST_LATITUDE_OFFSET),
+        segment.get(ValueLayout.JAVA_DOUBLE, LAT_LNG_BOUNDS_NORTHEAST_LONGITUDE_OFFSET),
+      ),
+    )
+
+  private fun offlineRegionSnapshot(snapshot: MemorySegment): OfflineRegionInfo =
+    try {
+      Arena.ofConfined().use { arena ->
+        val info = arena.allocate(OFFLINE_REGION_INFO_SIZE)
+        info.set(
+          ValueLayout.JAVA_INT,
+          OFFLINE_REGION_INFO_SIZE_OFFSET,
+          OFFLINE_REGION_INFO_SIZE.toInt(),
+        )
+        Status.check(offlineRegionSnapshotGetFunction().invokeWithArguments(snapshot, info) as Int)
+        offlineRegionInfo(info)
+      }
+    } finally {
+      offlineRegionSnapshotDestroyFunction().invokeWithArguments(snapshot)
+    }
+
+  private fun offlineRegionList(list: MemorySegment): List<OfflineRegionInfo> =
+    try {
+      Arena.ofConfined().use { arena ->
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(offlineRegionListCountFunction().invokeWithArguments(list, outCount) as Int)
+        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
+        List(count) { index ->
+          val info = arena.allocate(OFFLINE_REGION_INFO_SIZE)
+          info.set(
+            ValueLayout.JAVA_INT,
+            OFFLINE_REGION_INFO_SIZE_OFFSET,
+            OFFLINE_REGION_INFO_SIZE.toInt(),
+          )
+          Status.check(
+            offlineRegionListGetFunction().invokeWithArguments(list, index.toLong(), info) as Int
+          )
+          offlineRegionInfo(info)
+        }
+      }
+    } finally {
+      offlineRegionListDestroyFunction().invokeWithArguments(list)
+    }
+
+  private fun takeOfflineRegionSnapshot(
+    runtime: MemorySegment,
+    operationId: Long,
+    function: MethodHandle,
+  ): OfflineRegionInfo =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(function.invokeWithArguments(runtime, operationId, outSnapshot) as Int)
+      offlineRegionSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+    }
+
+  private fun takeOfflineRegionList(
+    runtime: MemorySegment,
+    operationId: Long,
+    function: MethodHandle,
+  ): List<OfflineRegionInfo> =
+    Arena.ofConfined().use { arena ->
+      val outList = arena.allocate(ValueLayout.ADDRESS)
+      outList.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(function.invokeWithArguments(runtime, operationId, outList) as Int)
+      offlineRegionList(outList.get(ValueLayout.ADDRESS, 0))
+    }
+
+  private fun offlineRegionInfo(info: MemorySegment): OfflineRegionInfo =
+    OfflineRegionInfo(
+      info.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_INFO_ID_OFFSET),
+      offlineRegionDefinition(info.asSlice(OFFLINE_REGION_INFO_DEFINITION_OFFSET)),
+      copyBytes(
+        info.get(ValueLayout.ADDRESS, OFFLINE_REGION_INFO_METADATA_OFFSET),
+        info.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_INFO_METADATA_SIZE_OFFSET),
+      ),
+    )
+
+  private fun offlineRegionDefinition(segment: MemorySegment): OfflineRegionDefinition =
+    when (val type = segment.get(ValueLayout.JAVA_INT, OFFLINE_REGION_DEFINITION_TYPE_OFFSET)) {
+      OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID ->
+        offlineTilePyramidDefinition(segment.asSlice(OFFLINE_REGION_DEFINITION_DATA_OFFSET))
+      else ->
+        OfflineRegionDefinition.Unknown(
+          type,
+          segment.get(ValueLayout.JAVA_INT, OFFLINE_REGION_DEFINITION_SIZE_OFFSET),
+        )
+    }
+
+  private fun offlineTilePyramidDefinition(
+    segment: MemorySegment
+  ): OfflineRegionDefinition.TilePyramid =
+    OfflineRegionDefinition.TilePyramid(
+      copyString(
+        segment.get(ValueLayout.ADDRESS, OFFLINE_TILE_PYRAMID_DEFINITION_STYLE_URL_OFFSET),
+        cStringLength(
+          segment.get(ValueLayout.ADDRESS, OFFLINE_TILE_PYRAMID_DEFINITION_STYLE_URL_OFFSET)
+        ),
+      ),
+      latLngBounds(segment.asSlice(OFFLINE_TILE_PYRAMID_DEFINITION_BOUNDS_OFFSET)),
+      segment.get(ValueLayout.JAVA_DOUBLE, OFFLINE_TILE_PYRAMID_DEFINITION_MIN_ZOOM_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, OFFLINE_TILE_PYRAMID_DEFINITION_MAX_ZOOM_OFFSET),
+      segment.get(ValueLayout.JAVA_FLOAT, OFFLINE_TILE_PYRAMID_DEFINITION_PIXEL_RATIO_OFFSET),
+      segment.get(
+        ValueLayout.JAVA_BOOLEAN,
+        OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET,
+      ),
+    )
+
+  private fun cStringLength(address: MemorySegment): Long {
+    if (address == MemorySegment.NULL) {
+      return 0
+    }
+    var length = 0L
+    while (address.reinterpret(length + 1).get(ValueLayout.JAVA_BYTE, length) != 0.toByte()) {
+      length++
+    }
+    return length
+  }
 
   private fun runtimeEventPayload(
     payloadType: Int,
@@ -809,6 +1187,35 @@ internal object NativeAccess {
   private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Long = 20
   private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long = 24
   private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long = 28
+
+  private const val OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID: Int = 0
+  private const val OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY: Int = 1
+
+  private const val LAT_LNG_BOUNDS_SOUTHWEST_LATITUDE_OFFSET: Long = 0
+  private const val LAT_LNG_BOUNDS_SOUTHWEST_LONGITUDE_OFFSET: Long = 8
+  private const val LAT_LNG_BOUNDS_NORTHEAST_LATITUDE_OFFSET: Long = 16
+  private const val LAT_LNG_BOUNDS_NORTHEAST_LONGITUDE_OFFSET: Long = 24
+
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_SIZE: Long = 72
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_SIZE_OFFSET: Long = 0
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_STYLE_URL_OFFSET: Long = 8
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_BOUNDS_OFFSET: Long = 16
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_MIN_ZOOM_OFFSET: Long = 48
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_MAX_ZOOM_OFFSET: Long = 56
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_PIXEL_RATIO_OFFSET: Long = 64
+  private const val OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long = 68
+
+  private const val OFFLINE_REGION_DEFINITION_SIZE: Long = 80
+  private const val OFFLINE_REGION_DEFINITION_SIZE_OFFSET: Long = 0
+  private const val OFFLINE_REGION_DEFINITION_TYPE_OFFSET: Long = 4
+  private const val OFFLINE_REGION_DEFINITION_DATA_OFFSET: Long = 8
+
+  private const val OFFLINE_REGION_INFO_SIZE: Long = 112
+  private const val OFFLINE_REGION_INFO_SIZE_OFFSET: Long = 0
+  private const val OFFLINE_REGION_INFO_ID_OFFSET: Long = 8
+  private const val OFFLINE_REGION_INFO_DEFINITION_OFFSET: Long = 16
+  private const val OFFLINE_REGION_INFO_METADATA_OFFSET: Long = 96
+  private const val OFFLINE_REGION_INFO_METADATA_SIZE_OFFSET: Long = 104
 
   internal data class NativeRuntimeEvent(
     val type: Int,
