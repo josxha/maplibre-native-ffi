@@ -2,6 +2,7 @@ package org.maplibre.nativeffi
 
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
+import org.maplibre.nativeffi.internal.callback.LogCallbackState
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
@@ -55,12 +56,12 @@ public actual object Maplibre {
 
   /** Installs or replaces the process-global native log callback. */
   public actual fun setLogCallback(callback: LogCallback) {
-    unsupportedAndroidLogCallback()
+    LogCallbackState.set(callback)
   }
 
   /** Clears the process-global native log callback. */
   public actual fun clearLogCallback() {
-    unsupportedAndroidLogCallback()
+    LogCallbackState.clear()
   }
 
   /** Configures severities that native logging may dispatch asynchronously. */
@@ -145,8 +146,3 @@ private fun Maplibre.checkCompatibleCAbi(actualVersion: Long) {
     )
   }
 }
-
-private fun unsupportedAndroidLogCallback(): Nothing =
-  throw UnsupportedOperationException(
-    "Log callbacks are not available until the Android callback bridge is implemented"
-  )

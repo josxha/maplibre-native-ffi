@@ -784,3 +784,14 @@ is being implemented.
   it has no request handle lifetime. Resource provider should remain separate so
   `ResourceRequestHandle` completion/cancellation semantics can migrate as one
   focused milestone.
+
+### JVM and Android Log Callback Milestone
+
+- Implemented process-global `Maplibre.setLogCallback` and `clearLogCallback` on
+  JVM and Android.
+- Added JVM FFM and Android JavaCPP callback registrations that copy log records
+  into common `LogRecord` values and contain callback exceptions.
+- Added JVM coverage for direct callback state invocation.
+- Discovery: log callbacks can migrate independently from runtime/resource
+  provider callbacks because they have no per-runtime or request-handle
+  lifetime, but they still need process-global replacement discipline.

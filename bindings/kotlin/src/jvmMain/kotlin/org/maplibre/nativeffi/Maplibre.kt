@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 import java.nio.file.Path
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
+import org.maplibre.nativeffi.internal.callback.LogCallbackState
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
@@ -60,12 +61,12 @@ public actual object Maplibre {
 
   /** Installs or replaces the process-global native log callback. */
   public actual fun setLogCallback(callback: LogCallback) {
-    unsupportedJvmLogCallback()
+    LogCallbackState.set(callback)
   }
 
   /** Clears the process-global native log callback. */
   public actual fun clearLogCallback() {
-    unsupportedJvmLogCallback()
+    LogCallbackState.clear()
   }
 
   /** Configures severities that native logging may dispatch asynchronously. */
@@ -93,8 +94,3 @@ public actual object Maplibre {
     return NativeAccess.latLngForProjectedMeters(meters)
   }
 }
-
-private fun unsupportedJvmLogCallback(): Nothing =
-  throw UnsupportedOperationException(
-    "Log callbacks are not available until the JVM callback bridge is implemented"
-  )

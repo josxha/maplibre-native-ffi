@@ -116,6 +116,12 @@ internal object NativeAccess {
     )
   }
 
+  internal fun setLogCallback(callback: MemorySegment): Int =
+    logSetCallbackFunction().invokeWithArguments(callback, MemorySegment.NULL) as Int
+
+  internal fun clearLogCallback(): Int =
+    intFunction("mln_log_clear_callback").invokeWithArguments() as Int
+
   internal fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters =
     Arena.ofConfined().use { arena ->
       val nativeCoordinate = arena.allocate(latLngLayout)
@@ -391,6 +397,12 @@ internal object NativeAccess {
 
   private fun statusInFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT))
+
+  private fun logSetCallbackFunction(): MethodHandle =
+    downcall(
+      "mln_log_set_callback",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
 
   private fun projectedMetersForLatLngFunction(): MethodHandle =
     downcall(
