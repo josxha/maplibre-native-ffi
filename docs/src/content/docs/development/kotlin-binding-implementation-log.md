@@ -662,3 +662,18 @@ is being implemented.
   depend on running before loader error-path tests. The missing-path loader test
   now treats an already-loaded library as the valid no-op state for
   `NativeLibrary.load(path)`.
+
+### Android Runtime Lifecycle Bridge Milestone
+
+- Replaced the Android `RuntimeHandle` placeholder for runtime creation,
+  `runOnce`, `close`, and `isClosed` with a JavaCPP-backed JNI handle.
+- Shared Android ABI loading by making the Android `NativeAccess` object
+  internal instead of private to `Maplibre.kt`.
+- Added Android runtime option materialization from common `RuntimeOptions`,
+  including C string validation and maximum-cache-size flag handling, while
+  leaving offline operations, event polling, maps, and callbacks as dedicated
+  follow-up bridge migrations.
+- Discovery: the Kotlin module currently has no Android test source set, so
+  Android runtime lifecycle is compile-validated through
+  `//bindings/kotlin:build` until instrumentation packaging and emulator tests
+  are introduced.

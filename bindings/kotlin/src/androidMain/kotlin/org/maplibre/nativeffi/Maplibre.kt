@@ -99,7 +99,7 @@ public actual object Maplibre {
   }
 }
 
-private object NativeAccess {
+internal object NativeAccess {
   private val lock = Any()
 
   @Volatile private var loaded = false
