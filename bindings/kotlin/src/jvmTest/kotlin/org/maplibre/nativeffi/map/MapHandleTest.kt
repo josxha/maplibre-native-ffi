@@ -74,6 +74,35 @@ class MapHandleTest {
     }
   }
 
+  @Test
+  fun styleLayerJsonCanBeAddedInspectedListedAndRemoved() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.addStyleLayerJson(backgroundLayer(), "")
+
+      assertTrue(map.styleLayerExists("background"))
+      assertEquals("background", map.styleLayerType("background"))
+      assertTrue(map.styleLayerIds().contains("background"))
+      assertTrue(map.removeStyleLayer("background"))
+      assertFalse(map.styleLayerExists("background"))
+      assertFalse(map.removeStyleLayer("background"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   private fun geoJsonSource(): JsonValue =
     JsonValue.ObjectValue(
       listOf(
@@ -87,6 +116,14 @@ class MapHandleTest {
             )
           ),
         ),
+      )
+    )
+
+  private fun backgroundLayer(): JsonValue =
+    JsonValue.ObjectValue(
+      listOf(
+        JsonValue.Member("id", JsonValue.StringValue("background")),
+        JsonValue.Member("type", JsonValue.StringValue("background")),
       )
     )
 }

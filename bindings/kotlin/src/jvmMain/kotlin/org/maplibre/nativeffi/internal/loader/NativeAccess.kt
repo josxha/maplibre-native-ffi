@@ -439,6 +439,55 @@ internal object NativeAccess {
       styleIdList(outList.get(ValueLayout.ADDRESS, 0))
     }
 
+  internal fun addStyleLayerJson(map: MemorySegment, layerJson: JsonValue, beforeLayerId: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStringViewStatusFunction("mln_map_add_style_layer_json")
+          .invokeWithArguments(map, jsonValue(arena, layerJson), stringView(arena, beforeLayerId))
+          as Int
+      )
+    }
+  }
+
+  internal fun removeStyleLayer(map: MemorySegment, layerId: String): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_remove_style_layer")
+          .invokeWithArguments(map, stringView(arena, layerId), outRemoved) as Int
+      )
+      outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun styleLayerExists(map: MemorySegment, layerId: String): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_style_layer_exists")
+          .invokeWithArguments(map, stringView(arena, layerId), outExists) as Int
+      )
+      outExists.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun styleLayerType(map: MemorySegment, layerId: String): String? =
+    Arena.ofConfined().use { arena ->
+      val outType = arena.allocate(STRING_VIEW_SIZE)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewTwoAddressStatusFunction("mln_map_get_style_layer_type")
+          .invokeWithArguments(map, stringView(arena, layerId), outType, outFound) as Int
+      )
+      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) stringView(outType) else null
+    }
+
+  internal fun styleLayerIds(map: MemorySegment): List<String> =
+    Arena.ofConfined().use { arena ->
+      val outList = arena.allocate(ValueLayout.ADDRESS)
+      outList.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(mapListStyleLayerIdsFunction().invokeWithArguments(map, outList) as Int)
+      styleIdList(outList.get(ValueLayout.ADDRESS, 0))
+    }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -681,6 +730,17 @@ internal object NativeAccess {
       ),
     )
 
+  private fun mapAddressStringViewStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+      ),
+    )
+
   private fun mapStringViewTwoAddressStatusFunction(name: String): MethodHandle =
     downcall(
       name,
@@ -696,6 +756,12 @@ internal object NativeAccess {
   private fun mapListStyleSourceIdsFunction(): MethodHandle =
     downcall(
       "mln_map_list_style_source_ids",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun mapListStyleLayerIdsFunction(): MethodHandle =
+    downcall(
+      "mln_map_list_style_layer_ids",
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
     )
 

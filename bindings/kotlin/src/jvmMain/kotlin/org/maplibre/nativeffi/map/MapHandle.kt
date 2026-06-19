@@ -212,7 +212,8 @@ private constructor(
   public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = unsupportedMapHandle()
 
   public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addStyleLayerJson(requireLiveHandle(), layerJson, beforeLayerId)
   }
 
   public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
@@ -251,13 +252,25 @@ private constructor(
     unsupportedMapHandle()
   }
 
-  public actual fun removeStyleLayer(layerId: String): Boolean = unsupportedMapHandle()
+  public actual fun removeStyleLayer(layerId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.removeStyleLayer(requireLiveHandle(), layerId)
+  }
 
-  public actual fun styleLayerExists(layerId: String): Boolean = unsupportedMapHandle()
+  public actual fun styleLayerExists(layerId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayerExists(requireLiveHandle(), layerId)
+  }
 
-  public actual fun styleLayerType(layerId: String): String? = unsupportedMapHandle()
+  public actual fun styleLayerType(layerId: String): String? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayerType(requireLiveHandle(), layerId)
+  }
 
-  public actual fun styleLayerIds(): List<String> = unsupportedMapHandle()
+  public actual fun styleLayerIds(): List<String> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayerIds(requireLiveHandle())
+  }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     unsupportedMapHandle()

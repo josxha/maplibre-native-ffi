@@ -288,7 +288,18 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = unsupportedMapHandle()
 
   public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    JsonScope(layerJson).use { nativeLayerJson ->
+      StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_style_layer_json(
+            map(requireLiveAddress()),
+            nativeLayerJson.value,
+            nativeBeforeLayerId.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
@@ -327,13 +338,63 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     unsupportedMapHandle()
   }
 
-  public actual fun removeStyleLayer(layerId: String): Boolean = unsupportedMapHandle()
+  public actual fun removeStyleLayer(layerId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    val outRemoved = booleanArrayOf(false)
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_remove_style_layer(
+          map(requireLiveAddress()),
+          nativeLayerId.view,
+          outRemoved,
+        )
+      )
+    }
+    return outRemoved[0]
+  }
 
-  public actual fun styleLayerExists(layerId: String): Boolean = unsupportedMapHandle()
+  public actual fun styleLayerExists(layerId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    val outExists = booleanArrayOf(false)
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_style_layer_exists(
+          map(requireLiveAddress()),
+          nativeLayerId.view,
+          outExists,
+        )
+      )
+    }
+    return outExists[0]
+  }
 
-  public actual fun styleLayerType(layerId: String): String? = unsupportedMapHandle()
+  public actual fun styleLayerType(layerId: String): String? {
+    NativeAccess.ensureLoaded()
+    val outFound = booleanArrayOf(false)
+    MaplibreNativeC.mln_string_view().use { outType ->
+      StringViewScope(layerId).use { nativeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_get_style_layer_type(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            outType,
+            outFound,
+          )
+        )
+      }
+      return if (outFound[0]) stringView(outType) else null
+    }
+  }
 
-  public actual fun styleLayerIds(): List<String> = unsupportedMapHandle()
+  public actual fun styleLayerIds(): List<String> {
+    NativeAccess.ensureLoaded()
+    PointerPointer<MaplibreNativeC.mln_style_id_list>(1).use { outList ->
+      outList.put(0, null as Pointer?)
+      Status.check(MaplibreNativeC.mln_map_list_style_layer_ids(map(requireLiveAddress()), outList))
+      val list = outList.get(MaplibreNativeC.mln_style_id_list::class.java, 0)
+      return styleIdList(requireNotNull(list))
+    }
+  }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     unsupportedMapHandle()

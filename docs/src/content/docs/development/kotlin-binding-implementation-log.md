@@ -837,3 +837,16 @@ is being implemented.
 - Discovery: FFM `Arena.allocate(byteSize, byteAlignment)` is easy to mistake
   for array allocation. Descriptor arrays in the hand-written JVM bridge must
   allocate `elementSize * count` bytes explicitly.
+
+### JVM and Android Style Layer JSON Milestone
+
+- Implemented JVM FFM and Android JavaCPP `MapHandle` style layer JSON mutation
+  and basic inspection: add, remove, exists, type, and ID list.
+- Reused the common `JsonValue` descriptor materialization added for style
+  sources, which kept this milestone focused on C call shape and owned layer ID
+  list cleanup.
+- Added JVM coverage for adding a background layer from common JSON, inspecting
+  its type/list entry, and removing it.
+- Discovery: source and layer JSON bridges share enough mechanics that a future
+  internal map/style bridge facade should expose domain operations while
+  centralizing string-view, JSON descriptor, and style ID list ownership.
