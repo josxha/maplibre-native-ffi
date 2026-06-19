@@ -2,6 +2,8 @@ package org.maplibre.nativeffi
 
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
+import org.maplibre.nativeffi.log.LogCallback
+import org.maplibre.nativeffi.log.LogSeverity
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -28,6 +30,18 @@ public expect object Maplibre {
 
   /** Sets Maplibre Native's process-global network status. */
   public fun setNetworkStatus(status: NetworkStatus)
+
+  /** Installs or replaces the process-global native log callback. */
+  public fun setLogCallback(callback: LogCallback)
+
+  /** Clears the process-global native log callback. */
+  public fun clearLogCallback()
+
+  /** Configures severities that native logging may dispatch asynchronously. */
+  public fun setAsyncLogSeverities(severities: Set<LogSeverity>)
+
+  /** Restores the native default async log severity mask. */
+  public fun restoreDefaultAsyncLogSeverities()
 
   /** Converts a geographic coordinate to spherical Mercator projected meters. */
   public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters

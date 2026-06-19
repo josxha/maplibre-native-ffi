@@ -4,6 +4,8 @@ import java.nio.file.Path
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.log.LogCallback
+import org.maplibre.nativeffi.log.LogSeverity
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -56,6 +58,29 @@ public actual object Maplibre {
     NativeAccess.setNetworkStatus(status.nativeValue)
   }
 
+  /** Installs or replaces the process-global native log callback. */
+  public actual fun setLogCallback(callback: LogCallback) {
+    unsupportedJvmLogCallback()
+  }
+
+  /** Clears the process-global native log callback. */
+  public actual fun clearLogCallback() {
+    unsupportedJvmLogCallback()
+  }
+
+  /** Configures severities that native logging may dispatch asynchronously. */
+  public actual fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
+    NativeAccess.ensureLoaded()
+    val mask = severities.fold(0) { acc, severity -> acc or severity.nativeMask }
+    NativeAccess.setAsyncLogSeverityMask(mask)
+  }
+
+  /** Restores the native default async log severity mask. */
+  public actual fun restoreDefaultAsyncLogSeverities() {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setAsyncLogSeverityMask(NativeAccess.DEFAULT_LOG_SEVERITY_MASK)
+  }
+
   /** Converts a geographic coordinate to spherical Mercator projected meters. */
   public actual fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters {
     NativeAccess.ensureLoaded()
@@ -68,3 +93,8 @@ public actual object Maplibre {
     return NativeAccess.latLngForProjectedMeters(meters)
   }
 }
+
+private fun unsupportedJvmLogCallback(): Nothing =
+  throw UnsupportedOperationException(
+    "Log callbacks are not available until the JVM callback bridge is implemented"
+  )

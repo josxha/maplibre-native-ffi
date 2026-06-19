@@ -83,23 +83,23 @@ public actual object Maplibre {
   }
 
   /** Installs or replaces the process-global native log callback. */
-  public fun setLogCallback(callback: LogCallback) {
+  public actual fun setLogCallback(callback: LogCallback) {
     LogCallbackState.set(callback)
   }
 
   /** Clears the process-global native log callback. */
-  public fun clearLogCallback() {
+  public actual fun clearLogCallback() {
     LogCallbackState.clear()
   }
 
   /** Configures severities that native logging may dispatch asynchronously. */
-  public fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
+  public actual fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
     val mask = severities.fold(0) { acc, severity -> acc or severity.nativeMask }
     Status.check(mln_log_set_async_severity_mask(mask.toUInt()))
   }
 
   /** Restores the native default async log severity mask. */
-  public fun restoreDefaultAsyncLogSeverities() {
+  public actual fun restoreDefaultAsyncLogSeverities() {
     Status.check(mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_DEFAULT))
   }
 

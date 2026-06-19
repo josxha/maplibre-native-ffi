@@ -4,6 +4,8 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.log.LogCallback
+import org.maplibre.nativeffi.log.LogSeverity
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -49,6 +51,31 @@ public actual object Maplibre {
       "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
     NativeAccess.setNetworkStatus(status.nativeValue)
+  }
+
+  /** Installs or replaces the process-global native log callback. */
+  public actual fun setLogCallback(callback: LogCallback) {
+    unsupportedAndroidLogCallback()
+  }
+
+  /** Clears the process-global native log callback. */
+  public actual fun clearLogCallback() {
+    unsupportedAndroidLogCallback()
+  }
+
+  /** Configures severities that native logging may dispatch asynchronously. */
+  public actual fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
+    NativeAccess.ensureLoaded()
+    val mask = severities.fold(0) { acc, severity -> acc or severity.nativeMask }
+    Status.check(MaplibreNativeC.mln_log_set_async_severity_mask(mask))
+  }
+
+  /** Restores the native default async log severity mask. */
+  public actual fun restoreDefaultAsyncLogSeverities() {
+    NativeAccess.ensureLoaded()
+    Status.check(
+      MaplibreNativeC.mln_log_set_async_severity_mask(MaplibreNativeC.MLN_LOG_SEVERITY_MASK_DEFAULT)
+    )
   }
 
   /** Converts a geographic coordinate to spherical Mercator projected meters. */
@@ -118,3 +145,8 @@ private fun Maplibre.checkCompatibleCAbi(actualVersion: Long) {
     )
   }
 }
+
+private fun unsupportedAndroidLogCallback(): Nothing =
+  throw UnsupportedOperationException(
+    "Log callbacks are not available until the Android callback bridge is implemented"
+  )
