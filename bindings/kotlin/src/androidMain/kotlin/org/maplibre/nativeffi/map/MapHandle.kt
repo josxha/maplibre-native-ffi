@@ -1,5 +1,9 @@
 package org.maplibre.nativeffi.map
 
+import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.PointerPointer
+import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraFitOptions
@@ -11,6 +15,9 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
@@ -33,19 +40,30 @@ import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
-/** Android actual placeholder until the JNI map bridge is migrated. */
-public actual class MapHandle private constructor() : AutoCloseable {
-  public actual val isClosed: Boolean
-    get() = unsupportedMapHandle()
+/** Owned Android JNI map handle. */
+public actual class MapHandle
+private constructor(private val runtime: RuntimeHandle, private val handleAddress: Long) :
+  AutoCloseable {
+  private val runtimeRetention = runtime.retainChild()
+  private val core = HandleStateCore("MapHandle", handleAddress)
 
-  public actual fun runtime(): RuntimeHandle = unsupportedMapHandle()
+  public actual val isClosed: Boolean
+    get() = core.isReleased()
+
+  public actual fun runtime(): RuntimeHandle = runtime
 
   public actual fun setStyleUrl(url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    optionalCString(url).use { nativeUrl ->
+      Status.check(MaplibreNativeC.mln_map_set_style_url(map(requireLiveAddress()), nativeUrl))
+    }
   }
 
   public actual fun setStyleJson(json: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    optionalCString(json).use { nativeJson ->
+      Status.check(MaplibreNativeC.mln_map_set_style_json(map(requireLiveAddress()), nativeJson))
+    }
   }
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
@@ -448,12 +466,72 @@ public actual class MapHandle private constructor() : AutoCloseable {
   public actual fun createProjection(): MapProjectionHandle = unsupportedMapHandle()
 
   public actual override fun close() {
-    unsupportedMapHandle()
+    core.closeOnce(
+      destroy = { MaplibreNativeC.mln_map_destroy(map(handleAddress)) },
+      afterSuccess = { runtimeRetention.close() },
+    )
   }
 
   public actual companion object {
-    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle =
-      unsupportedMapHandle()
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
+      NativeAccess.ensureLoaded()
+      MapOptionsScope(options).use { nativeOptions ->
+        PointerPointer<MaplibreNativeC.mln_map>(1).use { outMap ->
+          outMap.put(0, null as Pointer?)
+          Status.check(
+            MaplibreNativeC.mln_map_create(
+              runtime(runtime.nativeAddress()),
+              nativeOptions.options,
+              outMap,
+            )
+          )
+          val map = outMap.get(MaplibreNativeC.mln_map::class.java, 0)
+          val address = if (map == null || map.isNull) 0L else map.address()
+          require(address != 0L) { "mln_map_create returned a null map" }
+          return MapHandle(runtime, address)
+        }
+      }
+    }
+  }
+
+  private fun requireLiveAddress(): Long {
+    core.requireLive()
+    return handleAddress
+  }
+}
+
+private fun map(address: Long): MaplibreNativeC.mln_map =
+  MaplibreNativeC.mln_map(AddressPointer(address))
+
+private fun runtime(address: Long): MaplibreNativeC.mln_runtime =
+  MaplibreNativeC.mln_runtime(AddressPointer(address))
+
+private fun optionalCString(value: String): BytePointer {
+  require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
+  return BytePointer(value, java.nio.charset.StandardCharsets.UTF_8)
+}
+
+private class MapOptionsScope(value: MapOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_map_options = MaplibreNativeC.mln_map_options_default()
+
+  init {
+    value.width?.let { options.width(it) }
+    value.height?.let { options.height(it) }
+    value.scaleFactor?.let { options.scale_factor(it) }
+    value.mapMode?.let {
+      require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
+      options.map_mode(it.nativeValue)
+    }
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
+  init {
+    this.address = address
   }
 }
 

@@ -304,6 +304,8 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
 
+  internal fun nativeHandle(): MemorySegment = requireLiveHandle()
+
   private fun requireLiveHandle(): MemorySegment {
     core.requireLive()
     return handle

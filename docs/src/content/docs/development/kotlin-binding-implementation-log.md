@@ -811,3 +811,15 @@ is being implemented.
   migrate before map handles. It also exposes a cleanup target: response
   materialization is still platform-local and should eventually collapse behind
   a smaller expected resource bridge.
+
+### JVM and Android Map Lifecycle Milestone
+
+- Implemented JVM FFM and Android JavaCPP `MapHandle.create`, `close`,
+  `isClosed`, `runtime`, `setStyleUrl`, and `setStyleJson`.
+- Added platform map option materialization and runtime child retention so a
+  live map prevents its runtime from closing.
+- Added JVM coverage for map creation, style command acceptance, close
+  idempotency, and runtime retention.
+- Discovery: map creation is the first bridge slice where runtime events need a
+  live map registry to attach `mapSource`. This milestone keeps event source
+  lookup unchanged and leaves map registration for the broader map/event bridge.

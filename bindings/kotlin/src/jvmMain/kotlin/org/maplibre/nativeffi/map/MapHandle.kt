@@ -11,6 +11,8 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
@@ -33,19 +35,28 @@ import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
-/** JVM actual placeholder until the FFM map bridge is migrated. */
-public actual class MapHandle private constructor() : AutoCloseable {
-  public actual val isClosed: Boolean
-    get() = unsupportedMapHandle()
+/** Owned JVM FFM map handle. */
+public actual class MapHandle
+private constructor(
+  private val runtime: RuntimeHandle,
+  private val handle: java.lang.foreign.MemorySegment,
+) : AutoCloseable {
+  private val runtimeRetention = runtime.retainChild()
+  private val core = HandleStateCore("MapHandle", handle.address())
 
-  public actual fun runtime(): RuntimeHandle = unsupportedMapHandle()
+  public actual val isClosed: Boolean
+    get() = core.isReleased()
+
+  public actual fun runtime(): RuntimeHandle = runtime
 
   public actual fun setStyleUrl(url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setMapStyleUrl(requireLiveHandle(), url)
   }
 
   public actual fun setStyleJson(json: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setMapStyleJson(requireLiveHandle(), json)
   }
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
@@ -448,12 +459,22 @@ public actual class MapHandle private constructor() : AutoCloseable {
   public actual fun createProjection(): MapProjectionHandle = unsupportedMapHandle()
 
   public actual override fun close() {
-    unsupportedMapHandle()
+    core.closeOnce(
+      destroy = { NativeAccess.destroyMap(handle) },
+      afterSuccess = { runtimeRetention.close() },
+    )
   }
 
   public actual companion object {
-    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle =
-      unsupportedMapHandle()
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
+      NativeAccess.ensureLoaded()
+      return MapHandle(runtime, NativeAccess.createMap(runtime.nativeHandle(), options))
+    }
+  }
+
+  private fun requireLiveHandle(): java.lang.foreign.MemorySegment {
+    core.requireLive()
+    return handle
   }
 }
 

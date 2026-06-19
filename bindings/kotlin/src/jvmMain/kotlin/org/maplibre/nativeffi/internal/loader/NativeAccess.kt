@@ -17,6 +17,8 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.map.MapMode
+import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
@@ -317,6 +319,39 @@ internal object NativeAccess {
     resourceRequestReleaseFunction().invokeWithArguments(handle)
   }
 
+  internal fun createMap(runtime: MemorySegment, options: MapOptions): MemorySegment =
+    Arena.ofConfined().use { arena ->
+      val outMap = arena.allocate(ValueLayout.ADDRESS)
+      outMap.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapCreateFunction().invokeWithArguments(runtime, mapOptions(options, arena), outMap) as Int
+      )
+      outMap.get(ValueLayout.ADDRESS, 0).also { map ->
+        require(map != MemorySegment.NULL) { "mln_map_create returned a null map" }
+      }
+    }
+
+  internal fun destroyMap(map: MemorySegment): Int =
+    mapStatusFunction("mln_map_destroy").invokeWithArguments(map) as Int
+
+  internal fun setMapStyleUrl(map: MemorySegment, url: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_style_url")
+          .invokeWithArguments(map, cString(arena, url)) as Int
+      )
+    }
+  }
+
+  internal fun setMapStyleJson(map: MemorySegment, json: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_style_json")
+          .invokeWithArguments(map, cString(arena, json)) as Int
+      )
+    }
+  }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -527,6 +562,26 @@ internal object NativeAccess {
 
   private fun resourceRequestReleaseFunction(): MethodHandle =
     downcall("mln_resource_request_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+
+  private fun mapCreateFunction(): MethodHandle =
+    downcall(
+      "mln_map_create",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapStatusFunction(name: String): MethodHandle =
+    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+
+  private fun mapAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
 
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
     downcall(
@@ -848,6 +903,31 @@ internal object NativeAccess {
       length++
     }
     return copyString(address, length)
+  }
+
+  private fun mapOptions(options: MapOptions, arena: Arena): MemorySegment {
+    val segment = arena.allocate(MAP_OPTIONS_SIZE)
+    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_SIZE_OFFSET, MAP_OPTIONS_SIZE.toInt())
+    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_WIDTH_OFFSET, DEFAULT_MAP_WIDTH)
+    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_HEIGHT_OFFSET, DEFAULT_MAP_HEIGHT)
+    segment.set(ValueLayout.JAVA_DOUBLE, MAP_OPTIONS_SCALE_FACTOR_OFFSET, DEFAULT_SCALE_FACTOR)
+    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_MAP_MODE_OFFSET, MapMode.CONTINUOUS.nativeValue)
+    options.width?.let {
+      require(it >= 0) { "width must be non-negative" }
+      segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_WIDTH_OFFSET, it)
+    }
+    options.height?.let {
+      require(it >= 0) { "height must be non-negative" }
+      segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_HEIGHT_OFFSET, it)
+    }
+    options.scaleFactor?.let {
+      segment.set(ValueLayout.JAVA_DOUBLE, MAP_OPTIONS_SCALE_FACTOR_OFFSET, it)
+    }
+    options.mapMode?.let {
+      require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
+      segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_MAP_MODE_OFFSET, it.nativeValue)
+    }
+    return segment
   }
 
   private fun offlineRegionStatus(status: MemorySegment): OfflineRegionStatus =
@@ -1344,6 +1424,17 @@ internal object NativeAccess {
   private const val RESOURCE_RESPONSE_ETAG_OFFSET: Long = 72
   private const val RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET: Long = 80
   private const val RESOURCE_RESPONSE_RETRY_AFTER_OFFSET: Long = 88
+
+  private const val DEFAULT_MAP_WIDTH: Int = 256
+  private const val DEFAULT_MAP_HEIGHT: Int = 256
+  private const val DEFAULT_SCALE_FACTOR: Double = 1.0
+
+  private const val MAP_OPTIONS_SIZE: Long = 32
+  private const val MAP_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val MAP_OPTIONS_WIDTH_OFFSET: Long = 4
+  private const val MAP_OPTIONS_HEIGHT_OFFSET: Long = 8
+  private const val MAP_OPTIONS_SCALE_FACTOR_OFFSET: Long = 16
+  private const val MAP_OPTIONS_MAP_MODE_OFFSET: Long = 24
 
   private const val PAYLOAD_NONE: Int = 0
   private const val PAYLOAD_RENDER_FRAME: Int = 1

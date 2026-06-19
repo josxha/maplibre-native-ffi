@@ -447,6 +447,8 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
 
+  internal fun nativeAddress(): Long = requireLiveAddress()
+
   private fun requireLiveAddress(): Long {
     core.requireLive()
     return handleAddress
