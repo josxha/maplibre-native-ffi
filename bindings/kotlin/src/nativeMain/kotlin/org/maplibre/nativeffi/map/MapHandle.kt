@@ -183,18 +183,18 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   private val state = HandleState("MapHandle", handle, runtime)
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
-  public fun setStyleUrl(url: String) {
+  public actual fun setStyleUrl(url: String) {
     MemoryUtil.requireValidCString(url)
     Status.check(mln_map_set_style_url(state.requireLive(), url))
   }
 
-  public fun setStyleJson(json: String) {
+  public actual fun setStyleJson(json: String) {
     MemoryUtil.requireValidCString(json)
     Status.check(mln_map_set_style_json(state.requireLive(), json))
     clearCustomGeometrySources()
   }
 
-  public fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
+  public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
     memScoped {
       Status.check(
         mln_map_add_style_source_json(
@@ -206,7 +206,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun removeStyleSource(sourceId: String): Boolean = memScoped {
+  public actual fun removeStyleSource(sourceId: String): Boolean = memScoped {
     val outRemoved = alloc<BooleanVar>()
     Status.check(
       mln_map_remove_style_source(
@@ -220,7 +220,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     removed
   }
 
-  public fun styleSourceExists(sourceId: String): Boolean = memScoped {
+  public actual fun styleSourceExists(sourceId: String): Boolean = memScoped {
     val outExists = alloc<BooleanVar>()
     Status.check(
       mln_map_style_source_exists(
@@ -232,7 +232,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     outExists.value
   }
 
-  public fun styleSourceType(sourceId: String): SourceType? = memScoped {
+  public actual fun styleSourceType(sourceId: String): SourceType? = memScoped {
     val outType = alloc<UIntVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
@@ -246,7 +246,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (outFound.value) SourceType.fromNative(outType.value) else null
   }
 
-  public fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
+  public actual fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
     val outInfo = alloc<mln_style_source_info>()
     outInfo.size = sizeOf<mln_style_source_info>().toUInt()
     val outFound = alloc<BooleanVar>()
@@ -263,14 +263,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     StyleStructs.sourceInfo(outInfo, attribution)
   }
 
-  public fun styleSourceIds(): List<String> = memScoped {
+  public actual fun styleSourceIds(): List<String> = memScoped {
     val outList = alloc<CPointerVarOf<CPointer<mln_style_id_list>>>()
     outList.value = null
     Status.check(mln_map_list_style_source_ids(state.requireLive(), outList.ptr))
     StyleStructs.styleIdList(requireNotNull(outList.value))
   }
 
-  public fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
     memScoped {
       Status.check(
         mln_map_add_geojson_source_url(
@@ -282,7 +282,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
     memScoped {
       Status.check(
         mln_map_add_geojson_source_data(
@@ -294,7 +294,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
     memScoped {
       Status.check(
         mln_map_set_geojson_source_url(
@@ -306,7 +306,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
     memScoped {
       Status.check(
         mln_map_set_geojson_source_data(
@@ -318,7 +318,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions) {
+  public actual fun addCustomGeometrySource(
+    sourceId: String,
+    options: CustomGeometrySourceOptions,
+  ) {
     val sourceState = CustomGeometrySourceState(options)
     try {
       memScoped {
@@ -337,7 +340,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setCustomGeometrySourceTileData(
+  public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
     data: GeoJson,
@@ -354,7 +357,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
+  public actual fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_tile(
@@ -366,7 +369,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
+  public actual fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_region(
@@ -412,7 +415,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+  public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
     memScoped {
       Status.check(
         mln_map_add_vector_source_url(
@@ -425,7 +428,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addVectorSourceTiles(
+  public actual fun addVectorSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
@@ -444,7 +447,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+  public actual fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
     memScoped {
       Status.check(
         mln_map_add_raster_source_url(
@@ -457,7 +460,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addRasterSourceTiles(
+  public actual fun addRasterSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
@@ -476,7 +479,11 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addRasterDemSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+  public actual fun addRasterDemSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_url(
@@ -489,7 +496,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addRasterDemSourceTiles(
+  public actual fun addRasterDemSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,

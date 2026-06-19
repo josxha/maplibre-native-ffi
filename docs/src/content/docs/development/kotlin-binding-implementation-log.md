@@ -551,3 +551,15 @@ is being implemented.
   operation handles and companion construction. The operation result typing can
   stay common because `OfflineOperationHandle` already carries the binding-owned
   lifecycle and result-kind metadata.
+
+### Common Map Style Source Facade Milestone
+
+- Expanded the common `MapHandle` facade with style URL/JSON loading, generic
+  style source JSON mutation, style source inspection, GeoJSON source mutation,
+  custom geometry source mutation, and vector/raster/raster-dem source creation.
+- Converted the existing Kotlin/Native source-domain map methods into native
+  actuals and added JVM and Android actual placeholders until their map bridges
+  are migrated.
+- Reflection: custom geometry source ownership remains platform-local because
+  the native callback descriptor is bridge-specific, but the public source
+  lifecycle and tile invalidation API can already be common.

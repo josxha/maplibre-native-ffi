@@ -5,11 +5,18 @@ import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.CanonicalTileId
+import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.SourceInfo
+import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Android actual placeholder until the JNI map bridge is migrated. */
 public actual class MapHandle private constructor() : AutoCloseable {
@@ -17,6 +24,107 @@ public actual class MapHandle private constructor() : AutoCloseable {
     get() = unsupportedMapHandle()
 
   public actual fun runtime(): RuntimeHandle = unsupportedMapHandle()
+
+  public actual fun setStyleUrl(url: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setStyleJson(json: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun removeStyleSource(sourceId: String): Boolean = unsupportedMapHandle()
+
+  public actual fun styleSourceExists(sourceId: String): Boolean = unsupportedMapHandle()
+
+  public actual fun styleSourceType(sourceId: String): SourceType? = unsupportedMapHandle()
+
+  public actual fun styleSourceInfo(sourceId: String): SourceInfo? = unsupportedMapHandle()
+
+  public actual fun styleSourceIds(): List<String> = unsupportedMapHandle()
+
+  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addCustomGeometrySource(
+    sourceId: String,
+    options: CustomGeometrySourceOptions,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setCustomGeometrySourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: GeoJson,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addVectorSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addRasterSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addRasterDemSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addRasterDemSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    unsupportedMapHandle()
+  }
 
   public actual fun requestRepaint() {
     unsupportedMapHandle()

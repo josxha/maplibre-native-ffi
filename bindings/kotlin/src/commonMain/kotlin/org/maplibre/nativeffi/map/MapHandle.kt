@@ -5,17 +5,84 @@ import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.CanonicalTileId
+import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.SourceInfo
+import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned map handle. Platform actuals own the native map carrier. */
 public expect class MapHandle : AutoCloseable {
   public val isClosed: Boolean
 
   public fun runtime(): RuntimeHandle
+
+  public fun setStyleUrl(url: String)
+
+  public fun setStyleJson(json: String)
+
+  public fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue)
+
+  public fun removeStyleSource(sourceId: String): Boolean
+
+  public fun styleSourceExists(sourceId: String): Boolean
+
+  public fun styleSourceType(sourceId: String): SourceType?
+
+  public fun styleSourceInfo(sourceId: String): SourceInfo?
+
+  public fun styleSourceIds(): List<String>
+
+  public fun addGeoJsonSourceUrl(sourceId: String, url: String)
+
+  public fun addGeoJsonSourceData(sourceId: String, data: GeoJson)
+
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String)
+
+  public fun setGeoJsonSourceData(sourceId: String, data: GeoJson)
+
+  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions)
+
+  public fun setCustomGeometrySourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: GeoJson,
+  )
+
+  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId)
+
+  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds)
+
+  public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?)
+
+  public fun addVectorSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  )
+
+  public fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?)
+
+  public fun addRasterSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  )
+
+  public fun addRasterDemSourceUrl(sourceId: String, url: String, options: TileSourceOptions?)
+
+  public fun addRasterDemSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  )
 
   public fun requestRepaint()
 
