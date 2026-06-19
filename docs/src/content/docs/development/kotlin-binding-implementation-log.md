@@ -609,3 +609,13 @@ is being implemented.
 - Reflection: this is the first non-placeholder JVM handle actual below
   `Maplibre`. It confirms small bridge-support objects can migrate before the
   larger runtime/map/render handle transports are ready.
+
+### Android Native Buffer Actual Milestone
+
+- Replaced the Android `NativeBuffer` placeholder with a direct `ByteBuffer`
+  implementation, matching the existing Java JNI buffer behavior.
+- Kept the same copied byte-array reads, capacity checks, idempotent close, and
+  close-during-borrow semantics as the JVM and Kotlin/Native buffers.
+- Reflection: this gives Android JNI render readback a real platform carrier
+  without requiring the larger render-session bridge to be implemented in the
+  same milestone.
