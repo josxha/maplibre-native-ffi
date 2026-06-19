@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
@@ -11,7 +10,6 @@ import kotlinx.cinterop.staticCFunction
 import org.maplibre.nativeffi.internal.c.mln_log_clear_callback
 import org.maplibre.nativeffi.internal.c.mln_log_set_callback
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
-import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogEvent
 import org.maplibre.nativeffi.log.LogRecord
@@ -49,12 +47,12 @@ internal class LogCallbackState private constructor(private val callback: LogCal
   internal fun isClosedForTesting(): Boolean = closed.load() != 0
 
   internal companion object {
-    private val updateLock = AtomicInt(0)
-    private val installed = AtomicInt(0)
-    private val current = AtomicReference<LogCallbackState?>(null)
+    private val registry = LogCallbackRegistry<LogCallbackState>()
 
     fun set(callback: LogCallback) {
-      set(LogCallbackState(callback)) { mln_log_set_callback(staticCFunction(::logCallback), null) }
+      registry.set(LogCallbackState(callback)) {
+        mln_log_set_callback(staticCFunction(::logCallback), null)
+      }
     }
 
     fun setForTesting(
@@ -62,53 +60,17 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       install: () -> Int,
       captureReplacement: (LogCallbackState) -> Unit,
     ) {
-      set(LogCallbackState(callback).also(captureReplacement), install)
-    }
-
-    private fun set(replacement: LogCallbackState, install: () -> Int) {
-      var previous: LogCallbackState? = null
-      try {
-        withUpdateLock {
-          if (installed.load() == 0) {
-            Status.check(install())
-            installed.store(1)
-          }
-          previous = current.exchange(replacement)
-        }
-      } catch (error: Throwable) {
-        replacement.close()
-        throw error
-      }
-      previous?.close()
+      registry.set(LogCallbackState(callback).also(captureReplacement), install)
     }
 
     fun clear() {
-      var previous: LogCallbackState? = null
-      withUpdateLock {
-        if (installed.load() != 0) {
-          Status.check(mln_log_clear_callback())
-          installed.store(0)
-        }
-        previous = current.exchange(null)
-      }
-      previous?.close()
+      registry.clear(::mln_log_clear_callback)
     }
 
-    private inline fun <T> withUpdateLock(block: () -> T): T {
-      while (!updateLock.compareAndSet(0, 1)) {
-        // Spin briefly; log callback registration is process-global and infrequent.
-      }
-      try {
-        return block()
-      } finally {
-        updateLock.store(0)
-      }
-    }
-
-    fun currentForTesting(): LogCallbackState? = current.load()
+    fun currentForTesting(): LogCallbackState? = registry.current()
 
     fun invokeCurrent(severity: UInt, event: UInt, code: Long, message: CPointer<ByteVar>?): UInt =
-      current.load()?.invoke(severity, event, code, message) ?: 0U
+      registry.current()?.invoke(severity, event, code, message) ?: 0U
   }
 }
 

@@ -382,3 +382,17 @@ is being implemented.
 - Reflection: this prepares another small lifecycle primitive for future JVM and
   Android buffer implementations without deciding the eventual public buffer
   bridge API.
+
+### Common Log Callback Registry Milestone
+
+- Extracted process-global log callback install, replacement, clear, and failed
+  install cleanup behavior into a common `LogCallbackRegistry`.
+- Rewired the Kotlin/Native log callback state to use the common registry while
+  leaving raw C callback installation, message copying, and trampoline dispatch
+  in `nativeMain`.
+- Added common tests for first install, replacement cleanup, failed initial
+  install cleanup, and native clear accounting.
+- Discovery: the native log callback owner already had a clean split between
+  global replacement policy and raw upcall materialization, so the registry can
+  serve future FFM and Android actuals without changing the public log callback
+  API.
