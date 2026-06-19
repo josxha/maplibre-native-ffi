@@ -19,6 +19,7 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
@@ -62,6 +63,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationKind
 import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -499,6 +501,67 @@ internal object NativeAccess {
       Status.check(
         mapStringViewAddressStatusFunction("mln_map_set_geojson_source_data")
           .invokeWithArguments(map, stringView(arena, sourceId), geoJson(arena, data)) as Int
+      )
+    }
+  }
+
+  internal fun addCustomGeometrySource(
+    map: MemorySegment,
+    sourceId: String,
+    options: MemorySegment,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_add_custom_geometry_source")
+          .invokeWithArguments(map, stringView(arena, sourceId), options) as Int
+      )
+    }
+  }
+
+  internal fun setCustomGeometrySourceTileData(
+    map: MemorySegment,
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: GeoJson,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdAddressStatusFunction(
+            "mln_map_set_custom_geometry_source_tile_data"
+          )
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            canonicalTileId(arena, tileId),
+            geoJson(arena, data),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun invalidateCustomGeometrySourceTile(
+    map: MemorySegment,
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdStatusFunction("mln_map_invalidate_custom_geometry_source_tile")
+          .invokeWithArguments(map, stringView(arena, sourceId), canonicalTileId(arena, tileId))
+          as Int
+      )
+    }
+  }
+
+  internal fun invalidateCustomGeometrySourceRegion(
+    map: MemorySegment,
+    sourceId: String,
+    bounds: LatLngBounds,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewLatLngBoundsStatusFunction("mln_map_invalidate_custom_geometry_source_region")
+          .invokeWithArguments(map, stringView(arena, sourceId), latLngBounds(arena, bounds)) as Int
       )
     }
   }
@@ -1547,6 +1610,73 @@ internal object NativeAccess {
         .invokeWithArguments(response, nativeBytes(arena, bytes), bytes.size.toLong()) as Int
     }
 
+  internal fun customGeometrySourceOptions(
+    arena: Arena,
+    value: CustomGeometrySourceOptions,
+    fetchTile: MemorySegment,
+    cancelTile: MemorySegment,
+  ): MemorySegment {
+    val segment = arena.allocate(CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE_OFFSET,
+      CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE.toInt(),
+    )
+    segment.set(ValueLayout.ADDRESS, CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE_OFFSET, fetchTile)
+    segment.set(ValueLayout.ADDRESS, CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE_OFFSET, cancelTile)
+    segment.set(
+      ValueLayout.ADDRESS,
+      CUSTOM_GEOMETRY_SOURCE_OPTIONS_USER_DATA_OFFSET,
+      MemorySegment.NULL,
+    )
+    var fields = 0
+    value.minZoom?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_GEOMETRY_SOURCE_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.maxZoom?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_GEOMETRY_SOURCE_OPTIONS_MAX_ZOOM_OFFSET, it)
+    }
+    value.tolerance?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_GEOMETRY_SOURCE_OPTIONS_TOLERANCE_OFFSET, it)
+    }
+    value.tileSize?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
+      segment.set(ValueLayout.JAVA_INT, CUSTOM_GEOMETRY_SOURCE_OPTIONS_TILE_SIZE_OFFSET, it)
+    }
+    value.buffer?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
+      segment.set(ValueLayout.JAVA_INT, CUSTOM_GEOMETRY_SOURCE_OPTIONS_BUFFER_OFFSET, it)
+    }
+    value.clip?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
+      segment.set(ValueLayout.JAVA_BOOLEAN, CUSTOM_GEOMETRY_SOURCE_OPTIONS_CLIP_OFFSET, it)
+    }
+    value.wrap?.let {
+      fields = fields or CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+      segment.set(ValueLayout.JAVA_BOOLEAN, CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, CUSTOM_GEOMETRY_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  internal fun canonicalTileId(segment: MemorySegment): CanonicalTileId =
+    CanonicalTileId(
+      segment.get(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_Z_OFFSET),
+      Integer.toUnsignedLong(segment.get(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_X_OFFSET)),
+      Integer.toUnsignedLong(segment.get(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_Y_OFFSET)),
+    )
+
+  private fun canonicalTileId(arena: Arena, value: CanonicalTileId): MemorySegment {
+    val segment = arena.allocate(canonicalTileIdLayout)
+    segment.set(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_Z_OFFSET, value.z)
+    segment.set(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_X_OFFSET, value.x.toInt())
+    segment.set(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_Y_OFFSET, value.y.toInt())
+    return segment
+  }
+
   internal fun takeOfflineRegionStatusResult(
     runtime: MemorySegment,
     operationId: Long,
@@ -1825,6 +1955,40 @@ internal object NativeAccess {
         ValueLayout.ADDRESS,
         stringViewLayout,
         stringViewLayout,
+      ),
+    )
+
+  private fun mapStringViewCanonicalTileIdStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        canonicalTileIdLayout,
+      ),
+    )
+
+  private fun mapStringViewCanonicalTileIdAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        canonicalTileIdLayout,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapStringViewLatLngBoundsStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        latLngBoundsLayout,
       ),
     )
 
@@ -4197,6 +4361,13 @@ internal object NativeAccess {
       latLngLayout.withName("northeast"),
     )
 
+  private val canonicalTileIdLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_INT.withName("z"),
+      ValueLayout.JAVA_INT.withName("x"),
+      ValueLayout.JAVA_INT.withName("y"),
+    )
+
   private val unitBezierLayout =
     MemoryLayout.structLayout(
       ValueLayout.JAVA_DOUBLE.withName("x1"),
@@ -4380,6 +4551,11 @@ internal object NativeAccess {
   private const val GEOJSON_TYPE_OFFSET: Long = 4
   private const val GEOJSON_DATA_OFFSET: Long = 8
 
+  private const val CANONICAL_TILE_ID_SIZE: Long = 12
+  private const val CANONICAL_TILE_ID_Z_OFFSET: Long = 0
+  private const val CANONICAL_TILE_ID_X_OFFSET: Long = 4
+  private const val CANONICAL_TILE_ID_Y_OFFSET: Long = 8
+
   private const val JSON_VALUE_SIZE: Long = 24
   private const val JSON_VALUE_SIZE_OFFSET: Long = 0
   private const val JSON_VALUE_TYPE_OFFSET: Long = 4
@@ -4472,6 +4648,28 @@ internal object NativeAccess {
   private const val TILE_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long = 80
   private const val TILE_SOURCE_OPTIONS_VECTOR_ENCODING_OFFSET: Long = 84
   private const val TILE_SOURCE_OPTIONS_RASTER_ENCODING_OFFSET: Long = 88
+
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE: Int = 1 shl 2
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE: Int = 1 shl 3
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER: Int = 1 shl 4
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP: Int = 1 shl 5
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: Int = 1 shl 6
+
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE: Long = 72
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE_OFFSET: Long = 8
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE_OFFSET: Long = 16
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_USER_DATA_OFFSET: Long = 24
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long = 32
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long = 40
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_TOLERANCE_OFFSET: Long = 48
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long = 56
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_BUFFER_OFFSET: Long = 60
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CLIP_OFFSET: Long = 64
+  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET: Long = 65
 
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE: Long = 32
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET: Long = 0

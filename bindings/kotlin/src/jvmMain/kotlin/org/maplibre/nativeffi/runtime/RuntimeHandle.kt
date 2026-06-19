@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.foreign.MemorySegment
+import java.lang.ref.WeakReference
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -8,6 +9,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.loader.NativeAccess.NativeRuntimeEvent
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -21,6 +23,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   private val core = HandleStateCore("RuntimeHandle", handle.address())
   private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
+  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -271,6 +274,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         resourceProviderState = null
         resourceTransformState?.close()
         resourceTransformState = null
+        liveMaps.clear()
       },
     )
   }
@@ -306,6 +310,17 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   internal fun nativeHandle(): MemorySegment = requireLiveHandle()
 
+  internal fun registerMap(map: MapHandle) {
+    liveMaps[map.nativeAddress()] = WeakReference(map)
+  }
+
+  internal fun unregisterMap(map: MapHandle) {
+    val address = map.nativeAddress()
+    if (liveMaps[address]?.get() === map) {
+      liveMaps.remove(address)
+    }
+  }
+
   private fun requireLiveHandle(): MemorySegment {
     core.requireLive()
     return handle
@@ -313,14 +328,29 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   private fun NativeRuntimeEvent.toRuntimeEvent(): RuntimeEvent {
     val sourceType = RuntimeEventSourceType.fromNative(sourceType)
+    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceAddress) else null
+    val eventType = RuntimeEventType.fromNative(type)
+    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
+      mapSource?.releaseDetachedCustomGeometrySources()
+    }
     return RuntimeEvent(
-      RuntimeEventType.fromNative(type),
+      eventType,
       sourceType,
       if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
-      null,
+      mapSource,
       code,
       payload,
       message,
     )
+  }
+
+  private fun mapFor(address: Long): MapHandle? {
+    if (address == 0L) return null
+    val reference = liveMaps[address] ?: return null
+    val map = reference.get()
+    if (map == null) {
+      liveMaps.remove(address)
+    }
+    return map
   }
 }

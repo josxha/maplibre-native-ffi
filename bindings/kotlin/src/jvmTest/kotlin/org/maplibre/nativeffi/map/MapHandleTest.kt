@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
@@ -25,6 +26,8 @@ import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
+import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -119,6 +122,58 @@ class MapHandleTest {
         "inline-places",
         GeoJson.GeometryValue(Geometry.LineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
       )
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun customGeometrySourcesCanBeManaged() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.addCustomGeometrySource(
+        "custom-places",
+        CustomGeometrySourceOptions(
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          )
+          .apply {
+            minZoom = 0.0
+            maxZoom = 14.0
+            tolerance = 0.375
+            tileSize = 512
+            buffer = 64
+            clip = true
+            wrap = false
+          },
+      )
+
+      assertTrue(map.styleSourceExists("custom-places"))
+      assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-places"))
+
+      val tileId = CanonicalTileId(0, 0, 0)
+      map.setCustomGeometrySourceTileData("custom-places", tileId, geoJsonData())
+      map.invalidateCustomGeometrySourceTile("custom-places", tileId)
+      map.invalidateCustomGeometrySourceRegion(
+        "custom-places",
+        LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)),
+      )
+
+      assertTrue(map.removeStyleSource("custom-places"))
+      assertFalse(map.styleSourceExists("custom-places"))
     } finally {
       map.close()
       runtime.close()

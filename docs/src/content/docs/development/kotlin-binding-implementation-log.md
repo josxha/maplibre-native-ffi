@@ -1037,3 +1037,22 @@ is being implemented.
 - Discovery: making the Android geometry scope package-internal is enough to
   share descriptor ownership across map and projection actuals while keeping
   JavaCPP pointer details out of common code.
+
+### JVM and Android Custom Geometry Source Milestone
+
+- Implemented JVM FFM and Android JavaCPP custom geometry source add, tile data,
+  tile invalidation, and region invalidation APIs.
+- Added JVM and Android callback state owners for custom geometry source
+  fetch/cancel callbacks, including callback-gate protection and native
+  descriptor cleanup.
+- Registered JVM and Android maps with their runtime so map runtime events can
+  resolve the Kotlin `MapHandle` and sweep custom source states after
+  style-loaded events.
+- Added JVM coverage for adding/removing custom geometry sources and
+  updating/invalidating custom tile data.
+- Discovery: Kotlin/JVM FFM custom-source callbacks can keep `user_data` null
+  when upcall stubs are bound to the state object; Android JavaCPP callbacks
+  instead carry state through callback subclass captures.
+- Discovery: custom source lifecycle needs map/runtime coordination, not just
+  direct map methods, because style URL loads drop previous style sources
+  asynchronously.

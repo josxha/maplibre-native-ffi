@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime
 
+import java.lang.ref.WeakReference
 import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
@@ -16,6 +17,7 @@ import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
@@ -33,6 +35,7 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   private val core = HandleStateCore("RuntimeHandle", handleAddress)
   private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
+  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -389,6 +392,7 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
         resourceProviderState = null
         resourceTransformState?.close()
         resourceTransformState = null
+        liveMaps.clear()
       },
     )
   }
@@ -449,6 +453,17 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   internal fun nativeAddress(): Long = requireLiveAddress()
 
+  internal fun registerMap(map: MapHandle) {
+    liveMaps[map.nativeAddress()] = WeakReference(map)
+  }
+
+  internal fun unregisterMap(map: MapHandle) {
+    val address = map.nativeAddress()
+    if (liveMaps[address]?.get() === map) {
+      liveMaps.remove(address)
+    }
+  }
+
   private fun requireLiveAddress(): Long {
     core.requireLive()
     return handleAddress
@@ -456,15 +471,31 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   private fun runtimeEvent(event: MaplibreNativeC.mln_runtime_event): RuntimeEvent {
     val sourceType = RuntimeEventSourceType.fromNative(event.source_type())
+    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(event.source()) else null
+    val eventType = RuntimeEventType.fromNative(event.type())
+    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
+      mapSource?.releaseDetachedCustomGeometrySources()
+    }
     return RuntimeEvent(
-      RuntimeEventType.fromNative(event.type()),
+      eventType,
       sourceType,
       if (sourceType == RuntimeEventSourceType.RUNTIME) this else null,
-      null,
+      mapSource,
       event.code(),
       runtimeEventPayload(event),
       byteString(event.message(), event.message_size()),
     )
+  }
+
+  private fun mapFor(source: Pointer?): MapHandle? {
+    val address = source?.address() ?: return null
+    if (address == 0L) return null
+    val reference = liveMaps[address] ?: return null
+    val map = reference.get()
+    if (map == null) {
+      liveMaps.remove(address)
+    }
+    return map
   }
 
   private fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload {

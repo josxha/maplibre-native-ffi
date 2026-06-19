@@ -43,6 +43,7 @@ private constructor(
 ) : AutoCloseable {
   private val runtimeRetention = runtime.retainChild()
   private val core = HandleStateCore("MapHandle", handle.address())
+  private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -57,6 +58,7 @@ private constructor(
   public actual fun setStyleJson(json: String) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
+    clearCustomGeometrySources()
   }
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
@@ -66,7 +68,9 @@ private constructor(
 
   public actual fun removeStyleSource(sourceId: String): Boolean {
     NativeAccess.ensureLoaded()
-    return NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
+    val removed = NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
+    if (removed) closeCustomGeometrySource(sourceId)
+    return removed
   }
 
   public actual fun styleSourceExists(sourceId: String): Boolean {
@@ -113,7 +117,15 @@ private constructor(
     sourceId: String,
     options: CustomGeometrySourceOptions,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    val sourceState = CustomGeometrySourceState(options)
+    try {
+      NativeAccess.addCustomGeometrySource(requireLiveHandle(), sourceId, sourceState.descriptor())
+      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+    } catch (error: Throwable) {
+      closeQuietly(sourceState)
+      throw error
+    }
   }
 
   public actual fun setCustomGeometrySourceTileData(
@@ -121,15 +133,18 @@ private constructor(
     tileId: CanonicalTileId,
     data: GeoJson,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setCustomGeometrySourceTileData(requireLiveHandle(), sourceId, tileId, data)
   }
 
   public actual fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.invalidateCustomGeometrySourceTile(requireLiveHandle(), sourceId, tileId)
   }
 
   public actual fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.invalidateCustomGeometrySourceRegion(requireLiveHandle(), sourceId, bounds)
   }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
@@ -619,14 +634,33 @@ private constructor(
   public actual override fun close() {
     core.closeOnce(
       destroy = { NativeAccess.destroyMap(handle) },
-      afterSuccess = { runtimeRetention.close() },
+      afterSuccess = {
+        clearCustomGeometrySources()
+        runtime.unregisterMap(this)
+        runtimeRetention.close()
+      },
     )
   }
 
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
       NativeAccess.ensureLoaded()
-      return MapHandle(runtime, NativeAccess.createMap(runtime.nativeHandle(), options))
+      return MapHandle(runtime, NativeAccess.createMap(runtime.nativeHandle(), options)).also {
+        runtime.registerMap(it)
+      }
+    }
+  }
+
+  internal fun nativeAddress(): Long = handle.address()
+
+  internal fun releaseDetachedCustomGeometrySources() {
+    val iterator = customGeometrySources.iterator()
+    while (iterator.hasNext()) {
+      val entry = iterator.next()
+      if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
+        closeQuietly(entry.value)
+        iterator.remove()
+      }
     }
   }
 
@@ -634,9 +668,24 @@ private constructor(
     core.requireLive()
     return handle
   }
+
+  private fun closeCustomGeometrySource(sourceId: String) {
+    closeQuietly(customGeometrySources.remove(sourceId))
+  }
+
+  private fun clearCustomGeometrySources() {
+    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.clear()
+  }
 }
 
 private fun unsupportedMapHandle(): Nothing =
   throw UnsupportedOperationException(
     "MapHandle is not available until the JVM map bridge is implemented"
   )
+
+private fun closeQuietly(closeable: AutoCloseable?) {
+  try {
+    closeable?.close()
+  } catch (_: Exception) {}
+}

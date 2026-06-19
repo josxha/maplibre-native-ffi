@@ -22,6 +22,7 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
+import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -53,6 +54,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   AutoCloseable {
   private val runtimeRetention = runtime.retainChild()
   private val core = HandleStateCore("MapHandle", handleAddress)
+  private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -71,6 +73,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     optionalCString(json).use { nativeJson ->
       Status.check(MaplibreNativeC.mln_map_set_style_json(map(requireLiveAddress()), nativeJson))
     }
+    clearCustomGeometrySources()
   }
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
@@ -100,6 +103,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
         )
       )
     }
+    if (outRemoved[0]) closeCustomGeometrySource(sourceId)
     return outRemoved[0]
   }
 
@@ -235,7 +239,23 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     sourceId: String,
     options: CustomGeometrySourceOptions,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    val sourceState = CustomGeometrySourceState(options)
+    try {
+      StringViewScope(sourceId).use { nativeSourceId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_custom_geometry_source(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            sourceState.descriptor,
+          )
+        )
+      }
+      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+    } catch (error: Throwable) {
+      closeQuietly(sourceState)
+      throw error
+    }
   }
 
   public actual fun setCustomGeometrySourceTileData(
@@ -243,15 +263,49 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     tileId: CanonicalTileId,
     data: GeoJson,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      CanonicalTileIdScope(tileId).use { nativeTileId ->
+        GeoJsonScope(data).use { nativeData ->
+          Status.check(
+            MaplibreNativeC.mln_map_set_custom_geometry_source_tile_data(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeTileId.tileId,
+              nativeData.value,
+            )
+          )
+        }
+      }
+    }
   }
 
   public actual fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      CanonicalTileIdScope(tileId).use { nativeTileId ->
+        Status.check(
+          MaplibreNativeC.mln_map_invalidate_custom_geometry_source_tile(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeTileId.tileId,
+          )
+        )
+      }
+    }
   }
 
   public actual fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      Status.check(
+        MaplibreNativeC.mln_map_invalidate_custom_geometry_source_region(
+          map(requireLiveAddress()),
+          nativeSourceId.view,
+          latLngBounds(bounds),
+        )
+      )
+    }
   }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
@@ -1365,8 +1419,25 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   public actual override fun close() {
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_map_destroy(map(handleAddress)) },
-      afterSuccess = { runtimeRetention.close() },
+      afterSuccess = {
+        clearCustomGeometrySources()
+        runtime.unregisterMap(this)
+        runtimeRetention.close()
+      },
     )
+  }
+
+  internal fun nativeAddress(): Long = handleAddress
+
+  internal fun releaseDetachedCustomGeometrySources() {
+    val iterator = customGeometrySources.iterator()
+    while (iterator.hasNext()) {
+      val entry = iterator.next()
+      if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
+        closeQuietly(entry.value)
+        iterator.remove()
+      }
+    }
   }
 
   private fun addTileSourceUrl(
@@ -1462,7 +1533,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
           val map = outMap.get(MaplibreNativeC.mln_map::class.java, 0)
           val address = if (map == null || map.isNull) 0L else map.address()
           require(address != 0L) { "mln_map_create returned a null map" }
-          return MapHandle(runtime, address)
+          return MapHandle(runtime, address).also { runtime.registerMap(it) }
         }
       }
     }
@@ -1471,6 +1542,15 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   private fun requireLiveAddress(): Long {
     core.requireLive()
     return handleAddress
+  }
+
+  private fun closeCustomGeometrySource(sourceId: String) {
+    closeQuietly(customGeometrySources.remove(sourceId))
+  }
+
+  private fun clearCustomGeometrySources() {
+    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.clear()
   }
 }
 
@@ -2354,6 +2434,109 @@ private class GeoDescriptorScope : AutoCloseable {
   }
 }
 
+private class CanonicalTileIdScope(value: CanonicalTileId) : AutoCloseable {
+  val tileId: MaplibreNativeC.mln_canonical_tile_id =
+    MaplibreNativeC.mln_canonical_tile_id().z(value.z).x(value.x.toInt()).y(value.y.toInt())
+
+  override fun close() {
+    tileId.close()
+  }
+}
+
+private class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
+  AutoCloseable {
+  private val gate = CallbackGate("custom geometry callbacks", ::closeNative)
+  private val fetchTile =
+    object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
+      override fun call(userData: Pointer, tileId: MaplibreNativeC.mln_canonical_tile_id) {
+        fetchTile(tileId)
+      }
+    }
+  private val cancelTile =
+    object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
+      override fun call(userData: Pointer, tileId: MaplibreNativeC.mln_canonical_tile_id) {
+        cancelTile(tileId)
+      }
+    }
+  val descriptor: MaplibreNativeC.mln_custom_geometry_source_options =
+    MaplibreNativeC.mln_custom_geometry_source_options_default()
+
+  init {
+    descriptor.fetch_tile(fetchTile)
+    descriptor.cancel_tile(cancelTile)
+    descriptor.user_data(AddressPointer(0))
+    var fields = 0
+    options.minZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
+      descriptor.min_zoom(it)
+    }
+    options.maxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
+      descriptor.max_zoom(it)
+    }
+    options.tolerance?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
+      descriptor.tolerance(it)
+    }
+    options.tileSize?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
+      descriptor.tile_size(it)
+    }
+    options.buffer?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
+      descriptor.buffer(it)
+    }
+    options.clip?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
+      descriptor.clip(it)
+    }
+    options.wrap?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+      descriptor.wrap(it)
+    }
+    descriptor.fields(fields)
+  }
+
+  override fun close() {
+    gate.close()
+  }
+
+  private fun fetchTile(tileId: MaplibreNativeC.mln_canonical_tile_id) {
+    val lease = gate.enter() ?: return
+    try {
+      options.callback.fetchTile(canonicalTileId(tileId))
+    } catch (_: Throwable) {
+      // Native callbacks must not unwind through the C ABI.
+    } finally {
+      lease.close()
+    }
+  }
+
+  private fun cancelTile(tileId: MaplibreNativeC.mln_canonical_tile_id) {
+    val lease = gate.enter() ?: return
+    try {
+      options.callback.cancelTile(canonicalTileId(tileId))
+    } catch (_: Throwable) {
+      // Native callbacks must not unwind through the C ABI.
+    } finally {
+      lease.close()
+    }
+  }
+
+  private fun closeNative() {
+    descriptor.close()
+    fetchTile.close()
+    cancelTile.close()
+  }
+
+  private fun canonicalTileId(tileId: MaplibreNativeC.mln_canonical_tile_id): CanonicalTileId =
+    CanonicalTileId(
+      tileId.z(),
+      Integer.toUnsignedLong(tileId.x()),
+      Integer.toUnsignedLong(tileId.y()),
+    )
+}
+
 private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable {
   private val attribution: StringViewScope? = value?.attribution?.let(::StringViewScope)
   val options: MaplibreNativeC.mln_style_tile_source_options =
@@ -2567,6 +2750,12 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address
   }
+}
+
+private fun closeQuietly(closeable: AutoCloseable?) {
+  try {
+    closeable?.close()
+  } catch (_: Exception) {}
 }
 
 private fun unsupportedMapHandle(): Nothing =
