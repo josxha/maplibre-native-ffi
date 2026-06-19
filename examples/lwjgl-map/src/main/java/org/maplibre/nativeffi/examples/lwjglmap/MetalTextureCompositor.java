@@ -30,7 +30,7 @@ final class MetalTextureCompositor implements AutoCloseable {
     if (frame.width() == 0 || frame.height() == 0 || frame.texture().isNull()) {
       throw new IllegalStateException("owned Metal frame has an empty extent or null texture");
     }
-    drawTexture(frame.texture().address());
+    drawTexture(BindingApi.nativeAddress(frame.texture()));
   }
 
   void drawTexture(long texture) {

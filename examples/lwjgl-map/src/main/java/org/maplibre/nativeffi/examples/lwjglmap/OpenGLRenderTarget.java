@@ -22,21 +22,18 @@ final class OpenGLRenderTarget {
   private static RenderTarget attachSurface(
       OpenGLContext context, MapHandle map, Viewport viewport) {
     var descriptor =
-        new OpenGLSurfaceDescriptor()
-            .extent(extent(viewport))
-            .context(context.descriptor())
-            .surface(context.surfacePointer());
-    return new Surface(RenderSessionHandle.attachOpenGLSurface(map, descriptor));
+        new OpenGLSurfaceDescriptor(
+            extent(viewport), context.descriptor(), context.surfacePointer());
+    return new Surface(BindingApi.attachOpenGLSurface(map, descriptor));
   }
 
   private static RenderTarget attachOwnedTexture(
       OpenGLContext context, MapHandle map, Viewport viewport) {
-    var descriptor =
-        new OpenGLOwnedTextureDescriptor().extent(extent(viewport)).context(context.descriptor());
+    var descriptor = new OpenGLOwnedTextureDescriptor(extent(viewport), context.descriptor());
     RenderSessionHandle session = null;
     OpenGLTextureCompositor compositor = null;
     try {
-      session = RenderSessionHandle.attachOpenGLOwnedTexture(map, descriptor);
+      session = BindingApi.attachOpenGLOwnedTexture(map, descriptor);
       compositor = new OpenGLTextureCompositor(context, viewport);
       return new OwnedTexture(session, compositor);
     } catch (RuntimeException error) {
@@ -54,12 +51,9 @@ final class OpenGLRenderTarget {
     try {
       texture = new OpenGLBorrowedTexture(context, viewport);
       var descriptor =
-          new OpenGLBorrowedTextureDescriptor()
-              .extent(extent(viewport))
-              .context(context.descriptor())
-              .texture(texture.texture())
-              .target(texture.target());
-      session = RenderSessionHandle.attachOpenGLBorrowedTexture(map, descriptor);
+          new OpenGLBorrowedTextureDescriptor(
+              extent(viewport), context.descriptor(), texture.texture(), texture.target());
+      session = BindingApi.attachOpenGLBorrowedTexture(map, descriptor);
       compositor = new OpenGLTextureCompositor(context, viewport);
       return new BorrowedTexture(context, map, session, compositor, texture);
     } catch (RuntimeException error) {

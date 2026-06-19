@@ -38,8 +38,8 @@ final class InputController implements AutoCloseable {
   private static final double KEYBOARD_ZOOM = 1.25;
   private static final double KEYBOARD_BEARING = 10.0;
   private static final double KEYBOARD_PITCH = 5.0;
-  private static final AnimationOptions KEYBOARD_ANIMATION = new AnimationOptions().durationMs(160);
-  private static final AnimationOptions RESET_ANIMATION = new AnimationOptions().durationMs(220);
+  private static final AnimationOptions KEYBOARD_ANIMATION = animation(160);
+  private static final AnimationOptions RESET_ANIMATION = animation(220);
 
   private final long window;
   private final MapHandle map;
@@ -135,7 +135,12 @@ final class InputController implements AutoCloseable {
       case GLFW_KEY_E -> setBearing(currentBearing() + KEYBOARD_BEARING, true);
       case GLFW_KEY_RIGHT_BRACKET -> setPitch(currentPitch() + KEYBOARD_PITCH, true);
       case GLFW_KEY_LEFT_BRACKET -> setPitch(currentPitch() - KEYBOARD_PITCH, true);
-      case GLFW_KEY_0 -> map.easeTo(new CameraOptions().bearing(0.0).pitch(0.0), RESET_ANIMATION);
+      case GLFW_KEY_0 -> {
+        var camera = new CameraOptions();
+        camera.setBearing(0.0);
+        camera.setPitch(0.0);
+        map.easeTo(camera, RESET_ANIMATION);
+      }
       default -> changed = false;
     }
     if (changed) {
@@ -144,13 +149,13 @@ final class InputController implements AutoCloseable {
   }
 
   private double currentBearing() {
-    var camera = map.camera();
-    return camera.hasBearing() ? camera.bearing() : 0.0;
+    var camera = map.getCamera();
+    return camera.getBearing() != null ? camera.getBearing() : 0.0;
   }
 
   private double currentPitch() {
-    var camera = map.camera();
-    return camera.hasPitch() ? camera.pitch() : 0.0;
+    var camera = map.getCamera();
+    return camera.getPitch() != null ? camera.getPitch() : 0.0;
   }
 
   private ScreenPoint viewportCenter() {
@@ -159,7 +164,8 @@ final class InputController implements AutoCloseable {
   }
 
   private void setBearing(double bearing, boolean animated) {
-    var camera = new CameraOptions().bearing(bearing);
+    var camera = new CameraOptions();
+    camera.setBearing(bearing);
     if (animated) {
       map.easeTo(camera, KEYBOARD_ANIMATION);
     } else {
@@ -169,7 +175,8 @@ final class InputController implements AutoCloseable {
 
   private void setPitch(double pitch, boolean animated) {
     var clamped = Math.max(0.0, Math.min(60.0, pitch));
-    var camera = new CameraOptions().pitch(clamped);
+    var camera = new CameraOptions();
+    camera.setPitch(clamped);
     if (animated) {
       map.easeTo(camera, KEYBOARD_ANIMATION);
     } else {
@@ -183,5 +190,11 @@ final class InputController implements AutoCloseable {
     glfwSetMouseButtonCallback(window, null);
     glfwSetScrollCallback(window, null);
     glfwSetKeyCallback(window, null);
+  }
+
+  private static AnimationOptions animation(double durationMs) {
+    var options = new AnimationOptions();
+    options.setDurationMs(durationMs);
+    return options;
   }
 }

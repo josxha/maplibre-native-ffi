@@ -263,7 +263,7 @@ final class VulkanTextureCompositor implements AutoCloseable {
       throw new IllegalStateException(
           "MapLibre owned texture frame is not shader-readable: layout=" + frame.layout());
     }
-    drawImageView(frame.imageView().address());
+    drawImageView(BindingApi.nativeAddress(frame.imageView()));
   }
 
   void drawImageView(long imageView) {

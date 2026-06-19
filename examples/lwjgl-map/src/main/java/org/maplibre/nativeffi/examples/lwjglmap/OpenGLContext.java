@@ -66,7 +66,7 @@ final class OpenGLContext implements GraphicsContext {
   }
 
   private static OpenGLContext createEgl(String title, int width, int height) {
-    if (!Maplibre.supportedOpenGLContextProviders().contains(OpenGLContextProvider.EGL)) {
+    if (!Maplibre.INSTANCE.supportedOpenGLContextProviders().contains(OpenGLContextProvider.EGL)) {
       throw new IllegalStateException("Native library does not support EGL");
     }
     if (!glfwInit()) {
@@ -112,7 +112,7 @@ final class OpenGLContext implements GraphicsContext {
   }
 
   private static OpenGLContext createWgl(String title, int width, int height) {
-    if (!Maplibre.supportedOpenGLContextProviders().contains(OpenGLContextProvider.WGL)) {
+    if (!Maplibre.INSTANCE.supportedOpenGLContextProviders().contains(OpenGLContextProvider.WGL)) {
       throw new IllegalStateException("Native library does not support WGL");
     }
     if (!glfwInit()) {
@@ -163,16 +163,19 @@ final class OpenGLContext implements GraphicsContext {
   OpenGLContextDescriptor descriptor() {
     if (gles) {
       return new EglContextDescriptor(
-          NativePointer.ofAddress(eglDisplay),
-          NativePointer.ofAddress(eglConfig),
-          NativePointer.ofAddress(eglContext));
+          BindingApi.nativePointer(eglDisplay),
+          BindingApi.nativePointer(eglConfig),
+          BindingApi.nativePointer(eglContext),
+          BindingApi.nullNativePointer());
     }
     return new WglContextDescriptor(
-        NativePointer.ofAddress(hdc), NativePointer.ofAddress(glfwGetWGLContext(window)));
+        BindingApi.nativePointer(hdc),
+        BindingApi.nativePointer(glfwGetWGLContext(window)),
+        BindingApi.nullNativePointer());
   }
 
   NativePointer surfacePointer() {
-    return NativePointer.ofAddress(gles ? eglSurface : hdc);
+    return BindingApi.nativePointer(gles ? eglSurface : hdc);
   }
 
   void makeCurrent() {

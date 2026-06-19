@@ -4,7 +4,6 @@ import org.lwjgl.vulkan.VK10;
 import org.maplibre.nativeffi.camera.CameraOptions;
 import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.map.MapHandle;
-import org.maplibre.nativeffi.map.MapMode;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalContextDescriptor;
@@ -16,8 +15,6 @@ import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.VulkanContextDescriptor;
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor;
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload;
-import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
 import org.maplibre.nativeffi.runtime.RuntimeOptions;
 
@@ -36,23 +33,24 @@ final class MapState implements AutoCloseable {
   }
 
   static MapState create(GraphicsContext graphics, Viewport viewport, RenderTargetMode mode) {
-    var runtime = RuntimeHandle.create(new RuntimeOptions().cachePath(":memory:"));
-    var map =
-        MapHandle.create(
-            runtime,
-            new MapOptions()
-                .size(viewport.width(), viewport.height())
-                .scaleFactor(viewport.scaleFactor())
-                .mapMode(MapMode.CONTINUOUS));
+    var runtimeOptions = new RuntimeOptions();
+    runtimeOptions.setCachePath(":memory:");
+    var runtime = BindingApi.createRuntime(runtimeOptions);
+    var mapOptions = new MapOptions();
+    mapOptions.setWidth(viewport.width());
+    mapOptions.setHeight(viewport.height());
+    mapOptions.setScaleFactor(viewport.scaleFactor());
+    BindingApi.setContinuousMapMode(mapOptions);
+    var map = BindingApi.createMap(runtime, mapOptions);
     RenderTarget target = null;
     try {
       map.setStyleUrl(STYLE_URL);
-      map.jumpTo(
-          new CameraOptions()
-              .center(new LatLng(37.7749, -122.4194))
-              .zoom(13.0)
-              .bearing(12.0)
-              .pitch(30.0));
+      var camera = new CameraOptions();
+      camera.setCenter(new LatLng(37.7749, -122.4194));
+      camera.setZoom(13.0);
+      camera.setBearing(12.0);
+      camera.setPitch(30.0);
+      map.jumpTo(camera);
       target = attachRenderTarget(graphics, map, viewport, mode);
       return new MapState(runtime, map, target);
     } catch (RuntimeException error) {
@@ -106,17 +104,12 @@ final class MapState implements AutoCloseable {
   private void drainEvents() {
     while (true) {
       var event = runtime.pollEvent();
-      if (event.isEmpty()) {
+      if (event == null) {
         return;
       }
-      var value = event.get();
-      if (RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE.equals(value.type())
-          && value.mapSource().filter(source -> source == map).isPresent()) {
+      if (BindingApi.isMapRenderUpdateAvailable(event, map)) {
         renderPending = true;
-      } else if (RuntimeEventType.MAP_RENDER_FRAME_FINISHED.equals(value.type())
-          && value.mapSource().filter(source -> source == map).isPresent()
-          && value.payload() instanceof RuntimeEventPayload.RenderFrame frame
-          && frame.needsRepaint()) {
+      } else if (BindingApi.isRepaintNeededRenderFrame(event, map)) {
         renderPending = true;
       }
     }
@@ -154,14 +147,9 @@ final class MapState implements AutoCloseable {
     return switch (mode) {
       case NATIVE_SURFACE -> {
         var descriptor =
-            new VulkanSurfaceDescriptor()
-                .extent(
-                    new RenderTargetExtent(
-                        viewport.width(), viewport.height(), viewport.scaleFactor()))
-                .context(vulkanContextDescriptor(vulkan))
-                .surface(vulkan.surfacePointer());
-        yield new VulkanSurfaceRenderTarget(
-            RenderSessionHandle.attachVulkanSurface(map, descriptor));
+            new VulkanSurfaceDescriptor(
+                extent(viewport), vulkanContextDescriptor(vulkan), vulkan.surfacePointer());
+        yield new VulkanSurfaceRenderTarget(BindingApi.attachVulkanSurface(map, descriptor));
       }
       case OWNED_TEXTURE -> attachOwnedTextureRenderTarget(vulkan, map, viewport);
       case BORROWED_TEXTURE -> attachBorrowedTextureRenderTarget(vulkan, map, viewport);
@@ -173,13 +161,9 @@ final class MapState implements AutoCloseable {
     return switch (mode) {
       case NATIVE_SURFACE -> {
         var descriptor =
-            new MetalSurfaceDescriptor()
-                .extent(
-                    new RenderTargetExtent(
-                        viewport.width(), viewport.height(), viewport.scaleFactor()))
-                .context(metalContextDescriptor(metal))
-                .layer(metal.layerPointer());
-        yield new MetalSurfaceRenderTarget(RenderSessionHandle.attachMetalSurface(map, descriptor));
+            new MetalSurfaceDescriptor(
+                extent(viewport), metalContextDescriptor(metal), metal.layerPointer());
+        yield new MetalSurfaceRenderTarget(BindingApi.attachMetalSurface(map, descriptor));
       }
       case OWNED_TEXTURE -> attachMetalOwnedTextureRenderTarget(metal, map, viewport);
       case BORROWED_TEXTURE -> attachMetalBorrowedTextureRenderTarget(metal, map, viewport);
@@ -189,14 +173,11 @@ final class MapState implements AutoCloseable {
   private static RenderTarget attachOwnedTextureRenderTarget(
       VulkanContext vulkan, MapHandle map, Viewport viewport) {
     var descriptor =
-        new VulkanOwnedTextureDescriptor()
-            .extent(
-                new RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor()))
-            .context(vulkanContextDescriptor(vulkan));
+        new VulkanOwnedTextureDescriptor(extent(viewport), vulkanContextDescriptor(vulkan));
     RenderSessionHandle session = null;
     VulkanTextureCompositor compositor = null;
     try {
-      session = RenderSessionHandle.attachVulkanOwnedTexture(map, descriptor);
+      session = BindingApi.attachVulkanOwnedTexture(map, descriptor);
       compositor = new VulkanTextureCompositor(vulkan, viewport);
       return new VulkanOwnedTextureRenderTarget(session, compositor);
     } catch (RuntimeException error) {
@@ -226,17 +207,15 @@ final class MapState implements AutoCloseable {
     try {
       image = VulkanBorrowedImage.create(vulkan, viewport);
       var descriptor =
-          new VulkanBorrowedTextureDescriptor()
-              .extent(
-                  new RenderTargetExtent(
-                      viewport.width(), viewport.height(), viewport.scaleFactor()))
-              .context(vulkanContextDescriptor(vulkan))
-              .image(image.imagePointer())
-              .imageView(image.viewPointer())
-              .format(VK10.VK_FORMAT_R8G8B8A8_UNORM)
-              .initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED)
-              .finalLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-      session = RenderSessionHandle.attachVulkanBorrowedTexture(map, descriptor);
+          new VulkanBorrowedTextureDescriptor(
+              extent(viewport),
+              vulkanContextDescriptor(vulkan),
+              image.imagePointer(),
+              image.viewPointer(),
+              VK10.VK_FORMAT_R8G8B8A8_UNORM,
+              VK10.VK_IMAGE_LAYOUT_UNDEFINED);
+      descriptor.setFinalLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      session = BindingApi.attachVulkanBorrowedTexture(map, descriptor);
       compositor = new VulkanTextureCompositor(vulkan, viewport);
       return new VulkanBorrowedTextureRenderTarget(vulkan, map, session, compositor, image);
     } catch (RuntimeException error) {
@@ -267,25 +246,23 @@ final class MapState implements AutoCloseable {
 
   private static VulkanContextDescriptor vulkanContextDescriptor(VulkanContext vulkan) {
     return new VulkanContextDescriptor(
-            vulkan.instancePointer(),
-            vulkan.physicalDevicePointer(),
-            vulkan.devicePointer(),
-            vulkan.graphicsQueuePointer(),
-            vulkan.graphicsQueueFamilyIndex())
-        .procAddresses(vulkan.getInstanceProcAddrPointer(), vulkan.getDeviceProcAddrPointer());
+        vulkan.instancePointer(),
+        vulkan.physicalDevicePointer(),
+        vulkan.devicePointer(),
+        vulkan.graphicsQueuePointer(),
+        vulkan.graphicsQueueFamilyIndex(),
+        vulkan.getInstanceProcAddrPointer(),
+        vulkan.getDeviceProcAddrPointer());
   }
 
   private static RenderTarget attachMetalOwnedTextureRenderTarget(
       MetalContext metal, MapHandle map, Viewport viewport) {
     var descriptor =
-        new MetalOwnedTextureDescriptor()
-            .extent(
-                new RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor()))
-            .context(metalContextDescriptor(metal));
+        new MetalOwnedTextureDescriptor(extent(viewport), metalContextDescriptor(metal));
     RenderSessionHandle session = null;
     MetalTextureCompositor compositor = null;
     try {
-      session = RenderSessionHandle.attachMetalOwnedTexture(map, descriptor);
+      session = BindingApi.attachMetalOwnedTexture(map, descriptor);
       compositor = new MetalTextureCompositor(metal);
       return new MetalOwnedTextureRenderTarget(session, compositor);
     } catch (RuntimeException error) {
@@ -314,13 +291,8 @@ final class MapState implements AutoCloseable {
     MetalTextureCompositor compositor = null;
     try {
       texture = new MetalBorrowedTexture(metal, viewport);
-      var descriptor =
-          new MetalBorrowedTextureDescriptor()
-              .extent(
-                  new RenderTargetExtent(
-                      viewport.width(), viewport.height(), viewport.scaleFactor()))
-              .texture(texture.pointer());
-      session = RenderSessionHandle.attachMetalBorrowedTexture(map, descriptor);
+      var descriptor = new MetalBorrowedTextureDescriptor(extent(viewport), texture.pointer());
+      session = BindingApi.attachMetalBorrowedTexture(map, descriptor);
       compositor = new MetalTextureCompositor(metal);
       return new MetalBorrowedTextureRenderTarget(metal, map, session, compositor, texture);
     } catch (RuntimeException error) {
@@ -351,6 +323,10 @@ final class MapState implements AutoCloseable {
 
   private static MetalContextDescriptor metalContextDescriptor(MetalContext metal) {
     return new MetalContextDescriptor(metal.devicePointer());
+  }
+
+  private static RenderTargetExtent extent(Viewport viewport) {
+    return new RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor());
   }
 
   private static final class VulkanSurfaceRenderTarget implements RenderTarget {

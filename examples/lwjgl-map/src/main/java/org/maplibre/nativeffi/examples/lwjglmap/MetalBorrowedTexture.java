@@ -14,7 +14,7 @@ final class MetalBorrowedTexture implements AutoCloseable {
   }
 
   NativePointer pointer() {
-    return NativePointer.ofAddress(texture);
+    return BindingApi.nativePointer(texture);
   }
 
   long texture() {

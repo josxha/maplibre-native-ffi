@@ -125,30 +125,30 @@ final class VulkanContext implements GraphicsContext {
   }
 
   NativePointer instancePointer() {
-    return NativePointer.ofAddress(instance.address());
+    return BindingApi.nativePointer(instance.address());
   }
 
   NativePointer physicalDevicePointer() {
-    return NativePointer.ofAddress(physicalDevice.address());
+    return BindingApi.nativePointer(physicalDevice.address());
   }
 
   NativePointer devicePointer() {
-    return NativePointer.ofAddress(device.address());
+    return BindingApi.nativePointer(device.address());
   }
 
   NativePointer graphicsQueuePointer() {
-    return NativePointer.ofAddress(graphicsQueue.address());
+    return BindingApi.nativePointer(graphicsQueue.address());
   }
 
   NativePointer getInstanceProcAddrPointer() {
     ensureVulkanFunctionProvider();
-    return NativePointer.ofAddress(
+    return BindingApi.nativePointer(
         VK.getFunctionProvider().getFunctionAddress("vkGetInstanceProcAddr"));
   }
 
   NativePointer getDeviceProcAddrPointer() {
     ensureVulkanFunctionProvider();
-    return NativePointer.ofAddress(
+    return BindingApi.nativePointer(
         VK.getFunctionProvider().getFunctionAddress("vkGetDeviceProcAddr"));
   }
 
@@ -157,7 +157,7 @@ final class VulkanContext implements GraphicsContext {
   }
 
   NativePointer surfacePointer() {
-    return NativePointer.ofAddress(surface);
+    return BindingApi.nativePointer(surface);
   }
 
   VkInstance instance() {

@@ -11,18 +11,21 @@ public final class Main {
     if (mode == null) {
       return;
     }
-    var backends = Maplibre.supportedRenderBackends();
+    var backends = Maplibre.INSTANCE.supportedRenderBackends();
     System.out.println("native render backends: " + backends);
     if (!supportsUsableBackend(backends)) {
       throw new IllegalStateException(
           "The loaded MapLibre native library does not support a backend usable by lwjgl-map on"
               + " this platform");
     }
-    Maplibre.setLogCallback(
+    Maplibre.INSTANCE.setLogCallback(
         record -> {
           System.err.printf(
               "MapLibre %s %s %d: %s%n",
-              record.severity(), record.event(), record.code(), record.message());
+              BindingApi.logSeverity(record),
+              BindingApi.logEvent(record),
+              BindingApi.logCode(record),
+              BindingApi.logMessage(record));
           return true;
         });
     var propertyPath = System.getProperty("org.maplibre.nativeffi.library.path");
@@ -33,7 +36,7 @@ public final class Main {
     try {
       Shell.run(mode, backends);
     } finally {
-      Maplibre.clearLogCallback();
+      Maplibre.INSTANCE.clearLogCallback();
     }
   }
 

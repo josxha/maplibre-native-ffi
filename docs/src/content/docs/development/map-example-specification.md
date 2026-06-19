@@ -37,12 +37,12 @@ packaging/installer UX.
 
 ## Implementations
 
-| Example              | Binding  | Toolkit         | Platforms             | Backends              |
-| -------------------- | -------- | --------------- | --------------------- | --------------------- |
-| `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+| Example              | Binding    | Toolkit         | Platforms             | Backends              |
+| -------------------- | ---------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`   | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`  | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/lwjgl-map` | Kotlin/JVM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/swift-map` | Swift      | AppKit, SwiftUI | macOS                 | Metal                 |
 
 For examples built by native render-backend variant, “Backends” is the union of
 supported configured variants. A binary that selects one native render backend

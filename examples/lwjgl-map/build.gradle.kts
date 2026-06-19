@@ -1,7 +1,10 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
 
-plugins { application }
+plugins {
+  application
+  kotlin("jvm") version "2.2.21"
+}
 
 repositories { mavenCentral() }
 
@@ -36,7 +39,7 @@ application {
 }
 
 dependencies {
-  implementation(project(":bindings:java-ffm"))
+  implementation(project(":bindings:kotlin"))
   implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   implementation("org.lwjgl:lwjgl")
   implementation("org.lwjgl:lwjgl-egl")
@@ -52,7 +55,7 @@ dependencies {
   runtimeOnly("org.lwjgl:lwjgl-shaderc::$lwjglNative")
 }
 
-tasks.withType<JavaCompile>().configureEach { options.release = 25 }
+tasks.withType<JavaCompile>().configureEach { options.release = 24 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
 val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")

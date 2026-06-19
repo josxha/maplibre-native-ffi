@@ -1178,3 +1178,21 @@ is being implemented.
 - Discovery: Android render query support duplicates feature/geometry descriptor
   logic that already exists in the Android map binding. That is now the clearest
   candidate for the next Android/common consolidation cleanup.
+
+### LWJGL Kotlin Binding Consumer Milestone
+
+- Switched `examples/lwjgl-map` from `:bindings:java-ffm` to `:bindings:kotlin`.
+- Added a small example-local Kotlin adapter for binding-facing calls that are
+  intentionally awkward from Java: `NativePointer`, Kotlin object access,
+  value-class constants, runtime/map factories, render target attachments,
+  runtime event matching, and log record formatting.
+- Adapted Java host code to the Kotlin binding's constructor and mutable
+  property style for map/runtime/camera/render descriptors.
+- Updated the language matrix and map example specification so `lwjgl-map` is
+  tracked as a Kotlin/JVM binding example.
+- Discovery: moving the example dependency to `:bindings:kotlin` produced a
+  compact set of Java interop mismatches. Fixing those in the example adapter
+  avoids adding Java-oriented overloads or annotations to the public Kotlin
+  binding.
+- Discovery: the mixed Java/Kotlin example must compile Java at JVM 24 because
+  Kotlin 2.2 falls back from JDK 25 to JVM 24.

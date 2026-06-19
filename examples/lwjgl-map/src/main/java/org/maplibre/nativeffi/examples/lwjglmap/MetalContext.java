@@ -98,11 +98,11 @@ final class MetalContext implements GraphicsContext {
   }
 
   NativePointer devicePointer() {
-    return NativePointer.ofAddress(device);
+    return BindingApi.nativePointer(device);
   }
 
   NativePointer layerPointer() {
-    return NativePointer.ofAddress(layer);
+    return BindingApi.nativePointer(layer);
   }
 
   long createBorrowedTexture(Viewport viewport) {

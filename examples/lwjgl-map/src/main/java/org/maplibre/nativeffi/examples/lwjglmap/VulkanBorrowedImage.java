@@ -61,11 +61,11 @@ final class VulkanBorrowedImage implements AutoCloseable {
   }
 
   NativePointer imagePointer() {
-    return NativePointer.ofAddress(image);
+    return BindingApi.nativePointer(image);
   }
 
   NativePointer viewPointer() {
-    return NativePointer.ofAddress(view);
+    return BindingApi.nativePointer(view);
   }
 
   private void create(Viewport viewport) {
