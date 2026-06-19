@@ -7,6 +7,7 @@ import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 
 /** Owner-thread offline database operation that must be taken or discarded. */
 @OptIn(ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
@@ -19,6 +20,7 @@ internal constructor(
 ) : AutoCloseable {
   /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
   public val id: Long = uint64BitsToLong(nativeId)
+  private val runtimeRetention: HandleStateCore.ChildRetention = runtime.retainChild()
   private val leakReport = LeakReport(id, kind, resultKind)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
   private var closed = false
@@ -62,8 +64,10 @@ internal constructor(
   }
 
   internal fun markConsumed() {
+    if (closed) return
     closed = true
     leakReport.markClosed()
+    runtimeRetention.close()
   }
 
   override fun close() {

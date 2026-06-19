@@ -774,7 +774,7 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun closingOfflineOperationAfterRuntimeCloseConsumesHandle() {
+  fun runtimeCloseFailsWhileOfflineOperationIsLive() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val operation =
       OfflineOperationHandle<Unit>(
@@ -783,12 +783,15 @@ class RuntimeHandleTest {
         OfflineOperationKind.AMBIENT_CACHE,
         OfflineOperationResultKind.NONE,
       )
-
-    runtime.close()
-
-    assertFailsWith<InvalidStateException> { operation.close() }
-    assertTrue(operation.isClosed)
-    operation.close()
+    try {
+      val error = assertFailsWith<InvalidStateException> { runtime.close() }
+      assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+      assertEquals("RuntimeHandle has 1 live child handle(s)", error.diagnostic)
+      assertFalse(operation.isClosed)
+    } finally {
+      operation.markConsumed()
+      runtime.close()
+    }
   }
 
   private fun waitForMapEvent(

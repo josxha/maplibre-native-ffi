@@ -317,3 +317,15 @@ is being implemented.
 - Discovery: the native runtime close test already expected live maps to block
   runtime destruction, so wiring the common retention core tightened the
   diagnostic without changing that public behavior.
+
+### Offline Operation Retention Milestone
+
+- Wired `OfflineOperationHandle` into the common lifecycle child-retention model
+  so live offline operations retain their `RuntimeHandle` until they are taken,
+  discarded, or explicitly consumed by tests.
+- Updated the native runtime test to expect runtime close to fail while an
+  offline operation is live, matching the Java bindings' deterministic
+  destruction behavior.
+- Reflection: this is a small public behavior tightening, but it aligns with the
+  north-star rule that handle lifecycle state and parent retention are binding
+  semantics rather than platform bridge mechanics.
