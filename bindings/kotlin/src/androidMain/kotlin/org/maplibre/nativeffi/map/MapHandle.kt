@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.map
 
+import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
@@ -492,34 +493,152 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     }
   }
 
-  public actual fun styleLayerJson(layerId: String): JsonValue? = unsupportedMapHandle()
+  public actual fun styleLayerJson(layerId: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      PointerPointer<Pointer>(1).use { outSnapshot ->
+        BoolPointer(1).use { outFound ->
+          outSnapshot.put(0, null as Pointer?)
+          Status.check(
+            MaplibreNativeC.mln_map_get_style_layer_json(
+              map(requireLiveAddress()),
+              nativeLayerId.view,
+              outSnapshot,
+              outFound,
+            )
+          )
+          return if (outFound.get()) jsonSnapshot(outSnapshot) else null
+        }
+      }
+    }
+  }
 
   public actual fun setStyleLightJson(lightJson: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    JsonScope(lightJson).use { nativeLightJson ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_style_light_json(
+          map(requireLiveAddress()),
+          nativeLightJson.value,
+        )
+      )
+    }
   }
 
   public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      JsonScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_style_light_property(
+            map(requireLiveAddress()),
+            nativePropertyName.view,
+            nativeValue.value,
+          )
+        )
+      }
+    }
   }
 
-  public actual fun styleLightProperty(propertyName: String): JsonValue? = unsupportedMapHandle()
+  public actual fun styleLightProperty(propertyName: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(propertyName).use { nativePropertyName ->
+      PointerPointer<Pointer>(1).use { outSnapshot ->
+        outSnapshot.put(0, null as Pointer?)
+        Status.check(
+          MaplibreNativeC.mln_map_get_style_light_property(
+            map(requireLiveAddress()),
+            nativePropertyName.view,
+            outSnapshot,
+          )
+        )
+        return jsonSnapshot(outSnapshot)
+      }
+    }
+  }
 
   public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(propertyName).use { nativePropertyName ->
+        JsonScope(value).use { nativeValue ->
+          Status.check(
+            MaplibreNativeC.mln_map_set_layer_property(
+              map(requireLiveAddress()),
+              nativeLayerId.view,
+              nativePropertyName.view,
+              nativeValue.value,
+            )
+          )
+        }
+      }
+    }
   }
 
-  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? =
-    unsupportedMapHandle()
+  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(propertyName).use { nativePropertyName ->
+        PointerPointer<Pointer>(1).use { outSnapshot ->
+          outSnapshot.put(0, null as Pointer?)
+          Status.check(
+            MaplibreNativeC.mln_map_get_layer_property(
+              map(requireLiveAddress()),
+              nativeLayerId.view,
+              nativePropertyName.view,
+              outSnapshot,
+            )
+          )
+          return jsonSnapshot(outSnapshot)
+        }
+      }
+    }
+  }
 
   public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      JsonScope(filter).use { nativeFilter ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_layer_filter(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            nativeFilter.value,
+          )
+        )
+      }
+    }
   }
 
   public actual fun clearLayerFilter(layerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_layer_filter(
+          map(requireLiveAddress()),
+          nativeLayerId.view,
+          null,
+        )
+      )
+    }
   }
 
-  public actual fun layerFilter(layerId: String): JsonValue? = unsupportedMapHandle()
+  public actual fun layerFilter(layerId: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      PointerPointer<Pointer>(1).use { outSnapshot ->
+        outSnapshot.put(0, null as Pointer?)
+        Status.check(
+          MaplibreNativeC.mln_map_get_layer_filter(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            outSnapshot,
+          )
+        )
+        return jsonSnapshot(outSnapshot)
+      }
+    }
+  }
 
   public actual fun requestRepaint() {
     unsupportedMapHandle()
@@ -800,6 +919,55 @@ private fun copyStyleSourceAttribution(
       return String(bytes, java.nio.charset.StandardCharsets.UTF_8)
     }
   }
+}
+
+private fun jsonSnapshot(outSnapshot: PointerPointer<Pointer>): JsonValue? {
+  val snapshotPointer = outSnapshot.get(Pointer::class.java, 0) ?: return null
+  if (snapshotPointer.isNull) return null
+  val snapshot = MaplibreNativeC.mln_json_snapshot(snapshotPointer)
+  return try {
+    PointerPointer<Pointer>(1).use { outValue ->
+      outValue.put(0, null as Pointer?)
+      Status.check(MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue))
+      val valuePointer = outValue.get(Pointer::class.java, 0) ?: return null
+      if (valuePointer.isNull) null else jsonValue(MaplibreNativeC.mln_json_value(valuePointer))
+    }
+  } finally {
+    MaplibreNativeC.mln_json_snapshot_destroy(snapshot)
+  }
+}
+
+private fun jsonValue(value: MaplibreNativeC.mln_json_value): JsonValue =
+  when (value.type()) {
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL -> JsonValue.Null
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL -> JsonValue.Bool(value.data_bool_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT -> JsonValue.UInt(value.data_uint_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT -> JsonValue.Int(value.data_int_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE -> JsonValue.DoubleValue(value.data_double_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING ->
+      JsonValue.StringValue(stringView(value.data_string_value()))
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY -> jsonArray(value.data_array_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT -> jsonObject(value.data_object_value())
+    else -> JsonValue.Unknown(value.type(), value.size())
+  }
+
+private fun jsonArray(array: MaplibreNativeC.mln_json_array): JsonValue.Array {
+  val nativeValues = array.values()
+  return JsonValue.Array(
+    List(Math.toIntExact(array.value_count())) { index ->
+      jsonValue(nativeValues.getPointer(index.toLong()))
+    }
+  )
+}
+
+private fun jsonObject(obj: MaplibreNativeC.mln_json_object): JsonValue.ObjectValue {
+  val nativeMembers = obj.members()
+  return JsonValue.ObjectValue(
+    List(Math.toIntExact(obj.member_count())) { index ->
+      val member = nativeMembers.getPointer(index.toLong())
+      JsonValue.Member(stringView(member.key()), jsonValue(member.value()))
+    }
+  )
 }
 
 private class StringViewScope(value: String) : AutoCloseable {

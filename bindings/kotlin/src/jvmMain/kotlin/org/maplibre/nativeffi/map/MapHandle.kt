@@ -284,34 +284,50 @@ private constructor(
     NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
-  public actual fun styleLayerJson(layerId: String): JsonValue? = unsupportedMapHandle()
+  public actual fun styleLayerJson(layerId: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayerJson(requireLiveHandle(), layerId)
+  }
 
   public actual fun setStyleLightJson(lightJson: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleLightJson(requireLiveHandle(), lightJson)
   }
 
   public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
   }
 
-  public actual fun styleLightProperty(propertyName: String): JsonValue? = unsupportedMapHandle()
+  public actual fun styleLightProperty(propertyName: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLightProperty(requireLiveHandle(), propertyName)
+  }
 
   public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerProperty(requireLiveHandle(), layerId, propertyName, value)
   }
 
-  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? =
-    unsupportedMapHandle()
+  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerProperty(requireLiveHandle(), layerId, propertyName)
+  }
 
   public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerFilter(requireLiveHandle(), layerId, filter)
   }
 
   public actual fun clearLayerFilter(layerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.clearLayerFilter(requireLiveHandle(), layerId)
   }
 
-  public actual fun layerFilter(layerId: String): JsonValue? = unsupportedMapHandle()
+  public actual fun layerFilter(layerId: String): JsonValue? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerFilter(requireLiveHandle(), layerId)
+  }
 
   public actual fun requestRepaint() {
     unsupportedMapHandle()

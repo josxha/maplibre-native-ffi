@@ -102,6 +102,14 @@ class MapHandleTest {
       assertTrue(map.styleLayerExists("puck"))
       assertTrue(map.styleLayerIds().contains("background"))
       assertTrue(map.styleLayerIds().contains("puck"))
+      assertEquals("background", map.styleLayerJson("background")?.objectMember("type"))
+      map.setLayerProperty("background", "background-opacity", JsonValue.DoubleValue(0.5))
+      assertEquals(
+        JsonValue.DoubleValue(0.5),
+        map.layerProperty("background", "background-opacity"),
+      )
+      map.setStyleLightProperty("anchor", JsonValue.StringValue("viewport"))
+      assertEquals(JsonValue.StringValue("viewport"), map.styleLightProperty("anchor"))
       assertTrue(map.removeStyleLayer("background"))
       assertTrue(map.removeStyleLayer("puck"))
       assertFalse(map.styleLayerExists("background"))
@@ -135,4 +143,12 @@ class MapHandleTest {
         JsonValue.Member("type", JsonValue.StringValue("background")),
       )
     )
+
+  private fun JsonValue.objectMember(key: String): String? =
+    (this as? JsonValue.ObjectValue)
+      ?.members
+      ?.firstOrNull { it.key == key }
+      ?.value
+      ?.let { it as? JsonValue.StringValue }
+      ?.value
 }

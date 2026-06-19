@@ -863,3 +863,19 @@ is being implemented.
 - Discovery: simple map style commands are a good bridge migration slice because
   they reuse string-view ownership and status handling without requiring JSON
   snapshot/result decoding.
+
+### JVM and Android Style JSON Snapshot Milestone
+
+- Implemented JVM FFM and Android JavaCPP style JSON snapshot operations for
+  layer JSON, style light JSON/properties, layer properties, and layer filters.
+- Added JVM FFM snapshot decoding that borrows the root `mln_json_value`, copies
+  it into common `JsonValue`, and destroys the owned `mln_json_snapshot` on all
+  paths.
+- Added Android JavaCPP snapshot decoding beside the existing Android JSON
+  descriptor writer, using raw `PointerPointer<Pointer>` outputs where the
+  generated overloads require them.
+- Extended JVM coverage to round-trip layer JSON, layer property, and style
+  light property values through the common `JsonValue` API.
+- Discovery: JavaCPP generates different overload shapes for similar owned
+  pointer outputs. JSON snapshot getters prefer raw pointer-pointer outputs,
+  while some style ID list calls accept typed pointer-pointers.

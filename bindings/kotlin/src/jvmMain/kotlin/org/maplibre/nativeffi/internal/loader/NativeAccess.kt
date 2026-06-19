@@ -607,6 +607,117 @@ internal object NativeAccess {
     }
   }
 
+  internal fun styleLayerJson(map: MemorySegment, layerId: String): JsonValue? =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapStringViewTwoAddressStatusFunction("mln_map_get_style_layer_json")
+          .invokeWithArguments(map, stringView(arena, layerId), outSnapshot, outFound) as Int
+      )
+      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        jsonSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+      } else null
+    }
+
+  internal fun setStyleLightJson(map: MemorySegment, lightJson: JsonValue) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_style_light_json")
+          .invokeWithArguments(map, jsonValue(arena, lightJson)) as Int
+      )
+    }
+  }
+
+  internal fun setStyleLightProperty(map: MemorySegment, propertyName: String, value: JsonValue) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_style_light_property")
+          .invokeWithArguments(map, stringView(arena, propertyName), jsonValue(arena, value)) as Int
+      )
+    }
+  }
+
+  internal fun styleLightProperty(map: MemorySegment, propertyName: String): JsonValue? =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_get_style_light_property")
+          .invokeWithArguments(map, stringView(arena, propertyName), outSnapshot) as Int
+      )
+      jsonSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+    }
+
+  internal fun setLayerProperty(
+    map: MemorySegment,
+    layerId: String,
+    propertyName: String,
+    value: JsonValue,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsAddressStatusFunction("mln_map_set_layer_property")
+          .invokeWithArguments(
+            map,
+            stringView(arena, layerId),
+            stringView(arena, propertyName),
+            jsonValue(arena, value),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun layerProperty(
+    map: MemorySegment,
+    layerId: String,
+    propertyName: String,
+  ): JsonValue? =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapTwoStringViewsAddressStatusFunction("mln_map_get_layer_property")
+          .invokeWithArguments(
+            map,
+            stringView(arena, layerId),
+            stringView(arena, propertyName),
+            outSnapshot,
+          ) as Int
+      )
+      jsonSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+    }
+
+  internal fun setLayerFilter(map: MemorySegment, layerId: String, filter: JsonValue) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_layer_filter")
+          .invokeWithArguments(map, stringView(arena, layerId), jsonValue(arena, filter)) as Int
+      )
+    }
+  }
+
+  internal fun clearLayerFilter(map: MemorySegment, layerId: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_layer_filter")
+          .invokeWithArguments(map, stringView(arena, layerId), MemorySegment.NULL) as Int
+      )
+    }
+  }
+
+  internal fun layerFilter(map: MemorySegment, layerId: String): JsonValue? =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_get_layer_filter")
+          .invokeWithArguments(map, stringView(arena, layerId), outSnapshot) as Int
+      )
+      jsonSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+    }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -883,6 +994,18 @@ internal object NativeAccess {
       ),
     )
 
+  private fun mapTwoStringViewsAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun mapStringViewLatLngDoubleStatusFunction(name: String): MethodHandle =
     downcall(
       name,
@@ -975,6 +1098,15 @@ internal object NativeAccess {
         ValueLayout.ADDRESS,
       ),
     )
+
+  private fun jsonSnapshotGetFunction(): MethodHandle =
+    downcall(
+      "mln_json_snapshot_get",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun jsonSnapshotDestroyFunction(): MethodHandle =
+    downcall("mln_json_snapshot_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
 
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
     downcall(
@@ -1271,6 +1403,77 @@ internal object NativeAccess {
       }
       is JsonValue.Unknown ->
         throw IllegalArgumentException("unknown JSON values cannot be used as input")
+    }
+  }
+
+  private fun jsonSnapshot(snapshot: MemorySegment): JsonValue? {
+    if (snapshot == MemorySegment.NULL) {
+      return null
+    }
+    return try {
+      Arena.ofConfined().use { arena ->
+        val outValue = arena.allocate(ValueLayout.ADDRESS)
+        outValue.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+        Status.check(jsonSnapshotGetFunction().invokeWithArguments(snapshot, outValue) as Int)
+        val value = outValue.get(ValueLayout.ADDRESS, 0)
+        if (value == MemorySegment.NULL) null else readJson(value.reinterpret(JSON_VALUE_SIZE), 0)
+      }
+    } finally {
+      jsonSnapshotDestroyFunction().invokeWithArguments(snapshot)
+    }
+  }
+
+  private fun readJson(segment: MemorySegment, depth: Int): JsonValue {
+    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+      "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
+    }
+    return when (val type = segment.get(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET)) {
+      JSON_NULL -> JsonValue.Null
+      JSON_BOOL -> JsonValue.Bool(segment.get(ValueLayout.JAVA_BOOLEAN, JSON_VALUE_DATA_OFFSET))
+      JSON_UINT -> JsonValue.UInt(segment.get(ValueLayout.JAVA_LONG, JSON_VALUE_DATA_OFFSET))
+      JSON_INT -> JsonValue.Int(segment.get(ValueLayout.JAVA_LONG, JSON_VALUE_DATA_OFFSET))
+      JSON_DOUBLE ->
+        JsonValue.DoubleValue(segment.get(ValueLayout.JAVA_DOUBLE, JSON_VALUE_DATA_OFFSET))
+      JSON_STRING ->
+        JsonValue.StringValue(stringView(segment.asSlice(JSON_VALUE_DATA_OFFSET, STRING_VIEW_SIZE)))
+      JSON_ARRAY -> {
+        val count =
+          Math.toIntExact(
+            segment.get(ValueLayout.JAVA_LONG, JSON_VALUE_DATA_OFFSET + Long.SIZE_BYTES)
+          )
+        val values = segment.get(ValueLayout.ADDRESS, JSON_VALUE_DATA_OFFSET)
+        JsonValue.Array(
+          List(count) { index ->
+            readJson(
+              values
+                .reinterpret(JSON_VALUE_SIZE * count)
+                .asSlice(index * JSON_VALUE_SIZE, JSON_VALUE_SIZE),
+              depth + 1,
+            )
+          }
+        )
+      }
+      JSON_OBJECT -> {
+        val count =
+          Math.toIntExact(
+            segment.get(ValueLayout.JAVA_LONG, JSON_VALUE_DATA_OFFSET + Long.SIZE_BYTES)
+          )
+        val members = segment.get(ValueLayout.ADDRESS, JSON_VALUE_DATA_OFFSET)
+        JsonValue.ObjectValue(
+          List(count) { index ->
+            val member =
+              members
+                .reinterpret(JSON_MEMBER_SIZE * count)
+                .asSlice(index * JSON_MEMBER_SIZE, JSON_MEMBER_SIZE)
+            val value = member.get(ValueLayout.ADDRESS, JSON_MEMBER_VALUE_OFFSET)
+            JsonValue.Member(
+              stringView(member.asSlice(JSON_MEMBER_KEY_OFFSET, STRING_VIEW_SIZE)),
+              readJson(value.reinterpret(JSON_VALUE_SIZE), depth + 1),
+            )
+          }
+        )
+      }
+      else -> JsonValue.Unknown(type, segment.get(ValueLayout.JAVA_INT, JSON_VALUE_SIZE_OFFSET))
     }
   }
 
