@@ -60,18 +60,34 @@ private constructor(
   }
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
   }
 
-  public actual fun removeStyleSource(sourceId: String): Boolean = unsupportedMapHandle()
+  public actual fun removeStyleSource(sourceId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
+  }
 
-  public actual fun styleSourceExists(sourceId: String): Boolean = unsupportedMapHandle()
+  public actual fun styleSourceExists(sourceId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceExists(requireLiveHandle(), sourceId)
+  }
 
-  public actual fun styleSourceType(sourceId: String): SourceType? = unsupportedMapHandle()
+  public actual fun styleSourceType(sourceId: String): SourceType? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceType(requireLiveHandle(), sourceId)
+  }
 
-  public actual fun styleSourceInfo(sourceId: String): SourceInfo? = unsupportedMapHandle()
+  public actual fun styleSourceInfo(sourceId: String): SourceInfo? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceInfo(requireLiveHandle(), sourceId)
+  }
 
-  public actual fun styleSourceIds(): List<String> = unsupportedMapHandle()
+  public actual fun styleSourceIds(): List<String> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleSourceIds(requireLiveHandle())
+  }
 
   public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
     unsupportedMapHandle()

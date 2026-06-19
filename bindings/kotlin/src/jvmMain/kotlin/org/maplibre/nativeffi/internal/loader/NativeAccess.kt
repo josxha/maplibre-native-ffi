@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.RenderingStats
@@ -38,6 +39,8 @@ import org.maplibre.nativeffi.runtime.OfflineOperationKind
 import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.SourceInfo
+import org.maplibre.nativeffi.style.SourceType
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -352,6 +355,90 @@ internal object NativeAccess {
     }
   }
 
+  internal fun addStyleSourceJson(map: MemorySegment, sourceId: String, sourceJson: JsonValue) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_add_style_source_json")
+          .invokeWithArguments(map, stringView(arena, sourceId), jsonValue(arena, sourceJson))
+          as Int
+      )
+    }
+  }
+
+  internal fun removeStyleSource(map: MemorySegment, sourceId: String): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_remove_style_source")
+          .invokeWithArguments(map, stringView(arena, sourceId), outRemoved) as Int
+      )
+      outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun styleSourceExists(map: MemorySegment, sourceId: String): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_style_source_exists")
+          .invokeWithArguments(map, stringView(arena, sourceId), outExists) as Int
+      )
+      outExists.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun styleSourceType(map: MemorySegment, sourceId: String): SourceType? =
+    Arena.ofConfined().use { arena ->
+      val outType = arena.allocate(ValueLayout.JAVA_INT)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewTwoAddressStatusFunction("mln_map_get_style_source_type")
+          .invokeWithArguments(map, stringView(arena, sourceId), outType, outFound) as Int
+      )
+      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        SourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0))
+      } else null
+    }
+
+  internal fun styleSourceInfo(map: MemorySegment, sourceId: String): SourceInfo? =
+    Arena.ofConfined().use { arena ->
+      val sourceIdView = stringView(arena, sourceId)
+      val outInfo = arena.allocate(STYLE_SOURCE_INFO_SIZE)
+      outInfo.set(
+        ValueLayout.JAVA_INT,
+        STYLE_SOURCE_INFO_SIZE_OFFSET,
+        STYLE_SOURCE_INFO_SIZE.toInt(),
+      )
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewTwoAddressStatusFunction("mln_map_get_style_source_info")
+          .invokeWithArguments(map, sourceIdView, outInfo, outFound) as Int
+      )
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return@use null
+      }
+      val attribution =
+        if (outInfo.get(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET)) {
+          copyStyleSourceAttribution(
+            map,
+            sourceIdView,
+            outInfo.get(ValueLayout.JAVA_LONG, STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET),
+            arena,
+          ) ?: return@use null
+        } else null
+      SourceInfo(
+        SourceType.fromNative(outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TYPE_OFFSET)),
+        outInfo.get(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET),
+        attribution,
+      )
+    }
+
+  internal fun styleSourceIds(map: MemorySegment): List<String> =
+    Arena.ofConfined().use { arena ->
+      val outList = arena.allocate(ValueLayout.ADDRESS)
+      outList.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(mapListStyleSourceIdsFunction().invokeWithArguments(map, outList) as Int)
+      styleIdList(outList.get(ValueLayout.ADDRESS, 0))
+    }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -583,6 +670,69 @@ internal object NativeAccess {
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
     )
 
+  private fun mapStringViewAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapStringViewTwoAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapListStyleSourceIdsFunction(): MethodHandle =
+    downcall(
+      "mln_map_list_style_source_ids",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun styleIdListCountFunction(): MethodHandle =
+    downcall(
+      "mln_style_id_list_count",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun styleIdListGetFunction(): MethodHandle =
+    downcall(
+      "mln_style_id_list_get",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun styleIdListDestroyFunction(): MethodHandle =
+    downcall("mln_style_id_list_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+
+  private fun copyStyleSourceAttributionFunction(): MethodHandle =
+    downcall(
+      "mln_map_copy_style_source_attribution",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
     downcall(
       "mln_runtime_offline_region_get_status_take_result",
@@ -792,6 +942,95 @@ internal object NativeAccess {
     return arena.allocateFrom(value)
   }
 
+  private fun stringView(arena: Arena, value: String): MemorySegment {
+    val bytes = value.toByteArray(StandardCharsets.UTF_8)
+    val segment = arena.allocate(STRING_VIEW_SIZE)
+    segment.set(ValueLayout.ADDRESS, STRING_VIEW_DATA_OFFSET, nativeBytes(arena, bytes))
+    segment.set(ValueLayout.JAVA_LONG, STRING_VIEW_SIZE_OFFSET, bytes.size.toLong())
+    return segment
+  }
+
+  private fun jsonValue(arena: Arena, value: JsonValue): MemorySegment {
+    val segment = arena.allocate(JSON_VALUE_SIZE)
+    writeJson(segment, value, arena, 0)
+    return segment
+  }
+
+  private fun writeJson(segment: MemorySegment, value: JsonValue, arena: Arena, depth: Int) {
+    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+      "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
+    }
+    segment.set(ValueLayout.JAVA_INT, JSON_VALUE_SIZE_OFFSET, JSON_VALUE_SIZE.toInt())
+    when (value) {
+      JsonValue.Null -> segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_NULL)
+      is JsonValue.Bool -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_BOOL)
+        segment.set(ValueLayout.JAVA_BOOLEAN, JSON_VALUE_DATA_OFFSET, value.value)
+      }
+      is JsonValue.UInt -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_UINT)
+        segment.set(ValueLayout.JAVA_LONG, JSON_VALUE_DATA_OFFSET, value.value)
+      }
+      is JsonValue.Int -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_INT)
+        segment.set(ValueLayout.JAVA_LONG, JSON_VALUE_DATA_OFFSET, value.value)
+      }
+      is JsonValue.DoubleValue -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_DOUBLE)
+        segment.set(ValueLayout.JAVA_DOUBLE, JSON_VALUE_DATA_OFFSET, value.value)
+      }
+      is JsonValue.StringValue -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_STRING)
+        segment
+          .asSlice(JSON_VALUE_DATA_OFFSET, STRING_VIEW_SIZE)
+          .copyFrom(stringView(arena, value.value))
+      }
+      is JsonValue.Array -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_ARRAY)
+        val nativeValues =
+          if (value.values.isEmpty()) MemorySegment.NULL
+          else arena.allocate(JSON_VALUE_SIZE * value.values.size)
+        value.values.forEachIndexed { index, child ->
+          writeJson(
+            nativeValues.asSlice(index * JSON_VALUE_SIZE, JSON_VALUE_SIZE),
+            child,
+            arena,
+            depth + 1,
+          )
+        }
+        segment.set(ValueLayout.ADDRESS, JSON_VALUE_DATA_OFFSET, nativeValues)
+        segment.set(
+          ValueLayout.JAVA_LONG,
+          JSON_VALUE_DATA_OFFSET + Long.SIZE_BYTES,
+          value.values.size.toLong(),
+        )
+      }
+      is JsonValue.ObjectValue -> {
+        segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_OBJECT)
+        val nativeMembers =
+          if (value.members.isEmpty()) MemorySegment.NULL
+          else arena.allocate(JSON_MEMBER_SIZE * value.members.size)
+        value.members.forEachIndexed { index, member ->
+          val memberSegment = nativeMembers.asSlice(index * JSON_MEMBER_SIZE, JSON_MEMBER_SIZE)
+          memberSegment
+            .asSlice(JSON_MEMBER_KEY_OFFSET, STRING_VIEW_SIZE)
+            .copyFrom(stringView(arena, member.key))
+          val nativeValue = arena.allocate(JSON_VALUE_SIZE)
+          writeJson(nativeValue, member.value, arena, depth + 1)
+          memberSegment.set(ValueLayout.ADDRESS, JSON_MEMBER_VALUE_OFFSET, nativeValue)
+        }
+        segment.set(ValueLayout.ADDRESS, JSON_VALUE_DATA_OFFSET, nativeMembers)
+        segment.set(
+          ValueLayout.JAVA_LONG,
+          JSON_VALUE_DATA_OFFSET + Long.SIZE_BYTES,
+          value.members.size.toLong(),
+        )
+      }
+      is JsonValue.Unknown ->
+        throw IllegalArgumentException("unknown JSON values cannot be used as input")
+    }
+  }
+
   private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {
     if (bytes.isEmpty()) {
       return MemorySegment.NULL
@@ -810,6 +1049,12 @@ internal object NativeAccess {
 
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
+
+  private fun stringView(segment: MemorySegment): String =
+    copyString(
+      segment.get(ValueLayout.ADDRESS, STRING_VIEW_DATA_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, STRING_VIEW_SIZE_OFFSET),
+    )
 
   internal fun resourceRequest(request: MemorySegment): ResourceRequest =
     ResourceRequest(
@@ -1090,6 +1335,53 @@ internal object NativeAccess {
       offlineRegionListDestroyFunction().invokeWithArguments(list)
     }
 
+  private fun styleIdList(list: MemorySegment): List<String> =
+    try {
+      Arena.ofConfined().use { arena ->
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(styleIdListCountFunction().invokeWithArguments(list, outCount) as Int)
+        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
+        List(count) { index ->
+          val outId = arena.allocate(STRING_VIEW_SIZE)
+          Status.check(
+            styleIdListGetFunction().invokeWithArguments(list, index.toLong(), outId) as Int
+          )
+          stringView(outId)
+        }
+      }
+    } finally {
+      styleIdListDestroyFunction().invokeWithArguments(list)
+    }
+
+  private fun copyStyleSourceAttribution(
+    map: MemorySegment,
+    sourceId: MemorySegment,
+    attributionSize: Long,
+    arena: Arena,
+  ): String? {
+    if (attributionSize == 0L) {
+      return ""
+    }
+    val outAttribution = arena.allocate(attributionSize)
+    val outAttributionSize = arena.allocate(ValueLayout.JAVA_LONG)
+    val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+    Status.check(
+      copyStyleSourceAttributionFunction()
+        .invokeWithArguments(
+          map,
+          sourceId,
+          outAttribution,
+          attributionSize,
+          outAttributionSize,
+          outFound,
+        ) as Int
+    )
+    if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+      return null
+    }
+    return copyString(outAttribution, outAttributionSize.get(ValueLayout.JAVA_LONG, 0))
+  }
+
   private fun takeOfflineRegionSnapshot(
     runtime: MemorySegment,
     operationId: Long,
@@ -1365,6 +1657,39 @@ internal object NativeAccess {
       ValueLayout.JAVA_DOUBLE.withName("northing"),
       ValueLayout.JAVA_DOUBLE.withName("easting"),
     )
+
+  private val stringViewLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.ADDRESS.withName("data"),
+      ValueLayout.JAVA_LONG.withName("size"),
+    )
+
+  private const val STRING_VIEW_SIZE: Long = 16
+  private const val STRING_VIEW_DATA_OFFSET: Long = 0
+  private const val STRING_VIEW_SIZE_OFFSET: Long = 8
+
+  private const val JSON_VALUE_SIZE: Long = 24
+  private const val JSON_VALUE_SIZE_OFFSET: Long = 0
+  private const val JSON_VALUE_TYPE_OFFSET: Long = 4
+  private const val JSON_VALUE_DATA_OFFSET: Long = 8
+  private const val JSON_MEMBER_SIZE: Long = 24
+  private const val JSON_MEMBER_KEY_OFFSET: Long = 0
+  private const val JSON_MEMBER_VALUE_OFFSET: Long = 16
+  private const val JSON_NULL: Int = 0
+  private const val JSON_BOOL: Int = 1
+  private const val JSON_UINT: Int = 2
+  private const val JSON_INT: Int = 3
+  private const val JSON_DOUBLE: Int = 4
+  private const val JSON_STRING: Int = 5
+  private const val JSON_ARRAY: Int = 6
+  private const val JSON_OBJECT: Int = 7
+
+  private const val STYLE_SOURCE_INFO_SIZE: Long = 32
+  private const val STYLE_SOURCE_INFO_SIZE_OFFSET: Long = 0
+  private const val STYLE_SOURCE_INFO_TYPE_OFFSET: Long = 4
+  private const val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long = 16
+  private const val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long = 17
+  private const val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long = 24
 
   private const val RUNTIME_OPTION_MAXIMUM_CACHE_SIZE: Int = 1 shl 0
   private const val RUNTIME_OPTIONS_ASSET_PATH: Long = 8

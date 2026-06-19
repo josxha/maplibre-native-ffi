@@ -823,3 +823,17 @@ is being implemented.
 - Discovery: map creation is the first bridge slice where runtime events need a
   live map registry to attach `mapSource`. This milestone keeps event source
   lookup unchanged and leaves map registration for the broader map/event bridge.
+
+### JVM and Android Style Source JSON Milestone
+
+- Implemented JVM FFM and Android JavaCPP `MapHandle` style source JSON mutation
+  and source inspection: add, remove, exists, type, info, and ID list.
+- Added JVM FFM materialization for common `JsonValue` input descriptors, source
+  info copying, attribution copying, and owned style ID list destruction.
+- Added Android JavaCPP descriptor scopes for common `JsonValue` trees plus
+  copied source info and owned style ID list cleanup.
+- Added JVM coverage for adding a GeoJSON source from common JSON, inspecting
+  its type/info/list entry, and removing it.
+- Discovery: FFM `Arena.allocate(byteSize, byteAlignment)` is easy to mistake
+  for array allocation. Descriptor arrays in the hand-written JVM bridge must
+  allocate `elementSize * count` bytes explicitly.
