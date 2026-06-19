@@ -497,3 +497,18 @@ is being implemented.
 - Reflection: this completes the common surface for owned texture frame values
   and handles, leaving the platform-specific frame acquisition and release
   machinery inside platform source sets.
+
+### Common Map Projection Facade Milestone
+
+- Added a common `expect` facade for `MapProjectionHandle`, covering camera
+  access, camera updates, visible-coordinate and visible-geometry fitting,
+  pixel/coordinate conversion, close, and closed-state inspection.
+- Promoted `MapHandle.createProjection()` into the common map handle facade so
+  the projection handle has a common entrypoint instead of existing only as a
+  native-only return type.
+- Converted the existing Kotlin/Native projection handle and projection factory
+  into native actuals and added JVM and Android placeholders until the map
+  bridge implementations are migrated.
+- Discovery: projection is the first handle facade that forced an entrypoint
+  method onto an existing common owner facade, so future domain facades should
+  move return types and creation methods together.

@@ -1378,7 +1378,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     RenderSessionHandle.attachOpenGLSurface(this, descriptor)
 
-  public fun createProjection(): MapProjectionHandle = memScoped {
+  public actual fun createProjection(): MapProjectionHandle = memScoped {
     val outProjection = alloc<CPointerVarOf<CPointer<mln_map_projection>>>()
     outProjection.value = null
     Status.check(mln_map_projection_create(state.requireLive(), outProjection.ptr))

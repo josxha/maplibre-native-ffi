@@ -30,18 +30,18 @@ import org.maplibre.nativeffi.internal.struct.ValueStructs
 
 /** Owned standalone projection snapshot created from a map. */
 @OptIn(ExperimentalForeignApi::class)
-public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_projection>) :
+public actual class MapProjectionHandle internal constructor(handle: CPointer<mln_map_projection>) :
   AutoCloseable {
   private val state = HandleState("MapProjectionHandle", handle)
 
-  public val camera: CameraOptions
+  public actual val camera: CameraOptions
     get() = memScoped {
       val outCamera = mln_camera_options_default().getPointer(this)
       Status.check(mln_map_projection_get_camera(state.requireLive(), outCamera))
       MapStructs.cameraOptions(outCamera.pointed)
     }
 
-  public fun setCamera(camera: CameraOptions) {
+  public actual fun setCamera(camera: CameraOptions) {
     memScoped {
       Status.check(
         mln_map_projection_set_camera(state.requireLive(), MapStructs.cameraOptions(camera, this))
@@ -49,7 +49,7 @@ public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_p
     }
   }
 
-  public fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
+  public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -63,7 +63,7 @@ public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_p
     }
   }
 
-  public fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
+  public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
     memScoped {
       Status.check(
         mln_map_projection_set_visible_geometry(
@@ -75,7 +75,7 @@ public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_p
     }
   }
 
-  public fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
+  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
     val outPoint = alloc<mln_screen_point>()
     Status.check(
       mln_map_projection_pixel_for_lat_lng(
@@ -87,7 +87,7 @@ public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_p
     CoreStructs.screenPoint(outPoint)
   }
 
-  public fun latLngForPixel(point: ScreenPoint): LatLng = memScoped {
+  public actual fun latLngForPixel(point: ScreenPoint): LatLng = memScoped {
     val outCoordinate = alloc<mln_lat_lng>()
     Status.check(
       mln_map_projection_lat_lng_for_pixel(
@@ -99,11 +99,11 @@ public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_p
     CoreStructs.latLng(outCoordinate)
   }
 
-  override fun close() {
+  public actual override fun close() {
     state.closeOnce(::mln_map_projection_destroy)
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = state.isReleased()
 
   internal fun nativeHandle(): CPointer<mln_map_projection> = state.requireLive()

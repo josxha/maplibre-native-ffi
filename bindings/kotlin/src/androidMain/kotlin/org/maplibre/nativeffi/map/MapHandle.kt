@@ -9,6 +9,8 @@ public actual class MapHandle private constructor() : AutoCloseable {
 
   public actual fun runtime(): RuntimeHandle = unsupportedMapHandle()
 
+  public actual fun createProjection(): MapProjectionHandle = unsupportedMapHandle()
+
   public actual override fun close() {
     unsupportedMapHandle()
   }

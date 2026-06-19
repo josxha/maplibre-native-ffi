@@ -8,5 +8,7 @@ public expect class MapHandle : AutoCloseable {
 
   public fun runtime(): RuntimeHandle
 
+  public fun createProjection(): MapProjectionHandle
+
   override fun close()
 }
