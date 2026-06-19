@@ -795,3 +795,19 @@ is being implemented.
 - Discovery: log callbacks can migrate independently from runtime/resource
   provider callbacks because they have no per-runtime or request-handle
   lifetime, but they still need process-global replacement discipline.
+
+### JVM and Android Resource Provider Milestone
+
+- Implemented `RuntimeHandle.setResourceProvider` for JVM and Android.
+- Added JVM FFM and Android JavaCPP resource provider callback owners that copy
+  borrowed native requests into common `ResourceRequest` values and contain
+  callback exceptions.
+- Replaced JVM and Android `ResourceRequestHandle` placeholders with real
+  completion, cancellation, provider-decision, and release behavior backed by
+  the common handle core.
+- Added JVM coverage for direct provider callback invocation and request
+  copying.
+- Discovery: the resource provider bridge completes the callback family that can
+  migrate before map handles. It also exposes a cleanup target: response
+  materialization is still platform-local and should eventually collapse behind
+  a smaller expected resource bridge.

@@ -25,6 +25,13 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
+import org.maplibre.nativeffi.resource.ResourceKind
+import org.maplibre.nativeffi.resource.ResourceLoadingMethod
+import org.maplibre.nativeffi.resource.ResourcePriority
+import org.maplibre.nativeffi.resource.ResourceRequest
+import org.maplibre.nativeffi.resource.ResourceResponse
+import org.maplibre.nativeffi.resource.ResourceStoragePolicy
+import org.maplibre.nativeffi.resource.ResourceUsage
 import org.maplibre.nativeffi.runtime.OfflineOperationKind
 import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
@@ -174,6 +181,9 @@ internal object NativeAccess {
   internal fun destroyRuntime(runtime: MemorySegment): Int =
     runtimeStatusFunction("mln_runtime_destroy").invokeWithArguments(runtime) as Int
 
+  internal fun setResourceProvider(runtime: MemorySegment, provider: MemorySegment): Int =
+    runtimeSetResourceProviderFunction().invokeWithArguments(runtime, provider) as Int
+
   internal fun startAmbientCacheOperation(runtime: MemorySegment, operation: Int): Long =
     Arena.ofConfined().use { arena ->
       val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
@@ -287,6 +297,25 @@ internal object NativeAccess {
 
   internal fun clearResourceTransform(runtime: MemorySegment): Int =
     runtimeClearResourceTransformFunction().invokeWithArguments(runtime) as Int
+
+  internal fun completeResourceRequest(handle: MemorySegment, response: ResourceResponse): Int =
+    Arena.ofConfined().use { arena ->
+      resourceRequestCompleteFunction()
+        .invokeWithArguments(handle, resourceResponse(response, arena)) as Int
+    }
+
+  internal fun isResourceRequestCancelled(handle: MemorySegment): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outCancelled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        resourceRequestCancelledFunction().invokeWithArguments(handle, outCancelled) as Int
+      )
+      outCancelled.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun releaseResourceRequest(handle: MemorySegment) {
+    resourceRequestReleaseFunction().invokeWithArguments(handle)
+  }
 
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
@@ -455,6 +484,12 @@ internal object NativeAccess {
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
     )
 
+  private fun runtimeSetResourceProviderFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_set_resource_provider",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
   private fun runtimeSetResourceTransformFunction(): MethodHandle =
     downcall(
       "mln_runtime_set_resource_transform",
@@ -477,6 +512,21 @@ internal object NativeAccess {
         ValueLayout.JAVA_LONG,
       ),
     )
+
+  private fun resourceRequestCompleteFunction(): MethodHandle =
+    downcall(
+      "mln_resource_request_complete",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun resourceRequestCancelledFunction(): MethodHandle =
+    downcall(
+      "mln_resource_request_cancelled",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun resourceRequestReleaseFunction(): MethodHandle =
+    downcall("mln_resource_request_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
 
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
     downcall(
@@ -705,6 +755,100 @@ internal object NativeAccess {
 
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
+
+  internal fun resourceRequest(request: MemorySegment): ResourceRequest =
+    ResourceRequest(
+      copyCString(request.get(ValueLayout.ADDRESS, RESOURCE_REQUEST_URL_OFFSET)),
+      ResourceKind.fromNative(request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_KIND_OFFSET)),
+      ResourceLoadingMethod.fromNative(
+        request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_LOADING_METHOD_OFFSET)
+      ),
+      ResourcePriority.fromNative(
+        request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_PRIORITY_OFFSET)
+      ),
+      ResourceUsage.fromNative(request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_USAGE_OFFSET)),
+      ResourceStoragePolicy.fromNative(
+        request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_STORAGE_POLICY_OFFSET)
+      ),
+      if (request.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_REQUEST_HAS_RANGE_OFFSET))
+        ResourceRequest.ByteRange(
+          request.get(ValueLayout.JAVA_LONG, RESOURCE_REQUEST_RANGE_START_OFFSET),
+          request.get(ValueLayout.JAVA_LONG, RESOURCE_REQUEST_RANGE_END_OFFSET),
+        )
+      else null,
+      if (request.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_REQUEST_HAS_PRIOR_MODIFIED_OFFSET))
+        request.get(ValueLayout.JAVA_LONG, RESOURCE_REQUEST_PRIOR_MODIFIED_OFFSET)
+      else null,
+      if (request.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_REQUEST_HAS_PRIOR_EXPIRES_OFFSET))
+        request.get(ValueLayout.JAVA_LONG, RESOURCE_REQUEST_PRIOR_EXPIRES_OFFSET)
+      else null,
+      optionalCString(request.get(ValueLayout.ADDRESS, RESOURCE_REQUEST_PRIOR_ETAG_OFFSET)),
+      copyBytes(
+        request.get(ValueLayout.ADDRESS, RESOURCE_REQUEST_PRIOR_DATA_OFFSET),
+        request.get(ValueLayout.JAVA_LONG, RESOURCE_REQUEST_PRIOR_DATA_SIZE_OFFSET),
+      ),
+    )
+
+  private fun resourceResponse(response: ResourceResponse, arena: Arena): MemorySegment {
+    val segment = arena.allocate(RESOURCE_RESPONSE_SIZE)
+    val bytes = response.bytes
+    require(response.errorReason.isKnown) {
+      "Unknown resource error reason cannot be used as input: ${response.errorReason.nativeValue}"
+    }
+    segment.set(ValueLayout.JAVA_INT, RESOURCE_RESPONSE_SIZE_OFFSET, RESOURCE_RESPONSE_SIZE.toInt())
+    segment.set(ValueLayout.JAVA_INT, RESOURCE_RESPONSE_STATUS_OFFSET, response.status.nativeValue)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      RESOURCE_RESPONSE_ERROR_REASON_OFFSET,
+      response.errorReason.nativeValue,
+    )
+    if (bytes.isNotEmpty()) {
+      segment.set(ValueLayout.ADDRESS, RESOURCE_RESPONSE_BYTES_OFFSET, nativeBytes(arena, bytes))
+      segment.set(ValueLayout.JAVA_LONG, RESOURCE_RESPONSE_BYTE_COUNT_OFFSET, bytes.size.toLong())
+    }
+    segment.set(
+      ValueLayout.ADDRESS,
+      RESOURCE_RESPONSE_ERROR_MESSAGE_OFFSET,
+      optionalCString(arena, response.errorMessage),
+    )
+    segment.set(
+      ValueLayout.JAVA_BOOLEAN,
+      RESOURCE_RESPONSE_MUST_REVALIDATE_OFFSET,
+      response.mustRevalidate,
+    )
+    response.modifiedUnixMs?.let {
+      segment.set(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_MODIFIED_OFFSET, true)
+      segment.set(ValueLayout.JAVA_LONG, RESOURCE_RESPONSE_MODIFIED_OFFSET, it)
+    }
+    response.expiresUnixMs?.let {
+      segment.set(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_EXPIRES_OFFSET, true)
+      segment.set(ValueLayout.JAVA_LONG, RESOURCE_RESPONSE_EXPIRES_OFFSET, it)
+    }
+    segment.set(
+      ValueLayout.ADDRESS,
+      RESOURCE_RESPONSE_ETAG_OFFSET,
+      optionalCString(arena, response.etag),
+    )
+    response.retryAfterUnixMs?.let {
+      segment.set(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET, true)
+      segment.set(ValueLayout.JAVA_LONG, RESOURCE_RESPONSE_RETRY_AFTER_OFFSET, it)
+    }
+    return segment
+  }
+
+  private fun optionalCString(address: MemorySegment): String? =
+    if (address == MemorySegment.NULL) null else copyCString(address)
+
+  private fun copyCString(address: MemorySegment): String {
+    if (address == MemorySegment.NULL) {
+      return ""
+    }
+    var length = 0L
+    while (address.reinterpret(length + 1).get(ValueLayout.JAVA_BYTE, length) != 0.toByte()) {
+      length++
+    }
+    return copyString(address, length)
+  }
 
   private fun offlineRegionStatus(status: MemorySegment): OfflineRegionStatus =
     OfflineRegionStatus(
@@ -1167,6 +1311,39 @@ internal object NativeAccess {
   private const val RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET: Long = 40
   private const val RUNTIME_EVENT_MESSAGE_OFFSET: Long = 48
   private const val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = 56
+
+  private const val RESOURCE_REQUEST_URL_OFFSET: Long = 8
+  private const val RESOURCE_REQUEST_KIND_OFFSET: Long = 16
+  private const val RESOURCE_REQUEST_LOADING_METHOD_OFFSET: Long = 20
+  private const val RESOURCE_REQUEST_PRIORITY_OFFSET: Long = 24
+  private const val RESOURCE_REQUEST_USAGE_OFFSET: Long = 28
+  private const val RESOURCE_REQUEST_STORAGE_POLICY_OFFSET: Long = 32
+  private const val RESOURCE_REQUEST_HAS_RANGE_OFFSET: Long = 36
+  private const val RESOURCE_REQUEST_RANGE_START_OFFSET: Long = 40
+  private const val RESOURCE_REQUEST_RANGE_END_OFFSET: Long = 48
+  private const val RESOURCE_REQUEST_HAS_PRIOR_MODIFIED_OFFSET: Long = 56
+  private const val RESOURCE_REQUEST_PRIOR_MODIFIED_OFFSET: Long = 64
+  private const val RESOURCE_REQUEST_HAS_PRIOR_EXPIRES_OFFSET: Long = 72
+  private const val RESOURCE_REQUEST_PRIOR_EXPIRES_OFFSET: Long = 80
+  private const val RESOURCE_REQUEST_PRIOR_ETAG_OFFSET: Long = 88
+  private const val RESOURCE_REQUEST_PRIOR_DATA_OFFSET: Long = 96
+  private const val RESOURCE_REQUEST_PRIOR_DATA_SIZE_OFFSET: Long = 104
+
+  private const val RESOURCE_RESPONSE_SIZE: Long = 96
+  private const val RESOURCE_RESPONSE_SIZE_OFFSET: Long = 0
+  private const val RESOURCE_RESPONSE_STATUS_OFFSET: Long = 4
+  private const val RESOURCE_RESPONSE_ERROR_REASON_OFFSET: Long = 8
+  private const val RESOURCE_RESPONSE_BYTES_OFFSET: Long = 16
+  private const val RESOURCE_RESPONSE_BYTE_COUNT_OFFSET: Long = 24
+  private const val RESOURCE_RESPONSE_ERROR_MESSAGE_OFFSET: Long = 32
+  private const val RESOURCE_RESPONSE_MUST_REVALIDATE_OFFSET: Long = 40
+  private const val RESOURCE_RESPONSE_HAS_MODIFIED_OFFSET: Long = 41
+  private const val RESOURCE_RESPONSE_MODIFIED_OFFSET: Long = 48
+  private const val RESOURCE_RESPONSE_HAS_EXPIRES_OFFSET: Long = 56
+  private const val RESOURCE_RESPONSE_EXPIRES_OFFSET: Long = 64
+  private const val RESOURCE_RESPONSE_ETAG_OFFSET: Long = 72
+  private const val RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET: Long = 80
+  private const val RESOURCE_RESPONSE_RETRY_AFTER_OFFSET: Long = 88
 
   private const val PAYLOAD_NONE: Int = 0
   private const val PAYLOAD_RENDER_FRAME: Int = 1

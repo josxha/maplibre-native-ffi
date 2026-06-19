@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
+import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
@@ -30,6 +31,7 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handleAddress: Long) :
   AutoCloseable {
   private val core = HandleStateCore("RuntimeHandle", handleAddress)
+  private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
 
   public actual val isClosed: Boolean
@@ -321,7 +323,22 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   }
 
   public actual fun setResourceProvider(callback: ResourceProviderCallback) {
-    unsupportedRuntimeHandle()
+    val replacement = ResourceProviderState(callback)
+    val previous: ResourceProviderState?
+    try {
+      Status.check(
+        MaplibreNativeC.mln_runtime_set_resource_provider(
+          runtime(requireLiveAddress()),
+          replacement.descriptor(),
+        )
+      )
+      previous = resourceProviderState
+      resourceProviderState = replacement
+    } catch (error: Throwable) {
+      replacement.close()
+      throw error
+    }
+    previous?.close()
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
@@ -368,6 +385,8 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_runtime_destroy(runtime(handleAddress)) },
       afterSuccess = {
+        resourceProviderState?.close()
+        resourceProviderState = null
         resourceTransformState?.close()
         resourceTransformState = null
       },
@@ -848,8 +867,3 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
     return pointer
   }
 }
-
-private fun unsupportedRuntimeHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "RuntimeHandle is not available until the Android runtime bridge is implemented"
-  )
