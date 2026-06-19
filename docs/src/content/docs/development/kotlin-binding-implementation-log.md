@@ -154,3 +154,18 @@ is being implemented.
   direction because it avoids `externalNativeBuild` inside the KMP module. JNI
   packaging can stay as a later, explicit step once the JavaCPP bridge has moved
   under `androidMain`.
+
+### Android JavaCPP Seed Milestone
+
+- Enabled Java compilation for the Android KMP target and added the JavaCPP
+  runtime dependency to `androidMain`.
+- Added the JavaCPP C ABI configuration class under the unified
+  `org.maplibre.nativeffi.internal.javacpp` package in `androidMain`, adapted
+  from the existing Java JNI bridge configuration.
+- Discovery: the Android KMP plugin keeps Java compilation disabled by default;
+  `withJava()` is required before Android-only JavaCPP configuration sources can
+  compile inside the KMP module.
+- Reflection: this starts moving the JNI bridge into `androidMain` without
+  touching the desktop Java JNI module yet. The next JNI milestone needs to add
+  JavaCPP generation/build tasks for the Android target and connect the
+  generated `MaplibreNativeC` declarations to the Kotlin Android actuals.

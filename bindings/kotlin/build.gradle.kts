@@ -32,6 +32,8 @@ kotlin {
     compileSdk = 36
     minSdk = 24
 
+    withJava()
+
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
 
@@ -66,7 +68,11 @@ kotlin {
     }
   }
 
-  sourceSets { commonTest.dependencies { implementation(kotlin("test")) } }
+  sourceSets {
+    androidMain.dependencies { implementation("org.bytedeco:javacpp:1.5.11") }
+
+    commonTest.dependencies { implementation(kotlin("test")) }
+  }
 }
 
 tasks.withType<Test>().configureEach {
