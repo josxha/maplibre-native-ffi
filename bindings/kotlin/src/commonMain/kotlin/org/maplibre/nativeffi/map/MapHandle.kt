@@ -12,7 +12,17 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderSessionHandle
+import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
@@ -239,7 +249,35 @@ public expect class MapHandle : AutoCloseable {
 
   public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng>
 
+  public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle
+
+  public fun attachMetalBorrowedTexture(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): RenderSessionHandle
+
+  public fun attachVulkanOwnedTexture(descriptor: VulkanOwnedTextureDescriptor): RenderSessionHandle
+
+  public fun attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTextureDescriptor
+  ): RenderSessionHandle
+
+  public fun attachOpenGLOwnedTexture(descriptor: OpenGLOwnedTextureDescriptor): RenderSessionHandle
+
+  public fun attachOpenGLBorrowedTexture(
+    descriptor: OpenGLBorrowedTextureDescriptor
+  ): RenderSessionHandle
+
+  public fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle
+
+  public fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle
+
+  public fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle
+
   public fun createProjection(): MapProjectionHandle
 
   override fun close()
+
+  public companion object {
+    public fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle
+  }
 }

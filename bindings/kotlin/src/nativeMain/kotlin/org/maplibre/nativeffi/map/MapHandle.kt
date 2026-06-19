@@ -1364,36 +1364,37 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
   }
 
-  public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle =
-    RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
+  public actual fun attachMetalOwnedTexture(
+    descriptor: MetalOwnedTextureDescriptor
+  ): RenderSessionHandle = RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
 
-  public fun attachMetalBorrowedTexture(
+  public actual fun attachMetalBorrowedTexture(
     descriptor: MetalBorrowedTextureDescriptor
   ): RenderSessionHandle = RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor)
 
-  public fun attachVulkanOwnedTexture(
+  public actual fun attachVulkanOwnedTexture(
     descriptor: VulkanOwnedTextureDescriptor
   ): RenderSessionHandle = RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor)
 
-  public fun attachVulkanBorrowedTexture(
+  public actual fun attachVulkanBorrowedTexture(
     descriptor: VulkanBorrowedTextureDescriptor
   ): RenderSessionHandle = RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor)
 
-  public fun attachOpenGLOwnedTexture(
+  public actual fun attachOpenGLOwnedTexture(
     descriptor: OpenGLOwnedTextureDescriptor
   ): RenderSessionHandle = RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor)
 
-  public fun attachOpenGLBorrowedTexture(
+  public actual fun attachOpenGLBorrowedTexture(
     descriptor: OpenGLBorrowedTextureDescriptor
   ): RenderSessionHandle = RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor)
 
-  public fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
+  public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
     RenderSessionHandle.attachMetalSurface(this, descriptor)
 
-  public fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle =
+  public actual fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle =
     RenderSessionHandle.attachVulkanSurface(this, descriptor)
 
-  public fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
+  public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     RenderSessionHandle.attachOpenGLSurface(this, descriptor)
 
   public actual fun createProjection(): MapProjectionHandle = memScoped {
@@ -1429,8 +1430,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     return value.toInt()
   }
 
-  public companion object {
-    public fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle = memScoped {
+  public actual companion object {
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle = memScoped {
       val outMap = alloc<CPointerVarOf<CPointer<mln_map>>>()
       outMap.value = null
       Status.check(mln_map_create(runtime.nativeHandle(), mapOptions(options, this), outMap.ptr))

@@ -586,3 +586,15 @@ is being implemented.
 - Discovery: the location indicator image method uses `imageKind` and `imageId`
   in the existing Kotlin/Native API; the common facade preserves those names to
   avoid accidental API drift during expect/actual extraction.
+
+### Common Map Render Attachment Facade Milestone
+
+- Expanded the common `MapHandle` facade with Metal, Vulkan, and OpenGL texture
+  and surface attachment methods, plus the `MapHandle.create` factory.
+- Converted the existing Kotlin/Native render attachment methods and map factory
+  into native actuals and added JVM and Android actual placeholders until their
+  map/render bridges are migrated.
+- Reflection: the public attachment descriptors are already common copied
+  values, so the common facade can expose the full render-session creation
+  surface while each platform actual remains responsible for native descriptor
+  materialization.

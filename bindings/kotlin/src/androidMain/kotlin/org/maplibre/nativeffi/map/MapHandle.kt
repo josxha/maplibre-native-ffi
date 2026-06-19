@@ -12,7 +12,17 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderSessionHandle
+import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
@@ -402,10 +412,48 @@ public actual class MapHandle private constructor() : AutoCloseable {
   public actual fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> =
     unsupportedMapHandle()
 
+  public actual fun attachMetalOwnedTexture(
+    descriptor: MetalOwnedTextureDescriptor
+  ): RenderSessionHandle = unsupportedMapHandle()
+
+  public actual fun attachMetalBorrowedTexture(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): RenderSessionHandle = unsupportedMapHandle()
+
+  public actual fun attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor
+  ): RenderSessionHandle = unsupportedMapHandle()
+
+  public actual fun attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTextureDescriptor
+  ): RenderSessionHandle = unsupportedMapHandle()
+
+  public actual fun attachOpenGLOwnedTexture(
+    descriptor: OpenGLOwnedTextureDescriptor
+  ): RenderSessionHandle = unsupportedMapHandle()
+
+  public actual fun attachOpenGLBorrowedTexture(
+    descriptor: OpenGLBorrowedTextureDescriptor
+  ): RenderSessionHandle = unsupportedMapHandle()
+
+  public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
+    unsupportedMapHandle()
+
+  public actual fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle =
+    unsupportedMapHandle()
+
+  public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
+    unsupportedMapHandle()
+
   public actual fun createProjection(): MapProjectionHandle = unsupportedMapHandle()
 
   public actual override fun close() {
     unsupportedMapHandle()
+  }
+
+  public actual companion object {
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle =
+      unsupportedMapHandle()
   }
 }
 
