@@ -13,6 +13,8 @@ import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
+import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
@@ -170,19 +172,63 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      StringViewScope(url).use { nativeUrl ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_geojson_source_url(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeUrl.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      GeoJsonScope(data).use { nativeData ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_geojson_source_data(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeData.value,
+          )
+        )
+      }
+    }
   }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      StringViewScope(url).use { nativeUrl ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_geojson_source_url(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeUrl.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      GeoJsonScope(data).use { nativeData ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_geojson_source_data(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeData.value,
+          )
+        )
+      }
+    }
   }
 
   public actual fun addCustomGeometrySource(
@@ -1110,7 +1156,24 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   public actual fun cameraForGeometry(
     geometry: Geometry,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions = unsupportedMapHandle()
+  ): CameraOptions {
+    NativeAccess.ensureLoaded()
+    GeometryScope(geometry).use { nativeGeometry ->
+      CameraFitOptionsScope(fitOptions).use { nativeFitOptions ->
+        MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+          Status.check(
+            MaplibreNativeC.mln_map_camera_for_geometry(
+              map(requireLiveAddress()),
+              nativeGeometry.value,
+              nativeFitOptions.options,
+              outCamera,
+            )
+          )
+          return cameraOptions(outCamera)
+        }
+      }
+    }
+  }
 
   public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds =
     latLngBoundsForCamera(MaplibreNativeC::mln_map_lat_lng_bounds_for_camera, camera)
@@ -2048,6 +2111,246 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
         throw IllegalArgumentException("unknown JSON values cannot be used as input")
     }
     return out
+  }
+}
+
+private class GeometryScope(geometry: Geometry) : AutoCloseable {
+  private val scope = GeoDescriptorScope()
+  val value: MaplibreNativeC.mln_geometry = scope.geometry(geometry, 0)
+
+  override fun close() {
+    scope.close()
+  }
+}
+
+private class GeoJsonScope(geoJson: GeoJson) : AutoCloseable {
+  private val scope = GeoDescriptorScope()
+  val value: MaplibreNativeC.mln_geojson = scope.geoJson(geoJson)
+
+  override fun close() {
+    scope.close()
+  }
+}
+
+private class GeoDescriptorScope : AutoCloseable {
+  private val owned = mutableListOf<Pointer>()
+  private val strings = mutableListOf<StringViewScope>()
+  private val jsonValues = mutableListOf<JsonScope>()
+
+  override fun close() {
+    jsonValues.asReversed().forEach(JsonScope::close)
+    owned.asReversed().forEach(Pointer::close)
+    strings.asReversed().forEach(StringViewScope::close)
+  }
+
+  fun geometry(value: Geometry, depth: Int): MaplibreNativeC.mln_geometry {
+    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+      "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
+    }
+    val out = own(MaplibreNativeC.mln_geometry())
+    out.size(out.sizeof())
+    when (value) {
+      Geometry.Empty -> out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY)
+      is Geometry.Point ->
+        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT).data_point(latLng(value.coordinate))
+      is Geometry.LineString ->
+        out
+          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING)
+          .data_line_string(coordinateSpan(value.coordinates))
+      is Geometry.Polygon ->
+        out
+          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON)
+          .data_polygon(polygonGeometry(value.rings))
+      is Geometry.MultiPoint ->
+        out
+          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT)
+          .data_multi_point(coordinateSpan(value.coordinates))
+      is Geometry.MultiLineString ->
+        out
+          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING)
+          .data_multi_line_string(multiLineGeometry(value.lines))
+      is Geometry.MultiPolygon ->
+        out
+          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON)
+          .data_multi_polygon(multiPolygonGeometry(value.polygons))
+      is Geometry.Collection ->
+        out
+          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION)
+          .data_geometry_collection(geometryCollection(value.geometries, depth + 1))
+      is Geometry.Unknown ->
+        throw IllegalArgumentException("unknown geometries cannot be used as input")
+    }
+    return out
+  }
+
+  fun geoJson(value: GeoJson): MaplibreNativeC.mln_geojson {
+    val out = own(MaplibreNativeC.mln_geojson())
+    out.size(out.sizeof())
+    when (value) {
+      is GeoJson.GeometryValue ->
+        out
+          .type(MaplibreNativeC.MLN_GEOJSON_TYPE_GEOMETRY)
+          .data_geometry(geometry(value.geometry, 0))
+      is GeoJson.FeatureValue ->
+        out.type(MaplibreNativeC.MLN_GEOJSON_TYPE_FEATURE).data_feature(feature(value.feature, 0))
+      is GeoJson.FeatureCollection -> {
+        out.type(MaplibreNativeC.MLN_GEOJSON_TYPE_FEATURE_COLLECTION)
+        val collection = own(MaplibreNativeC.mln_feature_collection())
+        if (value.features.isNotEmpty()) {
+          val nativeFeatures = own(MaplibreNativeC.mln_feature(value.features.size.toLong()))
+          value.features.forEachIndexed { index, sourceFeature ->
+            nativeFeatures
+              .position(index.toLong())
+              .put<MaplibreNativeC.mln_feature>(feature(sourceFeature, 1))
+          }
+          nativeFeatures.position(0)
+          collection.features(nativeFeatures)
+        }
+        collection.feature_count(value.features.size.toLong())
+        out.data_feature_collection(collection)
+      }
+    }
+    return out
+  }
+
+  private fun <T : Pointer> own(pointer: T): T {
+    owned += pointer
+    return pointer
+  }
+
+  private fun string(value: String): MaplibreNativeC.mln_string_view {
+    val scope = StringViewScope(value)
+    strings += scope
+    return scope.view
+  }
+
+  private fun json(value: JsonValue): MaplibreNativeC.mln_json_value {
+    val scope = JsonScope(value)
+    jsonValues += scope
+    return scope.value
+  }
+
+  private fun coordinateSpan(values: List<LatLng>): MaplibreNativeC.mln_coordinate_span {
+    val out = own(MaplibreNativeC.mln_coordinate_span())
+    if (values.isNotEmpty()) {
+      val coordinates = own(MaplibreNativeC.mln_lat_lng(values.size.toLong()))
+      values.forEachIndexed { index, value ->
+        coordinates.position(index.toLong()).latitude(value.latitude).longitude(value.longitude)
+      }
+      coordinates.position(0)
+      out.coordinates(coordinates)
+    }
+    out.coordinate_count(values.size.toLong())
+    return out
+  }
+
+  private fun coordinateSpans(values: List<List<LatLng>>): MaplibreNativeC.mln_coordinate_span? {
+    if (values.isEmpty()) {
+      return null
+    }
+    val out = own(MaplibreNativeC.mln_coordinate_span(values.size.toLong()))
+    values.forEachIndexed { index, value ->
+      out.position(index.toLong()).put<MaplibreNativeC.mln_coordinate_span>(coordinateSpan(value))
+    }
+    out.position(0)
+    return out
+  }
+
+  private fun polygonGeometry(rings: List<List<LatLng>>): MaplibreNativeC.mln_polygon_geometry {
+    val out = own(MaplibreNativeC.mln_polygon_geometry())
+    coordinateSpans(rings)?.let(out::rings)
+    out.ring_count(rings.size.toLong())
+    return out
+  }
+
+  private fun multiLineGeometry(
+    lines: List<List<LatLng>>
+  ): MaplibreNativeC.mln_multi_line_geometry {
+    val out = own(MaplibreNativeC.mln_multi_line_geometry())
+    coordinateSpans(lines)?.let(out::lines)
+    out.line_count(lines.size.toLong())
+    return out
+  }
+
+  private fun multiPolygonGeometry(
+    polygons: List<List<List<LatLng>>>
+  ): MaplibreNativeC.mln_multi_polygon_geometry {
+    val out = own(MaplibreNativeC.mln_multi_polygon_geometry())
+    if (polygons.isNotEmpty()) {
+      val nativePolygons = own(MaplibreNativeC.mln_polygon_geometry(polygons.size.toLong()))
+      polygons.forEachIndexed { index, polygon ->
+        nativePolygons
+          .position(index.toLong())
+          .put<MaplibreNativeC.mln_polygon_geometry>(polygonGeometry(polygon))
+      }
+      nativePolygons.position(0)
+      out.polygons(nativePolygons)
+    }
+    out.polygon_count(polygons.size.toLong())
+    return out
+  }
+
+  private fun geometryCollection(
+    geometries: List<Geometry>,
+    depth: Int,
+  ): MaplibreNativeC.mln_geometry_collection {
+    val out = own(MaplibreNativeC.mln_geometry_collection())
+    if (geometries.isNotEmpty()) {
+      val nativeGeometries = own(MaplibreNativeC.mln_geometry(geometries.size.toLong()))
+      geometries.forEachIndexed { index, childGeometry ->
+        nativeGeometries
+          .position(index.toLong())
+          .put<MaplibreNativeC.mln_geometry>(geometry(childGeometry, depth))
+      }
+      nativeGeometries.position(0)
+      out.geometries(nativeGeometries)
+    }
+    out.geometry_count(geometries.size.toLong())
+    return out
+  }
+
+  private fun feature(value: Feature, depth: Int): MaplibreNativeC.mln_feature {
+    val out = own(MaplibreNativeC.mln_feature())
+    out.size(out.sizeof())
+    out.geometry(geometry(value.geometry, depth + 1))
+    if (value.properties.isNotEmpty()) {
+      val nativeMembers = own(MaplibreNativeC.mln_json_member(value.properties.size.toLong()))
+      value.properties.forEachIndexed { index, member ->
+        nativeMembers.position(index.toLong())
+        nativeMembers.key(string(member.key))
+        nativeMembers.value(json(member.value))
+      }
+      nativeMembers.position(0)
+      out.properties(nativeMembers)
+    }
+    out.property_count(value.properties.size.toLong())
+    featureIdentifier(out, value.identifier)
+    return out
+  }
+
+  private fun featureIdentifier(out: MaplibreNativeC.mln_feature, value: FeatureIdentifier) {
+    when (value) {
+      FeatureIdentifier.Null ->
+        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL)
+      is FeatureIdentifier.UInt ->
+        out
+          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT)
+          .identifier_uint_value(value.value)
+      is FeatureIdentifier.Int ->
+        out
+          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT)
+          .identifier_int_value(value.value)
+      is FeatureIdentifier.DoubleValue ->
+        out
+          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE)
+          .identifier_double_value(value.value)
+      is FeatureIdentifier.StringValue ->
+        out
+          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING)
+          .identifier_string_value(string(value.value))
+      is FeatureIdentifier.Unknown ->
+        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
+    }
   }
 }
 

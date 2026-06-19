@@ -90,19 +90,23 @@ private constructor(
   }
 
   public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
   }
 
   public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data)
   }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
   }
 
   public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, data)
   }
 
   public actual fun addCustomGeometrySource(
@@ -509,7 +513,10 @@ private constructor(
   public actual fun cameraForGeometry(
     geometry: Geometry,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions = unsupportedMapHandle()
+  ): CameraOptions {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cameraForGeometry(requireLiveHandle(), geometry, fitOptions)
+  }
 
   public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds {
     NativeAccess.ensureLoaded()

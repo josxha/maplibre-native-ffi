@@ -1008,3 +1008,20 @@ is being implemented.
 - Discovery: JVM FFM helpers that read and write the same descriptor can collide
   by signature inside `NativeAccess`; naming the reader `readFreeCameraOptions`
   keeps the public bridge method name available.
+
+### JVM and Android Geometry and GeoJSON Source Milestone
+
+- Implemented JVM FFM and Android JavaCPP descriptor materialization for
+  `Geometry`, `Feature`, `FeatureIdentifier`, and `GeoJson` inputs.
+- Implemented GeoJSON source URL/data add and update APIs on JVM and Android.
+- Implemented `cameraForGeometry` on JVM and Android using the same descriptor
+  graph as GeoJSON source data.
+- Added JVM coverage for URL-backed GeoJSON sources, inline GeoJSON feature
+  collections, source data updates, and geometry camera fitting.
+- Discovery: the geometry descriptor graph can be write-only for this migration
+  slice because current Kotlin map APIs only pass geometry and GeoJSON into the
+  C API. Query result and offline-region snapshots can add readback later when
+  they migrate.
+- Discovery: the C layout probe confirmed 16-byte view structs, 24-byte
+  `mln_geometry`/`mln_geojson`, and a 56-byte `mln_feature`; using those offsets
+  kept JVM FFM materialization aligned with the generated Java FFM bridge.

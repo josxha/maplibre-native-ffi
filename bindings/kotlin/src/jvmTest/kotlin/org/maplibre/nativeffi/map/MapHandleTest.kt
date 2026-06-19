@@ -12,6 +12,10 @@ import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.geo.FeatureIdentifier
+import org.maplibre.nativeffi.geo.GeoJson
+import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
@@ -84,6 +88,37 @@ class MapHandleTest {
       assertTrue(map.removeStyleSource("places"))
       assertFalse(map.styleSourceExists("places"))
       assertFalse(map.removeStyleSource("places"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun geoJsonSourcesCanBeAddedAndUpdated() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson")
+      assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
+      map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson")
+
+      map.addGeoJsonSourceData("inline-places", geoJsonData())
+      assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
+      map.setGeoJsonSourceData(
+        "inline-places",
+        GeoJson.GeometryValue(Geometry.LineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
+      )
     } finally {
       map.close()
       runtime.close()
@@ -417,6 +452,7 @@ class MapHandleTest {
       assertTrue(
         map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), null).center != null
       )
+      assertTrue(map.cameraForGeometry(Geometry.Point(LatLng(0.0, 0.0)), fit).center != null)
       assertTrue(map.latLngBoundsForCamera(camera).southwest.latitude.isFinite())
       assertTrue(map.latLngBoundsForCameraUnwrapped(camera).southwest.latitude.isFinite())
 
@@ -545,6 +581,25 @@ class MapHandleTest {
             )
           ),
         ),
+      )
+    )
+
+  private fun geoJsonData(): GeoJson =
+    GeoJson.FeatureCollection(
+      listOf(
+        Feature(
+          Geometry.Collection(
+            listOf(
+              Geometry.Point(LatLng(0.0, 0.0)),
+              Geometry.MultiLineString(listOf(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
+            )
+          ),
+          listOf(
+            JsonValue.Member("name", JsonValue.StringValue("Null Island")),
+            JsonValue.Member("rank", JsonValue.UInt(1)),
+          ),
+          FeatureIdentifier.UInt(1),
+        )
       )
     )
 

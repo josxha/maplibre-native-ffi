@@ -19,6 +19,10 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.geo.FeatureIdentifier
+import org.maplibre.nativeffi.geo.GeoJson
+import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
@@ -462,6 +466,42 @@ internal object NativeAccess {
       Status.check(mapListStyleSourceIdsFunction().invokeWithArguments(map, outList) as Int)
       styleIdList(outList.get(ValueLayout.ADDRESS, 0))
     }
+
+  internal fun addGeoJsonSourceUrl(map: MemorySegment, sourceId: String, url: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_add_geojson_source_url")
+          .invokeWithArguments(map, stringView(arena, sourceId), stringView(arena, url)) as Int
+      )
+    }
+  }
+
+  internal fun addGeoJsonSourceData(map: MemorySegment, sourceId: String, data: GeoJson) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_add_geojson_source_data")
+          .invokeWithArguments(map, stringView(arena, sourceId), geoJson(arena, data)) as Int
+      )
+    }
+  }
+
+  internal fun setGeoJsonSourceUrl(map: MemorySegment, sourceId: String, url: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_set_geojson_source_url")
+          .invokeWithArguments(map, stringView(arena, sourceId), stringView(arena, url)) as Int
+      )
+    }
+  }
+
+  internal fun setGeoJsonSourceData(map: MemorySegment, sourceId: String, data: GeoJson) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_geojson_source_data")
+          .invokeWithArguments(map, stringView(arena, sourceId), geoJson(arena, data)) as Int
+      )
+    }
+  }
 
   internal fun addVectorSourceUrl(
     map: MemorySegment,
@@ -1270,6 +1310,25 @@ internal object NativeAccess {
     }
   }
 
+  internal fun cameraForGeometry(
+    map: MemorySegment,
+    geometry: Geometry,
+    fitOptions: CameraFitOptions?,
+  ): CameraOptions =
+    Arena.ofConfined().use { arena ->
+      val outCamera = cameraOptionsDefault(arena)
+      Status.check(
+        mapAddressAddressAddressStatusFunction("mln_map_camera_for_geometry")
+          .invokeWithArguments(
+            map,
+            geometry(arena, geometry, 0),
+            cameraFitOptions(arena, fitOptions),
+            outCamera,
+          ) as Int
+      )
+      cameraOptions(outCamera)
+    }
+
   internal fun latLngBoundsForCamera(map: MemorySegment, camera: CameraOptions): LatLngBounds =
     mapLatLngBoundsForCamera("mln_map_lat_lng_bounds_for_camera", map, camera)
 
@@ -1708,6 +1767,18 @@ internal object NativeAccess {
     downcall(
       name,
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
     )
 
   private fun mapStringViewAddressStatusFunction(name: String): MethodHandle =
@@ -2868,6 +2939,252 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun geometry(arena: Arena, value: Geometry, depth: Int): MemorySegment {
+    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+      "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
+    }
+    val segment = arena.allocate(GEOMETRY_SIZE)
+    writeGeometry(segment, value, arena, depth)
+    return segment
+  }
+
+  private fun writeGeometry(segment: MemorySegment, value: Geometry, arena: Arena, depth: Int) {
+    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+      "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
+    }
+    segment.set(ValueLayout.JAVA_INT, GEOMETRY_SIZE_OFFSET, GEOMETRY_SIZE.toInt())
+    when (value) {
+      Geometry.Empty -> segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_EMPTY)
+      is Geometry.Point -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_POINT)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, latLngLayout.byteSize())
+          .copyFrom(latLng(value.coordinate, arena))
+      }
+      is Geometry.LineString -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_LINE_STRING)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, COORDINATE_SPAN_SIZE)
+          .copyFrom(coordinateSpan(arena, value.coordinates))
+      }
+      is Geometry.Polygon -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_POLYGON)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, POLYGON_GEOMETRY_SIZE)
+          .copyFrom(polygonGeometry(arena, value.rings))
+      }
+      is Geometry.MultiPoint -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_MULTI_POINT)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, COORDINATE_SPAN_SIZE)
+          .copyFrom(coordinateSpan(arena, value.coordinates))
+      }
+      is Geometry.MultiLineString -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_MULTI_LINE_STRING)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, MULTI_LINE_GEOMETRY_SIZE)
+          .copyFrom(multiLineGeometry(arena, value.lines))
+      }
+      is Geometry.MultiPolygon -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_MULTI_POLYGON)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, MULTI_POLYGON_GEOMETRY_SIZE)
+          .copyFrom(multiPolygonGeometry(arena, value.polygons))
+      }
+      is Geometry.Collection -> {
+        segment.set(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET, GEOMETRY_COLLECTION)
+        segment
+          .asSlice(GEOMETRY_DATA_OFFSET, GEOMETRY_COLLECTION_SIZE)
+          .copyFrom(geometryCollection(arena, value.geometries, depth + 1))
+      }
+      is Geometry.Unknown ->
+        throw IllegalArgumentException("unknown geometries cannot be used as input")
+    }
+  }
+
+  private fun coordinateSpan(arena: Arena, coordinates: List<LatLng>): MemorySegment {
+    val segment = arena.allocate(COORDINATE_SPAN_SIZE)
+    segment.set(
+      ValueLayout.ADDRESS,
+      COORDINATE_SPAN_COORDINATES_OFFSET,
+      latLngArray(arena, coordinates),
+    )
+    segment.set(ValueLayout.JAVA_LONG, COORDINATE_SPAN_COUNT_OFFSET, coordinates.size.toLong())
+    return segment
+  }
+
+  private fun coordinateSpans(arena: Arena, spans: List<List<LatLng>>): MemorySegment {
+    if (spans.isEmpty()) {
+      return MemorySegment.NULL
+    }
+    val array = arena.allocate(COORDINATE_SPAN_SIZE * spans.size)
+    spans.forEachIndexed { index, span ->
+      array
+        .asSlice(COORDINATE_SPAN_SIZE * index, COORDINATE_SPAN_SIZE)
+        .copyFrom(coordinateSpan(arena, span))
+    }
+    return array
+  }
+
+  private fun polygonGeometry(arena: Arena, rings: List<List<LatLng>>): MemorySegment {
+    val segment = arena.allocate(POLYGON_GEOMETRY_SIZE)
+    segment.set(ValueLayout.ADDRESS, POLYGON_GEOMETRY_RINGS_OFFSET, coordinateSpans(arena, rings))
+    segment.set(ValueLayout.JAVA_LONG, POLYGON_GEOMETRY_RING_COUNT_OFFSET, rings.size.toLong())
+    return segment
+  }
+
+  private fun multiLineGeometry(arena: Arena, lines: List<List<LatLng>>): MemorySegment {
+    val segment = arena.allocate(MULTI_LINE_GEOMETRY_SIZE)
+    segment.set(
+      ValueLayout.ADDRESS,
+      MULTI_LINE_GEOMETRY_LINES_OFFSET,
+      coordinateSpans(arena, lines),
+    )
+    segment.set(ValueLayout.JAVA_LONG, MULTI_LINE_GEOMETRY_LINE_COUNT_OFFSET, lines.size.toLong())
+    return segment
+  }
+
+  private fun multiPolygonGeometry(
+    arena: Arena,
+    polygons: List<List<List<LatLng>>>,
+  ): MemorySegment {
+    val segment = arena.allocate(MULTI_POLYGON_GEOMETRY_SIZE)
+    val nativePolygons =
+      if (polygons.isEmpty()) MemorySegment.NULL
+      else arena.allocate(POLYGON_GEOMETRY_SIZE * polygons.size)
+    polygons.forEachIndexed { index, polygon ->
+      nativePolygons
+        .asSlice(POLYGON_GEOMETRY_SIZE * index, POLYGON_GEOMETRY_SIZE)
+        .copyFrom(polygonGeometry(arena, polygon))
+    }
+    segment.set(ValueLayout.ADDRESS, MULTI_POLYGON_GEOMETRY_POLYGONS_OFFSET, nativePolygons)
+    segment.set(
+      ValueLayout.JAVA_LONG,
+      MULTI_POLYGON_GEOMETRY_POLYGON_COUNT_OFFSET,
+      polygons.size.toLong(),
+    )
+    return segment
+  }
+
+  private fun geometryCollection(
+    arena: Arena,
+    geometries: List<Geometry>,
+    depth: Int,
+  ): MemorySegment {
+    val segment = arena.allocate(GEOMETRY_COLLECTION_SIZE)
+    val nativeGeometries =
+      if (geometries.isEmpty()) MemorySegment.NULL
+      else arena.allocate(GEOMETRY_SIZE * geometries.size)
+    geometries.forEachIndexed { index, geometry ->
+      writeGeometry(
+        nativeGeometries.asSlice(GEOMETRY_SIZE * index, GEOMETRY_SIZE),
+        geometry,
+        arena,
+        depth,
+      )
+    }
+    segment.set(ValueLayout.ADDRESS, GEOMETRY_COLLECTION_GEOMETRIES_OFFSET, nativeGeometries)
+    segment.set(
+      ValueLayout.JAVA_LONG,
+      GEOMETRY_COLLECTION_GEOMETRY_COUNT_OFFSET,
+      geometries.size.toLong(),
+    )
+    return segment
+  }
+
+  private fun feature(arena: Arena, value: Feature, depth: Int): MemorySegment {
+    val segment = arena.allocate(FEATURE_SIZE)
+    writeFeature(segment, value, arena, depth)
+    return segment
+  }
+
+  private fun writeFeature(segment: MemorySegment, value: Feature, arena: Arena, depth: Int) {
+    segment.set(ValueLayout.JAVA_INT, FEATURE_SIZE_OFFSET, FEATURE_SIZE.toInt())
+    segment.set(
+      ValueLayout.ADDRESS,
+      FEATURE_GEOMETRY_OFFSET,
+      geometry(arena, value.geometry, depth + 1),
+    )
+    segment.set(
+      ValueLayout.ADDRESS,
+      FEATURE_PROPERTIES_OFFSET,
+      jsonMembers(arena, value.properties, depth + 1),
+    )
+    segment.set(
+      ValueLayout.JAVA_LONG,
+      FEATURE_PROPERTY_COUNT_OFFSET,
+      value.properties.size.toLong(),
+    )
+    writeFeatureIdentifier(segment, value.identifier, arena)
+  }
+
+  private fun writeFeatureIdentifier(
+    segment: MemorySegment,
+    value: FeatureIdentifier,
+    arena: Arena,
+  ) {
+    when (value) {
+      FeatureIdentifier.Null ->
+        segment.set(ValueLayout.JAVA_INT, FEATURE_IDENTIFIER_TYPE_OFFSET, FEATURE_IDENTIFIER_NULL)
+      is FeatureIdentifier.UInt -> {
+        segment.set(ValueLayout.JAVA_INT, FEATURE_IDENTIFIER_TYPE_OFFSET, FEATURE_IDENTIFIER_UINT)
+        segment.set(ValueLayout.JAVA_LONG, FEATURE_IDENTIFIER_OFFSET, value.value)
+      }
+      is FeatureIdentifier.Int -> {
+        segment.set(ValueLayout.JAVA_INT, FEATURE_IDENTIFIER_TYPE_OFFSET, FEATURE_IDENTIFIER_INT)
+        segment.set(ValueLayout.JAVA_LONG, FEATURE_IDENTIFIER_OFFSET, value.value)
+      }
+      is FeatureIdentifier.DoubleValue -> {
+        segment.set(ValueLayout.JAVA_INT, FEATURE_IDENTIFIER_TYPE_OFFSET, FEATURE_IDENTIFIER_DOUBLE)
+        segment.set(ValueLayout.JAVA_DOUBLE, FEATURE_IDENTIFIER_OFFSET, value.value)
+      }
+      is FeatureIdentifier.StringValue -> {
+        segment.set(ValueLayout.JAVA_INT, FEATURE_IDENTIFIER_TYPE_OFFSET, FEATURE_IDENTIFIER_STRING)
+        segment
+          .asSlice(FEATURE_IDENTIFIER_OFFSET, STRING_VIEW_SIZE)
+          .copyFrom(stringView(arena, value.value))
+      }
+      is FeatureIdentifier.Unknown ->
+        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
+    }
+  }
+
+  private fun geoJson(arena: Arena, value: GeoJson): MemorySegment {
+    val segment = arena.allocate(GEOJSON_SIZE)
+    segment.set(ValueLayout.JAVA_INT, GEOJSON_SIZE_OFFSET, GEOJSON_SIZE.toInt())
+    when (value) {
+      is GeoJson.GeometryValue -> {
+        segment.set(ValueLayout.JAVA_INT, GEOJSON_TYPE_OFFSET, GEOJSON_GEOMETRY)
+        segment.set(ValueLayout.ADDRESS, GEOJSON_DATA_OFFSET, geometry(arena, value.geometry, 0))
+      }
+      is GeoJson.FeatureValue -> {
+        segment.set(ValueLayout.JAVA_INT, GEOJSON_TYPE_OFFSET, GEOJSON_FEATURE)
+        segment.set(ValueLayout.ADDRESS, GEOJSON_DATA_OFFSET, feature(arena, value.feature, 0))
+      }
+      is GeoJson.FeatureCollection -> {
+        segment.set(ValueLayout.JAVA_INT, GEOJSON_TYPE_OFFSET, GEOJSON_FEATURE_COLLECTION)
+        val nativeFeatures =
+          if (value.features.isEmpty()) MemorySegment.NULL
+          else arena.allocate(FEATURE_SIZE * value.features.size)
+        value.features.forEachIndexed { index, feature ->
+          writeFeature(
+            nativeFeatures.asSlice(FEATURE_SIZE * index, FEATURE_SIZE),
+            feature,
+            arena,
+            1,
+          )
+        }
+        segment.set(ValueLayout.ADDRESS, GEOJSON_DATA_OFFSET, nativeFeatures)
+        segment.set(
+          ValueLayout.JAVA_LONG,
+          GEOJSON_DATA_OFFSET + Long.SIZE_BYTES,
+          value.features.size.toLong(),
+        )
+      }
+    }
+    return segment
+  }
+
   private fun premultipliedRgba8Image(arena: Arena, value: PremultipliedRgba8Image): MemorySegment {
     val pixels = value.pixels
     val segment = arena.allocate(PREMULTIPLIED_RGBA8_IMAGE_SIZE)
@@ -2934,6 +3251,25 @@ internal object NativeAccess {
   private fun debugOptions(mask: Int): Set<DebugOption> =
     DebugOption.entries.filterTo(mutableSetOf()) { option -> (mask and option.nativeMask) != 0 }
 
+  private fun jsonMembers(
+    arena: Arena,
+    members: List<JsonValue.Member>,
+    depth: Int,
+  ): MemorySegment {
+    val nativeMembers =
+      if (members.isEmpty()) MemorySegment.NULL else arena.allocate(JSON_MEMBER_SIZE * members.size)
+    members.forEachIndexed { index, member ->
+      val memberSegment = nativeMembers.asSlice(index * JSON_MEMBER_SIZE, JSON_MEMBER_SIZE)
+      memberSegment
+        .asSlice(JSON_MEMBER_KEY_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, member.key))
+      val nativeValue = arena.allocate(JSON_VALUE_SIZE)
+      writeJson(nativeValue, member.value, arena, depth)
+      memberSegment.set(ValueLayout.ADDRESS, JSON_MEMBER_VALUE_OFFSET, nativeValue)
+    }
+    return nativeMembers
+  }
+
   private fun writeJson(segment: MemorySegment, value: JsonValue, arena: Arena, depth: Int) {
     require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
@@ -2985,18 +3321,7 @@ internal object NativeAccess {
       }
       is JsonValue.ObjectValue -> {
         segment.set(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET, JSON_OBJECT)
-        val nativeMembers =
-          if (value.members.isEmpty()) MemorySegment.NULL
-          else arena.allocate(JSON_MEMBER_SIZE * value.members.size)
-        value.members.forEachIndexed { index, member ->
-          val memberSegment = nativeMembers.asSlice(index * JSON_MEMBER_SIZE, JSON_MEMBER_SIZE)
-          memberSegment
-            .asSlice(JSON_MEMBER_KEY_OFFSET, STRING_VIEW_SIZE)
-            .copyFrom(stringView(arena, member.key))
-          val nativeValue = arena.allocate(JSON_VALUE_SIZE)
-          writeJson(nativeValue, member.value, arena, depth + 1)
-          memberSegment.set(ValueLayout.ADDRESS, JSON_MEMBER_VALUE_OFFSET, nativeValue)
-        }
+        val nativeMembers = jsonMembers(arena, value.members, depth + 1)
         segment.set(ValueLayout.ADDRESS, JSON_VALUE_DATA_OFFSET, nativeMembers)
         segment.set(
           ValueLayout.JAVA_LONG,
@@ -3972,6 +4297,63 @@ internal object NativeAccess {
   private const val FREE_CAMERA_OPTIONS_FIELDS_OFFSET: Long = 4
   private const val FREE_CAMERA_OPTIONS_POSITION_OFFSET: Long = 8
   private const val FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET: Long = 32
+
+  private const val GEOMETRY_EMPTY: Int = 0
+  private const val GEOMETRY_POINT: Int = 1
+  private const val GEOMETRY_LINE_STRING: Int = 2
+  private const val GEOMETRY_POLYGON: Int = 3
+  private const val GEOMETRY_MULTI_POINT: Int = 4
+  private const val GEOMETRY_MULTI_LINE_STRING: Int = 5
+  private const val GEOMETRY_MULTI_POLYGON: Int = 6
+  private const val GEOMETRY_COLLECTION: Int = 7
+
+  private const val COORDINATE_SPAN_SIZE: Long = 16
+  private const val COORDINATE_SPAN_COORDINATES_OFFSET: Long = 0
+  private const val COORDINATE_SPAN_COUNT_OFFSET: Long = 8
+
+  private const val POLYGON_GEOMETRY_SIZE: Long = 16
+  private const val POLYGON_GEOMETRY_RINGS_OFFSET: Long = 0
+  private const val POLYGON_GEOMETRY_RING_COUNT_OFFSET: Long = 8
+
+  private const val MULTI_LINE_GEOMETRY_SIZE: Long = 16
+  private const val MULTI_LINE_GEOMETRY_LINES_OFFSET: Long = 0
+  private const val MULTI_LINE_GEOMETRY_LINE_COUNT_OFFSET: Long = 8
+
+  private const val MULTI_POLYGON_GEOMETRY_SIZE: Long = 16
+  private const val MULTI_POLYGON_GEOMETRY_POLYGONS_OFFSET: Long = 0
+  private const val MULTI_POLYGON_GEOMETRY_POLYGON_COUNT_OFFSET: Long = 8
+
+  private const val GEOMETRY_COLLECTION_SIZE: Long = 16
+  private const val GEOMETRY_COLLECTION_GEOMETRIES_OFFSET: Long = 0
+  private const val GEOMETRY_COLLECTION_GEOMETRY_COUNT_OFFSET: Long = 8
+
+  private const val GEOMETRY_SIZE: Long = 24
+  private const val GEOMETRY_SIZE_OFFSET: Long = 0
+  private const val GEOMETRY_TYPE_OFFSET: Long = 4
+  private const val GEOMETRY_DATA_OFFSET: Long = 8
+
+  private const val FEATURE_IDENTIFIER_NULL: Int = 0
+  private const val FEATURE_IDENTIFIER_UINT: Int = 1
+  private const val FEATURE_IDENTIFIER_INT: Int = 2
+  private const val FEATURE_IDENTIFIER_DOUBLE: Int = 3
+  private const val FEATURE_IDENTIFIER_STRING: Int = 4
+
+  private const val FEATURE_SIZE: Long = 56
+  private const val FEATURE_SIZE_OFFSET: Long = 0
+  private const val FEATURE_GEOMETRY_OFFSET: Long = 8
+  private const val FEATURE_PROPERTIES_OFFSET: Long = 16
+  private const val FEATURE_PROPERTY_COUNT_OFFSET: Long = 24
+  private const val FEATURE_IDENTIFIER_TYPE_OFFSET: Long = 32
+  private const val FEATURE_IDENTIFIER_OFFSET: Long = 40
+
+  private const val GEOJSON_GEOMETRY: Int = 1
+  private const val GEOJSON_FEATURE: Int = 2
+  private const val GEOJSON_FEATURE_COLLECTION: Int = 3
+
+  private const val GEOJSON_SIZE: Long = 24
+  private const val GEOJSON_SIZE_OFFSET: Long = 0
+  private const val GEOJSON_TYPE_OFFSET: Long = 4
+  private const val GEOJSON_DATA_OFFSET: Long = 8
 
   private const val JSON_VALUE_SIZE: Long = 24
   private const val JSON_VALUE_SIZE_OFFSET: Long = 0
