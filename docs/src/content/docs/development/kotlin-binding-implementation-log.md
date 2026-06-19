@@ -693,3 +693,15 @@ is being implemented.
   state is shared but the actual discard transport remains bridge-specific,
   reinforcing the north-star split between common handle semantics and platform
   call mechanics.
+
+### JVM and Android Offline Operation Start Milestone
+
+- Implemented JVM FFM and Android JavaCPP actuals for start-only offline
+  operations that do not require struct materialization or result marshalling:
+  region get, region list, status get, observe toggle, download-state mutation,
+  invalidation, and deletion.
+- Preserved the existing take-result placeholders so copied offline region
+  snapshots, lists, and status structs can migrate in a focused follow-up.
+- Discovery: JavaCPP's generated overloads for these calls expose `long[]`
+  output parameters cleanly, while the JVM FFM bridge benefits from small
+  grouped helpers for runtime plus out-operation-id function shapes.

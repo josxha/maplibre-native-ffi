@@ -45,10 +45,18 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   ): OfflineOperationHandle<OfflineRegionInfo> = unsupportedRuntimeHandle()
 
   public actual fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      NativeAccess.startOfflineRegion(requireLiveHandle(), id),
+      OfflineOperationKind.REGION_GET,
+      OfflineOperationResultKind.OPTIONAL_REGION,
+    )
 
   public actual fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      NativeAccess.startOfflineRegions(requireLiveHandle()),
+      OfflineOperationKind.REGIONS_LIST,
+      OfflineOperationResultKind.REGION_LIST,
+    )
 
   public actual fun startMergeOfflineRegionsDatabase(
     path: String
@@ -61,23 +69,50 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   public actual fun startOfflineRegionStatus(
     id: Long
-  ): OfflineOperationHandle<OfflineRegionStatus> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<OfflineRegionStatus> =
+    offlineOperation(
+      NativeAccess.startOfflineRegionStatus(requireLiveHandle(), id),
+      OfflineOperationKind.REGION_GET_STATUS,
+      OfflineOperationResultKind.REGION_STATUS,
+    )
 
   public actual fun startSetOfflineRegionObserved(
     id: Long,
     observed: Boolean,
-  ): OfflineOperationHandle<Unit> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<Unit> =
+    offlineOperation(
+      NativeAccess.startSetOfflineRegionObserved(requireLiveHandle(), id, observed),
+      OfflineOperationKind.REGION_SET_OBSERVED,
+      OfflineOperationResultKind.NONE,
+    )
 
   public actual fun startSetOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OfflineOperationHandle<Unit> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<Unit> =
+    offlineOperation(
+      NativeAccess.startSetOfflineRegionDownloadState(
+        requireLiveHandle(),
+        id,
+        downloadState.nativeValue,
+      ),
+      OfflineOperationKind.REGION_SET_DOWNLOAD_STATE,
+      OfflineOperationResultKind.NONE,
+    )
 
   public actual fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      NativeAccess.startInvalidateOfflineRegion(requireLiveHandle(), id),
+      OfflineOperationKind.REGION_INVALIDATE,
+      OfflineOperationResultKind.NONE,
+    )
 
   public actual fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      NativeAccess.startDeleteOfflineRegion(requireLiveHandle(), id),
+      OfflineOperationKind.REGION_DELETE,
+      OfflineOperationResultKind.NONE,
+    )
 
   public actual fun takeCreateOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>

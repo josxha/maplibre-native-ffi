@@ -164,6 +164,49 @@ internal object NativeAccess {
       outOperationId.get(ValueLayout.JAVA_LONG, 0)
     }
 
+  internal fun startOfflineRegion(runtime: MemorySegment, regionId: Long): Long =
+    startRuntimeLongOperation("mln_runtime_offline_region_get_start", runtime, regionId)
+
+  internal fun startOfflineRegions(runtime: MemorySegment): Long =
+    startRuntimeOperation("mln_runtime_offline_regions_list_start", runtime)
+
+  internal fun startOfflineRegionStatus(runtime: MemorySegment, regionId: Long): Long =
+    startRuntimeLongOperation("mln_runtime_offline_region_get_status_start", runtime, regionId)
+
+  internal fun startSetOfflineRegionObserved(
+    runtime: MemorySegment,
+    regionId: Long,
+    observed: Boolean,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeLongBooleanOperationStartFunction("mln_runtime_offline_region_set_observed_start")
+          .invokeWithArguments(runtime, regionId, observed, outOperationId) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startSetOfflineRegionDownloadState(
+    runtime: MemorySegment,
+    regionId: Long,
+    downloadState: Int,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeLongIntOperationStartFunction("mln_runtime_offline_region_set_download_state_start")
+          .invokeWithArguments(runtime, regionId, downloadState, outOperationId) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startInvalidateOfflineRegion(runtime: MemorySegment, regionId: Long): Long =
+    startRuntimeLongOperation("mln_runtime_offline_region_invalidate_start", runtime, regionId)
+
+  internal fun startDeleteOfflineRegion(runtime: MemorySegment, regionId: Long): Long =
+    startRuntimeLongOperation("mln_runtime_offline_region_delete_start", runtime, regionId)
+
   internal fun discardOfflineOperation(runtime: MemorySegment, operationId: Long): Int =
     runtimeOfflineOperationDiscardFunction().invokeWithArguments(runtime, operationId) as Int
 
@@ -212,6 +255,66 @@ internal object NativeAccess {
     downcall(
       "mln_runtime_offline_operation_discard",
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
+    )
+
+  private fun startRuntimeOperation(name: String, runtime: MemorySegment): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeOperationStartFunction(name).invokeWithArguments(runtime, outOperationId) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  private fun startRuntimeLongOperation(name: String, runtime: MemorySegment, value: Long): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeLongOperationStartFunction(name).invokeWithArguments(runtime, value, outOperationId)
+          as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  private fun runtimeOperationStartFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun runtimeLongOperationStartFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun runtimeLongBooleanOperationStartFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.JAVA_BOOLEAN,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun runtimeLongIntOperationStartFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+      ),
     )
 
   private fun runtimeOptions(options: RuntimeOptions, arena: Arena): MemorySegment {

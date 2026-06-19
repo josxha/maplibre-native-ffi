@@ -54,10 +54,18 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   ): OfflineOperationHandle<OfflineRegionInfo> = unsupportedRuntimeHandle()
 
   public actual fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_get_start),
+      OfflineOperationKind.REGION_GET,
+      OfflineOperationResultKind.OPTIONAL_REGION,
+    )
 
   public actual fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      startOfflineOperation(MaplibreNativeC::mln_runtime_offline_regions_list_start),
+      OfflineOperationKind.REGIONS_LIST,
+      OfflineOperationResultKind.REGION_LIST,
+    )
 
   public actual fun startMergeOfflineRegionsDatabase(
     path: String
@@ -70,23 +78,66 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   public actual fun startOfflineRegionStatus(
     id: Long
-  ): OfflineOperationHandle<OfflineRegionStatus> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<OfflineRegionStatus> =
+    offlineOperation(
+      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_get_status_start),
+      OfflineOperationKind.REGION_GET_STATUS,
+      OfflineOperationResultKind.REGION_STATUS,
+    )
 
   public actual fun startSetOfflineRegionObserved(
     id: Long,
     observed: Boolean,
-  ): OfflineOperationHandle<Unit> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<Unit> {
+    val outOperationId = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_runtime_offline_region_set_observed_start(
+        runtime(requireLiveAddress()),
+        id,
+        observed,
+        outOperationId,
+      )
+    )
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.REGION_SET_OBSERVED,
+      OfflineOperationResultKind.NONE,
+    )
+  }
 
   public actual fun startSetOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OfflineOperationHandle<Unit> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<Unit> {
+    val outOperationId = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_runtime_offline_region_set_download_state_start(
+        runtime(requireLiveAddress()),
+        id,
+        downloadState.nativeValue,
+        outOperationId,
+      )
+    )
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.REGION_SET_DOWNLOAD_STATE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
 
   public actual fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_invalidate_start),
+      OfflineOperationKind.REGION_INVALIDATE,
+      OfflineOperationResultKind.NONE,
+    )
 
   public actual fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit> =
-    unsupportedRuntimeHandle()
+    offlineOperation(
+      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_delete_start),
+      OfflineOperationKind.REGION_DELETE,
+      OfflineOperationResultKind.NONE,
+    )
 
   public actual fun takeCreateOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
@@ -150,6 +201,21 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     kind: OfflineOperationKind,
     resultKind: OfflineOperationResultKind,
   ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
+
+  private fun startOfflineOperation(start: (MaplibreNativeC.mln_runtime, LongArray) -> Int): Long {
+    val outOperationId = longArrayOf(0L)
+    Status.check(start(runtime(requireLiveAddress()), outOperationId))
+    return outOperationId[0]
+  }
+
+  private fun startOfflineLongOperation(
+    value: Long,
+    start: (MaplibreNativeC.mln_runtime, Long, LongArray) -> Int,
+  ): Long {
+    val outOperationId = longArrayOf(0L)
+    Status.check(start(runtime(requireLiveAddress()), value, outOperationId))
+    return outOperationId[0]
+  }
 
   internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
     if (operation.isClosed) return
