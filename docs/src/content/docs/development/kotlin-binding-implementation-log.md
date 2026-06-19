@@ -598,3 +598,14 @@ is being implemented.
   values, so the common facade can expose the full render-session creation
   surface while each platform actual remains responsible for native descriptor
   materialization.
+
+### JVM Native Buffer Actual Milestone
+
+- Replaced the JVM `NativeBuffer` placeholder with an FFM-backed implementation
+  using `Arena` and `MemorySegment`, matching the existing Java FFM buffer
+  behavior.
+- Added JVM tests for byte length, copied byte-array reads, capacity checks,
+  idempotent close, close-during-borrow behavior, and zero-length buffers.
+- Reflection: this is the first non-placeholder JVM handle actual below
+  `Maplibre`. It confirms small bridge-support objects can migrate before the
+  larger runtime/map/render handle transports are ready.
