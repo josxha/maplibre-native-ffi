@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
 
 /** Explicit handle for a Metal session-owned texture frame. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
-public class MetalOwnedTextureFrameHandle
+public actual class MetalOwnedTextureFrameHandle
 internal constructor(
   private val session: RenderSessionHandle,
   private val framePointer: CPointer<mln_metal_owned_texture_frame>,
@@ -25,15 +25,15 @@ internal constructor(
     )
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.reportLeak() }
 
-  public fun frame(): MetalOwnedTextureFrame {
+  public actual fun frame(): MetalOwnedTextureFrame {
     core.ensureOpen()
     return frameValue
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = core.isClosed()
 
-  override fun close() {
+  public actual override fun close() {
     core.close(
       releaseNative = { session.releaseMetalFrame(framePointer) },
       ownerClosed = { session.isClosed },

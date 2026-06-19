@@ -486,3 +486,14 @@ is being implemented.
 - Reflection: this extends the handle facade pattern into the render domain
   while leaving resize, render, query, texture readback, and frame acquisition
   calls in `nativeMain` until they can sit behind bridge facades.
+
+### Common Owned Texture Frame Handle Facade Milestone
+
+- Added common `expect` facades for the Metal, Vulkan, and OpenGL owned texture
+  frame handles, covering frame access, close, and closed-state inspection.
+- Converted the existing Kotlin/Native owned texture frame handles into native
+  actuals and added JVM and Android actual placeholders until their render
+  bridge implementations are available.
+- Reflection: this completes the common surface for owned texture frame values
+  and handles, leaving the platform-specific frame acquisition and release
+  machinery inside platform source sets.

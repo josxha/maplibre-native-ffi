@@ -11,7 +11,7 @@ import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame
 
 /** Explicit handle for an OpenGL session-owned texture frame. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
-public class OpenGLOwnedTextureFrameHandle
+public actual class OpenGLOwnedTextureFrameHandle
 internal constructor(
   private val session: RenderSessionHandle,
   private val framePointer: CPointer<mln_opengl_owned_texture_frame>,
@@ -25,15 +25,15 @@ internal constructor(
     )
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.reportLeak() }
 
-  public fun frame(): OpenGLOwnedTextureFrame {
+  public actual fun frame(): OpenGLOwnedTextureFrame {
     core.ensureOpen()
     return frameValue
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = core.isClosed()
 
-  override fun close() {
+  public actual override fun close() {
     core.close(
       releaseNative = { session.releaseOpenGLFrame(framePointer) },
       ownerClosed = { session.isClosed },
