@@ -1156,3 +1156,25 @@ is being implemented.
 - Discovery: an initial `mise run //bindings/kotlin:build` attempt stopped in
   the root dependency prerequisite before printing CMake output, but a rerun
   completed the native configure/build and full Kotlin build successfully.
+
+### Android Render Query Milestone
+
+- Implemented Android JavaCPP rendered-feature, source-feature, and
+  feature-extension query APIs on `RenderSessionHandle`.
+- Added Android query geometry and option scopes for rendered point, box, and
+  line-string queries plus layer/source-layer and JSON filters.
+- Added Android query result copy-out for queried features, optional source
+  metadata, feature state JSON, feature extension values, and feature extension
+  feature collections.
+- Added render-local Android feature and geometry descriptor scopes for
+  feature-extension inputs.
+- Removed the Android render-session unsupported placeholder now that render
+  query APIs are bridged.
+- Removed stale private JVM and Android map unsupported helpers that no longer
+  had callers after earlier map bridge milestones.
+- Discovery: JavaCPP generated direct wrappers for the query result handles,
+  `SizeTPointer`, and the query geometry constructor functions, so Android can
+  avoid JVM-style manual offset tables for this slice.
+- Discovery: Android render query support duplicates feature/geometry descriptor
+  logic that already exists in the Android map binding. That is now the clearest
+  candidate for the next Android/common consolidation cleanup.

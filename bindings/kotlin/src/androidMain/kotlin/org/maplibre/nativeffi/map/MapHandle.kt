@@ -2759,8 +2759,3 @@ private fun closeQuietly(closeable: AutoCloseable?) {
     closeable?.close()
   } catch (_: Exception) {}
 }
-
-private fun unsupportedMapHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "MapHandle is not available until the Android map bridge is implemented"
-  )

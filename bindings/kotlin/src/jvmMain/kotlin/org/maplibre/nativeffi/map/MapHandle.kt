@@ -732,11 +732,6 @@ private constructor(
   }
 }
 
-private fun unsupportedMapHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "MapHandle is not available until the JVM map bridge is implemented"
-  )
-
 private fun closeQuietly(closeable: AutoCloseable?) {
   try {
     closeable?.close()
