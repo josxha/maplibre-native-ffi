@@ -352,3 +352,21 @@ is being implemented.
 - Reflection: this is a small move, but it keeps the render-session API on the
   same trajectory as handle retention and callback gating: common code owns the
   public invalid-state behavior while actual source sets own native calls.
+
+### Common Resource Request Handle Core Milestone
+
+- Extracted provider-owned resource request handle state into
+  `ResourceRequestHandleCore`, covering one-shot completion, live-operation
+  retention, provider-decision finalization, pass-through release accounting,
+  and provider-owned native release.
+- Added common tests for provider-owned release, pass-through ownership,
+  completion-before-decision behavior, retry after pre-native completion
+  failure, duplicate completion rejection, and close-during-operation release
+  deferral.
+- Kept `ResourceRequestHandle` in `nativeMain` for now because it still owns the
+  native request pointer, response materialization, cancellation calls, and
+  Kotlin/Native cleaner registration.
+- Discovery: the existing native tests already described most of this state
+  machine through public behavior; extracting the core makes those rules
+  reusable for FFM and Android actuals without standardizing their handle
+  carriers yet.
