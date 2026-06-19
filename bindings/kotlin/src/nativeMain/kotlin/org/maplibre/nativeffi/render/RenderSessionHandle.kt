@@ -76,7 +76,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   private val state = HandleState("RenderSessionHandle", handle, map)
   private val activeFrame = ActiveFrameState()
 
-  public fun resize(width: Int, height: Int, scaleFactor: Double) {
+  public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
     activeFrame.ensureInactive("resize")
     require(width >= 0) { "width must be non-negative" }
     require(height >= 0) { "height must be non-negative" }
@@ -85,32 +85,32 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     )
   }
 
-  public fun renderUpdate() {
+  public actual fun renderUpdate() {
     activeFrame.ensureInactive("render")
     Status.check(mln_render_session_render_update(state.requireLive()))
   }
 
-  public fun detach() {
+  public actual fun detach() {
     activeFrame.ensureInactive("detach")
     Status.check(mln_render_session_detach(state.requireLive()))
   }
 
-  public fun reduceMemoryUse() {
+  public actual fun reduceMemoryUse() {
     activeFrame.ensureInactive("reduce memory use")
     Status.check(mln_render_session_reduce_memory_use(state.requireLive()))
   }
 
-  public fun clearData() {
+  public actual fun clearData() {
     activeFrame.ensureInactive("clear data")
     Status.check(mln_render_session_clear_data(state.requireLive()))
   }
 
-  public fun dumpDebugLogs() {
+  public actual fun dumpDebugLogs() {
     activeFrame.ensureInactive("dump debug logs")
     Status.check(mln_render_session_dump_debug_logs(state.requireLive()))
   }
 
-  public fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
     activeFrame.ensureInactive("set feature state")
     memScoped {
       Status.check(
@@ -123,7 +123,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
-  public fun getFeatureState(selector: FeatureStateSelector): JsonValue = memScoped {
+  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue = memScoped {
     activeFrame.ensureInactive("get feature state")
     val outState = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
     outState.value = null
@@ -137,7 +137,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     ValueStructs.jsonSnapshotHandle(outState.value) ?: JsonValue.ObjectValue(emptyList())
   }
 
-  public fun removeFeatureState(selector: FeatureStateSelector) {
+  public actual fun removeFeatureState(selector: FeatureStateSelector) {
     activeFrame.ensureInactive("remove feature state")
     memScoped {
       Status.check(
@@ -149,7 +149,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
-  public fun queryRenderedFeatures(
+  public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
   ): List<QueriedFeature> = memScoped {
@@ -167,7 +167,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     QueryStructs.featureQueryResult(requireNotNull(outResult.value))
   }
 
-  public fun querySourceFeatures(
+  public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
   ): List<QueriedFeature> = memScoped {
@@ -185,7 +185,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     QueryStructs.featureQueryResult(requireNotNull(outResult.value))
   }
 
-  public fun queryFeatureExtension(
+  public actual fun queryFeatureExtension(
     sourceId: String,
     feature: Feature,
     extension: String,
@@ -209,7 +209,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     QueryStructs.featureExtensionResult(requireNotNull(outResult.value))
   }
 
-  public fun textureImageInfo(): TextureImageInfo = memScoped {
+  public actual fun textureImageInfo(): TextureImageInfo = memScoped {
     activeFrame.ensureInactive("read texture data")
     val outInfo = mln_texture_image_info_default().getPointer(this)
     val status = mln_texture_read_premultiplied_rgba8(state.requireLive(), null, 0UL, outInfo)
@@ -222,7 +222,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
-  public fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo = memScoped {
+  public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo = memScoped {
     activeFrame.ensureInactive("read texture data")
     val outInfo = mln_texture_image_info_default().getPointer(this)
     buffer.borrow { pointer, capacity ->
@@ -238,7 +238,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     RenderStructs.textureImageInfo(outInfo.pointed)
   }
 
-  public fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {
+  public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {
     val frame = nativeHeap.alloc<mln_metal_owned_texture_frame>()
     var acquired = false
     var borrowStarted = false
@@ -268,7 +268,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
-  public fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle {
+  public actual fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle {
     val frame = nativeHeap.alloc<mln_vulkan_owned_texture_frame>()
     var acquired = false
     var borrowStarted = false
@@ -298,7 +298,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
-  public fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
+  public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
     val frame = nativeHeap.alloc<mln_opengl_owned_texture_frame>()
     var acquired = false
     var borrowStarted = false

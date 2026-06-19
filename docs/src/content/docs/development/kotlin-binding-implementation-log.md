@@ -525,3 +525,16 @@ is being implemented.
 - Reflection: `MapHandle` is now the main remaining consolidation surface. The
   next useful slices are style/source mutation, style layer/image mutation,
   render-session attachment, and runtime/offline operation entrypoints.
+
+### Common Render Session Operations Facade Milestone
+
+- Expanded the common `RenderSessionHandle` facade with resize, render update,
+  detach, memory/data/debug operations, feature state, rendered/source/extension
+  queries, texture readback, and owned texture frame acquisition.
+- Converted the existing Kotlin/Native render-session operation methods into
+  native actuals and added JVM and Android actual placeholders until their
+  render bridges are implemented.
+- Reflection: render-session attachment still belongs with the platform map
+  bridge for now because each attach path materializes backend-specific native
+  descriptors, but an already-created render session now has a shared common
+  control surface.
