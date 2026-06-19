@@ -32,18 +32,18 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 
 /** Process-global entry points for the Kotlin/Native binding. */
 @OptIn(ExperimentalForeignApi::class)
-public object Maplibre {
+public actual object Maplibre {
   /** C ABI contract version expected by this Kotlin/Native binding. */
-  public const val EXPECTED_C_ABI_VERSION: Long = 0L
+  public actual const val EXPECTED_C_ABI_VERSION: Long = 0L
 
   /** Native libraries are linked by the host binary for Kotlin/Native. */
-  public fun loadNativeLibrary() {
+  public actual fun loadNativeLibrary() {
     // Direct cinterop calls bind against the native library at link/load time.
     checkCompatibleCAbi()
   }
 
   /** Returns the native C ABI contract version. */
-  public fun cVersion(): Long = mln_c_version().toLong()
+  public actual fun cVersion(): Long = mln_c_version().toLong()
 
   internal fun checkCompatibleCAbi(actualVersion: Long = cVersion()) {
     if (actualVersion == EXPECTED_C_ABI_VERSION) {

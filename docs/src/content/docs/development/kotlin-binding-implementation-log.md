@@ -112,3 +112,19 @@ is being implemented.
 - Reflection: this is still a transitional platform facade. The destination is
   an `expect object Maplibre` in `commonMain` with JVM FFM and Kotlin/Native
   actuals once the JVM side has enough behavior to satisfy the common contract.
+
+### Common Maplibre Expect Milestone
+
+- Promoted the shared bootstrap subset of `Maplibre` into `commonMain` as the
+  first `expect` facade, with JVM FFM and Kotlin/Native actual objects for the
+  expected C ABI version, native library loading, and C ABI version query.
+- Discovery: `expect val` declarations cannot be `const` because they do not
+  have common initializers. The common API now exposes `EXPECTED_C_ABI_VERSION`
+  as a normal `val`, while platform actuals can still initialize it from
+  platform constants.
+- Discovery: Kotlin 2.2 still reports expect/actual classes as beta unless the
+  module opts in with `-Xexpect-actual-classes`. The Kotlin module now sets that
+  compiler flag explicitly.
+- Reflection: the first expect facade is intentionally narrow. It proves the
+  common facade pattern without forcing the JVM bridge to implement every
+  process-global native operation in the same commit.

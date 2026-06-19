@@ -17,6 +17,8 @@ val hostArch = System.getProperty("os.arch").lowercase()
 kotlin {
   jvmToolchain(25)
 
+  compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
+
   jvm { compilerOptions { jvmTarget.set(JvmTarget.JVM_24) } }
 
   when {
