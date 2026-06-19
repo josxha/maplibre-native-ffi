@@ -166,6 +166,41 @@ class MapHandleTest {
     }
   }
 
+  @Test
+  fun mapDebugControlsCanBeReadAndWritten() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.CONTINUOUS
+        },
+      )
+
+    try {
+      assertTrue(map.debugOptions.isEmpty())
+      map.debugOptions = setOf(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS)
+      assertEquals(setOf(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS), map.debugOptions)
+      map.debugOptions = emptySet()
+      assertTrue(map.debugOptions.isEmpty())
+
+      assertFalse(map.isRenderingStatsViewEnabled)
+      map.isRenderingStatsViewEnabled = true
+      assertTrue(map.isRenderingStatsViewEnabled)
+      map.isRenderingStatsViewEnabled = false
+      assertFalse(map.isRenderingStatsViewEnabled)
+
+      map.requestRepaint()
+      map.isFullyLoaded
+      map.dumpDebugLogs()
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   private fun geoJsonSource(): JsonValue =
     JsonValue.ObjectValue(
       listOf(

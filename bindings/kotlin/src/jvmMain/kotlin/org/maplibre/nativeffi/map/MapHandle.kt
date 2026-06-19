@@ -342,30 +342,44 @@ private constructor(
   }
 
   public actual fun requestRepaint() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.requestRepaint(requireLiveHandle())
   }
 
   public actual fun requestStillImage() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.requestStillImage(requireLiveHandle())
   }
 
   public actual var debugOptions: Set<DebugOption>
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.debugOptions(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setDebugOptions(requireLiveHandle(), value)
     }
 
   public actual var isRenderingStatsViewEnabled: Boolean
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.renderingStatsViewEnabled(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setRenderingStatsViewEnabled(requireLiveHandle(), value)
     }
 
   public actual val isFullyLoaded: Boolean
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.isFullyLoaded(requireLiveHandle())
+    }
 
   public actual fun dumpDebugLogs() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.dumpDebugLogs(requireLiveHandle())
   }
 
   public actual var viewportOptions: ViewportOptions

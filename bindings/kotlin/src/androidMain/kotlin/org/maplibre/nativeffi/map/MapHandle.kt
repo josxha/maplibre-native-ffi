@@ -722,30 +722,59 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual fun requestRepaint() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_request_repaint(map(requireLiveAddress())))
   }
 
   public actual fun requestStillImage() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_request_still_image(map(requireLiveAddress())))
   }
 
   public actual var debugOptions: Set<DebugOption>
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      val outOptions = intArrayOf(0)
+      Status.check(MaplibreNativeC.mln_map_get_debug_options(map(requireLiveAddress()), outOptions))
+      return debugOptions(outOptions[0])
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      Status.check(
+        MaplibreNativeC.mln_map_set_debug_options(map(requireLiveAddress()), debugOptionMask(value))
+      )
     }
 
   public actual var isRenderingStatsViewEnabled: Boolean
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      val outEnabled = booleanArrayOf(false)
+      Status.check(
+        MaplibreNativeC.mln_map_get_rendering_stats_view_enabled(
+          map(requireLiveAddress()),
+          outEnabled,
+        )
+      )
+      return outEnabled[0]
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      Status.check(
+        MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(map(requireLiveAddress()), value)
+      )
     }
 
   public actual val isFullyLoaded: Boolean
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      val outLoaded = booleanArrayOf(false)
+      Status.check(MaplibreNativeC.mln_map_is_fully_loaded(map(requireLiveAddress()), outLoaded))
+      return outLoaded[0]
+    }
 
   public actual fun dumpDebugLogs() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_dump_debug_logs(map(requireLiveAddress())))
   }
 
   public actual var viewportOptions: ViewportOptions
@@ -1060,6 +1089,12 @@ private fun styleImageInfo(info: MaplibreNativeC.mln_style_image_info): StyleIma
     info.pixel_ratio(),
     info.sdf(),
   )
+
+private fun debugOptionMask(options: Set<DebugOption>): Int =
+  options.fold(0) { acc, option -> acc or option.nativeMask }
+
+private fun debugOptions(mask: Int): Set<DebugOption> =
+  DebugOption.entries.filterTo(mutableSetOf()) { option -> (mask and option.nativeMask) != 0 }
 
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer

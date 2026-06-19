@@ -18,6 +18,7 @@ import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.map.DebugOption
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.RenderingStats
@@ -808,6 +809,62 @@ internal object NativeAccess {
       jsonSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
     }
 
+  internal fun requestRepaint(map: MemorySegment) {
+    Status.check(mapStatusFunction("mln_map_request_repaint").invokeWithArguments(map) as Int)
+  }
+
+  internal fun requestStillImage(map: MemorySegment) {
+    Status.check(mapStatusFunction("mln_map_request_still_image").invokeWithArguments(map) as Int)
+  }
+
+  internal fun setDebugOptions(map: MemorySegment, options: Set<DebugOption>) {
+    val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
+    Status.check(
+      mapIntStatusFunction("mln_map_set_debug_options").invokeWithArguments(map, mask) as Int
+    )
+  }
+
+  internal fun debugOptions(map: MemorySegment): Set<DebugOption> =
+    Arena.ofConfined().use { arena ->
+      val outOptions = arena.allocate(ValueLayout.JAVA_INT)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_debug_options").invokeWithArguments(map, outOptions)
+          as Int
+      )
+      debugOptions(outOptions.get(ValueLayout.JAVA_INT, 0))
+    }
+
+  internal fun setRenderingStatsViewEnabled(map: MemorySegment, enabled: Boolean) {
+    Status.check(
+      mapBooleanStatusFunction("mln_map_set_rendering_stats_view_enabled")
+        .invokeWithArguments(map, enabled) as Int
+    )
+  }
+
+  internal fun renderingStatsViewEnabled(map: MemorySegment): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outEnabled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_rendering_stats_view_enabled")
+          .invokeWithArguments(map, outEnabled) as Int
+      )
+      outEnabled.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun isFullyLoaded(map: MemorySegment): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outLoaded = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapAddressStatusFunction("mln_map_is_fully_loaded").invokeWithArguments(map, outLoaded)
+          as Int
+      )
+      outLoaded.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun dumpDebugLogs(map: MemorySegment) {
+    Status.check(mapStatusFunction("mln_map_dump_debug_logs").invokeWithArguments(map) as Int)
+  }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -1032,6 +1089,18 @@ internal object NativeAccess {
 
   private fun mapStatusFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+
+  private fun mapIntStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+    )
+
+  private fun mapBooleanStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN),
+    )
 
   private fun mapAddressStatusFunction(name: String): MethodHandle =
     downcall(
@@ -1497,6 +1566,9 @@ internal object NativeAccess {
       segment.get(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET),
       segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_SDF_OFFSET),
     )
+
+  private fun debugOptions(mask: Int): Set<DebugOption> =
+    DebugOption.entries.filterTo(mutableSetOf()) { option -> (mask and option.nativeMask) != 0 }
 
   private fun writeJson(segment: MemorySegment, value: JsonValue, arena: Arena, depth: Int) {
     require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {

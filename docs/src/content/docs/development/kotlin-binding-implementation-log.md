@@ -894,3 +894,17 @@ is being implemented.
 - Discovery: the common `PremultipliedRgba8Image` defensively copies its byte
   array, so bridge calls should read `pixels` once and pass that stable snapshot
   through the native call.
+
+### JVM and Android Map Debug Controls Milestone
+
+- Implemented JVM FFM and Android JavaCPP map debug/status controls: repaint
+  requests, still-image requests, debug option masks, rendering stats view
+  toggles, loaded-state reads, and debug-log dumps.
+- Added shared-style mask conversion in each bridge actual so common Kotlin
+  exposes `Set<DebugOption>` instead of raw bitfields.
+- Extended JVM coverage to round-trip debug option sets, toggle the rendering
+  stats view, and call repaint/load/debug-log operations through the Kotlin map
+  handle.
+- Discovery: this slice is a useful boundary between style state and broader
+  camera/render work because it removes map control placeholders without adding
+  descriptor structs or render-session ownership.
