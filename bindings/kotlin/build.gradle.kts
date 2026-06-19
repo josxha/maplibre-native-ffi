@@ -2,9 +2,15 @@ import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
-plugins { kotlin("multiplatform") version "2.2.21" }
+plugins {
+  kotlin("multiplatform") version "2.2.21"
+  id("com.android.kotlin.multiplatform.library") version "9.1.1"
+}
 
-repositories { mavenCentral() }
+repositories {
+  google()
+  mavenCentral()
+}
 
 val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
 val nativeLibraryPathForTests =
@@ -20,6 +26,14 @@ kotlin {
   compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
 
   jvm { compilerOptions { jvmTarget.set(JvmTarget.JVM_24) } }
+
+  android {
+    namespace = "org.maplibre.nativeffi"
+    compileSdk = 36
+    minSdk = 24
+
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+  }
 
   when {
     hostOs.contains("mac") && (hostArch == "aarch64" || hostArch == "arm64") -> macosArm64()

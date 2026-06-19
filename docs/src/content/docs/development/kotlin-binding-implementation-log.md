@@ -128,3 +128,29 @@ is being implemented.
 - Reflection: the first expect facade is intentionally narrow. It proves the
   common facade pattern without forcing the JVM bridge to implement every
   process-global native operation in the same commit.
+
+### Android Source Set Milestone
+
+- Added the Android KMP library plugin to the unified Kotlin module and created
+  the first `androidMain` actual for the shared `Maplibre` bootstrap facade.
+- Added Android target configuration with namespace `org.maplibre.nativeffi`,
+  compile SDK 36, min SDK 24, and JVM 17 bytecode for Android compilation.
+- Discovery: AGP 9.2.0 requires Gradle 9.4.1, while the repository currently
+  uses Gradle 9.3.1. AGP 9.1.1 matches the current wrapper, so this milestone
+  uses 9.1.1 rather than forcing a Gradle wrapper upgrade.
+- Discovery: the Android KMP plugin needs Google Maven in the module
+  repositories for Android lint artifacts; plugin management repositories alone
+  are not enough.
+- Discovery: local desktop builds did not export `ANDROID_HOME` even though the
+  SDK exists at the standard macOS location. The Kotlin mise task now exports
+  that location when present, while CI and Android-specific runs should provide
+  `ANDROID_HOME` or `ANDROID_SDK_ROOT` explicitly.
+- Problem: the Android `Maplibre` actual currently defines the JNI boundary as a
+  private external `nativeCVersion()` bootstrap call, but the JavaCPP-generated
+  Android JNI library has not moved into `androidMain` yet and no native library
+  is packaged in the AAR. This is a source-set and build-shape milestone, not a
+  complete Android runtime milestone.
+- Reflection: the official Android KMP plugin fits the mise-built-native-first
+  direction because it avoids `externalNativeBuild` inside the KMP module. JNI
+  packaging can stay as a later, explicit step once the JavaCPP bridge has moved
+  under `androidMain`.
