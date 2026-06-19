@@ -512,3 +512,16 @@ is being implemented.
 - Discovery: projection is the first handle facade that forced an entrypoint
   method onto an existing common owner facade, so future domain facades should
   move return types and creation methods together.
+
+### Common Map Camera And Control Facade Milestone
+
+- Expanded the common `MapHandle` facade with repaint requests, debug toggles,
+  viewport and tile options, camera reads and transitions, camera fitting,
+  bounds/free-camera/projection-mode properties, and pixel/coordinate
+  conversions.
+- Converted the existing Kotlin/Native map camera and control methods into
+  native actuals and added JVM and Android actual placeholders until their map
+  bridge implementations are migrated.
+- Reflection: `MapHandle` is now the main remaining consolidation surface. The
+  next useful slices are style/source mutation, style layer/image mutation,
+  render-session attachment, and runtime/offline operation entrypoints.
