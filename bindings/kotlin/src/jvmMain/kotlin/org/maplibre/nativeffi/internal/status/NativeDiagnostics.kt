@@ -8,7 +8,18 @@ import java.nio.charset.StandardCharsets
 import java.util.NoSuchElementException
 
 internal actual object NativeDiagnostics {
-  actual fun currentDiagnostic(): String {
+  actual fun currentDiagnostic(): String =
+    try {
+      currentNativeDiagnostic()
+    } catch (_: IllegalCallerException) {
+      ""
+    } catch (_: NoSuchElementException) {
+      ""
+    } catch (_: UnsatisfiedLinkError) {
+      ""
+    }
+
+  private fun currentNativeDiagnostic(): String {
     val symbol =
       SymbolLookup.loaderLookup().find("mln_thread_last_error_message").orElseThrow {
         NoSuchElementException("mln_thread_last_error_message")

@@ -264,3 +264,17 @@ is being implemented.
 - Reflection: this is the first internal bridge facade below the public
   `Maplibre` expect object. It keeps binding-owned status semantics common while
   leaving raw pointer/string conversion in platform source sets.
+
+### Common Status Test Milestone
+
+- Moved pure status mapping tests into `commonTest`, so JVM and Kotlin/Native
+  both exercise the shared `Status` facade.
+- Kept tests that depend on deterministic C status producers, copied native
+  diagnostics, and cinterop memory utilities in `nativeTest`.
+- Discovery: common status mapping tests can synthesize non-OK status codes
+  before a native library is loaded. Platform diagnostic bridges therefore need
+  to treat missing native diagnostic symbols as an empty diagnostic while still
+  copying diagnostics after real C calls.
+- Reflection: after a bridge helper moves to `commonMain`, its tests should move
+  with it unless they are specifically testing the platform actual or native C
+  behavior.

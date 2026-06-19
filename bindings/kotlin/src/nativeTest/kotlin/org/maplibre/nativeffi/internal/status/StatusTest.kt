@@ -13,9 +13,6 @@ import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.error.NativeErrorException
-import org.maplibre.nativeffi.error.UnsupportedFeatureException
-import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response_set_url
@@ -23,24 +20,9 @@ import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.runtime.NetworkStatus
 
 @OptIn(ExperimentalForeignApi::class)
-class StatusTest {
+class NativeStatusDiagnosticTest {
   // BND-020, BND-021, BND-022, BND-023, BND-024, BND-025, BND-026:
   // status mapping, diagnostic copies, and binding-owned diagnostics.
-
-  @Test
-  fun okStatusReturnsNormally() {
-    Status.check(MaplibreStatus.OK.nativeCode)
-  }
-
-  @Test
-  fun nonOkStatusesThrowMappedExceptionTypes() {
-    assertFailsWith<InvalidArgumentException> { Status.check(-1) }
-    assertFailsWith<InvalidStateException> { Status.check(-2) }
-    assertFailsWith<WrongThreadException> { Status.check(-3) }
-    assertFailsWith<UnsupportedFeatureException> { Status.check(-4) }
-    // Native error is produced by internal exception boundaries, so use the conversion hook.
-    assertFailsWith<NativeErrorException> { Status.check(-5) }
-  }
 
   @Test
   fun deterministicNativeStatusProducersThrowMappedExceptionTypes() {
@@ -66,14 +48,6 @@ class StatusTest {
       assertEquals(MaplibreStatus.INVALID_STATE, invalidState.status)
       assertTrue(invalidState.diagnostic.contains("resource transform"))
     }
-  }
-
-  @Test
-  fun unknownNativeStatusPreservesRawStatusCode() {
-    val exception = Status.exception(-127)
-
-    assertEquals(MaplibreStatus(-127), exception.status)
-    assertEquals(-127, exception.nativeStatusCode)
   }
 
   @Test
