@@ -204,7 +204,8 @@ private constructor(
   }
 
   public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addImageSourceUrl(requireLiveHandle(), sourceId, coordinates, url)
   }
 
   public actual fun addImageSourceImage(
@@ -212,22 +213,29 @@ private constructor(
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addImageSourceImage(requireLiveHandle(), sourceId, coordinates, image)
   }
 
   public actual fun setImageSourceUrl(sourceId: String, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setImageSourceUrl(requireLiveHandle(), sourceId, url)
   }
 
   public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setImageSourceImage(requireLiveHandle(), sourceId, image)
   }
 
   public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setImageSourceCoordinates(requireLiveHandle(), sourceId, coordinates)
   }
 
-  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = unsupportedMapHandle()
+  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.imageSourceCoordinates(requireLiveHandle(), sourceId)
+  }
 
   public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
     NativeAccess.ensureLoaded()

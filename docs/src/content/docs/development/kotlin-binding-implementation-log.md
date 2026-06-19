@@ -921,3 +921,18 @@ is being implemented.
 - Discovery: tile sources are a clean bridge slice before GeoJSON/custom sources
   because they exercise option structs and string-view arrays without requiring
   the geometry and feature descriptor graph.
+
+### JVM and Android Image Source Milestone
+
+- Implemented JVM FFM and Android JavaCPP image source operations for URL-backed
+  and inline-image sources, image updates, coordinate updates, and coordinate
+  lookup.
+- Added platform coordinate-array materialization for the fixed four-corner
+  image source contract and reused the existing premultiplied RGBA8 image
+  materialization.
+- Added JVM coverage that adds URL and inline image sources, updates URL, image,
+  and coordinates, reads coordinates back, and checks missing-source lookup.
+- Discovery: image sources are the first migrated source family that benefits
+  from small array-scope helpers on both bridges. Keeping those helpers
+  primitive-specific avoids pulling in the broader geometry/GeoJSON descriptor
+  graph too early.

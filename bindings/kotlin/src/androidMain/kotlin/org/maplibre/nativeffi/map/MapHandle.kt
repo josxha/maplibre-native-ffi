@@ -355,7 +355,22 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      LatLngArrayScope(coordinates).use { nativeCoordinates ->
+        StringViewScope(url).use { nativeUrl ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_image_source_url(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeCoordinates.coordinates,
+              nativeCoordinates.count,
+              nativeUrl.view,
+            )
+          )
+        }
+      }
+    }
   }
 
   public actual fun addImageSourceImage(
@@ -363,22 +378,93 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      LatLngArrayScope(coordinates).use { nativeCoordinates ->
+        PremultipliedImageScope(image).use { nativeImage ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_image_source_image(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeCoordinates.coordinates,
+              nativeCoordinates.count,
+              nativeImage.image,
+            )
+          )
+        }
+      }
+    }
   }
 
   public actual fun setImageSourceUrl(sourceId: String, url: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      StringViewScope(url).use { nativeUrl ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_image_source_url(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeUrl.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      PremultipliedImageScope(image).use { nativeImage ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_image_source_image(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeImage.image,
+          )
+        )
+      }
+    }
   }
 
   public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      LatLngArrayScope(coordinates).use { nativeCoordinates ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_image_source_coordinates(
+            map(requireLiveAddress()),
+            nativeSourceId.view,
+            nativeCoordinates.coordinates,
+            nativeCoordinates.count,
+          )
+        )
+      }
+    }
   }
 
-  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = unsupportedMapHandle()
+  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? {
+    NativeAccess.ensureLoaded()
+    val outFound = booleanArrayOf(false)
+    StringViewScope(sourceId).use { nativeSourceId ->
+      LatLngArrayScope(IMAGE_SOURCE_COORDINATE_COUNT).use { outCoordinates ->
+        SizeTPointer(1).use { outCoordinateCount ->
+          Status.check(
+            MaplibreNativeC.mln_map_get_image_source_coordinates(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              outCoordinates.coordinates,
+              outCoordinates.count,
+              outCoordinateCount,
+              outFound,
+            )
+          )
+          return if (outFound[0]) {
+            outCoordinates.toList(Math.toIntExact(outCoordinateCount.get()))
+          } else null
+        }
+      }
+    }
+  }
 
   public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
     NativeAccess.ensureLoaded()
@@ -1046,6 +1132,8 @@ private fun runtime(address: Long): MaplibreNativeC.mln_runtime =
 private fun latLng(value: LatLng): MaplibreNativeC.mln_lat_lng =
   MaplibreNativeC.mln_lat_lng().latitude(value.latitude).longitude(value.longitude)
 
+private const val IMAGE_SOURCE_COORDINATE_COUNT: Long = 4
+
 private fun optionalCString(value: String): BytePointer {
   require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
   return BytePointer(value, java.nio.charset.StandardCharsets.UTF_8)
@@ -1200,6 +1288,40 @@ private class StringViewArrayScope(values: List<String>) : AutoCloseable {
   override fun close() {
     views?.close()
     strings.asReversed().forEach(StringViewScope::close)
+  }
+}
+
+private class LatLngArrayScope : AutoCloseable {
+  val coordinates: MaplibreNativeC.mln_lat_lng
+  val count: Long
+
+  constructor(values: List<LatLng>) {
+    val coordinateSnapshot = values.toList()
+    coordinates = MaplibreNativeC.mln_lat_lng(coordinateSnapshot.size.toLong())
+    count = coordinateSnapshot.size.toLong()
+    coordinateSnapshot.forEachIndexed { index, coordinate ->
+      coordinates
+        .position(index.toLong())
+        .latitude(coordinate.latitude)
+        .longitude(coordinate.longitude)
+    }
+    coordinates.position(0)
+  }
+
+  constructor(count: Long) {
+    coordinates = MaplibreNativeC.mln_lat_lng(count)
+    this.count = count
+  }
+
+  fun toList(count: Int): List<LatLng> =
+    List(count) { index ->
+        val coordinate = coordinates.position(index.toLong())
+        LatLng(coordinate.latitude(), coordinate.longitude())
+      }
+      .also { coordinates.position(0) }
+
+  override fun close() {
+    coordinates.close()
   }
 }
 

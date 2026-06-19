@@ -221,6 +221,43 @@ class MapHandleTest {
   }
 
   @Test
+  fun imageSourcesCanBeAddedUpdatedAndInspected() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
+      val coordinates = imageCoordinates()
+      val moved = listOf(LatLng(1.0, 0.0), LatLng(1.0, 1.0), LatLng(0.0, 1.0), LatLng(0.0, 0.0))
+
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.addImageSourceUrl("overlay", coordinates, "https://example.com/image.png")
+
+      assertEquals(SourceType.IMAGE, map.styleSourceType("overlay"))
+      assertEquals(coordinates, map.imageSourceCoordinates("overlay"))
+      map.setImageSourceUrl("overlay", "https://example.com/updated-image.png")
+      map.setImageSourceImage("overlay", image)
+      map.setImageSourceCoordinates("overlay", moved)
+      assertEquals(moved, map.imageSourceCoordinates("overlay"))
+      assertEquals(null, map.imageSourceCoordinates("missing-overlay"))
+
+      map.addImageSourceImage("inline-overlay", coordinates, image)
+      assertEquals(SourceType.IMAGE, map.styleSourceInfo("inline-overlay")?.type)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
   fun mapDebugControlsCanBeReadAndWritten() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
@@ -278,6 +315,9 @@ class MapHandleTest {
         JsonValue.Member("type", JsonValue.StringValue("background")),
       )
     )
+
+  private fun imageCoordinates(): List<LatLng> =
+    listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
 
   private fun JsonValue.objectMember(key: String): String? =
     (this as? JsonValue.ObjectValue)

@@ -586,6 +586,117 @@ internal object NativeAccess {
     }
   }
 
+  internal fun addImageSourceUrl(
+    map: MemorySegment,
+    sourceId: String,
+    coordinates: List<LatLng>,
+    url: String,
+  ) {
+    val coordinateSnapshot = coordinates.toList()
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressLongStringViewStatusFunction("mln_map_add_image_source_url")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+            stringView(arena, url),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun addImageSourceImage(
+    map: MemorySegment,
+    sourceId: String,
+    coordinates: List<LatLng>,
+    image: PremultipliedRgba8Image,
+  ) {
+    val coordinateSnapshot = coordinates.toList()
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressLongAddressStatusFunction("mln_map_add_image_source_image")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+            premultipliedRgba8Image(arena, image),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun setImageSourceUrl(map: MemorySegment, sourceId: String, url: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_set_image_source_url")
+          .invokeWithArguments(map, stringView(arena, sourceId), stringView(arena, url)) as Int
+      )
+    }
+  }
+
+  internal fun setImageSourceImage(
+    map: MemorySegment,
+    sourceId: String,
+    image: PremultipliedRgba8Image,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_set_image_source_image")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            premultipliedRgba8Image(arena, image),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun setImageSourceCoordinates(
+    map: MemorySegment,
+    sourceId: String,
+    coordinates: List<LatLng>,
+  ) {
+    val coordinateSnapshot = coordinates.toList()
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressLongStatusFunction("mln_map_set_image_source_coordinates")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun imageSourceCoordinates(map: MemorySegment, sourceId: String): List<LatLng>? =
+    Arena.ofConfined().use { arena ->
+      val outCoordinates = arena.allocate(latLngLayout.byteSize() * IMAGE_SOURCE_COORDINATE_COUNT)
+      val outCoordinateCount = arena.allocate(ValueLayout.JAVA_LONG)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressLongTwoAddressStatusFunction("mln_map_get_image_source_coordinates")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            outCoordinates,
+            IMAGE_SOURCE_COORDINATE_COUNT.toLong(),
+            outCoordinateCount,
+            outFound,
+          ) as Int
+      )
+      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        latLngArray(
+          outCoordinates,
+          Math.toIntExact(outCoordinateCount.get(ValueLayout.JAVA_LONG, 0)),
+        )
+      } else null
+    }
+
   internal fun addStyleLayerJson(map: MemorySegment, layerJson: JsonValue, beforeLayerId: String) {
     Arena.ofConfined().use { arena ->
       Status.check(
@@ -1281,6 +1392,31 @@ internal object NativeAccess {
       ),
     )
 
+  private fun mapStringViewAddressLongStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+      ),
+    )
+
+  private fun mapStringViewAddressLongStringViewStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        stringViewLayout,
+      ),
+    )
+
   private fun mapStringViewAddressLongAddressStatusFunction(name: String): MethodHandle =
     downcall(
       name,
@@ -1892,6 +2028,31 @@ internal object NativeAccess {
     segment.set(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong(), value.longitude)
     return segment
   }
+
+  private fun latLngArray(arena: Arena, values: List<LatLng>): MemorySegment {
+    if (values.isEmpty()) {
+      return MemorySegment.NULL
+    }
+    val array = arena.allocate(latLngLayout.byteSize() * values.size)
+    values.forEachIndexed { index, value ->
+      array
+        .asSlice(latLngLayout.byteSize() * index, latLngLayout.byteSize())
+        .copyFrom(latLng(value, arena))
+    }
+    return array
+  }
+
+  private fun latLngArray(segment: MemorySegment, count: Int): List<LatLng> =
+    List(count) { index ->
+      val coordinate =
+        segment
+          .reinterpret(latLngLayout.byteSize() * count)
+          .asSlice(latLngLayout.byteSize() * index, latLngLayout.byteSize())
+      LatLng(
+        coordinate.get(ValueLayout.JAVA_DOUBLE, 0),
+        coordinate.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
+      )
+    }
 
   private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {
     if (bytes.isEmpty()) {
@@ -2552,6 +2713,8 @@ internal object NativeAccess {
   private const val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long = 16
   private const val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long = 17
   private const val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long = 24
+
+  private const val IMAGE_SOURCE_COORDINATE_COUNT: Int = 4
 
   private const val TILE_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val TILE_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
