@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi
 
 import java.nio.file.Path
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
@@ -52,5 +54,17 @@ public actual object Maplibre {
       "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
     NativeAccess.setNetworkStatus(status.nativeValue)
+  }
+
+  /** Converts a geographic coordinate to spherical Mercator projected meters. */
+  public actual fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.projectedMetersForLatLng(coordinate)
+  }
+
+  /** Converts spherical Mercator projected meters to a geographic coordinate. */
+  public actual fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngForProjectedMeters(meters)
   }
 }

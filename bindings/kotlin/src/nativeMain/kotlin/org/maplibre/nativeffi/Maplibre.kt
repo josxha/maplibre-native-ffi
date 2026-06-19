@@ -104,14 +104,14 @@ public actual object Maplibre {
   }
 
   /** Converts a geographic coordinate to spherical Mercator projected meters. */
-  public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters = memScoped {
+  public actual fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters = memScoped {
     val outMeters = alloc<mln_projected_meters>()
     Status.check(mln_projected_meters_for_lat_lng(CoreStructs.latLng(coordinate), outMeters.ptr))
     CoreStructs.projectedMeters(outMeters)
   }
 
   /** Converts spherical Mercator projected meters to a geographic coordinate. */
-  public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng = memScoped {
+  public actual fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng = memScoped {
     val outCoordinate = alloc<mln_lat_lng>()
     Status.check(
       mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr)

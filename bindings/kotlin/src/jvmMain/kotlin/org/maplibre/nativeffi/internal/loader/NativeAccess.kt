@@ -3,12 +3,15 @@ package org.maplibre.nativeffi.internal.loader
 import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
+import java.lang.foreign.MemoryLayout
 import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
 import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
@@ -90,6 +93,40 @@ internal object NativeAccess {
     Status.check(statusInFunction("mln_network_status_set").invokeWithArguments(status) as Int)
   }
 
+  internal fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters =
+    Arena.ofConfined().use { arena ->
+      val nativeCoordinate = arena.allocate(latLngLayout)
+      nativeCoordinate.set(ValueLayout.JAVA_DOUBLE, 0, coordinate.latitude)
+      nativeCoordinate.set(
+        ValueLayout.JAVA_DOUBLE,
+        Double.SIZE_BYTES.toLong(),
+        coordinate.longitude,
+      )
+      val outMeters = arena.allocate(projectedMetersLayout)
+      Status.check(
+        projectedMetersForLatLngFunction().invokeWithArguments(nativeCoordinate, outMeters) as Int
+      )
+      ProjectedMeters(
+        outMeters.get(ValueLayout.JAVA_DOUBLE, 0),
+        outMeters.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
+      )
+    }
+
+  internal fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng =
+    Arena.ofConfined().use { arena ->
+      val nativeMeters = arena.allocate(projectedMetersLayout)
+      nativeMeters.set(ValueLayout.JAVA_DOUBLE, 0, meters.northing)
+      nativeMeters.set(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong(), meters.easting)
+      val outCoordinate = arena.allocate(latLngLayout)
+      Status.check(
+        latLngForProjectedMetersFunction().invokeWithArguments(nativeMeters, outCoordinate) as Int
+      )
+      LatLng(
+        outCoordinate.get(ValueLayout.JAVA_DOUBLE, 0),
+        outCoordinate.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
+      )
+    }
+
   private fun intFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT))
 
@@ -98,6 +135,18 @@ internal object NativeAccess {
 
   private fun statusInFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT))
+
+  private fun projectedMetersForLatLngFunction(): MethodHandle =
+    downcall(
+      "mln_projected_meters_for_lat_lng",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, latLngLayout, ValueLayout.ADDRESS),
+    )
+
+  private fun latLngForProjectedMetersFunction(): MethodHandle =
+    downcall(
+      "mln_lat_lng_for_projected_meters",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, projectedMetersLayout, ValueLayout.ADDRESS),
+    )
 
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
@@ -117,4 +166,16 @@ internal object NativeAccess {
     missing.addSuppressed(cause)
     return missing
   }
+
+  private val latLngLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("latitude"),
+      ValueLayout.JAVA_DOUBLE.withName("longitude"),
+    )
+
+  private val projectedMetersLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("northing"),
+      ValueLayout.JAVA_DOUBLE.withName("easting"),
+    )
 }

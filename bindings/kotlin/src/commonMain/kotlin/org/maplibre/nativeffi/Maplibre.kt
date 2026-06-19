@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -26,4 +28,10 @@ public expect object Maplibre {
 
   /** Sets Maplibre Native's process-global network status. */
   public fun setNetworkStatus(status: NetworkStatus)
+
+  /** Converts a geographic coordinate to spherical Mercator projected meters. */
+  public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters
+
+  /** Converts spherical Mercator projected meters to a geographic coordinate. */
+  public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng
 }

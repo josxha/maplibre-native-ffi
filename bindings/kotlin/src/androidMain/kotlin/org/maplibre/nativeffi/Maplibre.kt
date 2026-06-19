@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.OpenGLContextProvider
@@ -47,6 +49,26 @@ public actual object Maplibre {
       "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
     NativeAccess.setNetworkStatus(status.nativeValue)
+  }
+
+  /** Converts a geographic coordinate to spherical Mercator projected meters. */
+  public actual fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters {
+    NativeAccess.ensureLoaded()
+    val nativeCoordinate =
+      MaplibreNativeC.mln_lat_lng().latitude(coordinate.latitude).longitude(coordinate.longitude)
+    val outMeters = MaplibreNativeC.mln_projected_meters()
+    Status.check(MaplibreNativeC.mln_projected_meters_for_lat_lng(nativeCoordinate, outMeters))
+    return ProjectedMeters(outMeters.northing(), outMeters.easting())
+  }
+
+  /** Converts spherical Mercator projected meters to a geographic coordinate. */
+  public actual fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng {
+    NativeAccess.ensureLoaded()
+    val nativeMeters =
+      MaplibreNativeC.mln_projected_meters().northing(meters.northing).easting(meters.easting)
+    val outCoordinate = MaplibreNativeC.mln_lat_lng()
+    Status.check(MaplibreNativeC.mln_lat_lng_for_projected_meters(nativeMeters, outCoordinate))
+    return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
   }
 }
 

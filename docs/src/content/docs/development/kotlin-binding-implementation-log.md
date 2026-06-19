@@ -619,3 +619,18 @@ is being implemented.
 - Reflection: this gives Android JNI render readback a real platform carrier
   without requiring the larger render-session bridge to be implemented in the
   same milestone.
+
+### Common Projection Helper Facade Milestone
+
+- Promoted `Maplibre.projectedMetersForLatLng` and
+  `Maplibre.latLngForProjectedMeters` into the common process-global facade.
+- Converted the Kotlin/Native implementations into native actuals, added JVM FFM
+  actuals using explicit `mln_lat_lng` and `mln_projected_meters` struct
+  layouts, and added Android JNI actuals using JavaCPP-generated structs.
+- Discovery: small by-value C structs can be bridged in Kotlin/JVM without
+  importing the Java `jextract` classes, but each layout must stay local and
+  explicit until a broader internal bridge facade owns generated layouts.
+- Discovery: a JVM projection smoke test loaded the process-global native
+  library before `NativeLibraryTest`, making the existing missing-path assertion
+  order-dependent. JVM tests that load the native library need isolation before
+  they can be added freely.
