@@ -993,3 +993,18 @@ is being implemented.
   that offset probing is worthwhile. `mln_camera_options` is 120 bytes,
   `mln_animation_options` is 64 bytes, and `mln_camera_fit_options` is 56 bytes
   on the current ABI.
+
+### JVM and Android Bounds and Free Camera Milestone
+
+- Implemented JVM FFM and Android JavaCPP `bounds` and `freeCameraOptions` map
+  properties.
+- Added platform materialization for `BoundOptions`, `FreeCameraOptions`,
+  `Vec3`, and `Quaternion`, including field masks and nested value structs.
+- Added JVM coverage that round-trips bound constraints and free-camera options
+  through the common Kotlin map handle.
+- Discovery: bounds and free-camera updates mutate camera transform state, so
+  tests that assert projection camera snapshots need to run before applying
+  those stateful constraints.
+- Discovery: JVM FFM helpers that read and write the same descriptor can collide
+  by signature inside `NativeAccess`; naming the reader `readFreeCameraOptions`
+  keeps the public bridge method name available.

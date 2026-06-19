@@ -522,15 +522,23 @@ private constructor(
   }
 
   public actual var bounds: BoundOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.bounds(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setBounds(requireLiveHandle(), value)
     }
 
   public actual var freeCameraOptions: FreeCameraOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.freeCameraOptions(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setFreeCameraOptions(requireLiveHandle(), value)
     }
 
   public actual var projectionMode: ProjectionModeOptions

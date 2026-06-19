@@ -14,7 +14,9 @@ import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -430,6 +432,29 @@ class MapHandleTest {
       } finally {
         projection.close()
       }
+
+      map.bounds =
+        org.maplibre.nativeffi.camera.BoundOptions().apply {
+          this.bounds = bounds
+          minZoom = 1.0
+          maxZoom = 10.0
+          minPitch = 0.0
+          maxPitch = 45.0
+        }
+      val boundOptions = map.bounds
+      assertEquals(bounds, boundOptions.bounds)
+      assertEquals(1.0, boundOptions.minZoom ?: 0.0, 1e-6)
+      assertEquals(10.0, boundOptions.maxZoom ?: 0.0, 1e-6)
+      assertEquals(0.0, boundOptions.minPitch ?: -1.0, 1e-6)
+      assertEquals(45.0, boundOptions.maxPitch ?: 0.0, 1e-6)
+
+      map.freeCameraOptions =
+        org.maplibre.nativeffi.camera.FreeCameraOptions().apply {
+          position = Vec3(0.0, 0.0, 1.0)
+          orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
+        }
+      assertTrue(map.freeCameraOptions.position != null)
+      assertTrue(map.freeCameraOptions.orientation != null)
     } finally {
       map.close()
       runtime.close()

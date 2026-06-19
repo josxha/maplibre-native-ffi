@@ -12,16 +12,20 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
+import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.TileId
+import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.ConstrainMode
@@ -1274,6 +1278,43 @@ internal object NativeAccess {
     camera: CameraOptions,
   ): LatLngBounds =
     mapLatLngBoundsForCamera("mln_map_lat_lng_bounds_for_camera_unwrapped", map, camera)
+
+  internal fun bounds(map: MemorySegment): BoundOptions =
+    Arena.ofConfined().use { arena ->
+      val outBounds = boundOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_bounds").invokeWithArguments(map, outBounds) as Int
+      )
+      boundOptions(outBounds)
+    }
+
+  internal fun setBounds(map: MemorySegment, options: BoundOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_bounds")
+          .invokeWithArguments(map, boundOptions(arena, options)) as Int
+      )
+    }
+  }
+
+  internal fun freeCameraOptions(map: MemorySegment): FreeCameraOptions =
+    Arena.ofConfined().use { arena ->
+      val outOptions = freeCameraOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_free_camera_options")
+          .invokeWithArguments(map, outOptions) as Int
+      )
+      readFreeCameraOptions(outOptions)
+    }
+
+  internal fun setFreeCameraOptions(map: MemorySegment, options: FreeCameraOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_free_camera_options")
+          .invokeWithArguments(map, freeCameraOptions(arena, options)) as Int
+      )
+    }
+  }
 
   internal fun pixelForLatLng(map: MemorySegment, coordinate: LatLng): ScreenPoint =
     Arena.ofConfined().use { arena ->
@@ -2725,6 +2766,102 @@ internal object NativeAccess {
       latLngBounds(outBounds)
     }
 
+  private fun boundOptionsDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(BOUND_OPTIONS_SIZE)
+    segment.set(ValueLayout.JAVA_INT, BOUND_OPTIONS_SIZE_OFFSET, BOUND_OPTIONS_SIZE.toInt())
+    return segment
+  }
+
+  private fun boundOptions(arena: Arena, value: BoundOptions): MemorySegment {
+    val segment = boundOptionsDefault(arena)
+    var fields = 0
+    value.bounds?.let {
+      fields = fields or BOUND_OPTION_BOUNDS
+      segment
+        .asSlice(BOUND_OPTIONS_BOUNDS_OFFSET, LAT_LNG_BOUNDS_SIZE)
+        .copyFrom(latLngBounds(arena, it))
+    }
+    value.minZoom?.let {
+      fields = fields or BOUND_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.maxZoom?.let {
+      fields = fields or BOUND_OPTION_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_ZOOM_OFFSET, it)
+    }
+    value.minPitch?.let {
+      fields = fields or BOUND_OPTION_MIN_PITCH
+      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_PITCH_OFFSET, it)
+    }
+    value.maxPitch?.let {
+      fields = fields or BOUND_OPTION_MAX_PITCH
+      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_PITCH_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, BOUND_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun boundOptions(segment: MemorySegment): BoundOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, BOUND_OPTIONS_FIELDS_OFFSET)
+    return BoundOptions().apply {
+      if ((fields and BOUND_OPTION_BOUNDS) != 0) {
+        bounds = latLngBounds(segment.asSlice(BOUND_OPTIONS_BOUNDS_OFFSET, LAT_LNG_BOUNDS_SIZE))
+      }
+      if ((fields and BOUND_OPTION_MIN_ZOOM) != 0) {
+        minZoom = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_ZOOM_OFFSET)
+      }
+      if ((fields and BOUND_OPTION_MAX_ZOOM) != 0) {
+        maxZoom = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_ZOOM_OFFSET)
+      }
+      if ((fields and BOUND_OPTION_MIN_PITCH) != 0) {
+        minPitch = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_PITCH_OFFSET)
+      }
+      if ((fields and BOUND_OPTION_MAX_PITCH) != 0) {
+        maxPitch = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_PITCH_OFFSET)
+      }
+    }
+  }
+
+  private fun freeCameraOptionsDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(FREE_CAMERA_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      FREE_CAMERA_OPTIONS_SIZE_OFFSET,
+      FREE_CAMERA_OPTIONS_SIZE.toInt(),
+    )
+    return segment
+  }
+
+  private fun freeCameraOptions(arena: Arena, value: FreeCameraOptions): MemorySegment {
+    val segment = freeCameraOptionsDefault(arena)
+    var fields = 0
+    value.position?.let {
+      fields = fields or FREE_CAMERA_OPTION_POSITION
+      segment.asSlice(FREE_CAMERA_OPTIONS_POSITION_OFFSET, VEC3_SIZE).copyFrom(vec3(it, arena))
+    }
+    value.orientation?.let {
+      fields = fields or FREE_CAMERA_OPTION_ORIENTATION
+      segment
+        .asSlice(FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET, QUATERNION_SIZE)
+        .copyFrom(quaternion(it, arena))
+    }
+    segment.set(ValueLayout.JAVA_INT, FREE_CAMERA_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun readFreeCameraOptions(segment: MemorySegment): FreeCameraOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, FREE_CAMERA_OPTIONS_FIELDS_OFFSET)
+    return FreeCameraOptions().apply {
+      if ((fields and FREE_CAMERA_OPTION_POSITION) != 0) {
+        position = vec3(segment.asSlice(FREE_CAMERA_OPTIONS_POSITION_OFFSET, VEC3_SIZE))
+      }
+      if ((fields and FREE_CAMERA_OPTION_ORIENTATION) != 0) {
+        orientation =
+          quaternion(segment.asSlice(FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET, QUATERNION_SIZE))
+      }
+    }
+  }
+
   private fun jsonValue(arena: Arena, value: JsonValue): MemorySegment {
     val segment = arena.allocate(JSON_VALUE_SIZE)
     writeJson(segment, value, arena, 0)
@@ -3024,6 +3161,38 @@ internal object NativeAccess {
     segment.set(ValueLayout.JAVA_DOUBLE, UNIT_BEZIER_Y2_OFFSET, value.y2)
     return segment
   }
+
+  private fun vec3(value: Vec3, arena: Arena): MemorySegment {
+    val segment = arena.allocate(vec3Layout)
+    segment.set(ValueLayout.JAVA_DOUBLE, VEC3_X_OFFSET, value.x)
+    segment.set(ValueLayout.JAVA_DOUBLE, VEC3_Y_OFFSET, value.y)
+    segment.set(ValueLayout.JAVA_DOUBLE, VEC3_Z_OFFSET, value.z)
+    return segment
+  }
+
+  private fun vec3(segment: MemorySegment): Vec3 =
+    Vec3(
+      segment.get(ValueLayout.JAVA_DOUBLE, VEC3_X_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, VEC3_Y_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, VEC3_Z_OFFSET),
+    )
+
+  private fun quaternion(value: Quaternion, arena: Arena): MemorySegment {
+    val segment = arena.allocate(quaternionLayout)
+    segment.set(ValueLayout.JAVA_DOUBLE, QUATERNION_X_OFFSET, value.x)
+    segment.set(ValueLayout.JAVA_DOUBLE, QUATERNION_Y_OFFSET, value.y)
+    segment.set(ValueLayout.JAVA_DOUBLE, QUATERNION_Z_OFFSET, value.z)
+    segment.set(ValueLayout.JAVA_DOUBLE, QUATERNION_W_OFFSET, value.w)
+    return segment
+  }
+
+  private fun quaternion(segment: MemorySegment): Quaternion =
+    Quaternion(
+      segment.get(ValueLayout.JAVA_DOUBLE, QUATERNION_X_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, QUATERNION_Y_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, QUATERNION_Z_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, QUATERNION_W_OFFSET),
+    )
 
   private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {
     if (bytes.isEmpty()) {
@@ -3686,6 +3855,21 @@ internal object NativeAccess {
       ValueLayout.JAVA_DOUBLE.withName("y2"),
     )
 
+  private val vec3Layout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("x"),
+      ValueLayout.JAVA_DOUBLE.withName("y"),
+      ValueLayout.JAVA_DOUBLE.withName("z"),
+    )
+
+  private val quaternionLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("x"),
+      ValueLayout.JAVA_DOUBLE.withName("y"),
+      ValueLayout.JAVA_DOUBLE.withName("z"),
+      ValueLayout.JAVA_DOUBLE.withName("w"),
+    )
+
   private val stringViewLayout =
     MemoryLayout.structLayout(
       ValueLayout.ADDRESS.withName("data"),
@@ -3703,6 +3887,19 @@ internal object NativeAccess {
   private const val UNIT_BEZIER_Y1_OFFSET: Long = 8
   private const val UNIT_BEZIER_X2_OFFSET: Long = 16
   private const val UNIT_BEZIER_Y2_OFFSET: Long = 24
+
+  private const val VEC3_SIZE: Long = 24
+  private const val VEC3_X_OFFSET: Long = 0
+  private const val VEC3_Y_OFFSET: Long = 8
+  private const val VEC3_Z_OFFSET: Long = 16
+
+  private const val QUATERNION_SIZE: Long = 32
+  private const val QUATERNION_X_OFFSET: Long = 0
+  private const val QUATERNION_Y_OFFSET: Long = 8
+  private const val QUATERNION_Z_OFFSET: Long = 16
+  private const val QUATERNION_W_OFFSET: Long = 24
+
+  private const val LAT_LNG_BOUNDS_SIZE: Long = 32
 
   private const val CAMERA_OPTION_CENTER: Int = 1 shl 0
   private const val CAMERA_OPTION_ZOOM: Int = 1 shl 1
@@ -3751,6 +3948,30 @@ internal object NativeAccess {
   private const val CAMERA_FIT_OPTIONS_PADDING_OFFSET: Long = 8
   private const val CAMERA_FIT_OPTIONS_BEARING_OFFSET: Long = 40
   private const val CAMERA_FIT_OPTIONS_PITCH_OFFSET: Long = 48
+
+  private const val BOUND_OPTION_BOUNDS: Int = 1 shl 0
+  private const val BOUND_OPTION_MIN_ZOOM: Int = 1 shl 1
+  private const val BOUND_OPTION_MAX_ZOOM: Int = 1 shl 2
+  private const val BOUND_OPTION_MIN_PITCH: Int = 1 shl 3
+  private const val BOUND_OPTION_MAX_PITCH: Int = 1 shl 4
+
+  private const val BOUND_OPTIONS_SIZE: Long = 72
+  private const val BOUND_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val BOUND_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val BOUND_OPTIONS_BOUNDS_OFFSET: Long = 8
+  private const val BOUND_OPTIONS_MIN_ZOOM_OFFSET: Long = 40
+  private const val BOUND_OPTIONS_MAX_ZOOM_OFFSET: Long = 48
+  private const val BOUND_OPTIONS_MIN_PITCH_OFFSET: Long = 56
+  private const val BOUND_OPTIONS_MAX_PITCH_OFFSET: Long = 64
+
+  private const val FREE_CAMERA_OPTION_POSITION: Int = 1 shl 0
+  private const val FREE_CAMERA_OPTION_ORIENTATION: Int = 1 shl 1
+
+  private const val FREE_CAMERA_OPTIONS_SIZE: Long = 64
+  private const val FREE_CAMERA_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val FREE_CAMERA_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val FREE_CAMERA_OPTIONS_POSITION_OFFSET: Long = 8
+  private const val FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET: Long = 32
 
   private const val JSON_VALUE_SIZE: Long = 24
   private const val JSON_VALUE_SIZE_OFFSET: Long = 0

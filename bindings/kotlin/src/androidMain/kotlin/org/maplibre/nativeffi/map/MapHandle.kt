@@ -17,7 +17,9 @@ import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -1117,15 +1119,42 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     latLngBoundsForCamera(MaplibreNativeC::mln_map_lat_lng_bounds_for_camera_unwrapped, camera)
 
   public actual var bounds: BoundOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_bound_options_default().use { outOptions ->
+        Status.check(MaplibreNativeC.mln_map_get_bounds(map(requireLiveAddress()), outOptions))
+        return boundOptions(outOptions)
+      }
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      BoundOptionsScope(value).use { nativeOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_bounds(map(requireLiveAddress()), nativeOptions.options)
+        )
+      }
     }
 
   public actual var freeCameraOptions: FreeCameraOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_free_camera_options_default().use { outOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_get_free_camera_options(map(requireLiveAddress()), outOptions)
+        )
+        return freeCameraOptions(outOptions)
+      }
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      FreeCameraOptionsScope(value).use { nativeOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_free_camera_options(
+            map(requireLiveAddress()),
+            nativeOptions.options,
+          )
+        )
+      }
     }
 
   public actual var projectionMode: ProjectionModeOptions
@@ -1629,6 +1658,45 @@ private fun cameraOptions(value: MaplibreNativeC.mln_camera_options): CameraOpti
   }
 }
 
+private fun boundOptions(value: MaplibreNativeC.mln_bound_options): BoundOptions {
+  val fields = value.fields()
+  return BoundOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS) != 0) {
+      bounds = latLngBounds(value.bounds())
+    }
+    if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM) != 0) {
+      minZoom = value.min_zoom()
+    }
+    if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM) != 0) {
+      maxZoom = value.max_zoom()
+    }
+    if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_MIN_PITCH) != 0) {
+      minPitch = value.min_pitch()
+    }
+    if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_MAX_PITCH) != 0) {
+      maxPitch = value.max_pitch()
+    }
+  }
+}
+
+private fun freeCameraOptions(value: MaplibreNativeC.mln_free_camera_options): FreeCameraOptions {
+  val fields = value.fields()
+  return FreeCameraOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION) != 0) {
+      position = Vec3(value._position().x(), value._position().y(), value._position().z())
+    }
+    if ((fields and MaplibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0) {
+      orientation =
+        Quaternion(
+          value.orientation().x(),
+          value.orientation().y(),
+          value.orientation().z(),
+          value.orientation().w(),
+        )
+    }
+  }
+}
+
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer
   val view: MaplibreNativeC.mln_string_view = MaplibreNativeC.mln_string_view()
@@ -1847,6 +1915,61 @@ private class CameraFitOptionsScope(value: CameraFitOptions?) : AutoCloseable {
 
   override fun close() {
     options?.close()
+  }
+}
+
+private class BoundOptionsScope(value: BoundOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_bound_options = MaplibreNativeC.mln_bound_options_default()
+
+  init {
+    var fields = 0
+    value.bounds?.let {
+      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS
+      options.bounds(latLngBounds(it))
+    }
+    value.minZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM
+      options.min_zoom(it)
+    }
+    value.maxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM
+      options.max_zoom(it)
+    }
+    value.minPitch?.let {
+      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_MIN_PITCH
+      options.min_pitch(it)
+    }
+    value.maxPitch?.let {
+      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_MAX_PITCH
+      options.max_pitch(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private class FreeCameraOptionsScope(value: FreeCameraOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_free_camera_options =
+    MaplibreNativeC.mln_free_camera_options_default()
+
+  init {
+    var fields = 0
+    value.position?.let {
+      fields = fields or MaplibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION
+      options._position(MaplibreNativeC.mln_vec3().x(it.x).y(it.y).z(it.z))
+    }
+    value.orientation?.let {
+      fields = fields or MaplibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION
+      options.orientation(MaplibreNativeC.mln_quaternion().x(it.x).y(it.y).z(it.z).w(it.w))
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
   }
 }
 
