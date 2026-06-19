@@ -417,30 +417,39 @@ private constructor(
     }
 
   public actual val camera: CameraOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.camera(requireLiveHandle())
+    }
 
   public actual fun jumpTo(camera: CameraOptions) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.jumpTo(requireLiveHandle(), camera)
   }
 
   public actual fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.easeTo(requireLiveHandle(), camera, animation)
   }
 
   public actual fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.flyTo(requireLiveHandle(), camera, animation)
   }
 
   public actual fun moveBy(deltaX: Double, deltaY: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.moveBy(requireLiveHandle(), deltaX, deltaY)
   }
 
   public actual fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.moveByAnimated(requireLiveHandle(), deltaX, deltaY, animation)
   }
 
   public actual fun scaleBy(scale: Double, anchor: ScreenPoint?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.scaleBy(requireLiveHandle(), scale, anchor)
   }
 
   public actual fun scaleByAnimated(
@@ -448,11 +457,13 @@ private constructor(
     anchor: ScreenPoint?,
     animation: AnimationOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.scaleByAnimated(requireLiveHandle(), scale, anchor, animation)
   }
 
   public actual fun rotateBy(first: ScreenPoint, second: ScreenPoint) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.rotateBy(requireLiveHandle(), first, second)
   }
 
   public actual fun rotateByAnimated(
@@ -460,41 +471,55 @@ private constructor(
     second: ScreenPoint,
     animation: AnimationOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.rotateByAnimated(requireLiveHandle(), first, second, animation)
   }
 
   public actual fun pitchBy(pitch: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.pitchBy(requireLiveHandle(), pitch)
   }
 
   public actual fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.pitchByAnimated(requireLiveHandle(), pitch, animation)
   }
 
   public actual fun cancelTransitions() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.cancelTransitions(requireLiveHandle())
   }
 
   public actual fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions = unsupportedMapHandle()
+  ): CameraOptions {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cameraForLatLngBounds(requireLiveHandle(), bounds, fitOptions)
+  }
 
   public actual fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions = unsupportedMapHandle()
+  ): CameraOptions {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.cameraForLatLngs(requireLiveHandle(), coordinates, fitOptions)
+  }
 
   public actual fun cameraForGeometry(
     geometry: Geometry,
     fitOptions: CameraFitOptions?,
   ): CameraOptions = unsupportedMapHandle()
 
-  public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds =
-    unsupportedMapHandle()
+  public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngBoundsForCamera(requireLiveHandle(), camera)
+  }
 
-  public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds =
-    unsupportedMapHandle()
+  public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngBoundsForCameraUnwrapped(requireLiveHandle(), camera)
+  }
 
   public actual var bounds: BoundOptions
     get() = unsupportedMapHandle()

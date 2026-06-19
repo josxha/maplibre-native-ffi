@@ -972,3 +972,24 @@ is being implemented.
 - Discovery: the existing `mln_map_projection` C API snapshots transform state,
   so a projection handle can remain usable after the source map closes without
   retaining the source map.
+
+### JVM and Android Camera Control Milestone
+
+- Implemented JVM FFM and Android JavaCPP camera snapshot and command APIs:
+  `camera`, `jumpTo`, `easeTo`, `flyTo`, pan/zoom/rotate/pitch commands, and
+  transition cancellation.
+- Added platform materialization for `CameraOptions`, `AnimationOptions`, and
+  `CameraFitOptions`, including field masks, nested edge-inset/screen-point
+  values, and cubic easing descriptors.
+- Implemented camera fitting for bounds and coordinate lists, plus wrapped and
+  unwrapped bounds-for-camera helpers.
+- Completed standalone projection camera support for camera read/write and
+  visible-coordinate fitting on JVM and Android.
+- Kept geometry fitting unsupported in this slice because it depends on the
+  broader `Geometry`/GeoJSON descriptor graph migration.
+- Added JVM coverage for camera read/write, animated and non-animated camera
+  commands, camera fitting, bounds calculation, and projection camera fitting.
+- Discovery: camera-family FFM structs have enough nested layout and padding
+  that offset probing is worthwhile. `mln_camera_options` is 120 bytes,
+  `mln_animation_options` is 64 bytes, and `mln_camera_fit_options` is 56 bytes
+  on the current ABI.

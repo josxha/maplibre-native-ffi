@@ -11,7 +11,11 @@ import java.lang.invoke.MethodHandle
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
+import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.CameraFitOptions
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
+import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -1097,6 +1101,180 @@ internal object NativeAccess {
     }
   }
 
+  internal fun camera(map: MemorySegment): CameraOptions =
+    Arena.ofConfined().use { arena ->
+      val outCamera = cameraOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_camera").invokeWithArguments(map, outCamera) as Int
+      )
+      cameraOptions(outCamera)
+    }
+
+  internal fun jumpTo(map: MemorySegment, camera: CameraOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_jump_to")
+          .invokeWithArguments(map, cameraOptions(arena, camera)) as Int
+      )
+    }
+  }
+
+  internal fun easeTo(map: MemorySegment, camera: CameraOptions, animation: AnimationOptions?) {
+    mapCameraAnimationCommand("mln_map_ease_to", map, camera, animation)
+  }
+
+  internal fun flyTo(map: MemorySegment, camera: CameraOptions, animation: AnimationOptions?) {
+    mapCameraAnimationCommand("mln_map_fly_to", map, camera, animation)
+  }
+
+  internal fun moveBy(map: MemorySegment, deltaX: Double, deltaY: Double) {
+    Status.check(
+      mapDoubleDoubleStatusFunction("mln_map_move_by").invokeWithArguments(map, deltaX, deltaY)
+        as Int
+    )
+  }
+
+  internal fun moveByAnimated(
+    map: MemorySegment,
+    deltaX: Double,
+    deltaY: Double,
+    animation: AnimationOptions?,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapDoubleDoubleAddressStatusFunction("mln_map_move_by_animated")
+          .invokeWithArguments(map, deltaX, deltaY, animationOptions(arena, animation)) as Int
+      )
+    }
+  }
+
+  internal fun scaleBy(map: MemorySegment, scale: Double, anchor: ScreenPoint?) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapDoubleAddressStatusFunction("mln_map_scale_by")
+          .invokeWithArguments(
+            map,
+            scale,
+            anchor?.let { screenPoint(it, arena) } ?: MemorySegment.NULL,
+          ) as Int
+      )
+    }
+  }
+
+  internal fun scaleByAnimated(
+    map: MemorySegment,
+    scale: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapDoubleAddressAddressStatusFunction("mln_map_scale_by_animated")
+          .invokeWithArguments(
+            map,
+            scale,
+            anchor?.let { screenPoint(it, arena) } ?: MemorySegment.NULL,
+            animationOptions(arena, animation),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun rotateBy(map: MemorySegment, first: ScreenPoint, second: ScreenPoint) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoScreenPointsStatusFunction("mln_map_rotate_by")
+          .invokeWithArguments(map, screenPoint(first, arena), screenPoint(second, arena)) as Int
+      )
+    }
+  }
+
+  internal fun rotateByAnimated(
+    map: MemorySegment,
+    first: ScreenPoint,
+    second: ScreenPoint,
+    animation: AnimationOptions?,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoScreenPointsAddressStatusFunction("mln_map_rotate_by_animated")
+          .invokeWithArguments(
+            map,
+            screenPoint(first, arena),
+            screenPoint(second, arena),
+            animationOptions(arena, animation),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun pitchBy(map: MemorySegment, pitch: Double) {
+    Status.check(mapDoubleStatusFunction("mln_map_pitch_by").invokeWithArguments(map, pitch) as Int)
+  }
+
+  internal fun pitchByAnimated(map: MemorySegment, pitch: Double, animation: AnimationOptions?) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapDoubleAddressStatusFunction("mln_map_pitch_by_animated")
+          .invokeWithArguments(map, pitch, animationOptions(arena, animation)) as Int
+      )
+    }
+  }
+
+  internal fun cancelTransitions(map: MemorySegment) {
+    Status.check(mapStatusFunction("mln_map_cancel_transitions").invokeWithArguments(map) as Int)
+  }
+
+  internal fun cameraForLatLngBounds(
+    map: MemorySegment,
+    bounds: LatLngBounds,
+    fitOptions: CameraFitOptions?,
+  ): CameraOptions =
+    Arena.ofConfined().use { arena ->
+      val outCamera = cameraOptionsDefault(arena)
+      Status.check(
+        mapLatLngBoundsAddressAddressStatusFunction("mln_map_camera_for_lat_lng_bounds")
+          .invokeWithArguments(
+            map,
+            latLngBounds(arena, bounds),
+            cameraFitOptions(arena, fitOptions),
+            outCamera,
+          ) as Int
+      )
+      cameraOptions(outCamera)
+    }
+
+  internal fun cameraForLatLngs(
+    map: MemorySegment,
+    coordinates: List<LatLng>,
+    fitOptions: CameraFitOptions?,
+  ): CameraOptions {
+    val coordinateSnapshot = coordinates.toList()
+    return Arena.ofConfined().use { arena ->
+      val outCamera = cameraOptionsDefault(arena)
+      Status.check(
+        mapAddressLongAddressAddressStatusFunction("mln_map_camera_for_lat_lngs")
+          .invokeWithArguments(
+            map,
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+            cameraFitOptions(arena, fitOptions),
+            outCamera,
+          ) as Int
+      )
+      cameraOptions(outCamera)
+    }
+  }
+
+  internal fun latLngBoundsForCamera(map: MemorySegment, camera: CameraOptions): LatLngBounds =
+    mapLatLngBoundsForCamera("mln_map_lat_lng_bounds_for_camera", map, camera)
+
+  internal fun latLngBoundsForCameraUnwrapped(
+    map: MemorySegment,
+    camera: CameraOptions,
+  ): LatLngBounds =
+    mapLatLngBoundsForCamera("mln_map_lat_lng_bounds_for_camera_unwrapped", map, camera)
+
   internal fun pixelForLatLng(map: MemorySegment, coordinate: LatLng): ScreenPoint =
     Arena.ofConfined().use { arena ->
       val outPoint = arena.allocate(screenPointLayout)
@@ -1186,6 +1364,44 @@ internal object NativeAccess {
 
   internal fun destroyMapProjection(projection: MemorySegment): Int =
     mapStatusFunction("mln_map_projection_destroy").invokeWithArguments(projection) as Int
+
+  internal fun projectionCamera(projection: MemorySegment): CameraOptions =
+    Arena.ofConfined().use { arena ->
+      val outCamera = cameraOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_projection_get_camera")
+          .invokeWithArguments(projection, outCamera) as Int
+      )
+      cameraOptions(outCamera)
+    }
+
+  internal fun setProjectionCamera(projection: MemorySegment, camera: CameraOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_projection_set_camera")
+          .invokeWithArguments(projection, cameraOptions(arena, camera)) as Int
+      )
+    }
+  }
+
+  internal fun setProjectionVisibleCoordinates(
+    projection: MemorySegment,
+    coordinates: List<LatLng>,
+    padding: EdgeInsets,
+  ) {
+    val coordinateSnapshot = coordinates.toList()
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        projectionAddressLongEdgeInsetsStatusFunction("mln_map_projection_set_visible_coordinates")
+          .invokeWithArguments(
+            projection,
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+            edgeInsets(arena, padding),
+          ) as Int
+      )
+    }
+  }
 
   internal fun projectionPixelForLatLng(
     projection: MemorySegment,
@@ -1519,6 +1735,129 @@ internal object NativeAccess {
         stringViewLayout,
         latLngLayout,
         ValueLayout.JAVA_DOUBLE,
+      ),
+    )
+
+  private fun mapDoubleStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE),
+    )
+
+  private fun mapDoubleDoubleStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_DOUBLE,
+        ValueLayout.JAVA_DOUBLE,
+      ),
+    )
+
+  private fun mapDoubleAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_DOUBLE,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapDoubleDoubleAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_DOUBLE,
+        ValueLayout.JAVA_DOUBLE,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapDoubleAddressAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_DOUBLE,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapTwoAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapTwoScreenPointsStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        screenPointLayout,
+        screenPointLayout,
+      ),
+    )
+
+  private fun mapTwoScreenPointsAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        screenPointLayout,
+        screenPointLayout,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapLatLngBoundsAddressAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        latLngBoundsLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapAddressLongAddressAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun projectionAddressLongEdgeInsetsStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        edgeInsetsLayout,
       ),
     )
 
@@ -2038,6 +2377,12 @@ internal object NativeAccess {
     segment.set(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_RIGHT_OFFSET, value.right)
   }
 
+  private fun edgeInsets(arena: Arena, value: EdgeInsets): MemorySegment {
+    val segment = arena.allocate(edgeInsetsLayout)
+    writeEdgeInsets(segment, value)
+    return segment
+  }
+
   private fun viewportOptionsDefault(arena: Arena): MemorySegment {
     val segment = arena.allocate(VIEWPORT_OPTIONS_SIZE)
     segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_SIZE_OFFSET, VIEWPORT_OPTIONS_SIZE.toInt())
@@ -2202,6 +2547,183 @@ internal object NativeAccess {
       }
     }
   }
+
+  private fun cameraOptionsDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(CAMERA_OPTIONS_SIZE)
+    segment.set(ValueLayout.JAVA_INT, CAMERA_OPTIONS_SIZE_OFFSET, CAMERA_OPTIONS_SIZE.toInt())
+    return segment
+  }
+
+  private fun cameraOptions(arena: Arena, value: CameraOptions): MemorySegment {
+    val segment = cameraOptionsDefault(arena)
+    var fields = 0
+    value.center?.let {
+      fields = fields or CAMERA_OPTION_CENTER
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LATITUDE_OFFSET, it.latitude)
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LONGITUDE_OFFSET, it.longitude)
+    }
+    value.centerAltitude?.let {
+      fields = fields or CAMERA_OPTION_CENTER_ALTITUDE
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_CENTER_ALTITUDE_OFFSET, it)
+    }
+    value.padding?.let {
+      fields = fields or CAMERA_OPTION_PADDING
+      writeEdgeInsets(segment.asSlice(CAMERA_OPTIONS_PADDING_OFFSET, EDGE_INSETS_SIZE), it)
+    }
+    value.anchor?.let {
+      fields = fields or CAMERA_OPTION_ANCHOR
+      segment
+        .asSlice(CAMERA_OPTIONS_ANCHOR_OFFSET, SCREEN_POINT_SIZE)
+        .copyFrom(screenPoint(it, arena))
+    }
+    value.zoom?.let {
+      fields = fields or CAMERA_OPTION_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ZOOM_OFFSET, it)
+    }
+    value.bearing?.let {
+      fields = fields or CAMERA_OPTION_BEARING
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_BEARING_OFFSET, it)
+    }
+    value.pitch?.let {
+      fields = fields or CAMERA_OPTION_PITCH
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_PITCH_OFFSET, it)
+    }
+    value.roll?.let {
+      fields = fields or CAMERA_OPTION_ROLL
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ROLL_OFFSET, it)
+    }
+    value.fieldOfView?.let {
+      fields = fields or CAMERA_OPTION_FOV
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_FOV_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, CAMERA_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun cameraOptions(segment: MemorySegment): CameraOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, CAMERA_OPTIONS_FIELDS_OFFSET)
+    return CameraOptions().apply {
+      if ((fields and CAMERA_OPTION_CENTER) != 0) {
+        center =
+          LatLng(
+            segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LATITUDE_OFFSET),
+            segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LONGITUDE_OFFSET),
+          )
+      }
+      if ((fields and CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
+        centerAltitude = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_CENTER_ALTITUDE_OFFSET)
+      }
+      if ((fields and CAMERA_OPTION_PADDING) != 0) {
+        padding = edgeInsets(segment.asSlice(CAMERA_OPTIONS_PADDING_OFFSET, EDGE_INSETS_SIZE))
+      }
+      if ((fields and CAMERA_OPTION_ANCHOR) != 0) {
+        anchor = screenPoint(segment.asSlice(CAMERA_OPTIONS_ANCHOR_OFFSET, SCREEN_POINT_SIZE))
+      }
+      if ((fields and CAMERA_OPTION_ZOOM) != 0) {
+        zoom = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ZOOM_OFFSET)
+      }
+      if ((fields and CAMERA_OPTION_BEARING) != 0) {
+        bearing = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_BEARING_OFFSET)
+      }
+      if ((fields and CAMERA_OPTION_PITCH) != 0) {
+        pitch = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_PITCH_OFFSET)
+      }
+      if ((fields and CAMERA_OPTION_ROLL) != 0) {
+        roll = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ROLL_OFFSET)
+      }
+      if ((fields and CAMERA_OPTION_FOV) != 0) {
+        fieldOfView = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_FOV_OFFSET)
+      }
+    }
+  }
+
+  private fun animationOptions(arena: Arena, value: AnimationOptions?): MemorySegment {
+    if (value == null) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(ANIMATION_OPTIONS_SIZE)
+    var fields = 0
+    segment.set(ValueLayout.JAVA_INT, ANIMATION_OPTIONS_SIZE_OFFSET, ANIMATION_OPTIONS_SIZE.toInt())
+    value.durationMs?.let {
+      fields = fields or ANIMATION_OPTION_DURATION
+      segment.set(ValueLayout.JAVA_DOUBLE, ANIMATION_OPTIONS_DURATION_OFFSET, it)
+    }
+    value.velocity?.let {
+      fields = fields or ANIMATION_OPTION_VELOCITY
+      segment.set(ValueLayout.JAVA_DOUBLE, ANIMATION_OPTIONS_VELOCITY_OFFSET, it)
+    }
+    value.minZoom?.let {
+      fields = fields or ANIMATION_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, ANIMATION_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.easing?.let {
+      fields = fields or ANIMATION_OPTION_EASING
+      segment
+        .asSlice(ANIMATION_OPTIONS_EASING_OFFSET, UNIT_BEZIER_SIZE)
+        .copyFrom(unitBezier(it, arena))
+    }
+    segment.set(ValueLayout.JAVA_INT, ANIMATION_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun cameraFitOptions(arena: Arena, value: CameraFitOptions?): MemorySegment {
+    if (value == null) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(CAMERA_FIT_OPTIONS_SIZE)
+    var fields = 0
+    segment.set(
+      ValueLayout.JAVA_INT,
+      CAMERA_FIT_OPTIONS_SIZE_OFFSET,
+      CAMERA_FIT_OPTIONS_SIZE.toInt(),
+    )
+    value.padding?.let {
+      fields = fields or CAMERA_FIT_OPTION_PADDING
+      writeEdgeInsets(segment.asSlice(CAMERA_FIT_OPTIONS_PADDING_OFFSET, EDGE_INSETS_SIZE), it)
+    }
+    value.bearing?.let {
+      fields = fields or CAMERA_FIT_OPTION_BEARING
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_FIT_OPTIONS_BEARING_OFFSET, it)
+    }
+    value.pitch?.let {
+      fields = fields or CAMERA_FIT_OPTION_PITCH
+      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_FIT_OPTIONS_PITCH_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, CAMERA_FIT_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun mapCameraAnimationCommand(
+    functionName: String,
+    map: MemorySegment,
+    camera: CameraOptions,
+    animation: AnimationOptions?,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoAddressStatusFunction(functionName)
+          .invokeWithArguments(
+            map,
+            cameraOptions(arena, camera),
+            animationOptions(arena, animation),
+          ) as Int
+      )
+    }
+  }
+
+  private fun mapLatLngBoundsForCamera(
+    functionName: String,
+    map: MemorySegment,
+    camera: CameraOptions,
+  ): LatLngBounds =
+    Arena.ofConfined().use { arena ->
+      val outBounds = arena.allocate(latLngBoundsLayout)
+      Status.check(
+        mapTwoAddressStatusFunction(functionName)
+          .invokeWithArguments(map, cameraOptions(arena, camera), outBounds) as Int
+      )
+      latLngBounds(outBounds)
+    }
 
   private fun jsonValue(arena: Arena, value: JsonValue): MemorySegment {
     val segment = arena.allocate(JSON_VALUE_SIZE)
@@ -2494,6 +3016,15 @@ internal object NativeAccess {
       screenPoint(point)
     }
 
+  private fun unitBezier(value: UnitBezier, arena: Arena): MemorySegment {
+    val segment = arena.allocate(unitBezierLayout)
+    segment.set(ValueLayout.JAVA_DOUBLE, UNIT_BEZIER_X1_OFFSET, value.x1)
+    segment.set(ValueLayout.JAVA_DOUBLE, UNIT_BEZIER_Y1_OFFSET, value.y1)
+    segment.set(ValueLayout.JAVA_DOUBLE, UNIT_BEZIER_X2_OFFSET, value.x2)
+    segment.set(ValueLayout.JAVA_DOUBLE, UNIT_BEZIER_Y2_OFFSET, value.y2)
+    return segment
+  }
+
   private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {
     if (bytes.isEmpty()) {
       return MemorySegment.NULL
@@ -2745,6 +3276,12 @@ internal object NativeAccess {
       LAT_LNG_BOUNDS_NORTHEAST_LONGITUDE_OFFSET,
       bounds.northeast.longitude,
     )
+  }
+
+  private fun latLngBounds(arena: Arena, bounds: LatLngBounds): MemorySegment {
+    val segment = arena.allocate(latLngBoundsLayout)
+    latLngBounds(bounds, segment)
+    return segment
   }
 
   private fun latLngBounds(segment: MemorySegment): LatLngBounds =
@@ -3127,6 +3664,28 @@ internal object NativeAccess {
       ValueLayout.JAVA_DOUBLE.withName("y"),
     )
 
+  private val edgeInsetsLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("top"),
+      ValueLayout.JAVA_DOUBLE.withName("left"),
+      ValueLayout.JAVA_DOUBLE.withName("bottom"),
+      ValueLayout.JAVA_DOUBLE.withName("right"),
+    )
+
+  private val latLngBoundsLayout =
+    MemoryLayout.structLayout(
+      latLngLayout.withName("southwest"),
+      latLngLayout.withName("northeast"),
+    )
+
+  private val unitBezierLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("x1"),
+      ValueLayout.JAVA_DOUBLE.withName("y1"),
+      ValueLayout.JAVA_DOUBLE.withName("x2"),
+      ValueLayout.JAVA_DOUBLE.withName("y2"),
+    )
+
   private val stringViewLayout =
     MemoryLayout.structLayout(
       ValueLayout.ADDRESS.withName("data"),
@@ -3136,6 +3695,62 @@ internal object NativeAccess {
   private const val STRING_VIEW_SIZE: Long = 16
   private const val STRING_VIEW_DATA_OFFSET: Long = 0
   private const val STRING_VIEW_SIZE_OFFSET: Long = 8
+
+  private const val SCREEN_POINT_SIZE: Long = 16
+
+  private const val UNIT_BEZIER_SIZE: Long = 32
+  private const val UNIT_BEZIER_X1_OFFSET: Long = 0
+  private const val UNIT_BEZIER_Y1_OFFSET: Long = 8
+  private const val UNIT_BEZIER_X2_OFFSET: Long = 16
+  private const val UNIT_BEZIER_Y2_OFFSET: Long = 24
+
+  private const val CAMERA_OPTION_CENTER: Int = 1 shl 0
+  private const val CAMERA_OPTION_ZOOM: Int = 1 shl 1
+  private const val CAMERA_OPTION_BEARING: Int = 1 shl 2
+  private const val CAMERA_OPTION_PITCH: Int = 1 shl 3
+  private const val CAMERA_OPTION_CENTER_ALTITUDE: Int = 1 shl 4
+  private const val CAMERA_OPTION_PADDING: Int = 1 shl 5
+  private const val CAMERA_OPTION_ANCHOR: Int = 1 shl 6
+  private const val CAMERA_OPTION_ROLL: Int = 1 shl 7
+  private const val CAMERA_OPTION_FOV: Int = 1 shl 8
+
+  private const val CAMERA_OPTIONS_SIZE: Long = 120
+  private const val CAMERA_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val CAMERA_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val CAMERA_OPTIONS_LATITUDE_OFFSET: Long = 8
+  private const val CAMERA_OPTIONS_LONGITUDE_OFFSET: Long = 16
+  private const val CAMERA_OPTIONS_CENTER_ALTITUDE_OFFSET: Long = 24
+  private const val CAMERA_OPTIONS_PADDING_OFFSET: Long = 32
+  private const val CAMERA_OPTIONS_ANCHOR_OFFSET: Long = 64
+  private const val CAMERA_OPTIONS_ZOOM_OFFSET: Long = 80
+  private const val CAMERA_OPTIONS_BEARING_OFFSET: Long = 88
+  private const val CAMERA_OPTIONS_PITCH_OFFSET: Long = 96
+  private const val CAMERA_OPTIONS_ROLL_OFFSET: Long = 104
+  private const val CAMERA_OPTIONS_FOV_OFFSET: Long = 112
+
+  private const val ANIMATION_OPTION_DURATION: Int = 1 shl 0
+  private const val ANIMATION_OPTION_VELOCITY: Int = 1 shl 1
+  private const val ANIMATION_OPTION_MIN_ZOOM: Int = 1 shl 2
+  private const val ANIMATION_OPTION_EASING: Int = 1 shl 3
+
+  private const val ANIMATION_OPTIONS_SIZE: Long = 64
+  private const val ANIMATION_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val ANIMATION_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val ANIMATION_OPTIONS_DURATION_OFFSET: Long = 8
+  private const val ANIMATION_OPTIONS_VELOCITY_OFFSET: Long = 16
+  private const val ANIMATION_OPTIONS_MIN_ZOOM_OFFSET: Long = 24
+  private const val ANIMATION_OPTIONS_EASING_OFFSET: Long = 32
+
+  private const val CAMERA_FIT_OPTION_PADDING: Int = 1 shl 0
+  private const val CAMERA_FIT_OPTION_BEARING: Int = 1 shl 1
+  private const val CAMERA_FIT_OPTION_PITCH: Int = 1 shl 2
+
+  private const val CAMERA_FIT_OPTIONS_SIZE: Long = 56
+  private const val CAMERA_FIT_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val CAMERA_FIT_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val CAMERA_FIT_OPTIONS_PADDING_OFFSET: Long = 8
+  private const val CAMERA_FIT_OPTIONS_BEARING_OFFSET: Long = 40
+  private const val CAMERA_FIT_OPTIONS_PITCH_OFFSET: Long = 48
 
   private const val JSON_VALUE_SIZE: Long = 24
   private const val JSON_VALUE_SIZE_OFFSET: Long = 0

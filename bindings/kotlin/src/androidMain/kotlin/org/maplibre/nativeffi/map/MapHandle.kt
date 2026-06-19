@@ -917,30 +917,77 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     }
 
   public actual val camera: CameraOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+        Status.check(MaplibreNativeC.mln_map_get_camera(map(requireLiveAddress()), outCamera))
+        return cameraOptions(outCamera)
+      }
+    }
 
   public actual fun jumpTo(camera: CameraOptions) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    CameraOptionsScope(camera).use { nativeCamera ->
+      Status.check(MaplibreNativeC.mln_map_jump_to(map(requireLiveAddress()), nativeCamera.options))
+    }
   }
 
   public actual fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    CameraOptionsScope(camera).use { nativeCamera ->
+      AnimationOptionsScope(animation).use { nativeAnimation ->
+        Status.check(
+          MaplibreNativeC.mln_map_ease_to(
+            map(requireLiveAddress()),
+            nativeCamera.options,
+            nativeAnimation.options,
+          )
+        )
+      }
+    }
   }
 
   public actual fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    CameraOptionsScope(camera).use { nativeCamera ->
+      AnimationOptionsScope(animation).use { nativeAnimation ->
+        Status.check(
+          MaplibreNativeC.mln_map_fly_to(
+            map(requireLiveAddress()),
+            nativeCamera.options,
+            nativeAnimation.options,
+          )
+        )
+      }
+    }
   }
 
   public actual fun moveBy(deltaX: Double, deltaY: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_move_by(map(requireLiveAddress()), deltaX, deltaY))
   }
 
   public actual fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    AnimationOptionsScope(animation).use { nativeAnimation ->
+      Status.check(
+        MaplibreNativeC.mln_map_move_by_animated(
+          map(requireLiveAddress()),
+          deltaX,
+          deltaY,
+          nativeAnimation.options,
+        )
+      )
+    }
   }
 
   public actual fun scaleBy(scale: Double, anchor: ScreenPoint?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    ScreenPointScope(anchor).use { nativeAnchor ->
+      Status.check(
+        MaplibreNativeC.mln_map_scale_by(map(requireLiveAddress()), scale, nativeAnchor.point)
+      )
+    }
   }
 
   public actual fun scaleByAnimated(
@@ -948,11 +995,30 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     anchor: ScreenPoint?,
     animation: AnimationOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    ScreenPointScope(anchor).use { nativeAnchor ->
+      AnimationOptionsScope(animation).use { nativeAnimation ->
+        Status.check(
+          MaplibreNativeC.mln_map_scale_by_animated(
+            map(requireLiveAddress()),
+            scale,
+            nativeAnchor.point,
+            nativeAnimation.options,
+          )
+        )
+      }
+    }
   }
 
   public actual fun rotateBy(first: ScreenPoint, second: ScreenPoint) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(
+      MaplibreNativeC.mln_map_rotate_by(
+        map(requireLiveAddress()),
+        screenPoint(first),
+        screenPoint(second),
+      )
+    )
   }
 
   public actual fun rotateByAnimated(
@@ -960,30 +1026,84 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     second: ScreenPoint,
     animation: AnimationOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    AnimationOptionsScope(animation).use { nativeAnimation ->
+      Status.check(
+        MaplibreNativeC.mln_map_rotate_by_animated(
+          map(requireLiveAddress()),
+          screenPoint(first),
+          screenPoint(second),
+          nativeAnimation.options,
+        )
+      )
+    }
   }
 
   public actual fun pitchBy(pitch: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_pitch_by(map(requireLiveAddress()), pitch))
   }
 
   public actual fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    AnimationOptionsScope(animation).use { nativeAnimation ->
+      Status.check(
+        MaplibreNativeC.mln_map_pitch_by_animated(
+          map(requireLiveAddress()),
+          pitch,
+          nativeAnimation.options,
+        )
+      )
+    }
   }
 
   public actual fun cancelTransitions() {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_cancel_transitions(map(requireLiveAddress())))
   }
 
   public actual fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions = unsupportedMapHandle()
+  ): CameraOptions {
+    NativeAccess.ensureLoaded()
+    CameraFitOptionsScope(fitOptions).use { nativeFitOptions ->
+      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+        Status.check(
+          MaplibreNativeC.mln_map_camera_for_lat_lng_bounds(
+            map(requireLiveAddress()),
+            latLngBounds(bounds),
+            nativeFitOptions.options,
+            outCamera,
+          )
+        )
+        return cameraOptions(outCamera)
+      }
+    }
+  }
 
   public actual fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions?,
-  ): CameraOptions = unsupportedMapHandle()
+  ): CameraOptions {
+    NativeAccess.ensureLoaded()
+    LatLngArrayScope(coordinates).use { nativeCoordinates ->
+      CameraFitOptionsScope(fitOptions).use { nativeFitOptions ->
+        MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+          Status.check(
+            MaplibreNativeC.mln_map_camera_for_lat_lngs(
+              map(requireLiveAddress()),
+              nativeCoordinates.coordinates,
+              nativeCoordinates.count,
+              nativeFitOptions.options,
+              outCamera,
+            )
+          )
+          return cameraOptions(outCamera)
+        }
+      }
+    }
+  }
 
   public actual fun cameraForGeometry(
     geometry: Geometry,
@@ -991,10 +1111,10 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   ): CameraOptions = unsupportedMapHandle()
 
   public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds =
-    unsupportedMapHandle()
+    latLngBoundsForCamera(MaplibreNativeC::mln_map_lat_lng_bounds_for_camera, camera)
 
   public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds =
-    unsupportedMapHandle()
+    latLngBoundsForCamera(MaplibreNativeC::mln_map_lat_lng_bounds_for_camera_unwrapped, camera)
 
   public actual var bounds: BoundOptions
     get() = unsupportedMapHandle()
@@ -1216,6 +1336,24 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     }
   }
 
+  private fun latLngBoundsForCamera(
+    function:
+      (
+        MaplibreNativeC.mln_map,
+        MaplibreNativeC.mln_camera_options,
+        MaplibreNativeC.mln_lat_lng_bounds,
+      ) -> Int,
+    camera: CameraOptions,
+  ): LatLngBounds {
+    NativeAccess.ensureLoaded()
+    CameraOptionsScope(camera).use { nativeCamera ->
+      MaplibreNativeC.mln_lat_lng_bounds().use { outBounds ->
+        Status.check(function(map(requireLiveAddress()), nativeCamera.options, outBounds))
+        return latLngBounds(outBounds)
+      }
+    }
+  }
+
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
       NativeAccess.ensureLoaded()
@@ -1255,6 +1393,14 @@ private fun latLng(value: LatLng): MaplibreNativeC.mln_lat_lng =
 
 private fun latLng(value: MaplibreNativeC.mln_lat_lng): LatLng =
   LatLng(value.latitude(), value.longitude())
+
+private fun latLngBounds(value: LatLngBounds): MaplibreNativeC.mln_lat_lng_bounds =
+  MaplibreNativeC.mln_lat_lng_bounds()
+    .southwest(latLng(value.southwest))
+    .northeast(latLng(value.northeast))
+
+private fun latLngBounds(value: MaplibreNativeC.mln_lat_lng_bounds): LatLngBounds =
+  LatLngBounds(latLng(value.southwest()), latLng(value.northeast()))
 
 private fun screenPoint(value: ScreenPoint): MaplibreNativeC.mln_screen_point =
   MaplibreNativeC.mln_screen_point().x(value.x).y(value.y)
@@ -1450,6 +1596,39 @@ private fun projectionModeOptions(
   }
 }
 
+private fun cameraOptions(value: MaplibreNativeC.mln_camera_options): CameraOptions {
+  val fields = value.fields()
+  return CameraOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_CENTER) != 0) {
+      center = LatLng(value.latitude(), value.longitude())
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
+      centerAltitude = value.center_altitude()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_PADDING) != 0) {
+      padding = edgeInsets(value.padding())
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR) != 0) {
+      anchor = screenPoint(value.anchor())
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM) != 0) {
+      zoom = value.zoom()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_BEARING) != 0) {
+      bearing = value.bearing()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_PITCH) != 0) {
+      pitch = value.pitch()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ROLL) != 0) {
+      roll = value.roll()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_FOV) != 0) {
+      fieldOfView = value.field_of_view()
+    }
+  }
+}
+
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer
   val view: MaplibreNativeC.mln_string_view = MaplibreNativeC.mln_string_view()
@@ -1549,6 +1728,125 @@ private class ScreenPointArrayScope : AutoCloseable {
 
   override fun close() {
     points.close()
+  }
+}
+
+private class ScreenPointScope(value: ScreenPoint?) : AutoCloseable {
+  val point: MaplibreNativeC.mln_screen_point? = value?.let(::screenPoint)
+
+  override fun close() {
+    point?.close()
+  }
+}
+
+private class CameraOptionsScope(value: CameraOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_camera_options = MaplibreNativeC.mln_camera_options_default()
+
+  init {
+    var fields = 0
+    value.center?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_CENTER
+      options.latitude(it.latitude).longitude(it.longitude)
+    }
+    value.centerAltitude?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE
+      options.center_altitude(it)
+    }
+    value.padding?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_PADDING
+      writeEdgeInsets(options.padding(), it)
+    }
+    value.anchor?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR
+      options.anchor(screenPoint(it))
+    }
+    value.zoom?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM
+      options.zoom(it)
+    }
+    value.bearing?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_BEARING
+      options.bearing(it)
+    }
+    value.pitch?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_PITCH
+      options.pitch(it)
+    }
+    value.roll?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_ROLL
+      options.roll(it)
+    }
+    value.fieldOfView?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_FOV
+      options.field_of_view(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private class AnimationOptionsScope(value: AnimationOptions?) : AutoCloseable {
+  val options: MaplibreNativeC.mln_animation_options? = value?.let {
+    MaplibreNativeC.mln_animation_options_default()
+  }
+
+  init {
+    if (value != null && options != null) {
+      var fields = 0
+      value.durationMs?.let {
+        fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_DURATION
+        options.duration_ms(it)
+      }
+      value.velocity?.let {
+        fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_VELOCITY
+        options.velocity(it)
+      }
+      value.minZoom?.let {
+        fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_MIN_ZOOM
+        options.min_zoom(it)
+      }
+      value.easing?.let {
+        fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_EASING
+        options.easing(MaplibreNativeC.mln_unit_bezier().x1(it.x1).y1(it.y1).x2(it.x2).y2(it.y2))
+      }
+      options.fields(fields)
+    }
+  }
+
+  override fun close() {
+    options?.close()
+  }
+}
+
+private class CameraFitOptionsScope(value: CameraFitOptions?) : AutoCloseable {
+  val options: MaplibreNativeC.mln_camera_fit_options? = value?.let {
+    MaplibreNativeC.mln_camera_fit_options_default()
+  }
+
+  init {
+    if (value != null && options != null) {
+      var fields = 0
+      value.padding?.let {
+        fields = fields or MaplibreNativeC.MLN_CAMERA_FIT_OPTION_PADDING
+        writeEdgeInsets(options.padding(), it)
+      }
+      value.bearing?.let {
+        fields = fields or MaplibreNativeC.MLN_CAMERA_FIT_OPTION_BEARING
+        options.bearing(it)
+      }
+      value.pitch?.let {
+        fields = fields or MaplibreNativeC.MLN_CAMERA_FIT_OPTION_PITCH
+        options.pitch(it)
+      }
+      options.fields(fields)
+    }
+  }
+
+  override fun close() {
+    options?.close()
   }
 }
 

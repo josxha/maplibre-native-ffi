@@ -6,9 +6,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.CameraFitOptions
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
+import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -347,6 +353,83 @@ class MapHandleTest {
       assertEquals(false, projectionMode.axonometric)
       assertEquals(0.0, projectionMode.xSkew)
       assertEquals(0.0, projectionMode.ySkew)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun cameraCommandsAndProjectionCameraCanBeUsed() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      val camera =
+        CameraOptions().apply {
+          center = LatLng(10.0, 20.0)
+          zoom = 3.0
+          bearing = 15.0
+          pitch = 20.0
+          padding = EdgeInsets.ZERO
+          anchor = ScreenPoint(64.0, 64.0)
+        }
+      map.jumpTo(camera)
+      assertNear(requireNotNull(camera.center), requireNotNull(map.camera.center))
+      assertEquals(3.0, map.camera.zoom ?: 0.0, 1e-6)
+
+      val animation =
+        AnimationOptions().apply {
+          durationMs = 0.0
+          minZoom = 2.0
+          easing = UnitBezier(0.0, 0.0, 1.0, 1.0)
+        }
+      map.easeTo(CameraOptions().apply { zoom = 3.25 }, animation)
+      map.flyTo(CameraOptions().apply { zoom = 3.5 }, null)
+      map.moveBy(0.0, 0.0)
+      map.moveByAnimated(0.0, 0.0, null)
+      map.scaleBy(1.0, null)
+      map.scaleByAnimated(1.0, ScreenPoint(64.0, 64.0), animation)
+      map.rotateBy(ScreenPoint(0.0, 0.0), ScreenPoint(1.0, 1.0))
+      map.rotateByAnimated(ScreenPoint(0.0, 0.0), ScreenPoint(1.0, 1.0), null)
+      map.pitchBy(0.0)
+      map.pitchByAnimated(0.0, null)
+      map.cancelTransitions()
+
+      val fit =
+        CameraFitOptions().apply {
+          padding = EdgeInsets.ZERO
+          bearing = 0.0
+          pitch = 0.0
+        }
+      val bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0))
+      assertTrue(map.cameraForLatLngBounds(bounds, fit).center != null)
+      assertTrue(
+        map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), null).center != null
+      )
+      assertTrue(map.latLngBoundsForCamera(camera).southwest.latitude.isFinite())
+      assertTrue(map.latLngBoundsForCameraUnwrapped(camera).southwest.latitude.isFinite())
+
+      val projection = map.createProjection()
+      try {
+        projection.setCamera(camera)
+        assertNear(requireNotNull(camera.center), requireNotNull(projection.camera.center))
+        projection.setVisibleCoordinates(
+          listOf(bounds.southwest, bounds.northeast),
+          EdgeInsets.ZERO,
+        )
+        assertTrue(projection.camera.center != null)
+      } finally {
+        projection.close()
+      }
     } finally {
       map.close()
       runtime.close()

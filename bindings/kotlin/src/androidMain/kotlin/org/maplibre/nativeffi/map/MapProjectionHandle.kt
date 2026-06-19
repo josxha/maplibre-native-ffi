@@ -17,14 +17,47 @@ public actual class MapProjectionHandle internal constructor(private val handleA
   private val core = HandleStateCore("MapProjectionHandle", handleAddress)
 
   public actual val camera: CameraOptions
-    get() = unsupportedMapProjectionCamera()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+        Status.check(
+          MaplibreNativeC.mln_map_projection_get_camera(projection(requireLiveAddress()), outCamera)
+        )
+        return projectionCameraOptions(outCamera)
+      }
+    }
 
   public actual fun setCamera(camera: CameraOptions) {
-    unsupportedMapProjectionCamera()
+    NativeAccess.ensureLoaded()
+    ProjectionCameraOptionsScope(camera).use { nativeCamera ->
+      Status.check(
+        MaplibreNativeC.mln_map_projection_set_camera(
+          projection(requireLiveAddress()),
+          nativeCamera.options,
+        )
+      )
+    }
   }
 
   public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
-    unsupportedMapProjectionCamera()
+    NativeAccess.ensureLoaded()
+    ProjectionLatLngArrayScope(coordinates).use { nativeCoordinates ->
+      MaplibreNativeC.mln_edge_insets()
+        .top(padding.top)
+        .left(padding.left)
+        .bottom(padding.bottom)
+        .right(padding.right)
+        .use { nativePadding ->
+          Status.check(
+            MaplibreNativeC.mln_map_projection_set_visible_coordinates(
+              projection(requireLiveAddress()),
+              nativeCoordinates.coordinates,
+              nativeCoordinates.count,
+              nativePadding,
+            )
+          )
+        }
+    }
   }
 
   public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
@@ -85,7 +118,117 @@ private class ProjectionAddressPointer(address: Long) : Pointer(null as Pointer?
   }
 }
 
+private fun projectionCameraOptions(value: MaplibreNativeC.mln_camera_options): CameraOptions {
+  val fields = value.fields()
+  return CameraOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_CENTER) != 0) {
+      center = LatLng(value.latitude(), value.longitude())
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
+      centerAltitude = value.center_altitude()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_PADDING) != 0) {
+      val padding = value.padding()
+      this.padding = EdgeInsets(padding.top(), padding.left(), padding.bottom(), padding.right())
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR) != 0) {
+      anchor = ScreenPoint(value.anchor().x(), value.anchor().y())
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM) != 0) {
+      zoom = value.zoom()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_BEARING) != 0) {
+      bearing = value.bearing()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_PITCH) != 0) {
+      pitch = value.pitch()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_ROLL) != 0) {
+      roll = value.roll()
+    }
+    if ((fields and MaplibreNativeC.MLN_CAMERA_OPTION_FOV) != 0) {
+      fieldOfView = value.field_of_view()
+    }
+  }
+}
+
+private class ProjectionCameraOptionsScope(value: CameraOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_camera_options = MaplibreNativeC.mln_camera_options_default()
+
+  init {
+    var fields = 0
+    value.center?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_CENTER
+      options.latitude(it.latitude).longitude(it.longitude)
+    }
+    value.centerAltitude?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE
+      options.center_altitude(it)
+    }
+    value.padding?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_PADDING
+      options.padding(
+        MaplibreNativeC.mln_edge_insets()
+          .top(it.top)
+          .left(it.left)
+          .bottom(it.bottom)
+          .right(it.right)
+      )
+    }
+    value.anchor?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR
+      options.anchor(MaplibreNativeC.mln_screen_point().x(it.x).y(it.y))
+    }
+    value.zoom?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM
+      options.zoom(it)
+    }
+    value.bearing?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_BEARING
+      options.bearing(it)
+    }
+    value.pitch?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_PITCH
+      options.pitch(it)
+    }
+    value.roll?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_ROLL
+      options.roll(it)
+    }
+    value.fieldOfView?.let {
+      fields = fields or MaplibreNativeC.MLN_CAMERA_OPTION_FOV
+      options.field_of_view(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private class ProjectionLatLngArrayScope(values: List<LatLng>) : AutoCloseable {
+  private val coordinateSnapshot = values.toList()
+  val coordinates: MaplibreNativeC.mln_lat_lng =
+    MaplibreNativeC.mln_lat_lng(coordinateSnapshot.size.toLong())
+  val count: Long = coordinateSnapshot.size.toLong()
+
+  init {
+    coordinateSnapshot.forEachIndexed { index, coordinate ->
+      coordinates
+        .position(index.toLong())
+        .latitude(coordinate.latitude)
+        .longitude(coordinate.longitude)
+    }
+    coordinates.position(0)
+  }
+
+  override fun close() {
+    coordinates.close()
+  }
+}
+
 private fun unsupportedMapProjectionCamera(): Nothing =
   throw UnsupportedOperationException(
-    "MapProjectionHandle camera fitting is not available until the Android camera bridge is implemented"
+    "MapProjectionHandle geometry fitting is not available until the Android geometry bridge is implemented"
   )

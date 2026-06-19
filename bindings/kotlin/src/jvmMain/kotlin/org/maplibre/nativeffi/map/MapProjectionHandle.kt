@@ -15,14 +15,19 @@ public actual class MapProjectionHandle internal constructor(private val handle:
   private val core = HandleStateCore("MapProjectionHandle", handle.address())
 
   public actual val camera: CameraOptions
-    get() = unsupportedMapProjectionCamera()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.projectionCamera(requireLiveHandle())
+    }
 
   public actual fun setCamera(camera: CameraOptions) {
-    unsupportedMapProjectionCamera()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setProjectionCamera(requireLiveHandle(), camera)
   }
 
   public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
-    unsupportedMapProjectionCamera()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setProjectionVisibleCoordinates(requireLiveHandle(), coordinates, padding)
   }
 
   public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
@@ -54,5 +59,5 @@ public actual class MapProjectionHandle internal constructor(private val handle:
 
 private fun unsupportedMapProjectionCamera(): Nothing =
   throw UnsupportedOperationException(
-    "MapProjectionHandle camera fitting is not available until the JVM camera bridge is implemented"
+    "MapProjectionHandle geometry fitting is not available until the JVM geometry bridge is implemented"
   )
