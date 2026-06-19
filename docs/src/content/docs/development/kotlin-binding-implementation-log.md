@@ -411,3 +411,16 @@ is being implemented.
 - Reflection: this removes another set of duplicated native-only lifecycle code
   and leaves the platform source set focused on the actual frame pointer
   mechanics.
+
+### Common Resource Provider Callback Milestone
+
+- Moved `ResourceProviderCallback` to `commonMain`, matching the north-star rule
+  that public callback interfaces belong to common code.
+- Added a common `expect` facade for `ResourceRequestHandle` so the public
+  callback contract no longer depends on a Kotlin/Native pointer-backed handle.
+- Converted the existing Kotlin/Native `ResourceRequestHandle` into the native
+  actual and added explicit JVM and Android actual placeholders until their FFM
+  and JNI resource provider bridges are implemented.
+- Reflection: this is the first public handle facade moved to expect/actual form
+  instead of only extracting internal state, which is a step toward domain-level
+  bridge facades.

@@ -19,9 +19,8 @@ import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 
-/** Owned handle for a resource provider request that Kotlin chose to handle. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
-public class ResourceRequestHandle
+public actual class ResourceRequestHandle
 internal constructor(
   private val handle: CPointer<mln_resource_request_handle>,
   private val completer:
@@ -38,7 +37,7 @@ internal constructor(
   private val core = ResourceRequestHandleCore { releaser(handle) }
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.releaseIfOwned() }
 
-  public fun complete(response: ResourceResponse) {
+  public actual fun complete(response: ResourceResponse) {
     val operation = core.beginComplete()
     var reachedNative = false
     try {
@@ -63,7 +62,7 @@ internal constructor(
     }
   }
 
-  public fun isCancelled(): Boolean = core.withLiveHandle {
+  public actual fun isCancelled(): Boolean = core.withLiveHandle {
     memScoped {
       val outCancelled = alloc<BooleanVar>()
       outCancelled.value = false
@@ -72,7 +71,7 @@ internal constructor(
     }
   }
 
-  override fun close() {
+  public actual override fun close() {
     core.close()
   }
 
