@@ -19,4 +19,20 @@ class RuntimeHandleTest {
     assertTrue(runtime.isClosed)
     assertFailsWith<InvalidStateException> { runtime.runOnce() }
   }
+
+  @Test
+  fun ambientCacheOperationRetainsRuntimeUntilDiscarded() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
+
+    assertFalse(operation.isClosed)
+    assertFailsWith<InvalidStateException> { runtime.close() }
+
+    operation.close()
+    operation.close()
+
+    assertTrue(operation.isClosed)
+    runtime.close()
+    assertTrue(runtime.isClosed)
+  }
 }

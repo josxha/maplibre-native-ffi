@@ -154,6 +154,19 @@ internal object NativeAccess {
   internal fun destroyRuntime(runtime: MemorySegment): Int =
     runtimeStatusFunction("mln_runtime_destroy").invokeWithArguments(runtime) as Int
 
+  internal fun startAmbientCacheOperation(runtime: MemorySegment, operation: Int): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeAmbientCacheOperationStartFunction()
+          .invokeWithArguments(runtime, operation, outOperationId) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun discardOfflineOperation(runtime: MemorySegment, operationId: Long): Int =
+    runtimeOfflineOperationDiscardFunction().invokeWithArguments(runtime, operationId) as Int
+
   private fun intFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT))
 
@@ -183,6 +196,23 @@ internal object NativeAccess {
 
   private fun runtimeStatusFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+
+  private fun runtimeAmbientCacheOperationStartFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_run_ambient_cache_operation_start",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun runtimeOfflineOperationDiscardFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_offline_operation_discard",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
+    )
 
   private fun runtimeOptions(options: RuntimeOptions, arena: Arena): MemorySegment {
     val nativeOptions = arena.allocate(runtimeOptionsLayout)

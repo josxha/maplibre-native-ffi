@@ -1,25 +1,51 @@
 package org.maplibre.nativeffi.runtime
 
-/** Android actual placeholder until the JNI offline bridge is migrated. */
-public actual class OfflineOperationHandle<T> private constructor() : AutoCloseable {
-  public actual val id: Long
-    get() = unsupportedOfflineOperationHandle()
+import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 
-  public actual val kind: OfflineOperationKind
-    get() = unsupportedOfflineOperationHandle()
+/** Owner-thread offline database operation backed by the Android JNI bridge. */
+public actual class OfflineOperationHandle<T>
+internal constructor(
+  private val runtime: RuntimeHandle,
+  public actual val id: Long,
+  public actual val kind: OfflineOperationKind,
+  public actual val resultKind: OfflineOperationResultKind,
+) : AutoCloseable {
+  private val runtimeRetention: HandleStateCore.ChildRetention = runtime.retainChild()
+  private var closed = false
 
-  public actual val resultKind: OfflineOperationResultKind
-    get() = unsupportedOfflineOperationHandle()
+  init {
+    require(id != 0L) { "offline operation id must not be zero" }
+  }
 
   public actual val isClosed: Boolean
-    get() = unsupportedOfflineOperationHandle()
+    get() = closed
+
+  internal fun requireLive(expectedRuntime: RuntimeHandle): Long {
+    if (closed) {
+      throw InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode,
+        "OfflineOperationHandle is already closed",
+      )
+    }
+    if (runtime !== expectedRuntime) {
+      throw InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode,
+        "OfflineOperationHandle belongs to a different RuntimeHandle",
+      )
+    }
+    return id
+  }
+
+  internal fun markConsumed() {
+    if (closed) return
+    closed = true
+    runtimeRetention.close()
+  }
 
   public actual override fun close() {
-    unsupportedOfflineOperationHandle()
+    if (closed) return
+    runtime.discardOfflineOperation(this)
   }
 }
-
-private fun unsupportedOfflineOperationHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "OfflineOperationHandle is not available until the Android offline bridge is implemented"
-  )

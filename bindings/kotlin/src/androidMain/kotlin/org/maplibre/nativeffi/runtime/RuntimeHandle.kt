@@ -5,6 +5,7 @@ import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
 import org.maplibre.nativeffi.NativeAccess
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -25,12 +26,27 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   public actual fun runOnce() {
     NativeAccess.ensureLoaded()
-    Status.check(MaplibreNativeC.mln_runtime_run_once(runtime(core.requireLiveAddress())))
+    Status.check(MaplibreNativeC.mln_runtime_run_once(runtime(requireLiveAddress())))
   }
 
   public actual fun startAmbientCacheOperation(
     operation: AmbientCacheOperation
-  ): OfflineOperationHandle<Unit> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<Unit> {
+    NativeAccess.ensureLoaded()
+    val outOperationId = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_runtime_run_ambient_cache_operation_start(
+        runtime(requireLiveAddress()),
+        operation.nativeValue,
+        outOperationId,
+      )
+    )
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.AMBIENT_CACHE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
 
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
@@ -128,11 +144,35 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       }
     }
   }
-}
 
-private fun HandleStateCore.requireLiveAddress(): Long {
-  requireLive()
-  return address()
+  private fun <T> offlineOperation(
+    operationId: Long,
+    kind: OfflineOperationKind,
+    resultKind: OfflineOperationResultKind,
+  ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
+
+  internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
+    if (operation.isClosed) return
+    val operationId = operation.requireLive(this)
+    val runtimeAddress =
+      try {
+        requireLiveAddress()
+      } catch (error: InvalidStateException) {
+        operation.markConsumed()
+        throw error
+      }
+    Status.check(
+      MaplibreNativeC.mln_runtime_offline_operation_discard(runtime(runtimeAddress), operationId)
+    )
+    operation.markConsumed()
+  }
+
+  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+
+  private fun requireLiveAddress(): Long {
+    core.requireLive()
+    return handleAddress
+  }
 }
 
 private fun runtime(address: Long): MaplibreNativeC.mln_runtime =

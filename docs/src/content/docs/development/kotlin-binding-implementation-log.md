@@ -677,3 +677,19 @@ is being implemented.
   Android runtime lifecycle is compile-validated through
   `//bindings/kotlin:build` until instrumentation packaging and emulator tests
   are introduced.
+
+### JVM and Android Offline Operation Handle Milestone
+
+- Replaced JVM and Android `OfflineOperationHandle` placeholders with real
+  lifecycle wrappers that expose id, kind, result kind, close state, runtime
+  ownership checks, child retention, and discard-on-close behavior.
+- Implemented `RuntimeHandle.startAmbientCacheOperation` on JVM through FFM and
+  on Android through JavaCPP so both platform runtime handles can create and
+  discard a native offline operation without waiting for full offline result
+  marshalling.
+- Added JVM coverage for ambient cache operation child retention: a runtime with
+  a live operation rejects close until the operation is discarded.
+- Discovery: this is the first migrated operation handle where common lifecycle
+  state is shared but the actual discard transport remains bridge-specific,
+  reinforcing the north-star split between common handle semantics and platform
+  call mechanics.

@@ -1,8 +1,10 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.foreign.MemorySegment
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -26,7 +28,16 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   public actual fun startAmbientCacheOperation(
     operation: AmbientCacheOperation
-  ): OfflineOperationHandle<Unit> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<Unit> {
+    NativeAccess.ensureLoaded()
+    val operationId =
+      NativeAccess.startAmbientCacheOperation(requireLiveHandle(), operation.nativeValue)
+    return offlineOperation(
+      operationId,
+      OfflineOperationKind.AMBIENT_CACHE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
 
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
@@ -115,6 +126,33 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       NativeAccess.ensureLoaded()
       return RuntimeHandle(NativeAccess.createRuntime(options))
     }
+  }
+
+  private fun <T> offlineOperation(
+    operationId: Long,
+    kind: OfflineOperationKind,
+    resultKind: OfflineOperationResultKind,
+  ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
+
+  internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
+    if (operation.isClosed) return
+    val operationId = operation.requireLive(this)
+    val runtime =
+      try {
+        requireLiveHandle()
+      } catch (error: InvalidStateException) {
+        operation.markConsumed()
+        throw error
+      }
+    Status.check(NativeAccess.discardOfflineOperation(runtime, operationId))
+    operation.markConsumed()
+  }
+
+  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+
+  private fun requireLiveHandle(): MemorySegment {
+    core.requireLive()
+    return handle
   }
 }
 
