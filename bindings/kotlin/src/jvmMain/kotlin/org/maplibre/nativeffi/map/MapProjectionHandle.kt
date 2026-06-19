@@ -1,42 +1,58 @@
 package org.maplibre.nativeffi.map
 
+import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.loader.NativeAccess
 
-/** JVM actual placeholder until the FFM map projection bridge is migrated. */
-public actual class MapProjectionHandle private constructor() : AutoCloseable {
+/** Owned JVM FFM standalone projection snapshot. */
+public actual class MapProjectionHandle internal constructor(private val handle: MemorySegment) :
+  AutoCloseable {
+  private val core = HandleStateCore("MapProjectionHandle", handle.address())
+
   public actual val camera: CameraOptions
-    get() = unsupportedMapProjectionHandle()
+    get() = unsupportedMapProjectionCamera()
 
   public actual fun setCamera(camera: CameraOptions) {
-    unsupportedMapProjectionHandle()
+    unsupportedMapProjectionCamera()
   }
 
   public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
-    unsupportedMapProjectionHandle()
+    unsupportedMapProjectionCamera()
   }
 
   public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
-    unsupportedMapProjectionHandle()
+    unsupportedMapProjectionCamera()
   }
 
-  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint =
-    unsupportedMapProjectionHandle()
+  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.projectionPixelForLatLng(requireLiveHandle(), coordinate)
+  }
 
-  public actual fun latLngForPixel(point: ScreenPoint): LatLng = unsupportedMapProjectionHandle()
+  public actual fun latLngForPixel(point: ScreenPoint): LatLng {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.projectionLatLngForPixel(requireLiveHandle(), point)
+  }
 
   public actual val isClosed: Boolean
-    get() = unsupportedMapProjectionHandle()
+    get() = core.isReleased()
 
   public actual override fun close() {
-    unsupportedMapProjectionHandle()
+    core.closeOnce(destroy = { NativeAccess.destroyMapProjection(handle) })
+  }
+
+  private fun requireLiveHandle(): MemorySegment {
+    core.requireLive()
+    return handle
   }
 }
 
-private fun unsupportedMapProjectionHandle(): Nothing =
+private fun unsupportedMapProjectionCamera(): Nothing =
   throw UnsupportedOperationException(
-    "MapProjectionHandle is not available until the JVM map bridge is implemented"
+    "MapProjectionHandle camera fitting is not available until the JVM camera bridge is implemented"
   )

@@ -951,3 +951,24 @@ is being implemented.
   `mln_map_viewport_options` and `mln_map_tile_options` both contain padding
   before double-aligned fields. A tiny `offsetof` probe is a better source of
   truth than hand-counting from the header.
+
+### JVM and Android Coordinate Projection Milestone
+
+- Implemented JVM FFM and Android JavaCPP map coordinate conversion APIs:
+  `pixelForLatLng`, `latLngForPixel`, `pixelsForLatLngs`, and
+  `latLngsForPixels`.
+- Added owned JVM and Android `MapProjectionHandle` actuals for standalone
+  projection creation, coordinate conversion, close, and closed-state handling.
+- Kept projection camera access and visible-coordinate fitting unsupported in
+  this slice because they depend on the broader camera and geometry descriptor
+  migration.
+- Added JVM coverage for map coordinate round-trips, empty batch conversion
+  calls, projection round-trips, idempotent projection close, and projection use
+  after the source map closes.
+- Discovery: JavaCPP top-level private helper names still collide at generated
+  bytecode level within the same package. Android bridge helpers that need
+  per-file pointer wrappers should use distinct class names, even when they are
+  source-private.
+- Discovery: the existing `mln_map_projection` C API snapshots transform state,
+  so a projection handle can remain usable after the source map closes without
+  retaining the source map.

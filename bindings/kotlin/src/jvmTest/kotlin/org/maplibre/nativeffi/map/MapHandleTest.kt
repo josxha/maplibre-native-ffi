@@ -353,6 +353,77 @@ class MapHandleTest {
     }
   }
 
+  @Test
+  fun mapCoordinateConversionsCanBeRoundTripped() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      val coordinate = LatLng(0.0, 0.0)
+      val point = map.pixelForLatLng(coordinate)
+      val roundTrip = map.latLngForPixel(point)
+      assertNear(coordinate, roundTrip)
+
+      val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0))
+      val points = map.pixelsForLatLngs(coordinates)
+      assertEquals(coordinates.size, points.size)
+      val coordinateRoundTrips = map.latLngsForPixels(points)
+      assertEquals(coordinates.size, coordinateRoundTrips.size)
+      coordinates.zip(coordinateRoundTrips).forEach { (expected, actual) ->
+        assertNear(expected, actual)
+      }
+
+      assertEquals(emptyList(), map.pixelsForLatLngs(emptyList()))
+      assertEquals(emptyList(), map.latLngsForPixels(emptyList()))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun mapProjectionCoordinateConversionsCanBeRoundTrippedAndClosed() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      val projection = map.createProjection()
+      assertFalse(projection.isClosed)
+      val coordinate = LatLng(0.0, 0.0)
+      val point = projection.pixelForLatLng(coordinate)
+      val roundTrip = projection.latLngForPixel(point)
+      assertNear(coordinate, roundTrip)
+
+      map.close()
+      val detachedPoint = projection.pixelForLatLng(coordinate)
+      assertNear(coordinate, projection.latLngForPixel(detachedPoint))
+
+      projection.close()
+      projection.close()
+      assertTrue(projection.isClosed)
+      assertFailsWith<InvalidStateException> { projection.pixelForLatLng(coordinate) }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   private fun geoJsonSource(): JsonValue =
     JsonValue.ObjectValue(
       listOf(
@@ -379,6 +450,11 @@ class MapHandleTest {
 
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
+
+  private fun assertNear(expected: LatLng, actual: LatLng) {
+    assertEquals(expected.latitude, actual.latitude, 1e-6)
+    assertEquals(expected.longitude, actual.longitude, 1e-6)
+  }
 
   private fun JsonValue.objectMember(key: String): String? =
     (this as? JsonValue.ObjectValue)

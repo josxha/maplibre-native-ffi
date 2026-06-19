@@ -518,15 +518,25 @@ private constructor(
       NativeAccess.setProjectionMode(requireLiveHandle(), value)
     }
 
-  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = unsupportedMapHandle()
+  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.pixelForLatLng(requireLiveHandle(), coordinate)
+  }
 
-  public actual fun latLngForPixel(point: ScreenPoint): LatLng = unsupportedMapHandle()
+  public actual fun latLngForPixel(point: ScreenPoint): LatLng {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngForPixel(requireLiveHandle(), point)
+  }
 
-  public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> =
-    unsupportedMapHandle()
+  public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.pixelsForLatLngs(requireLiveHandle(), coordinates)
+  }
 
-  public actual fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> =
-    unsupportedMapHandle()
+  public actual fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.latLngsForPixels(requireLiveHandle(), points)
+  }
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor
@@ -561,7 +571,10 @@ private constructor(
   public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     unsupportedMapHandle()
 
-  public actual fun createProjection(): MapProjectionHandle = unsupportedMapHandle()
+  public actual fun createProjection(): MapProjectionHandle {
+    NativeAccess.ensureLoaded()
+    return MapProjectionHandle(NativeAccess.createMapProjection(requireLiveHandle()))
+  }
 
   public actual override fun close() {
     core.closeOnce(

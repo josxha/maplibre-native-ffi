@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
@@ -1096,6 +1097,119 @@ internal object NativeAccess {
     }
   }
 
+  internal fun pixelForLatLng(map: MemorySegment, coordinate: LatLng): ScreenPoint =
+    Arena.ofConfined().use { arena ->
+      val outPoint = arena.allocate(screenPointLayout)
+      Status.check(
+        mapLatLngAddressStatusFunction("mln_map_pixel_for_lat_lng")
+          .invokeWithArguments(map, latLng(coordinate, arena), outPoint) as Int
+      )
+      screenPoint(outPoint)
+    }
+
+  internal fun latLngForPixel(map: MemorySegment, point: ScreenPoint): LatLng =
+    Arena.ofConfined().use { arena ->
+      val outCoordinate = arena.allocate(latLngLayout)
+      Status.check(
+        mapScreenPointAddressStatusFunction("mln_map_lat_lng_for_pixel")
+          .invokeWithArguments(map, screenPoint(point, arena), outCoordinate) as Int
+      )
+      latLng(outCoordinate)
+    }
+
+  internal fun pixelsForLatLngs(map: MemorySegment, coordinates: List<LatLng>): List<ScreenPoint> {
+    val coordinateSnapshot = coordinates.toList()
+    if (coordinateSnapshot.isEmpty()) {
+      Arena.ofConfined().use { arena ->
+        Status.check(
+          mapAddressLongAddressStatusFunction("mln_map_pixels_for_lat_lngs")
+            .invokeWithArguments(map, MemorySegment.NULL, 0L, MemorySegment.NULL) as Int
+        )
+      }
+      return emptyList()
+    }
+    return Arena.ofConfined().use { arena ->
+      val outPoints = arena.allocate(screenPointLayout.byteSize() * coordinateSnapshot.size)
+      Status.check(
+        mapAddressLongAddressStatusFunction("mln_map_pixels_for_lat_lngs")
+          .invokeWithArguments(
+            map,
+            latLngArray(arena, coordinateSnapshot),
+            coordinateSnapshot.size.toLong(),
+            outPoints,
+          ) as Int
+      )
+      screenPointArray(outPoints, coordinateSnapshot.size)
+    }
+  }
+
+  internal fun latLngsForPixels(map: MemorySegment, points: List<ScreenPoint>): List<LatLng> {
+    val pointSnapshot = points.toList()
+    if (pointSnapshot.isEmpty()) {
+      Arena.ofConfined().use { arena ->
+        Status.check(
+          mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels")
+            .invokeWithArguments(map, MemorySegment.NULL, 0L, MemorySegment.NULL) as Int
+        )
+      }
+      return emptyList()
+    }
+    return Arena.ofConfined().use { arena ->
+      val outCoordinates = arena.allocate(latLngLayout.byteSize() * pointSnapshot.size)
+      Status.check(
+        mapAddressLongAddressStatusFunction("mln_map_lat_lngs_for_pixels")
+          .invokeWithArguments(
+            map,
+            screenPointArray(arena, pointSnapshot),
+            pointSnapshot.size.toLong(),
+            outCoordinates,
+          ) as Int
+      )
+      latLngArray(outCoordinates, pointSnapshot.size)
+    }
+  }
+
+  internal fun createMapProjection(map: MemorySegment): MemorySegment =
+    Arena.ofConfined().use { arena ->
+      val outProjection = arena.allocate(ValueLayout.ADDRESS)
+      outProjection.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapAddressStatusFunction("mln_map_projection_create")
+          .invokeWithArguments(map, outProjection) as Int
+      )
+      outProjection.get(ValueLayout.ADDRESS, 0).also { projection ->
+        require(projection != MemorySegment.NULL) {
+          "mln_map_projection_create returned a null projection"
+        }
+      }
+    }
+
+  internal fun destroyMapProjection(projection: MemorySegment): Int =
+    mapStatusFunction("mln_map_projection_destroy").invokeWithArguments(projection) as Int
+
+  internal fun projectionPixelForLatLng(
+    projection: MemorySegment,
+    coordinate: LatLng,
+  ): ScreenPoint =
+    Arena.ofConfined().use { arena ->
+      val outPoint = arena.allocate(screenPointLayout)
+      Status.check(
+        projectionLatLngAddressStatusFunction("mln_map_projection_pixel_for_lat_lng")
+          .invokeWithArguments(projection, latLng(coordinate, arena), outPoint) as Int
+      )
+      screenPoint(outPoint)
+    }
+
+  internal fun projectionLatLngForPixel(projection: MemorySegment, point: ScreenPoint): LatLng =
+    Arena.ofConfined().use { arena ->
+      val outCoordinate = arena.allocate(latLngLayout)
+      Status.check(
+        projectionScreenPointAddressStatusFunction("mln_map_projection_lat_lng_for_pixel")
+          .invokeWithArguments(projection, screenPoint(point, arena), outCoordinate) as Int
+      )
+      latLng(outCoordinate)
+    }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -1407,6 +1521,46 @@ internal object NativeAccess {
         ValueLayout.JAVA_DOUBLE,
       ),
     )
+
+  private fun mapLatLngAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        latLngLayout,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapScreenPointAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        screenPointLayout,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun mapAddressLongAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun projectionLatLngAddressStatusFunction(name: String): MethodHandle =
+    mapLatLngAddressStatusFunction(name)
+
+  private fun projectionScreenPointAddressStatusFunction(name: String): MethodHandle =
+    mapScreenPointAddressStatusFunction(name)
 
   private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle =
     downcall(
@@ -2274,6 +2428,12 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun latLng(segment: MemorySegment): LatLng =
+    LatLng(
+      segment.get(ValueLayout.JAVA_DOUBLE, 0),
+      segment.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
+    )
+
   private fun latLngArray(arena: Arena, values: List<LatLng>): MemorySegment {
     if (values.isEmpty()) {
       return MemorySegment.NULL
@@ -2297,6 +2457,41 @@ internal object NativeAccess {
         coordinate.get(ValueLayout.JAVA_DOUBLE, 0),
         coordinate.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
       )
+    }
+
+  private fun screenPoint(value: ScreenPoint, arena: Arena): MemorySegment {
+    val segment = arena.allocate(screenPointLayout)
+    segment.set(ValueLayout.JAVA_DOUBLE, 0, value.x)
+    segment.set(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong(), value.y)
+    return segment
+  }
+
+  private fun screenPoint(segment: MemorySegment): ScreenPoint =
+    ScreenPoint(
+      segment.get(ValueLayout.JAVA_DOUBLE, 0),
+      segment.get(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong()),
+    )
+
+  private fun screenPointArray(arena: Arena, values: List<ScreenPoint>): MemorySegment {
+    if (values.isEmpty()) {
+      return MemorySegment.NULL
+    }
+    val array = arena.allocate(screenPointLayout.byteSize() * values.size)
+    values.forEachIndexed { index, value ->
+      array
+        .asSlice(screenPointLayout.byteSize() * index, screenPointLayout.byteSize())
+        .copyFrom(screenPoint(value, arena))
+    }
+    return array
+  }
+
+  private fun screenPointArray(segment: MemorySegment, count: Int): List<ScreenPoint> =
+    List(count) { index ->
+      val point =
+        segment
+          .reinterpret(screenPointLayout.byteSize() * count)
+          .asSlice(screenPointLayout.byteSize() * index, screenPointLayout.byteSize())
+      screenPoint(point)
     }
 
   private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {
@@ -2924,6 +3119,12 @@ internal object NativeAccess {
     MemoryLayout.structLayout(
       ValueLayout.JAVA_DOUBLE.withName("northing"),
       ValueLayout.JAVA_DOUBLE.withName("easting"),
+    )
+
+  private val screenPointLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_DOUBLE.withName("x"),
+      ValueLayout.JAVA_DOUBLE.withName("y"),
     )
 
   private val stringViewLayout =
