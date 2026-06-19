@@ -9,17 +9,16 @@ import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 
-/** Owner-thread offline database operation that must be taken or discarded. */
 @OptIn(ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
-public class OfflineOperationHandle<T>
+public actual class OfflineOperationHandle<T>
 internal constructor(
   private val runtime: RuntimeHandle,
   private val nativeId: ULong,
-  public val kind: OfflineOperationKind,
-  public val resultKind: OfflineOperationResultKind,
+  public actual val kind: OfflineOperationKind,
+  public actual val resultKind: OfflineOperationResultKind,
 ) : AutoCloseable {
   /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
-  public val id: Long = uint64BitsToLong(nativeId)
+  public actual val id: Long = uint64BitsToLong(nativeId)
   private val runtimeRetention: HandleStateCore.ChildRetention = runtime.retainChild()
   private val leakReport = LeakReport(id, kind, resultKind)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
@@ -29,7 +28,7 @@ internal constructor(
     require(nativeId != 0UL) { "offline operation id must not be zero" }
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = closed
 
   internal fun requireLive(expectedRuntime: RuntimeHandle): ULong {
@@ -70,7 +69,7 @@ internal constructor(
     runtimeRetention.close()
   }
 
-  override fun close() {
+  public actual override fun close() {
     if (closed) return
     runtime.discardOfflineOperation(this)
   }

@@ -462,3 +462,16 @@ is being implemented.
 - Reflection: this starts the domain-level handle facade migration described in
   the north star, while keeping the actual runtime and map method bodies in
   `nativeMain` until native operations are behind bridge facades.
+
+### Common Offline Operation Facade Milestone
+
+- Added a common `expect` facade for `OfflineOperationHandle`, covering the
+  public operation id, kind, result kind, close state, and close contract.
+- Converted the existing Kotlin/Native offline operation handle into the native
+  actual while keeping native operation ids, runtime validation, leak reporting,
+  and discard mechanics in `nativeMain`.
+- Added explicit JVM and Android actual placeholders until their offline bridges
+  are implemented.
+- Reflection: this keeps the offline public API visible from `commonMain` and
+  builds on the initial `RuntimeHandle` facade without moving native operation
+  transport prematurely.
