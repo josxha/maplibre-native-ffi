@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+
 /** Process-global entry points for the Android JNI bridge. */
 public actual object Maplibre {
   /** C ABI contract version expected by this Android binding. */
@@ -18,8 +20,6 @@ public actual object Maplibre {
 }
 
 private object NativeAccess {
-  private const val LIBRARY_NAME = "jniMaplibreNativeC"
-
   private val lock = Any()
 
   @Volatile private var loaded = false
@@ -34,13 +34,12 @@ private object NativeAccess {
         return
       }
 
-      System.loadLibrary(LIBRARY_NAME)
       Maplibre.checkCompatibleCAbi(cVersion())
       loaded = true
     }
   }
 
-  fun cVersion(): Long = Integer.toUnsignedLong(nativeCVersion())
+  fun cVersion(): Long = Integer.toUnsignedLong(MaplibreNativeC.mln_c_version())
 }
 
 private fun Maplibre.checkCompatibleCAbi(actualVersion: Long) {
@@ -51,5 +50,3 @@ private fun Maplibre.checkCompatibleCAbi(actualVersion: Long) {
     )
   }
 }
-
-private external fun nativeCVersion(): Int

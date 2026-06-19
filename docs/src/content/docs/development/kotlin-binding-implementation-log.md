@@ -188,3 +188,15 @@ is being implemented.
 - Problem: this still does not build or package the JavaCPP native JNI bridge
   library for Android. It only moves generated declarations into `androidMain`;
   native JavaCPP builder output and AAR `jniLibs` packaging remain future work.
+
+### Android JavaCPP Facade Milestone
+
+- Replaced the temporary Android `nativeCVersion()` external declaration with a
+  call to the generated JavaCPP `MaplibreNativeC.mln_c_version()` declaration.
+- Discovery: once the generated JavaCPP source directory is registered with the
+  Android KMP variant and generation dependencies are explicit, Kotlin
+  `androidMain` sources can compile against generated Android Java declarations
+  in the same module.
+- Reflection: the Android `Maplibre` actual is now shaped like the existing Java
+  JNI bootstrap path: JavaCPP owns the native declaration surface, while Kotlin
+  owns the public facade and ABI compatibility behavior.
