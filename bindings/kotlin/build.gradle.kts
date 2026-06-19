@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -17,6 +19,12 @@ val nativeLibraryPathForTests =
   providers.environmentVariable("MLN_FFI_BUILD_DIR").map {
     "$it/${System.mapLibraryName("maplibre-native-c")}"
   }
+val javaCppVersion = "1.5.11"
+val javaCppToolClasspath =
+  configurations.detachedConfiguration(dependencies.create("org.bytedeco:javacpp:$javaCppVersion"))
+val generatedJavaCppSources =
+  layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
+val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val hostOs = System.getProperty("os.name").lowercase()
 val hostArch = System.getProperty("os.arch").lowercase()
 
@@ -69,11 +77,64 @@ kotlin {
   }
 
   sourceSets {
-    androidMain.dependencies { implementation("org.bytedeco:javacpp:1.5.11") }
+    androidMain.dependencies { implementation("org.bytedeco:javacpp:$javaCppVersion") }
 
     commonTest.dependencies { implementation(kotlin("test")) }
   }
 }
+
+androidComponents {
+  onVariants { variant ->
+    variant.sources.java?.addStaticSourceDirectory(
+      generatedJavaCppSources.get().asFile.absolutePath
+    )
+  }
+}
+
+val compileJavaCppConfig =
+  tasks.register<JavaCompile>("compileAndroidJavaCppConfig") {
+    source(
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java"
+    )
+    classpath = javaCppToolClasspath
+    destinationDirectory = javaCppConfigClasses
+    options.release = 17
+  }
+
+val generateJavaCppBindings =
+  tasks.register<JavaExec>("generateAndroidJavaCppBindings") {
+    group = "build"
+    description = "Generates JavaCPP declarations for the Android MapLibre Native C ABI."
+    dependsOn(compileJavaCppConfig)
+    classpath = files(javaCppConfigClasses) + javaCppToolClasspath
+    mainClass = "org.bytedeco.javacpp.tools.Builder"
+    args(
+      "-classpath",
+      classpath.asPath,
+      "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
+      "-d",
+      generatedJavaCppSources.get().asFile.absolutePath,
+      "-nogenerate",
+      "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeCConfig",
+    )
+    inputs.file(
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java"
+    )
+    inputs.dir(rootProject.layout.projectDirectory.dir("include"))
+    outputs.file(
+      generatedJavaCppSources.map {
+        it.file("org/maplibre/nativeffi/internal/javacpp/MaplibreNativeC.java")
+      }
+    )
+  }
+
+tasks
+  .matching { it.name == "compileAndroidMainJavaWithJavac" }
+  .configureEach { dependsOn(generateJavaCppBindings) }
+
+tasks
+  .matching { it.name == "compileAndroidMain" || it.name == "extractAndroidMainAnnotations" }
+  .configureEach { dependsOn(generateJavaCppBindings) }
 
 tasks.withType<Test>().configureEach {
   if (name == "jvmTest") {

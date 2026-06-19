@@ -169,3 +169,22 @@ is being implemented.
   touching the desktop Java JNI module yet. The next JNI milestone needs to add
   JavaCPP generation/build tasks for the Android target and connect the
   generated `MaplibreNativeC` declarations to the Kotlin Android actuals.
+
+### Android JavaCPP Generation Milestone
+
+- Added Gradle tasks in the Kotlin module to compile the Android JavaCPP config
+  class and generate `MaplibreNativeC` declarations into
+  `build/generated/sources/javacpp/androidMain/java`.
+- Wired the generated JavaCPP source directory into the Android KMP variant and
+  made Android Kotlin compilation, annotation extraction, and Java compilation
+  depend on generation explicitly.
+- Discovery: adding a generated Java source directory through
+  `androidComponents` makes both Kotlin compilation and annotation extraction
+  observe the directory, so Gradle validation requires explicit dependencies on
+  the generator task for those consumers, not just for `javac`.
+- Discovery: JavaCPP generation succeeds inside the KMP module using the same C
+  header list as the Java JNI bridge, with the generated declarations now using
+  the unified `org.maplibre.nativeffi.internal.javacpp` package.
+- Problem: this still does not build or package the JavaCPP native JNI bridge
+  library for Android. It only moves generated declarations into `androidMain`;
+  native JavaCPP builder output and AAR `jniLibs` packaging remain future work.
