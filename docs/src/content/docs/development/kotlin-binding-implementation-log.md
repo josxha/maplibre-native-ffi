@@ -739,3 +739,17 @@ is being implemented.
 - Discovery: status result marshalling is a useful first result-taking slice
   because it exercises typed operation consumption without introducing snapshot
   handle or list ownership yet.
+
+### JVM and Android Runtime Event Payload Milestone
+
+- Expanded JVM and Android `RuntimeHandle.pollEvent` payload materialization
+  from offline-completed-only decoding to every current C runtime event payload
+  variant.
+- Moved JVM FFM payload materialization into `NativeAccess` so borrowed string
+  fields inside payload structs are copied while their native pointers are still
+  readable.
+- Kept Android payload decoding on JavaCPP struct wrappers and runtime `sizeof`
+  checks instead of duplicating struct offsets in Kotlin.
+- Discovery: payload decoding can reach parity before map handle migration, but
+  map-originated events still cannot attach a live `MapHandle` source until the
+  JVM and Android map handle registries exist.

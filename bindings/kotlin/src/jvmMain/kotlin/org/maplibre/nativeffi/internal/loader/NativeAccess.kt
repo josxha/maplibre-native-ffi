@@ -14,9 +14,17 @@ import java.util.NoSuchElementException
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
+import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.map.RenderingStats
+import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.render.RenderMode
+import org.maplibre.nativeffi.resource.ResourceErrorReason
+import org.maplibre.nativeffi.runtime.OfflineOperationKind
+import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
+import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
@@ -275,6 +283,7 @@ internal object NativeAccess {
       }
       val payload = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_PAYLOAD_OFFSET)
       val payloadSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET)
+      val payloadType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
       val message = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_MESSAGE_OFFSET)
       val messageSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
       NativeRuntimeEvent(
@@ -282,9 +291,7 @@ internal object NativeAccess {
         sourceType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
         sourceAddress = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_SOURCE_OFFSET).address(),
         code = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_CODE_OFFSET),
-        payloadType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET),
-        payloadSize = payloadSize,
-        payloadBytes = copyBytes(payload, payloadSize),
+        payload = runtimeEventPayload(payloadType, payload, payloadSize),
         message = copyString(message, messageSize),
       )
     }
@@ -509,6 +516,175 @@ internal object NativeAccess {
       status.get(ValueLayout.JAVA_BOOLEAN, OFFLINE_REGION_STATUS_COMPLETE_OFFSET),
     )
 
+  private fun runtimeEventPayload(
+    payloadType: Int,
+    payload: MemorySegment,
+    payloadSize: Long,
+  ): RuntimeEventPayload =
+    when (payloadType) {
+      PAYLOAD_NONE -> RuntimeEventPayload.None
+      PAYLOAD_RENDER_FRAME ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_RENDER_FRAME_SIZE)) {
+          renderFramePayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_RENDER_MAP ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_RENDER_MAP_SIZE)) {
+          renderMapPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_STYLE_IMAGE_MISSING ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_STYLE_IMAGE_MISSING_SIZE)) {
+          styleImageMissingPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_TILE_ACTION ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_TILE_ACTION_SIZE)) {
+          tileActionPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_OFFLINE_REGION_STATUS ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_REGION_STATUS_SIZE)) {
+          offlineRegionStatusPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+        if (
+          hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_SIZE)
+        ) {
+          offlineRegionResponseErrorPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
+        if (
+          hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_SIZE)
+        ) {
+          offlineRegionTileCountLimitPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE)) {
+          offlineOperationCompletedPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
+      else -> unknownPayload(payloadType, payload, payloadSize)
+    }
+
+  private fun hasPayloadSize(
+    payload: MemorySegment,
+    payloadSize: Long,
+    requiredSize: Long,
+  ): Boolean = payload != MemorySegment.NULL && payloadSize >= requiredSize
+
+  private fun unknownPayload(
+    payloadType: Int,
+    payload: MemorySegment,
+    payloadSize: Long,
+  ): RuntimeEventPayload.Unknown =
+    RuntimeEventPayload.Unknown(payloadType, payloadSize, copyBytes(payload, payloadSize))
+
+  private fun renderFramePayload(payload: MemorySegment): RuntimeEventPayload.RenderFrame =
+    RuntimeEventPayload.RenderFrame(
+      RenderMode.fromNative(
+        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_RENDER_FRAME_MODE_OFFSET)
+      ),
+      payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_RENDER_FRAME_NEEDS_REPAINT_OFFSET),
+      payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_RENDER_FRAME_PLACEMENT_CHANGED_OFFSET),
+      RenderingStats(
+        payload.get(ValueLayout.JAVA_DOUBLE, RUNTIME_EVENT_RENDER_FRAME_ENCODING_TIME_OFFSET),
+        payload.get(ValueLayout.JAVA_DOUBLE, RUNTIME_EVENT_RENDER_FRAME_RENDERING_TIME_OFFSET),
+        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_RENDER_FRAME_FRAME_COUNT_OFFSET),
+        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_RENDER_FRAME_DRAW_CALL_COUNT_OFFSET),
+        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_RENDER_FRAME_TOTAL_DRAW_CALL_COUNT_OFFSET),
+      ),
+    )
+
+  private fun renderMapPayload(payload: MemorySegment): RuntimeEventPayload.RenderMap =
+    RuntimeEventPayload.RenderMap(
+      RenderMode.fromNative(payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_RENDER_MAP_MODE_OFFSET))
+    )
+
+  private fun styleImageMissingPayload(
+    payload: MemorySegment
+  ): RuntimeEventPayload.StyleImageMissing =
+    RuntimeEventPayload.StyleImageMissing(
+      copyString(
+        payload.get(ValueLayout.ADDRESS, RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_OFFSET),
+        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_SIZE_OFFSET),
+      )
+    )
+
+  private fun tileActionPayload(payload: MemorySegment): RuntimeEventPayload.TileAction =
+    RuntimeEventPayload.TileAction(
+      TileOperation.fromNative(
+        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_OPERATION_OFFSET)
+      ),
+      TileId(
+        Integer.toUnsignedLong(
+          payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_OVERSCALED_Z_OFFSET)
+        ),
+        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_WRAP_OFFSET),
+        Integer.toUnsignedLong(
+          payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_CANONICAL_Z_OFFSET)
+        ),
+        Integer.toUnsignedLong(
+          payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_CANONICAL_X_OFFSET)
+        ),
+        Integer.toUnsignedLong(
+          payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_CANONICAL_Y_OFFSET)
+        ),
+      ),
+      copyString(
+        payload.get(ValueLayout.ADDRESS, RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_OFFSET),
+        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_SIZE_OFFSET),
+      ),
+    )
+
+  private fun offlineRegionStatusPayload(
+    payload: MemorySegment
+  ): RuntimeEventPayload.OfflineRegionStatusChanged =
+    RuntimeEventPayload.OfflineRegionStatusChanged(
+      payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_OFFLINE_REGION_STATUS_REGION_ID_OFFSET),
+      offlineRegionStatus(payload.asSlice(RUNTIME_EVENT_OFFLINE_REGION_STATUS_STATUS_OFFSET)),
+    )
+
+  private fun offlineRegionResponseErrorPayload(
+    payload: MemorySegment
+  ): RuntimeEventPayload.OfflineRegionResponseError =
+    RuntimeEventPayload.OfflineRegionResponseError(
+      payload.get(
+        ValueLayout.JAVA_LONG,
+        RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REGION_ID_OFFSET,
+      ),
+      ResourceErrorReason.fromNative(
+        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REASON_OFFSET)
+      ),
+    )
+
+  private fun offlineRegionTileCountLimitPayload(
+    payload: MemorySegment
+  ): RuntimeEventPayload.OfflineRegionTileCountLimit =
+    RuntimeEventPayload.OfflineRegionTileCountLimit(
+      payload.get(
+        ValueLayout.JAVA_LONG,
+        RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_REGION_ID_OFFSET,
+      ),
+      payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET),
+    )
+
+  private fun offlineOperationCompletedPayload(
+    payload: MemorySegment
+  ): RuntimeEventPayload.OfflineOperationCompleted =
+    RuntimeEventPayload.OfflineOperationCompleted(
+      payload.get(
+        ValueLayout.JAVA_LONG,
+        RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET,
+      ),
+      OfflineOperationKind.fromNative(
+        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET)
+      ),
+      OfflineOperationResultKind.fromNative(
+        payload.get(
+          ValueLayout.JAVA_INT,
+          RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET,
+        )
+      ),
+      payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
+      payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET),
+    )
+
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
     return Linker.nativeLinker().downcallHandle(symbol, descriptor)
@@ -566,6 +742,16 @@ internal object NativeAccess {
   private const val RUNTIME_EVENT_MESSAGE_OFFSET: Long = 48
   private const val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = 56
 
+  private const val PAYLOAD_NONE: Int = 0
+  private const val PAYLOAD_RENDER_FRAME: Int = 1
+  private const val PAYLOAD_RENDER_MAP: Int = 2
+  private const val PAYLOAD_STYLE_IMAGE_MISSING: Int = 3
+  private const val PAYLOAD_TILE_ACTION: Int = 4
+  private const val PAYLOAD_OFFLINE_REGION_STATUS: Int = 5
+  private const val PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: Int = 6
+  private const val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int = 7
+  private const val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int = 8
+
   private const val OFFLINE_REGION_STATUS_SIZE: Long = 64
   private const val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = 0
   private const val OFFLINE_REGION_STATUS_DOWNLOAD_STATE_OFFSET: Long = 4
@@ -578,14 +764,58 @@ internal object NativeAccess {
   private const val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_IS_PRECISE_OFFSET: Long = 56
   private const val OFFLINE_REGION_STATUS_COMPLETE_OFFSET: Long = 57
 
+  private const val RUNTIME_EVENT_RENDER_FRAME_SIZE: Long = 64
+  private const val RUNTIME_EVENT_RENDER_FRAME_MODE_OFFSET: Long = 4
+  private const val RUNTIME_EVENT_RENDER_FRAME_NEEDS_REPAINT_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_RENDER_FRAME_PLACEMENT_CHANGED_OFFSET: Long = 9
+  private const val RUNTIME_EVENT_RENDER_FRAME_ENCODING_TIME_OFFSET: Long = 24
+  private const val RUNTIME_EVENT_RENDER_FRAME_RENDERING_TIME_OFFSET: Long = 32
+  private const val RUNTIME_EVENT_RENDER_FRAME_FRAME_COUNT_OFFSET: Long = 40
+  private const val RUNTIME_EVENT_RENDER_FRAME_DRAW_CALL_COUNT_OFFSET: Long = 48
+  private const val RUNTIME_EVENT_RENDER_FRAME_TOTAL_DRAW_CALL_COUNT_OFFSET: Long = 56
+
+  private const val RUNTIME_EVENT_RENDER_MAP_SIZE: Long = 8
+  private const val RUNTIME_EVENT_RENDER_MAP_MODE_OFFSET: Long = 4
+
+  private const val RUNTIME_EVENT_STYLE_IMAGE_MISSING_SIZE: Long = 24
+  private const val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_SIZE_OFFSET: Long = 16
+
+  private const val RUNTIME_EVENT_TILE_ACTION_SIZE: Long = 48
+  private const val RUNTIME_EVENT_TILE_ACTION_OPERATION_OFFSET: Long = 4
+  private const val RUNTIME_EVENT_TILE_ACTION_OVERSCALED_Z_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_TILE_ACTION_WRAP_OFFSET: Long = 12
+  private const val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Z_OFFSET: Long = 16
+  private const val RUNTIME_EVENT_TILE_ACTION_CANONICAL_X_OFFSET: Long = 20
+  private const val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Y_OFFSET: Long = 24
+  private const val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_OFFSET: Long = 32
+  private const val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_SIZE_OFFSET: Long = 40
+
+  private const val RUNTIME_EVENT_OFFLINE_REGION_STATUS_SIZE: Long = 80
+  private const val RUNTIME_EVENT_OFFLINE_REGION_STATUS_REGION_ID_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_OFFLINE_REGION_STATUS_STATUS_OFFSET: Long = 16
+
+  private const val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_SIZE: Long = 24
+  private const val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REGION_ID_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REASON_OFFSET: Long = 16
+
+  private const val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_SIZE: Long = 24
+  private const val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_REGION_ID_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET: Long = 16
+
+  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE: Long = 32
+  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Long = 16
+  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Long = 20
+  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long = 24
+  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long = 28
+
   internal data class NativeRuntimeEvent(
     val type: Int,
     val sourceType: Int,
     val sourceAddress: Long,
     val code: Int,
-    val payloadType: Int,
-    val payloadSize: Long,
-    val payloadBytes: ByteArray,
+    val payload: RuntimeEventPayload,
     val message: String,
   )
 }

@@ -1,8 +1,6 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.foreign.MemorySegment
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
@@ -224,46 +222,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
       null,
       code,
-      runtimeEventPayload(),
+      payload,
       message,
     )
   }
-
-  private fun NativeRuntimeEvent.runtimeEventPayload(): RuntimeEventPayload =
-    when (payloadType) {
-      PAYLOAD_NONE -> RuntimeEventPayload.None
-      PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        if (payloadBytes.size >= OFFLINE_OPERATION_COMPLETED_SIZE) {
-          offlineOperationCompletedPayload(payloadBytes)
-        } else unknownPayload()
-      else -> unknownPayload()
-    }
-
-  private fun NativeRuntimeEvent.unknownPayload(): RuntimeEventPayload =
-    RuntimeEventPayload.Unknown(payloadType, payloadSize, payloadBytes)
 }
-
-private fun offlineOperationCompletedPayload(payload: ByteArray): RuntimeEventPayload {
-  val buffer = ByteBuffer.wrap(payload).order(ByteOrder.nativeOrder())
-  return RuntimeEventPayload.OfflineOperationCompleted(
-    buffer.getLong(OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET),
-    OfflineOperationKind.fromNative(buffer.getInt(OFFLINE_OPERATION_COMPLETED_KIND_OFFSET)),
-    OfflineOperationResultKind.fromNative(
-      buffer.getInt(OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET)
-    ),
-    buffer.getInt(OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
-    buffer.get(OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET) != 0.toByte(),
-  )
-}
-
-private const val PAYLOAD_NONE: Int = 0
-private const val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int = 8
-private const val OFFLINE_OPERATION_COMPLETED_SIZE: Int = 32
-private const val OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Int = 8
-private const val OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Int = 16
-private const val OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Int = 20
-private const val OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Int = 24
-private const val OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Int = 28
 
 private fun unsupportedRuntimeHandle(): Nothing =
   throw UnsupportedOperationException(

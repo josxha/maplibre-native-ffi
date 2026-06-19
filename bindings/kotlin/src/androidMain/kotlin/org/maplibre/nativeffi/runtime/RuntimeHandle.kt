@@ -1,20 +1,23 @@
 package org.maplibre.nativeffi.runtime
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.map.RenderingStats
+import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.render.RenderMode
+import org.maplibre.nativeffi.resource.ResourceErrorReason
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
@@ -320,9 +323,51 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     val payloadBytes = payloadBytes(event)
     return when (payloadType) {
       MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME ->
+        if (hasPayloadSize(event, PayloadSizes.RENDER_FRAME)) {
+          renderFramePayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
+        if (hasPayloadSize(event, PayloadSizes.RENDER_MAP)) {
+          renderMapPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING ->
+        if (hasPayloadSize(event, PayloadSizes.STYLE_IMAGE_MISSING)) {
+          styleImageMissingPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION ->
+        if (hasPayloadSize(event, PayloadSizes.TILE_ACTION)) {
+          tileActionPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_STATUS)) {
+          offlineRegionStatusPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_RESPONSE_ERROR)) {
+          offlineRegionResponseErrorPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_TILE_COUNT_LIMIT)) {
+          offlineRegionTileCountLimitPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
       MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        if (payloadBytes.size >= OFFLINE_OPERATION_COMPLETED_SIZE) {
-          offlineOperationCompletedPayload(payloadBytes)
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_OPERATION_COMPLETED)) {
+          offlineOperationCompletedPayload(event.payload())
         } else {
           RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
         }
@@ -330,6 +375,9 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     }
   }
 }
+
+private fun hasPayloadSize(event: MaplibreNativeC.mln_runtime_event, requiredSize: Long): Boolean =
+  event.payload() != null && !event.payload().isNull && event.payload_size() >= requiredSize
 
 private fun payloadBytes(event: MaplibreNativeC.mln_runtime_event): ByteArray =
   byteArray(event.payload(), event.payload_size())
@@ -346,16 +394,46 @@ private fun byteArray(pointer: Pointer?, byteCount: Long): ByteArray {
   return bytes
 }
 
-private fun offlineOperationCompletedPayload(payload: ByteArray): RuntimeEventPayload {
-  val buffer = ByteBuffer.wrap(payload).order(ByteOrder.nativeOrder())
-  return RuntimeEventPayload.OfflineOperationCompleted(
-    buffer.getLong(OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET),
-    OfflineOperationKind.fromNative(buffer.getInt(OFFLINE_OPERATION_COMPLETED_KIND_OFFSET)),
-    OfflineOperationResultKind.fromNative(
-      buffer.getInt(OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET)
+private fun renderFramePayload(payload: Pointer): RuntimeEventPayload.RenderFrame {
+  val frame = MaplibreNativeC.mln_runtime_event_render_frame(payload)
+  return RuntimeEventPayload.RenderFrame(
+    RenderMode.fromNative(frame.mode()),
+    frame.needs_repaint(),
+    frame.placement_changed(),
+    RenderingStats(
+      frame.stats().encoding_time(),
+      frame.stats().rendering_time(),
+      frame.stats().frame_count(),
+      frame.stats().draw_call_count(),
+      frame.stats().total_draw_call_count(),
     ),
-    buffer.getInt(OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
-    buffer.get(OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET) != 0.toByte(),
+  )
+}
+
+private fun renderMapPayload(payload: Pointer): RuntimeEventPayload.RenderMap =
+  RuntimeEventPayload.RenderMap(
+    RenderMode.fromNative(MaplibreNativeC.mln_runtime_event_render_map(payload).mode())
+  )
+
+private fun styleImageMissingPayload(payload: Pointer): RuntimeEventPayload.StyleImageMissing {
+  val missing = MaplibreNativeC.mln_runtime_event_style_image_missing(payload)
+  return RuntimeEventPayload.StyleImageMissing(
+    byteString(missing.image_id(), missing.image_id_size())
+  )
+}
+
+private fun tileActionPayload(payload: Pointer): RuntimeEventPayload.TileAction {
+  val action = MaplibreNativeC.mln_runtime_event_tile_action(payload)
+  return RuntimeEventPayload.TileAction(
+    TileOperation.fromNative(action.operation()),
+    TileId(
+      Integer.toUnsignedLong(action.tile_id().overscaled_z()),
+      action.tile_id().wrap(),
+      Integer.toUnsignedLong(action.tile_id().canonical_z()),
+      Integer.toUnsignedLong(action.tile_id().canonical_x()),
+      Integer.toUnsignedLong(action.tile_id().canonical_y()),
+    ),
+    byteString(action.source_id(), action.source_id_size()),
   )
 }
 
@@ -374,12 +452,63 @@ private fun offlineRegionStatus(
     status.complete(),
   )
 
-private const val OFFLINE_OPERATION_COMPLETED_SIZE: Int = 32
-private const val OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Int = 8
-private const val OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Int = 16
-private const val OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Int = 20
-private const val OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Int = 24
-private const val OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Int = 28
+private fun offlineRegionStatusPayload(
+  payload: Pointer
+): RuntimeEventPayload.OfflineRegionStatusChanged {
+  val status = MaplibreNativeC.mln_runtime_event_offline_region_status(payload)
+  return RuntimeEventPayload.OfflineRegionStatusChanged(
+    status.region_id(),
+    offlineRegionStatus(status.status()),
+  )
+}
+
+private fun offlineRegionResponseErrorPayload(
+  payload: Pointer
+): RuntimeEventPayload.OfflineRegionResponseError {
+  val error = MaplibreNativeC.mln_runtime_event_offline_region_response_error(payload)
+  return RuntimeEventPayload.OfflineRegionResponseError(
+    error.region_id(),
+    ResourceErrorReason.fromNative(error.reason()),
+  )
+}
+
+private fun offlineRegionTileCountLimitPayload(
+  payload: Pointer
+): RuntimeEventPayload.OfflineRegionTileCountLimit {
+  val limit = MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit(payload)
+  return RuntimeEventPayload.OfflineRegionTileCountLimit(limit.region_id(), limit.limit())
+}
+
+private fun offlineOperationCompletedPayload(
+  payload: Pointer
+): RuntimeEventPayload.OfflineOperationCompleted {
+  val operation = MaplibreNativeC.mln_runtime_event_offline_operation_completed(payload)
+  return RuntimeEventPayload.OfflineOperationCompleted(
+    operation.operation_id(),
+    OfflineOperationKind.fromNative(operation.operation_kind()),
+    OfflineOperationResultKind.fromNative(operation.result_kind()),
+    operation.result_status(),
+    operation.found(),
+  )
+}
+
+private object PayloadSizes {
+  val RENDER_FRAME: Long =
+    MaplibreNativeC.mln_runtime_event_render_frame().use { it.sizeof().toLong() }
+  val RENDER_MAP: Long = MaplibreNativeC.mln_runtime_event_render_map().use { it.sizeof().toLong() }
+  val STYLE_IMAGE_MISSING: Long =
+    MaplibreNativeC.mln_runtime_event_style_image_missing().use { it.sizeof().toLong() }
+  val TILE_ACTION: Long =
+    MaplibreNativeC.mln_runtime_event_tile_action().use { it.sizeof().toLong() }
+  val OFFLINE_REGION_STATUS: Long =
+    MaplibreNativeC.mln_runtime_event_offline_region_status().use { it.sizeof().toLong() }
+  val OFFLINE_REGION_RESPONSE_ERROR: Long =
+    MaplibreNativeC.mln_runtime_event_offline_region_response_error().use { it.sizeof().toLong() }
+  val OFFLINE_REGION_TILE_COUNT_LIMIT: Long =
+    MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit().use { it.sizeof().toLong() }
+  val OFFLINE_OPERATION_COMPLETED: Long =
+    MaplibreNativeC.mln_runtime_event_offline_operation_completed().use { it.sizeof().toLong() }
+}
 
 private fun runtime(address: Long): MaplibreNativeC.mln_runtime =
   MaplibreNativeC.mln_runtime(AddressPointer(address))
