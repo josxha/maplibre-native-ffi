@@ -69,12 +69,43 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   public actual fun startMergeOfflineRegionsDatabase(
     path: String
-  ): OfflineOperationHandle<List<OfflineRegionInfo>> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<List<OfflineRegionInfo>> {
+    require('\u0000' !in path) { "C string inputs must not contain embedded NUL characters" }
+    val outOperationId = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_runtime_offline_regions_merge_database_start(
+        runtime(requireLiveAddress()),
+        path,
+        outOperationId,
+      )
+    )
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.REGIONS_MERGE_DATABASE,
+      OfflineOperationResultKind.REGION_LIST,
+    )
+  }
 
   public actual fun startUpdateOfflineRegionMetadata(
     id: Long,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<OfflineRegionInfo> {
+    val outOperationId = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_runtime_offline_region_update_metadata_start(
+        runtime(requireLiveAddress()),
+        id,
+        metadata,
+        metadata.size.toLong(),
+        outOperationId,
+      )
+    )
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.REGION_UPDATE_METADATA,
+      OfflineOperationResultKind.REGION,
+    )
+  }
 
   public actual fun startOfflineRegionStatus(
     id: Long

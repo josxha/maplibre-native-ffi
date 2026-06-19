@@ -60,12 +60,22 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   public actual fun startMergeOfflineRegionsDatabase(
     path: String
-  ): OfflineOperationHandle<List<OfflineRegionInfo>> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<List<OfflineRegionInfo>> =
+    offlineOperation(
+      NativeAccess.startMergeOfflineRegionsDatabase(requireLiveHandle(), path),
+      OfflineOperationKind.REGIONS_MERGE_DATABASE,
+      OfflineOperationResultKind.REGION_LIST,
+    )
 
   public actual fun startUpdateOfflineRegionMetadata(
     id: Long,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo> = unsupportedRuntimeHandle()
+  ): OfflineOperationHandle<OfflineRegionInfo> =
+    offlineOperation(
+      NativeAccess.startUpdateOfflineRegionMetadata(requireLiveHandle(), id, metadata),
+      OfflineOperationKind.REGION_UPDATE_METADATA,
+      OfflineOperationResultKind.REGION,
+    )
 
   public actual fun startOfflineRegionStatus(
     id: Long

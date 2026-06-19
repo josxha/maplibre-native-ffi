@@ -705,3 +705,14 @@ is being implemented.
 - Discovery: JavaCPP's generated overloads for these calls expose `long[]`
   output parameters cleanly, while the JVM FFM bridge benefits from small
   grouped helpers for runtime plus out-operation-id function shapes.
+
+### JVM and Android Offline Metadata Start Milestone
+
+- Implemented JVM FFM and Android JavaCPP actuals for starting offline database
+  merge operations and offline region metadata updates.
+- Added JVM bridge support for temporary UTF-8 C strings and byte-array
+  materialization, including embedded-NUL rejection and null metadata pointers
+  for zero-length payloads.
+- Discovery: merge/update are a useful boundary before offline result
+  marshalling because they exercise borrowed path and byte storage without
+  needing copied offline region structs yet.

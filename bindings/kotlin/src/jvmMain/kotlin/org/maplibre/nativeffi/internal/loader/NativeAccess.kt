@@ -170,6 +170,38 @@ internal object NativeAccess {
   internal fun startOfflineRegions(runtime: MemorySegment): Long =
     startRuntimeOperation("mln_runtime_offline_regions_list_start", runtime)
 
+  internal fun startMergeOfflineRegionsDatabase(runtime: MemorySegment, path: String): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeAddressOperationStartFunction("mln_runtime_offline_regions_merge_database_start")
+          .invokeWithArguments(runtime, cString(arena, path), outOperationId) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startUpdateOfflineRegionMetadata(
+    runtime: MemorySegment,
+    regionId: Long,
+    metadata: ByteArray,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeLongAddressLongOperationStartFunction(
+            "mln_runtime_offline_region_update_metadata_start"
+          )
+          .invokeWithArguments(
+            runtime,
+            regionId,
+            nativeBytes(arena, metadata),
+            metadata.size.toLong(),
+            outOperationId,
+          ) as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
   internal fun startOfflineRegionStatus(runtime: MemorySegment, regionId: Long): Long =
     startRuntimeLongOperation("mln_runtime_offline_region_get_status_start", runtime, regionId)
 
@@ -293,6 +325,30 @@ internal object NativeAccess {
       ),
     )
 
+  private fun runtimeAddressOperationStartFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun runtimeLongAddressLongOperationStartFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun runtimeLongBooleanOperationStartFunction(name: String): MethodHandle =
     downcall(
       name,
@@ -340,10 +396,21 @@ internal object NativeAccess {
   }
 
   private fun optionalCString(arena: Arena, value: String?): MemorySegment =
-    value?.let {
-      require('\u0000' !in it) { "C string inputs must not contain embedded NUL characters" }
-      arena.allocateFrom(it)
-    } ?: MemorySegment.NULL
+    value?.let { cString(arena, it) } ?: MemorySegment.NULL
+
+  private fun cString(arena: Arena, value: String): MemorySegment {
+    require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
+    return arena.allocateFrom(value)
+  }
+
+  private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {
+    if (bytes.isEmpty()) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(bytes.size.toLong())
+    MemorySegment.copy(bytes, 0, segment, ValueLayout.JAVA_BYTE, 0, bytes.size)
+    return segment
+  }
 
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
