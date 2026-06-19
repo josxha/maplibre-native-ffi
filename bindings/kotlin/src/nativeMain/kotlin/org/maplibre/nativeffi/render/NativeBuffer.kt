@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.render
 
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
@@ -12,15 +10,16 @@ import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.readBytes
+import org.maplibre.nativeffi.internal.lifecycle.BorrowedResourceCore
 
 /** Explicit off-heap byte buffer for reusable native readback and upload storage. */
-@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public class NativeBuffer
 private constructor(private val pointer: CPointer<ByteVar>?, private val length: Long) :
   AutoCloseable {
-  private val state = AtomicInt(0)
-  private val nativeReference = NativeReference(pointer)
-  @Suppress("unused") private val cleaner: Cleaner = createCleaner(nativeReference) { it.release() }
+  private val core = BorrowedResourceCore("NativeBuffer") { releaseNative() }
+  @Suppress("unused")
+  private val cleaner: Cleaner = createCleaner(core) { it.releaseNativeForCleaner() }
 
   public fun byteLength(): Long = withOpenBuffer { length }
 
@@ -39,72 +38,21 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
     }
   }
 
-  override fun close() {
-    while (true) {
-      val current = state.load()
-      if (current < 0) return
-      if (state.compareAndSet(current, CLOSED_FLAG or current)) {
-        if (current == 0) {
-          nativeReference.release()
-        }
-        return
-      }
-    }
-  }
+  override fun close() = core.close()
 
-  private inline fun <T> withOpenBuffer(block: () -> T): T {
-    retain()
-    try {
-      return block()
-    } finally {
-      release()
-    }
-  }
+  private fun <T> withOpenBuffer(block: () -> T): T = core.withOpenResource(block)
 
-  private fun retain() {
-    while (true) {
-      val current = state.load()
-      check(current >= 0) { "NativeBuffer is already closed" }
-      check(current < ACTIVE_MASK) { "too many active NativeBuffer borrows" }
-      if (state.compareAndSet(current, current + 1)) return
-    }
-  }
-
-  private fun release() {
-    while (true) {
-      val current = state.load()
-      val active = current and ACTIVE_MASK
-      check(active > 0) { "NativeBuffer borrow count underflow" }
-      val next = current - 1
-      if (state.compareAndSet(current, next)) {
-        if (next == CLOSED_FLAG) {
-          nativeReference.release()
-        }
-        return
-      }
-    }
+  private fun releaseNative() {
+    pointer?.let { nativeHeap.free(it.rawValue) }
   }
 
   public companion object {
-    private const val CLOSED_FLAG = Int.MIN_VALUE
-    private const val ACTIVE_MASK = Int.MAX_VALUE
-
     public fun allocate(byteLength: Long): NativeBuffer {
       require(byteLength >= 0) { "byteLength must be non-negative" }
       require(byteLength <= Int.MAX_VALUE) { "byteLength exceeds Kotlin/Native allocation limit" }
       val pointer =
         if (byteLength == 0L) null else nativeHeap.allocArray<ByteVar>(byteLength.toInt())
       return NativeBuffer(pointer, byteLength)
-    }
-  }
-
-  private class NativeReference(private val pointer: CPointer<ByteVar>?) {
-    private val released = AtomicInt(0)
-
-    fun release() {
-      if (released.compareAndSet(0, 1)) {
-        pointer?.let { nativeHeap.free(it.rawValue) }
-      }
     }
   }
 }

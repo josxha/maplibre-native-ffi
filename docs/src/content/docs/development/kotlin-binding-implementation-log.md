@@ -370,3 +370,15 @@ is being implemented.
   machine through public behavior; extracting the core makes those rules
   reusable for FFM and Android actuals without standardizing their handle
   carriers yet.
+
+### Common Borrowed Resource Core Milestone
+
+- Added a common `BorrowedResourceCore` for closeable resources that permit
+  temporary active borrows and defer native cleanup until the last borrow exits.
+- Rewired `NativeBuffer` through the common borrowed-resource core while keeping
+  native heap allocation, pointer reads, and native heap free in `nativeMain`.
+- Added common tests for immediate close, close during a borrow, post-close
+  borrow rejection, and cleaner-style release idempotence.
+- Reflection: this prepares another small lifecycle primitive for future JVM and
+  Android buffer implementations without deciding the eventual public buffer
+  bridge API.
