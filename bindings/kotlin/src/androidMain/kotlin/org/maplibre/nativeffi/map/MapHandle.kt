@@ -1371,36 +1371,36 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor
-  ): RenderSessionHandle = unsupportedMapHandle()
+  ): RenderSessionHandle = RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
 
   public actual fun attachMetalBorrowedTexture(
     descriptor: MetalBorrowedTextureDescriptor
-  ): RenderSessionHandle = unsupportedMapHandle()
+  ): RenderSessionHandle = RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor)
 
   public actual fun attachVulkanOwnedTexture(
     descriptor: VulkanOwnedTextureDescriptor
-  ): RenderSessionHandle = unsupportedMapHandle()
+  ): RenderSessionHandle = RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor)
 
   public actual fun attachVulkanBorrowedTexture(
     descriptor: VulkanBorrowedTextureDescriptor
-  ): RenderSessionHandle = unsupportedMapHandle()
+  ): RenderSessionHandle = RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor)
 
   public actual fun attachOpenGLOwnedTexture(
     descriptor: OpenGLOwnedTextureDescriptor
-  ): RenderSessionHandle = unsupportedMapHandle()
+  ): RenderSessionHandle = RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor)
 
   public actual fun attachOpenGLBorrowedTexture(
     descriptor: OpenGLBorrowedTextureDescriptor
-  ): RenderSessionHandle = unsupportedMapHandle()
+  ): RenderSessionHandle = RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor)
 
   public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
-    unsupportedMapHandle()
+    RenderSessionHandle.attachMetalSurface(this, descriptor)
 
   public actual fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle =
-    unsupportedMapHandle()
+    RenderSessionHandle.attachVulkanSurface(this, descriptor)
 
   public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
-    unsupportedMapHandle()
+    RenderSessionHandle.attachOpenGLSurface(this, descriptor)
 
   public actual fun createProjection(): MapProjectionHandle {
     NativeAccess.ensureLoaded()
@@ -1428,6 +1428,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   internal fun nativeAddress(): Long = handleAddress
+
+  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
 
   internal fun releaseDetachedCustomGeometrySources() {
     val iterator = customGeometrySources.iterator()

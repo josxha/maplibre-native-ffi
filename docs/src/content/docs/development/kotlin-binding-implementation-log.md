@@ -1075,3 +1075,20 @@ is being implemented.
 - Discovery: the JVM render session should retain its parent map through common
   `HandleStateCore` child retention, matching the Kotlin Native ownership rule
   without introducing a JVM-only lifecycle path.
+
+### Android Render Session Core Milestone
+
+- Implemented Android JavaCPP render target attachment for Metal, Vulkan, and
+  OpenGL texture and surface descriptors.
+- Replaced the Android render session placeholder with a JavaCPP-backed handle
+  for lifecycle, resize, render update, detach, renderer maintenance commands,
+  and premultiplied RGBA8 readback metadata/data.
+- Kept Android feature state, query result APIs, and owned texture frame
+  acquisition unsupported in this slice so the descriptor and lifecycle bridge
+  can land separately from the larger query/value materialization work.
+- Discovery: Android can reuse JavaCPP default descriptor constructors for
+  render targets, which avoids duplicating the manual FFM offset table needed by
+  the JVM bridge.
+- Discovery: Kotlin actual classes cannot add an `actual companion object`
+  unless the expect declaration has one; Android-only construction helpers need
+  a plain companion or top-level internal functions.
