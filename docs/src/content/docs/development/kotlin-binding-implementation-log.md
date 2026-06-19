@@ -538,3 +538,16 @@ is being implemented.
   bridge for now because each attach path materializes backend-specific native
   descriptors, but an already-created render session now has a shared common
   control surface.
+
+### Common Runtime Operations Facade Milestone
+
+- Expanded the common `RuntimeHandle` facade with runtime pumping, offline
+  operation start/take methods, resource provider and transform callbacks, event
+  polling, and runtime creation.
+- Converted the existing Kotlin/Native runtime operations and companion factory
+  into native actuals and added JVM and Android actual placeholders until their
+  runtime bridges are migrated.
+- Discovery: runtime is the first facade where the common API includes both
+  operation handles and companion construction. The operation result typing can
+  stay common because `OfflineOperationHandle` already carries the binding-owned
+  lifecycle and result-kind metadata.

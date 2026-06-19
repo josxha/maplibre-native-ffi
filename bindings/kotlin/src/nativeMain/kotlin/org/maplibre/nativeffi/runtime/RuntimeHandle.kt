@@ -76,11 +76,11 @@ internal constructor(
   private var resourceTransformState: ResourceTransformState? = null
   private var resourceProviderState: ResourceProviderState? = null
 
-  public fun runOnce() {
+  public actual fun runOnce() {
     Status.check(mln_runtime_run_once(state.requireLive()))
   }
 
-  public fun startAmbientCacheOperation(
+  public actual fun startAmbientCacheOperation(
     operation: AmbientCacheOperation
   ): OfflineOperationHandle<Unit> = memScoped {
     val outOperationId = alloc<ULongVar>()
@@ -98,7 +98,7 @@ internal constructor(
     )
   }
 
-  public fun startCreateOfflineRegion(
+  public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
   ): OfflineOperationHandle<OfflineRegionInfo> = memScoped {
@@ -119,27 +119,31 @@ internal constructor(
     )
   }
 
-  public fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(mln_runtime_offline_region_get_start(state.requireLive(), id, outOperationId.ptr))
-    offlineOperation(
-      outOperationId.value,
-      OfflineOperationKind.REGION_GET,
-      OfflineOperationResultKind.OPTIONAL_REGION,
-    )
-  }
+  public actual fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> =
+    memScoped {
+      val outOperationId = alloc<ULongVar>()
+      Status.check(
+        mln_runtime_offline_region_get_start(state.requireLive(), id, outOperationId.ptr)
+      )
+      offlineOperation(
+        outOperationId.value,
+        OfflineOperationKind.REGION_GET,
+        OfflineOperationResultKind.OPTIONAL_REGION,
+      )
+    }
 
-  public fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(mln_runtime_offline_regions_list_start(state.requireLive(), outOperationId.ptr))
-    offlineOperation(
-      outOperationId.value,
-      OfflineOperationKind.REGIONS_LIST,
-      OfflineOperationResultKind.REGION_LIST,
-    )
-  }
+  public actual fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>> =
+    memScoped {
+      val outOperationId = alloc<ULongVar>()
+      Status.check(mln_runtime_offline_regions_list_start(state.requireLive(), outOperationId.ptr))
+      offlineOperation(
+        outOperationId.value,
+        OfflineOperationKind.REGIONS_LIST,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    }
 
-  public fun startMergeOfflineRegionsDatabase(
+  public actual fun startMergeOfflineRegionsDatabase(
     path: String
   ): OfflineOperationHandle<List<OfflineRegionInfo>> = memScoped {
     MemoryUtil.requireValidCString(path)
@@ -158,7 +162,7 @@ internal constructor(
     )
   }
 
-  public fun startUpdateOfflineRegionMetadata(
+  public actual fun startUpdateOfflineRegionMetadata(
     id: Long,
     metadata: ByteArray,
   ): OfflineOperationHandle<OfflineRegionInfo> = memScoped {
@@ -179,20 +183,21 @@ internal constructor(
     )
   }
 
-  public fun startOfflineRegionStatus(id: Long): OfflineOperationHandle<OfflineRegionStatus> =
-    memScoped {
-      val outOperationId = alloc<ULongVar>()
-      Status.check(
-        mln_runtime_offline_region_get_status_start(state.requireLive(), id, outOperationId.ptr)
-      )
-      offlineOperation(
-        outOperationId.value,
-        OfflineOperationKind.REGION_GET_STATUS,
-        OfflineOperationResultKind.REGION_STATUS,
-      )
-    }
+  public actual fun startOfflineRegionStatus(
+    id: Long
+  ): OfflineOperationHandle<OfflineRegionStatus> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_get_status_start(state.requireLive(), id, outOperationId.ptr)
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_GET_STATUS,
+      OfflineOperationResultKind.REGION_STATUS,
+    )
+  }
 
-  public fun startSetOfflineRegionObserved(
+  public actual fun startSetOfflineRegionObserved(
     id: Long,
     observed: Boolean,
   ): OfflineOperationHandle<Unit> = memScoped {
@@ -212,7 +217,7 @@ internal constructor(
     )
   }
 
-  public fun startSetOfflineRegionDownloadState(
+  public actual fun startSetOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
   ): OfflineOperationHandle<Unit> = memScoped {
@@ -235,19 +240,20 @@ internal constructor(
     )
   }
 
-  public fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_invalidate_start(state.requireLive(), id, outOperationId.ptr)
-    )
-    offlineOperation(
-      outOperationId.value,
-      OfflineOperationKind.REGION_INVALIDATE,
-      OfflineOperationResultKind.NONE,
-    )
-  }
+  public actual fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit> =
+    memScoped {
+      val outOperationId = alloc<ULongVar>()
+      Status.check(
+        mln_runtime_offline_region_invalidate_start(state.requireLive(), id, outOperationId.ptr)
+      )
+      offlineOperation(
+        outOperationId.value,
+        OfflineOperationKind.REGION_INVALIDATE,
+        OfflineOperationResultKind.NONE,
+      )
+    }
 
-  public fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit> = memScoped {
+  public actual fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit> = memScoped {
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_delete_start(state.requireLive(), id, outOperationId.ptr)
@@ -259,7 +265,7 @@ internal constructor(
     )
   }
 
-  public fun takeCreateOfflineRegionResult(
+  public actual fun takeCreateOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
   ): OfflineRegionInfo = memScoped {
     val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
@@ -277,7 +283,7 @@ internal constructor(
     RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
   }
 
-  public fun takeOfflineRegionResult(
+  public actual fun takeOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo?>
   ): OfflineRegionInfo? = memScoped {
     val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
@@ -302,7 +308,7 @@ internal constructor(
     else RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
   }
 
-  public fun takeOfflineRegionsResult(
+  public actual fun takeOfflineRegionsResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
   ): List<OfflineRegionInfo> = memScoped {
     val outRegions = alloc<CPointerVarOf<CPointer<mln_offline_region_list>>>()
@@ -320,7 +326,7 @@ internal constructor(
     RuntimeStructs.offlineRegionList(requireNotNull(outRegions.value))
   }
 
-  public fun takeMergeOfflineRegionsDatabaseResult(
+  public actual fun takeMergeOfflineRegionsDatabaseResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
   ): List<OfflineRegionInfo> = memScoped {
     val outRegions = alloc<CPointerVarOf<CPointer<mln_offline_region_list>>>()
@@ -342,7 +348,7 @@ internal constructor(
     RuntimeStructs.offlineRegionList(requireNotNull(outRegions.value))
   }
 
-  public fun takeUpdateOfflineRegionMetadataResult(
+  public actual fun takeUpdateOfflineRegionMetadataResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
   ): OfflineRegionInfo = memScoped {
     val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
@@ -364,7 +370,7 @@ internal constructor(
     RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
   }
 
-  public fun takeOfflineRegionStatusResult(
+  public actual fun takeOfflineRegionStatusResult(
     operation: OfflineOperationHandle<OfflineRegionStatus>
   ): OfflineRegionStatus = memScoped {
     val outStatus = alloc<mln_offline_region_status>()
@@ -406,7 +412,7 @@ internal constructor(
     operation.markConsumed()
   }
 
-  public fun setResourceProvider(callback: ResourceProviderCallback) {
+  public actual fun setResourceProvider(callback: ResourceProviderCallback) {
     setResourceProvider(callback) { replacement ->
       mln_runtime_set_resource_provider(state.requireLive(), replacement.descriptor())
     }
@@ -436,7 +442,7 @@ internal constructor(
     previous?.close()
   }
 
-  public fun setResourceTransform(callback: ResourceTransformCallback) {
+  public actual fun setResourceTransform(callback: ResourceTransformCallback) {
     setResourceTransform(callback) { replacement ->
       mln_runtime_set_resource_transform(state.requireLive(), replacement.descriptor())
     }
@@ -466,14 +472,14 @@ internal constructor(
     previous?.close()
   }
 
-  public fun clearResourceTransform() {
+  public actual fun clearResourceTransform() {
     Status.check(mln_runtime_clear_resource_transform(state.requireLive()))
     val previous = resourceTransformState
     resourceTransformState = null
     previous?.close()
   }
 
-  public fun pollEvent(): RuntimeEvent? = memScoped {
+  public actual fun pollEvent(): RuntimeEvent? = memScoped {
     val event = alloc<mln_runtime_event>()
     event.size = sizeOf<mln_runtime_event>().toUInt()
     val hasEvent = alloc<BooleanVar>()
@@ -558,8 +564,8 @@ internal constructor(
     }
   }
 
-  public companion object {
-    public fun create(options: RuntimeOptions): RuntimeHandle =
+  public actual companion object {
+    public actual fun create(options: RuntimeOptions): RuntimeHandle =
       create(options, Maplibre.cVersion(), ::mln_runtime_create)
 
     internal fun createForTesting(
