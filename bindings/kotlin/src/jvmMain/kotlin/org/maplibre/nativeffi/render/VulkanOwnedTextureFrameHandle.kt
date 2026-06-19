@@ -1,18 +1,46 @@
 package org.maplibre.nativeffi.render
 
-/** JVM actual placeholder until the FFM Vulkan owned texture frame bridge is migrated. */
-public actual class VulkanOwnedTextureFrameHandle private constructor() : AutoCloseable {
-  public actual fun frame(): VulkanOwnedTextureFrame = unsupportedVulkanOwnedTextureFrameHandle()
+import org.maplibre.nativeffi.internal.loader.NativeAccess
+
+/** Explicit handle for a Vulkan session-owned texture frame. */
+public actual class VulkanOwnedTextureFrameHandle
+internal constructor(
+  private val session: RenderSessionHandle,
+  private val frameSegment: NativeAccess.OwnedTextureFrameSegment,
+  private val scope: FrameScope,
+  private val frameValue: VulkanOwnedTextureFrame,
+) : AutoCloseable {
+  private val core =
+    OwnedTextureFrameHandleCore(
+      "VulkanOwnedTextureFrameHandle",
+      "Vulkan owned texture frame handle is closed",
+    )
+
+  public actual fun frame(): VulkanOwnedTextureFrame {
+    core.ensureOpen()
+    return frameValue
+  }
 
   public actual val isClosed: Boolean
-    get() = unsupportedVulkanOwnedTextureFrameHandle()
+    get() = core.isClosed()
 
   public actual override fun close() {
-    unsupportedVulkanOwnedTextureFrameHandle()
+    core.close(
+      releaseNative = { session.releaseVulkanFrame(frameSegment.segment) },
+      ownerClosed = { session.isClosed },
+      releaseLocal = ::releaseLocal,
+    )
+  }
+
+  private fun releaseLocal() {
+    try {
+      scope.close()
+    } finally {
+      try {
+        frameSegment.close()
+      } finally {
+        session.finishFrameBorrow()
+      }
+    }
   }
 }
-
-private fun unsupportedVulkanOwnedTextureFrameHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "VulkanOwnedTextureFrameHandle is not available until the JVM render bridge is implemented"
-  )

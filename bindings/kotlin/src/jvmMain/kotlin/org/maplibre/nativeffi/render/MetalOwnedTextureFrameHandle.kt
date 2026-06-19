@@ -1,18 +1,46 @@
 package org.maplibre.nativeffi.render
 
-/** JVM actual placeholder until the FFM Metal owned texture frame bridge is migrated. */
-public actual class MetalOwnedTextureFrameHandle private constructor() : AutoCloseable {
-  public actual fun frame(): MetalOwnedTextureFrame = unsupportedMetalOwnedTextureFrameHandle()
+import org.maplibre.nativeffi.internal.loader.NativeAccess
+
+/** Explicit handle for a Metal session-owned texture frame. */
+public actual class MetalOwnedTextureFrameHandle
+internal constructor(
+  private val session: RenderSessionHandle,
+  private val frameSegment: NativeAccess.OwnedTextureFrameSegment,
+  private val scope: FrameScope,
+  private val frameValue: MetalOwnedTextureFrame,
+) : AutoCloseable {
+  private val core =
+    OwnedTextureFrameHandleCore(
+      "MetalOwnedTextureFrameHandle",
+      "Metal owned texture frame handle is closed",
+    )
+
+  public actual fun frame(): MetalOwnedTextureFrame {
+    core.ensureOpen()
+    return frameValue
+  }
 
   public actual val isClosed: Boolean
-    get() = unsupportedMetalOwnedTextureFrameHandle()
+    get() = core.isClosed()
 
   public actual override fun close() {
-    unsupportedMetalOwnedTextureFrameHandle()
+    core.close(
+      releaseNative = { session.releaseMetalFrame(frameSegment.segment) },
+      ownerClosed = { session.isClosed },
+      releaseLocal = ::releaseLocal,
+    )
+  }
+
+  private fun releaseLocal() {
+    try {
+      scope.close()
+    } finally {
+      try {
+        frameSegment.close()
+      } finally {
+        session.finishFrameBorrow()
+      }
+    }
   }
 }
-
-private fun unsupportedMetalOwnedTextureFrameHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "MetalOwnedTextureFrameHandle is not available until the JVM render bridge is implemented"
-  )

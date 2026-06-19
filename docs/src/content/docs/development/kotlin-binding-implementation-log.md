@@ -1106,3 +1106,19 @@ is being implemented.
 - Discovery: Android JSON descriptor helpers are still duplicated between map
   and render code. They should be consolidated after query migration clarifies
   the final shared descriptor surface.
+
+### JVM Owned Texture Frame Milestone
+
+- Implemented JVM FFM owned texture frame acquisition and release for Metal,
+  Vulkan, and OpenGL render sessions.
+- Replaced the JVM owned texture frame handle placeholders with real handle
+  implementations that expose scoped frame values and release native frames on
+  close.
+- Added active-frame guards to JVM render-session commands so resize, render,
+  detach, readback, feature state, and destroy reject while a frame is borrowed.
+- Discovery: JVM FFM `MemorySegment.scope()` is not the object to close in this
+  JDK API shape. The frame owner needs to retain the allocating `Arena`
+  explicitly and close that arena when the frame handle closes.
+- Discovery: current frame ABI sizes are 64 bytes for Metal, 72 bytes for
+  Vulkan, and 64 bytes for OpenGL; all three share generation/extent/frame-id
+  offsets before backend-specific handles.

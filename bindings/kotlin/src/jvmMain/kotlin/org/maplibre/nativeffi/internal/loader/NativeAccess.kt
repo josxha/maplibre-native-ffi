@@ -51,15 +51,18 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.EglContextDescriptor
+import org.maplibre.nativeffi.render.FrameScope
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalOwnedTextureFrame
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.NativeBuffer
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureFrame
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.render.RenderMode
@@ -68,6 +71,7 @@ import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanOwnedTextureFrame
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
 import org.maplibre.nativeffi.resource.ResourceErrorReason
@@ -1722,6 +1726,146 @@ internal object NativeAccess {
       readTextureImageInfo(outInfo)
     }
 
+  internal fun acquireMetalOwnedTextureFrame(session: MemorySegment): OwnedTextureFrameSegment {
+    val arena = Arena.ofShared()
+    val frame = arena.allocate(METAL_OWNED_TEXTURE_FRAME_SIZE)
+    frame.set(
+      ValueLayout.JAVA_INT,
+      METAL_OWNED_TEXTURE_FRAME_SIZE_OFFSET,
+      METAL_OWNED_TEXTURE_FRAME_SIZE.toInt(),
+    )
+    try {
+      Status.check(
+        metalOwnedTextureAcquireFrameFunction().invokeWithArguments(session, frame) as Int
+      )
+      return OwnedTextureFrameSegment(frame, arena)
+    } catch (error: Throwable) {
+      arena.close()
+      throw error
+    }
+  }
+
+  internal fun acquireVulkanOwnedTextureFrame(session: MemorySegment): OwnedTextureFrameSegment {
+    val arena = Arena.ofShared()
+    val frame = arena.allocate(VULKAN_OWNED_TEXTURE_FRAME_SIZE)
+    frame.set(
+      ValueLayout.JAVA_INT,
+      VULKAN_OWNED_TEXTURE_FRAME_SIZE_OFFSET,
+      VULKAN_OWNED_TEXTURE_FRAME_SIZE.toInt(),
+    )
+    try {
+      Status.check(
+        vulkanOwnedTextureAcquireFrameFunction().invokeWithArguments(session, frame) as Int
+      )
+      return OwnedTextureFrameSegment(frame, arena)
+    } catch (error: Throwable) {
+      arena.close()
+      throw error
+    }
+  }
+
+  internal fun acquireOpenGLOwnedTextureFrame(session: MemorySegment): OwnedTextureFrameSegment {
+    val arena = Arena.ofShared()
+    val frame = arena.allocate(OPENGL_OWNED_TEXTURE_FRAME_SIZE)
+    frame.set(
+      ValueLayout.JAVA_INT,
+      OPENGL_OWNED_TEXTURE_FRAME_SIZE_OFFSET,
+      OPENGL_OWNED_TEXTURE_FRAME_SIZE.toInt(),
+    )
+    try {
+      Status.check(
+        openglOwnedTextureAcquireFrameFunction().invokeWithArguments(session, frame) as Int
+      )
+      return OwnedTextureFrameSegment(frame, arena)
+    } catch (error: Throwable) {
+      arena.close()
+      throw error
+    }
+  }
+
+  internal fun releaseMetalOwnedTextureFrame(session: MemorySegment, frame: MemorySegment) {
+    Status.check(metalOwnedTextureReleaseFrameFunction().invokeWithArguments(session, frame) as Int)
+  }
+
+  internal fun releaseVulkanOwnedTextureFrame(session: MemorySegment, frame: MemorySegment) {
+    Status.check(
+      vulkanOwnedTextureReleaseFrameFunction().invokeWithArguments(session, frame) as Int
+    )
+  }
+
+  internal fun releaseOpenGLOwnedTextureFrame(session: MemorySegment, frame: MemorySegment) {
+    Status.check(
+      openglOwnedTextureReleaseFrameFunction().invokeWithArguments(session, frame) as Int
+    )
+  }
+
+  internal fun metalOwnedTextureFrame(
+    segment: MemorySegment,
+    scope: FrameScope,
+  ): MetalOwnedTextureFrame =
+    MetalOwnedTextureFrame(
+      scope,
+      segment.get(ValueLayout.JAVA_LONG, METAL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, METAL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, METAL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, METAL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, METAL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET),
+      scopedPointer(
+        segment.get(ValueLayout.ADDRESS, METAL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET),
+        scope,
+      ),
+      scopedPointer(
+        segment.get(ValueLayout.ADDRESS, METAL_OWNED_TEXTURE_FRAME_DEVICE_OFFSET),
+        scope,
+      ),
+      segment.get(ValueLayout.JAVA_LONG, METAL_OWNED_TEXTURE_FRAME_PIXEL_FORMAT_OFFSET),
+    )
+
+  internal fun vulkanOwnedTextureFrame(
+    segment: MemorySegment,
+    scope: FrameScope,
+  ): VulkanOwnedTextureFrame =
+    VulkanOwnedTextureFrame(
+      scope,
+      segment.get(ValueLayout.JAVA_LONG, VULKAN_OWNED_TEXTURE_FRAME_GENERATION_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_WIDTH_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, VULKAN_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, VULKAN_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET),
+      scopedPointer(
+        segment.get(ValueLayout.ADDRESS, VULKAN_OWNED_TEXTURE_FRAME_IMAGE_OFFSET),
+        scope,
+      ),
+      scopedPointer(
+        segment.get(ValueLayout.ADDRESS, VULKAN_OWNED_TEXTURE_FRAME_IMAGE_VIEW_OFFSET),
+        scope,
+      ),
+      scopedPointer(
+        segment.get(ValueLayout.ADDRESS, VULKAN_OWNED_TEXTURE_FRAME_DEVICE_OFFSET),
+        scope,
+      ),
+      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_FORMAT_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_LAYOUT_OFFSET),
+    )
+
+  internal fun openglOwnedTextureFrame(
+    segment: MemorySegment,
+    scope: FrameScope,
+  ): OpenGLOwnedTextureFrame =
+    OpenGLOwnedTextureFrame(
+      scope,
+      segment.get(ValueLayout.JAVA_LONG, OPENGL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, OPENGL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, OPENGL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_TARGET_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_INTERNAL_FORMAT_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_FORMAT_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_TYPE_OFFSET),
+    )
+
   internal fun createMapProjection(map: MemorySegment): MemorySegment =
     Arena.ofConfined().use { arena ->
       val outProjection = arena.allocate(ValueLayout.ADDRESS)
@@ -2303,6 +2447,10 @@ internal object NativeAccess {
 
   private fun nativePointer(pointer: NativePointer): MemorySegment =
     if (pointer.isNull) MemorySegment.NULL else MemorySegment.ofAddress(pointer.address)
+
+  private fun scopedPointer(pointer: MemorySegment, scope: FrameScope): NativePointer =
+    if (pointer == MemorySegment.NULL) NativePointer.NULL
+    else NativePointer.scoped(pointer.address(), scope)
 
   private fun copy(source: MemorySegment, target: MemorySegment, targetOffset: Long) {
     MemorySegment.copy(source, 0, target, targetOffset, source.byteSize())
@@ -2887,6 +3035,24 @@ internal object NativeAccess {
         ValueLayout.ADDRESS,
       ),
     )
+
+  private fun metalOwnedTextureAcquireFrameFunction(): MethodHandle =
+    renderSessionAddressStatusFunction("mln_metal_owned_texture_acquire_frame")
+
+  private fun vulkanOwnedTextureAcquireFrameFunction(): MethodHandle =
+    renderSessionAddressStatusFunction("mln_vulkan_owned_texture_acquire_frame")
+
+  private fun openglOwnedTextureAcquireFrameFunction(): MethodHandle =
+    renderSessionAddressStatusFunction("mln_opengl_owned_texture_acquire_frame")
+
+  private fun metalOwnedTextureReleaseFrameFunction(): MethodHandle =
+    renderSessionAddressStatusFunction("mln_metal_owned_texture_release_frame")
+
+  private fun vulkanOwnedTextureReleaseFrameFunction(): MethodHandle =
+    renderSessionAddressStatusFunction("mln_vulkan_owned_texture_release_frame")
+
+  private fun openglOwnedTextureReleaseFrameFunction(): MethodHandle =
+    renderSessionAddressStatusFunction("mln_opengl_owned_texture_release_frame")
 
   private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle =
     downcall(
@@ -5471,6 +5637,43 @@ internal object NativeAccess {
   private const val TEXTURE_IMAGE_INFO_STRIDE_OFFSET: Long = 12
   private const val TEXTURE_IMAGE_INFO_BYTE_LENGTH_OFFSET: Long = 16
 
+  private const val METAL_OWNED_TEXTURE_FRAME_SIZE: Long = 64
+  private const val METAL_OWNED_TEXTURE_FRAME_SIZE_OFFSET: Long = 0
+  private const val METAL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET: Long = 8
+  private const val METAL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET: Long = 16
+  private const val METAL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET: Long = 20
+  private const val METAL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET: Long = 24
+  private const val METAL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET: Long = 32
+  private const val METAL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET: Long = 40
+  private const val METAL_OWNED_TEXTURE_FRAME_DEVICE_OFFSET: Long = 48
+  private const val METAL_OWNED_TEXTURE_FRAME_PIXEL_FORMAT_OFFSET: Long = 56
+
+  private const val VULKAN_OWNED_TEXTURE_FRAME_SIZE: Long = 72
+  private const val VULKAN_OWNED_TEXTURE_FRAME_SIZE_OFFSET: Long = 0
+  private const val VULKAN_OWNED_TEXTURE_FRAME_GENERATION_OFFSET: Long = 8
+  private const val VULKAN_OWNED_TEXTURE_FRAME_WIDTH_OFFSET: Long = 16
+  private const val VULKAN_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET: Long = 20
+  private const val VULKAN_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET: Long = 24
+  private const val VULKAN_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET: Long = 32
+  private const val VULKAN_OWNED_TEXTURE_FRAME_IMAGE_OFFSET: Long = 40
+  private const val VULKAN_OWNED_TEXTURE_FRAME_IMAGE_VIEW_OFFSET: Long = 48
+  private const val VULKAN_OWNED_TEXTURE_FRAME_DEVICE_OFFSET: Long = 56
+  private const val VULKAN_OWNED_TEXTURE_FRAME_FORMAT_OFFSET: Long = 64
+  private const val VULKAN_OWNED_TEXTURE_FRAME_LAYOUT_OFFSET: Long = 68
+
+  private const val OPENGL_OWNED_TEXTURE_FRAME_SIZE: Long = 64
+  private const val OPENGL_OWNED_TEXTURE_FRAME_SIZE_OFFSET: Long = 0
+  private const val OPENGL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET: Long = 8
+  private const val OPENGL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET: Long = 16
+  private const val OPENGL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET: Long = 20
+  private const val OPENGL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET: Long = 24
+  private const val OPENGL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET: Long = 32
+  private const val OPENGL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET: Long = 40
+  private const val OPENGL_OWNED_TEXTURE_FRAME_TARGET_OFFSET: Long = 44
+  private const val OPENGL_OWNED_TEXTURE_FRAME_INTERNAL_FORMAT_OFFSET: Long = 48
+  private const val OPENGL_OWNED_TEXTURE_FRAME_FORMAT_OFFSET: Long = 52
+  private const val OPENGL_OWNED_TEXTURE_FRAME_TYPE_OFFSET: Long = 56
+
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE: Long = 32
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET: Long = 0
   private const val PREMULTIPLIED_RGBA8_IMAGE_WIDTH_OFFSET: Long = 4
@@ -5674,4 +5877,11 @@ internal object NativeAccess {
     val payload: RuntimeEventPayload,
     val message: String,
   )
+
+  internal class OwnedTextureFrameSegment(val segment: MemorySegment, private val arena: Arena) :
+    AutoCloseable {
+    override fun close() {
+      arena.close()
+    }
+  }
 }
