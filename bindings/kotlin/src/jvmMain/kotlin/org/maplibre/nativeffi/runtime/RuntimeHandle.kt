@@ -149,7 +149,17 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
 
   public actual fun takeOfflineRegionStatusResult(
     operation: OfflineOperationHandle<OfflineRegionStatus>
-  ): OfflineRegionStatus = unsupportedRuntimeHandle()
+  ): OfflineRegionStatus {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_GET_STATUS,
+        OfflineOperationResultKind.REGION_STATUS,
+      )
+    val status = NativeAccess.takeOfflineRegionStatusResult(requireLiveHandle(), operationId)
+    operation.markConsumed()
+    return status
+  }
 
   public actual fun setResourceProvider(callback: ResourceProviderCallback) {
     unsupportedRuntimeHandle()

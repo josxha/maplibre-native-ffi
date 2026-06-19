@@ -194,7 +194,26 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
 
   public actual fun takeOfflineRegionStatusResult(
     operation: OfflineOperationHandle<OfflineRegionStatus>
-  ): OfflineRegionStatus = unsupportedRuntimeHandle()
+  ): OfflineRegionStatus {
+    val operationId =
+      operation.requireLive(
+        this,
+        OfflineOperationKind.REGION_GET_STATUS,
+        OfflineOperationResultKind.REGION_STATUS,
+      )
+    MaplibreNativeC.mln_offline_region_status().use { status ->
+      status.size(status.sizeof())
+      Status.check(
+        MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(
+          runtime(requireLiveAddress()),
+          operationId,
+          status,
+        )
+      )
+      operation.markConsumed()
+      return offlineRegionStatus(status)
+    }
+  }
 
   public actual fun setResourceProvider(callback: ResourceProviderCallback) {
     unsupportedRuntimeHandle()
@@ -339,6 +358,21 @@ private fun offlineOperationCompletedPayload(payload: ByteArray): RuntimeEventPa
     buffer.get(OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET) != 0.toByte(),
   )
 }
+
+private fun offlineRegionStatus(
+  status: MaplibreNativeC.mln_offline_region_status
+): OfflineRegionStatus =
+  OfflineRegionStatus(
+    OfflineRegionDownloadState.fromNative(status.download_state()),
+    status.completed_resource_count(),
+    status.completed_resource_size(),
+    status.completed_tile_count(),
+    status.required_tile_count(),
+    status.completed_tile_size(),
+    status.required_resource_count(),
+    status.required_resource_count_is_precise(),
+    status.complete(),
+  )
 
 private const val OFFLINE_OPERATION_COMPLETED_SIZE: Int = 32
 private const val OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Int = 8

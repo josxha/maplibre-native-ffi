@@ -15,6 +15,8 @@ import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
+import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
@@ -243,6 +245,24 @@ internal object NativeAccess {
   internal fun discardOfflineOperation(runtime: MemorySegment, operationId: Long): Int =
     runtimeOfflineOperationDiscardFunction().invokeWithArguments(runtime, operationId) as Int
 
+  internal fun takeOfflineRegionStatusResult(
+    runtime: MemorySegment,
+    operationId: Long,
+  ): OfflineRegionStatus =
+    Arena.ofConfined().use { arena ->
+      val status = arena.allocate(OFFLINE_REGION_STATUS_SIZE)
+      status.set(
+        ValueLayout.JAVA_INT,
+        OFFLINE_REGION_STATUS_SIZE_OFFSET,
+        OFFLINE_REGION_STATUS_SIZE.toInt(),
+      )
+      Status.check(
+        runtimeOfflineRegionStatusTakeResultFunction()
+          .invokeWithArguments(runtime, operationId, status) as Int
+      )
+      offlineRegionStatus(status)
+    }
+
   internal fun pollRuntimeEvent(runtime: MemorySegment): NativeRuntimeEvent? =
     Arena.ofConfined().use { arena ->
       val event = arena.allocate(RUNTIME_EVENT_SIZE)
@@ -314,6 +334,17 @@ internal object NativeAccess {
     downcall(
       "mln_runtime_offline_operation_discard",
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
+    )
+
+  private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_offline_region_get_status_take_result",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
     )
 
   private fun runtimePollEventFunction(): MethodHandle =
@@ -460,6 +491,24 @@ internal object NativeAccess {
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
 
+  private fun offlineRegionStatus(status: MemorySegment): OfflineRegionStatus =
+    OfflineRegionStatus(
+      OfflineRegionDownloadState.fromNative(
+        status.get(ValueLayout.JAVA_INT, OFFLINE_REGION_STATUS_DOWNLOAD_STATE_OFFSET)
+      ),
+      status.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_COUNT_OFFSET),
+      status.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_SIZE_OFFSET),
+      status.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_STATUS_COMPLETED_TILE_COUNT_OFFSET),
+      status.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_STATUS_REQUIRED_TILE_COUNT_OFFSET),
+      status.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_STATUS_COMPLETED_TILE_SIZE_OFFSET),
+      status.get(ValueLayout.JAVA_LONG, OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_OFFSET),
+      status.get(
+        ValueLayout.JAVA_BOOLEAN,
+        OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_IS_PRECISE_OFFSET,
+      ),
+      status.get(ValueLayout.JAVA_BOOLEAN, OFFLINE_REGION_STATUS_COMPLETE_OFFSET),
+    )
+
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
     return Linker.nativeLinker().downcallHandle(symbol, descriptor)
@@ -516,6 +565,18 @@ internal object NativeAccess {
   private const val RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET: Long = 40
   private const val RUNTIME_EVENT_MESSAGE_OFFSET: Long = 48
   private const val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = 56
+
+  private const val OFFLINE_REGION_STATUS_SIZE: Long = 64
+  private const val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = 0
+  private const val OFFLINE_REGION_STATUS_DOWNLOAD_STATE_OFFSET: Long = 4
+  private const val OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_COUNT_OFFSET: Long = 8
+  private const val OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_SIZE_OFFSET: Long = 16
+  private const val OFFLINE_REGION_STATUS_COMPLETED_TILE_COUNT_OFFSET: Long = 24
+  private const val OFFLINE_REGION_STATUS_REQUIRED_TILE_COUNT_OFFSET: Long = 32
+  private const val OFFLINE_REGION_STATUS_COMPLETED_TILE_SIZE_OFFSET: Long = 40
+  private const val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_OFFSET: Long = 48
+  private const val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_IS_PRECISE_OFFSET: Long = 56
+  private const val OFFLINE_REGION_STATUS_COMPLETE_OFFSET: Long = 57
 
   internal data class NativeRuntimeEvent(
     val type: Int,

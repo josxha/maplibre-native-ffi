@@ -728,3 +728,14 @@ is being implemented.
   runtime-originated events already copy cleanly. Map-originated event source
   lookup and richer typed payload decoding should remain a separate map/event
   bridge milestone.
+
+### JVM and Android Offline Status Result Milestone
+
+- Implemented `RuntimeHandle.takeOfflineRegionStatusResult` on JVM and Android,
+  including fixed-size `mln_offline_region_status` materialization and copied
+  common `OfflineRegionStatus` values.
+- Added expected operation-kind/result-kind checks to JVM and Android
+  `OfflineOperationHandle` before consuming typed results.
+- Discovery: status result marshalling is a useful first result-taking slice
+  because it exercises typed operation consumption without introducing snapshot
+  handle or list ownership yet.
