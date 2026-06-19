@@ -200,3 +200,19 @@ is being implemented.
 - Reflection: the Android `Maplibre` actual is now shaped like the existing Java
   JNI bootstrap path: JavaCPP owns the native declaration surface, while Kotlin
   owns the public facade and ABI compatibility behavior.
+
+### Common Maplibre Process Globals Milestone
+
+- Expanded the common `Maplibre` expect facade to include process-global render
+  backend support, OpenGL context provider support, and network status access.
+- Added JVM FFM downcalls for the same process-global C functions used by the
+  existing Java FFM binding, without pulling in the generated jextract surface.
+- Added Android JavaCPP calls for the same process-global C functions, keeping
+  JavaCPP as the Android declaration bridge while Kotlin owns validation and
+  status-to-exception mapping.
+- Discovery: this is a good boundary for common facade growth because all three
+  platform bridges can implement it without handle identity, callbacks, struct
+  layout materialization, or Android platform initialization.
+- Reflection: direct FFM remains productive for small process-global functions,
+  but broader JVM migration still needs a deliberate generated-vs-handwritten
+  bridge boundary before moving map/runtime/resource handles into common code.

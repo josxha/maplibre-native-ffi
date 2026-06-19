@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.internal.loader
 
+import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.SymbolLookup
@@ -8,6 +9,8 @@ import java.lang.invoke.MethodHandle
 import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.error.MaplibreStatus
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -67,14 +70,44 @@ internal object NativeAccess {
   }
 
   internal fun cVersion(): Long =
-    cVersionHandle().invokeWithArguments().let { Integer.toUnsignedLong(it as Int) }
+    intFunction("mln_c_version").invokeWithArguments().let { Integer.toUnsignedLong(it as Int) }
 
-  private fun cVersionHandle(): MethodHandle {
-    val symbol =
-      SymbolLookup.loaderLookup().find("mln_c_version").orElseThrow {
-        NoSuchElementException("mln_c_version")
-      }
-    return Linker.nativeLinker().downcallHandle(symbol, FunctionDescriptor.of(ValueLayout.JAVA_INT))
+  internal fun supportedRenderBackendMask(): Int =
+    intFunction("mln_supported_render_backend_mask").invokeWithArguments() as Int
+
+  internal fun supportedOpenGLContextProviderMask(): Int =
+    intFunction("mln_opengl_supported_context_provider_mask").invokeWithArguments() as Int
+
+  internal fun networkStatus(): Int =
+    Arena.ofConfined().use { arena ->
+      val outStatus = arena.allocate(ValueLayout.JAVA_INT)
+      checkStatus(statusOutFunction("mln_network_status_get").invokeWithArguments(outStatus) as Int)
+      outStatus.get(ValueLayout.JAVA_INT, 0)
+    }
+
+  internal fun setNetworkStatus(status: Int) {
+    checkStatus(statusInFunction("mln_network_status_set").invokeWithArguments(status) as Int)
+  }
+
+  private fun intFunction(name: String): MethodHandle =
+    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT))
+
+  private fun statusOutFunction(name: String): MethodHandle =
+    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+
+  private fun statusInFunction(name: String): MethodHandle =
+    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT))
+
+  private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
+    val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
+    return Linker.nativeLinker().downcallHandle(symbol, descriptor)
+  }
+
+  private fun checkStatus(nativeStatusCode: Int) {
+    val status = MaplibreStatus.fromNative(nativeStatusCode)
+    if (status != MaplibreStatus.OK) {
+      throw MaplibreException.forStatus(status, nativeStatusCode)
+    }
   }
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =

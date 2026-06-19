@@ -1,5 +1,9 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.render.OpenGLContextProvider
+import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.runtime.NetworkStatus
+
 /** Process-global entry points for the MapLibre Native FFI binding. */
 public expect object Maplibre {
   /** C ABI contract version expected by this binding. */
@@ -10,4 +14,16 @@ public expect object Maplibre {
 
   /** Returns the native C ABI contract version. */
   public fun cVersion(): Long
+
+  /** Returns the render backends compiled into the loaded native library. */
+  public fun supportedRenderBackends(): Set<RenderBackend>
+
+  /** Returns the OpenGL context providers compiled into the loaded native library. */
+  public fun supportedOpenGLContextProviders(): Set<OpenGLContextProvider>
+
+  /** Reads Maplibre Native's process-global network status. */
+  public val networkStatus: NetworkStatus
+
+  /** Sets Maplibre Native's process-global network status. */
+  public fun setNetworkStatus(status: NetworkStatus)
 }

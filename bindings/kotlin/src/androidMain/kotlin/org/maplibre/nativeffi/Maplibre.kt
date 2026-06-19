@@ -1,6 +1,11 @@
 package org.maplibre.nativeffi
 
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.render.OpenGLContextProvider
+import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.runtime.NetworkStatus
 
 /** Process-global entry points for the Android JNI bridge. */
 public actual object Maplibre {
@@ -16,6 +21,33 @@ public actual object Maplibre {
   public actual fun cVersion(): Long {
     NativeAccess.ensureLoaded()
     return NativeAccess.cVersion()
+  }
+
+  /** Returns the render backends compiled into the loaded native library. */
+  public actual fun supportedRenderBackends(): Set<RenderBackend> {
+    NativeAccess.ensureLoaded()
+    return RenderBackend.fromMask(NativeAccess.supportedRenderBackendMask())
+  }
+
+  /** Returns the OpenGL context providers compiled into the loaded native library. */
+  public actual fun supportedOpenGLContextProviders(): Set<OpenGLContextProvider> {
+    NativeAccess.ensureLoaded()
+    return OpenGLContextProvider.fromMask(NativeAccess.supportedOpenGLContextProviderMask())
+  }
+
+  /** Reads Maplibre Native's process-global network status. */
+  public actual val networkStatus: NetworkStatus
+    get() {
+      NativeAccess.ensureLoaded()
+      return NetworkStatus.fromNative(NativeAccess.networkStatus())
+    }
+
+  /** Sets Maplibre Native's process-global network status. */
+  public actual fun setNetworkStatus(status: NetworkStatus) {
+    require(status.isKnown) {
+      "Unknown network status cannot be used as input: ${status.nativeValue}"
+    }
+    NativeAccess.setNetworkStatus(status.nativeValue)
   }
 }
 
@@ -40,6 +72,28 @@ private object NativeAccess {
   }
 
   fun cVersion(): Long = Integer.toUnsignedLong(MaplibreNativeC.mln_c_version())
+
+  fun supportedRenderBackendMask(): Int = MaplibreNativeC.mln_supported_render_backend_mask()
+
+  fun supportedOpenGLContextProviderMask(): Int =
+    MaplibreNativeC.mln_opengl_supported_context_provider_mask()
+
+  fun networkStatus(): Int {
+    val outStatus = intArrayOf(0)
+    checkStatus(MaplibreNativeC.mln_network_status_get(outStatus))
+    return outStatus[0]
+  }
+
+  fun setNetworkStatus(status: Int) {
+    checkStatus(MaplibreNativeC.mln_network_status_set(status))
+  }
+
+  private fun checkStatus(nativeStatusCode: Int) {
+    val status = MaplibreStatus.fromNative(nativeStatusCode)
+    if (status != MaplibreStatus.OK) {
+      throw MaplibreException.forStatus(status, nativeStatusCode)
+    }
+  }
 }
 
 private fun Maplibre.checkCompatibleCAbi(actualVersion: Long) {

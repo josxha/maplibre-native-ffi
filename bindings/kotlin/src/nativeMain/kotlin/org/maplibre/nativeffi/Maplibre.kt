@@ -54,19 +54,19 @@ public actual object Maplibre {
   }
 
   /** Returns the render backends compiled into the loaded native library. */
-  public fun supportedRenderBackends(): Set<RenderBackend> =
+  public actual fun supportedRenderBackends(): Set<RenderBackend> =
     RenderBackend.fromMask(mln_supported_render_backend_mask())
 
   /** Returns the OpenGL context providers compiled into the loaded native library. */
-  public fun supportedOpenGLContextProviders(): Set<OpenGLContextProvider> =
+  public actual fun supportedOpenGLContextProviders(): Set<OpenGLContextProvider> =
     OpenGLContextProvider.fromMask(mln_opengl_supported_context_provider_mask())
 
   /** Reads Maplibre Native's process-global network status. */
-  public val networkStatus: NetworkStatus
+  public actual val networkStatus: NetworkStatus
     get() = networkStatus(::mln_network_status_get)
 
   /** Sets Maplibre Native's process-global network status. */
-  public fun setNetworkStatus(status: NetworkStatus) {
+  public actual fun setNetworkStatus(status: NetworkStatus) {
     require(status.isKnown) {
       "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
