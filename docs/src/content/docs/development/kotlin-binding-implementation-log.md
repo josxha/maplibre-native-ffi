@@ -1092,3 +1092,17 @@ is being implemented.
 - Discovery: Kotlin actual classes cannot add an `actual companion object`
   unless the expect declaration has one; Android-only construction helpers need
   a plain companion or top-level internal functions.
+
+### Android Render Feature State Milestone
+
+- Implemented Android JavaCPP render-session feature state set, get, and remove
+  APIs.
+- Added Android render-local materializers for `FeatureStateSelector`,
+  `JsonValue` inputs, and JSON snapshot readback so Android render sessions
+  match the JVM feature-state surface.
+- Kept Android feature query result APIs unsupported in this slice because they
+  need additional query geometry/options materializers and native result
+  ownership.
+- Discovery: Android JSON descriptor helpers are still duplicated between map
+  and render code. They should be consolidated after query migration clarifies
+  the final shared descriptor surface.

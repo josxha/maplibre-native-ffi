@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.render
 
+import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
@@ -73,14 +74,47 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      JsonScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_render_session_set_feature_state(
+            renderSession(requireLiveAddress()),
+            nativeSelector.selector,
+            nativeValue.value,
+          )
+        )
+      }
+    }
   }
 
-  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue =
-    unsupportedRenderSessionHandle()
+  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue {
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      PointerPointer<Pointer>(1).use { outState ->
+        outState.put(0, null as Pointer?)
+        Status.check(
+          MaplibreNativeC.mln_render_session_get_feature_state(
+            renderSession(requireLiveAddress()),
+            nativeSelector.selector,
+            outState,
+          )
+        )
+        return jsonSnapshot(outState) ?: JsonValue.ObjectValue(emptyList())
+      }
+    }
+  }
 
   public actual fun removeFeatureState(selector: FeatureStateSelector) {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      Status.check(
+        MaplibreNativeC.mln_render_session_remove_feature_state(
+          renderSession(requireLiveAddress()),
+          nativeSelector.selector,
+        )
+      )
+    }
   }
 
   public actual fun queryRenderedFeatures(
@@ -416,6 +450,63 @@ private fun setOpenGLContext(
 private fun textureImageInfo(info: MaplibreNativeC.mln_texture_image_info): TextureImageInfo =
   TextureImageInfo(info.width(), info.height(), info.stride(), info.byte_length())
 
+private fun jsonSnapshot(outSnapshot: PointerPointer<Pointer>): JsonValue? {
+  val snapshotPointer = outSnapshot.get(Pointer::class.java, 0) ?: return null
+  if (snapshotPointer.isNull) return null
+  val snapshot = MaplibreNativeC.mln_json_snapshot(snapshotPointer)
+  return try {
+    PointerPointer<Pointer>(1).use { outValue ->
+      outValue.put(0, null as Pointer?)
+      Status.check(MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue))
+      val valuePointer = outValue.get(Pointer::class.java, 0) ?: return null
+      if (valuePointer.isNull) null else jsonValue(MaplibreNativeC.mln_json_value(valuePointer))
+    }
+  } finally {
+    MaplibreNativeC.mln_json_snapshot_destroy(snapshot)
+  }
+}
+
+private fun jsonValue(value: MaplibreNativeC.mln_json_value): JsonValue =
+  when (value.type()) {
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL -> JsonValue.Null
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL -> JsonValue.Bool(value.data_bool_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT -> JsonValue.UInt(value.data_uint_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT -> JsonValue.Int(value.data_int_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE -> JsonValue.DoubleValue(value.data_double_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING ->
+      JsonValue.StringValue(stringView(value.data_string_value()))
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY -> jsonArray(value.data_array_value())
+    MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT -> jsonObject(value.data_object_value())
+    else -> JsonValue.Unknown(value.type(), value.size())
+  }
+
+private fun jsonArray(array: MaplibreNativeC.mln_json_array): JsonValue.Array {
+  val nativeValues = array.values()
+  return JsonValue.Array(
+    List(Math.toIntExact(array.value_count())) { index ->
+      jsonValue(nativeValues.getPointer(index.toLong()))
+    }
+  )
+}
+
+private fun jsonObject(obj: MaplibreNativeC.mln_json_object): JsonValue.ObjectValue {
+  val nativeMembers = obj.members()
+  return JsonValue.ObjectValue(
+    List(Math.toIntExact(obj.member_count())) { index ->
+      val member = nativeMembers.getPointer(index.toLong())
+      JsonValue.Member(stringView(member.key()), jsonValue(member.value()))
+    }
+  )
+}
+
+private fun stringView(value: MaplibreNativeC.mln_string_view): String {
+  val size = Math.toIntExact(value.size())
+  if (size == 0) return ""
+  val bytes = ByteArray(size)
+  value.data().get(bytes, 0, size)
+  return String(bytes, StandardCharsets.UTF_8)
+}
+
 private fun map(address: Long): MaplibreNativeC.mln_map =
   MaplibreNativeC.mln_map(AddressPointer(address))
 
@@ -424,6 +515,138 @@ private fun renderSession(address: Long): MaplibreNativeC.mln_render_session =
 
 private fun pointerOrNull(pointer: NativePointer): Pointer? =
   if (pointer.isNull) null else AddressPointer(pointer.address)
+
+private class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoCloseable {
+  private val sourceId = StringViewScope(value.sourceId)
+  private val sourceLayerId = value.sourceLayerId?.let(::StringViewScope)
+  private val featureId = value.featureId?.let(::StringViewScope)
+  private val stateKey = value.stateKey?.let(::StringViewScope)
+  val selector: MaplibreNativeC.mln_feature_state_selector =
+    MaplibreNativeC.mln_feature_state_selector()
+
+  init {
+    selector.size(selector.sizeof())
+    selector.source_id(sourceId.view)
+    var fields = 0
+    sourceLayerId?.let {
+      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+      selector.source_layer_id(it.view)
+    }
+    featureId?.let {
+      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+      selector.feature_id(it.view)
+    }
+    stateKey?.let {
+      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+      selector.state_key(it.view)
+    }
+    selector.fields(fields)
+  }
+
+  override fun close() {
+    selector.close()
+    stateKey?.close()
+    featureId?.close()
+    sourceLayerId?.close()
+    sourceId.close()
+  }
+}
+
+private class JsonScope(value: JsonValue) : AutoCloseable {
+  private val owned = mutableListOf<Pointer>()
+  private val strings = mutableListOf<StringViewScope>()
+  val value: MaplibreNativeC.mln_json_value = jsonValue(value)
+
+  override fun close() {
+    owned.asReversed().forEach(Pointer::close)
+    strings.asReversed().forEach(StringViewScope::close)
+  }
+
+  private fun <T : Pointer> own(pointer: T): T {
+    owned += pointer
+    return pointer
+  }
+
+  private fun string(value: String): MaplibreNativeC.mln_string_view {
+    val scope = StringViewScope(value)
+    strings += scope
+    return scope.view
+  }
+
+  private fun jsonValue(value: JsonValue, depth: Int = 0): MaplibreNativeC.mln_json_value {
+    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+      "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
+    }
+    val out = own(MaplibreNativeC.mln_json_value())
+    out.size(out.sizeof())
+    when (value) {
+      JsonValue.Null -> out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL)
+      is JsonValue.Bool ->
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL).data_bool_value(value.value)
+      is JsonValue.UInt ->
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT).data_uint_value(value.value)
+      is JsonValue.Int ->
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT).data_int_value(value.value)
+      is JsonValue.DoubleValue ->
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE).data_double_value(value.value)
+      is JsonValue.StringValue ->
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING).data_string_value(string(value.value))
+      is JsonValue.Array -> {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY)
+        val array = own(MaplibreNativeC.mln_json_array())
+        if (value.values.isNotEmpty()) {
+          val nativeValues = own(MaplibreNativeC.mln_json_value(value.values.size.toLong()))
+          value.values.forEachIndexed { index, child ->
+            nativeValues
+              .position(index.toLong())
+              .put<MaplibreNativeC.mln_json_value>(jsonValue(child, depth + 1))
+          }
+          nativeValues.position(0)
+          array.values(nativeValues)
+        }
+        array.value_count(value.values.size.toLong())
+        out.data_array_value(array)
+      }
+      is JsonValue.ObjectValue -> {
+        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT)
+        val obj = own(MaplibreNativeC.mln_json_object())
+        if (value.members.isNotEmpty()) {
+          val nativeMembers = own(MaplibreNativeC.mln_json_member(value.members.size.toLong()))
+          value.members.forEachIndexed { index, member ->
+            nativeMembers.position(index.toLong())
+            nativeMembers.key(string(member.key))
+            nativeMembers.value(jsonValue(member.value, depth + 1))
+          }
+          nativeMembers.position(0)
+          obj.members(nativeMembers)
+        }
+        obj.member_count(value.members.size.toLong())
+        out.data_object_value(obj)
+      }
+      is JsonValue.Unknown ->
+        throw IllegalArgumentException("unknown JSON values cannot be used as input")
+    }
+    return out
+  }
+}
+
+private class StringViewScope(value: String) : AutoCloseable {
+  private val bytes: BytePointer
+  val view: MaplibreNativeC.mln_string_view = MaplibreNativeC.mln_string_view()
+
+  init {
+    val utf8 = value.toByteArray(StandardCharsets.UTF_8)
+    bytes = BytePointer(Math.max(utf8.size, 1).toLong())
+    if (utf8.isNotEmpty()) bytes.put(utf8, 0, utf8.size)
+    view.data(if (utf8.isEmpty()) null else bytes)
+    view.size(utf8.size.toLong())
+  }
+
+  override fun close() {
+    view.close()
+    bytes.close()
+  }
+}
 
 private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
