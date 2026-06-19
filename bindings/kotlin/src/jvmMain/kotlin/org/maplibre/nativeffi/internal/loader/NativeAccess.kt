@@ -1503,6 +1503,20 @@ internal object NativeAccess {
     }
   }
 
+  internal fun setProjectionVisibleGeometry(
+    projection: MemorySegment,
+    geometry: Geometry,
+    padding: EdgeInsets,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        projectionAddressEdgeInsetsStatusFunction("mln_map_projection_set_visible_geometry")
+          .invokeWithArguments(projection, geometry(arena, geometry, 0), edgeInsets(arena, padding))
+          as Int
+      )
+    }
+  }
+
   internal fun projectionPixelForLatLng(
     projection: MemorySegment,
     coordinate: LatLng,
@@ -1969,6 +1983,17 @@ internal object NativeAccess {
         ValueLayout.ADDRESS,
         ValueLayout.ADDRESS,
         ValueLayout.JAVA_LONG,
+        edgeInsetsLayout,
+      ),
+    )
+
+  private fun projectionAddressEdgeInsetsStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
         edgeInsetsLayout,
       ),
     )

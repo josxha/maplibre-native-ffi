@@ -2114,7 +2114,7 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
   }
 }
 
-private class GeometryScope(geometry: Geometry) : AutoCloseable {
+internal class GeometryScope(geometry: Geometry) : AutoCloseable {
   private val scope = GeoDescriptorScope()
   val value: MaplibreNativeC.mln_geometry = scope.geometry(geometry, 0)
 

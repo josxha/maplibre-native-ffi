@@ -31,7 +31,8 @@ public actual class MapProjectionHandle internal constructor(private val handle:
   }
 
   public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
-    unsupportedMapProjectionCamera()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setProjectionVisibleGeometry(requireLiveHandle(), geometry, padding)
   }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
@@ -56,8 +57,3 @@ public actual class MapProjectionHandle internal constructor(private val handle:
     return handle
   }
 }
-
-private fun unsupportedMapProjectionCamera(): Nothing =
-  throw UnsupportedOperationException(
-    "MapProjectionHandle geometry fitting is not available until the JVM geometry bridge is implemented"
-  )

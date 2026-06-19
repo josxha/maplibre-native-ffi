@@ -1025,3 +1025,15 @@ is being implemented.
 - Discovery: the C layout probe confirmed 16-byte view structs, 24-byte
   `mln_geometry`/`mln_geojson`, and a 56-byte `mln_feature`; using those offsets
   kept JVM FFM materialization aligned with the generated Java FFM bridge.
+
+### JVM and Android Projection Geometry Milestone
+
+- Implemented `MapProjectionHandle.setVisibleGeometry` on JVM FFM and Android
+  JavaCPP.
+- Reused the geometry descriptor graph from the GeoJSON source milestone for
+  projection fitting instead of adding a second geometry materializer.
+- Added JVM coverage that fits a standalone projection to a geometry and reads
+  the computed camera back through the common Kotlin projection API.
+- Discovery: making the Android geometry scope package-internal is enough to
+  share descriptor ownership across map and projection actuals while keeping
+  JavaCPP pointer details out of common code.

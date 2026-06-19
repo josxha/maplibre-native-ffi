@@ -465,6 +465,8 @@ class MapHandleTest {
           EdgeInsets.ZERO,
         )
         assertTrue(projection.camera.center != null)
+        projection.setVisibleGeometry(Geometry.Point(LatLng(0.0, 0.0)), EdgeInsets.ZERO)
+        assertTrue(projection.camera.center != null)
       } finally {
         projection.close()
       }

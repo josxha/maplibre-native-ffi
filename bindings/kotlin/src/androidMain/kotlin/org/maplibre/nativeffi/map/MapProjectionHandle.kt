@@ -61,7 +61,23 @@ public actual class MapProjectionHandle internal constructor(private val handleA
   }
 
   public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
-    unsupportedMapProjectionCamera()
+    NativeAccess.ensureLoaded()
+    GeometryScope(geometry).use { nativeGeometry ->
+      MaplibreNativeC.mln_edge_insets()
+        .top(padding.top)
+        .left(padding.left)
+        .bottom(padding.bottom)
+        .right(padding.right)
+        .use { nativePadding ->
+          Status.check(
+            MaplibreNativeC.mln_map_projection_set_visible_geometry(
+              projection(requireLiveAddress()),
+              nativeGeometry.value,
+              nativePadding,
+            )
+          )
+        }
+    }
   }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
@@ -227,8 +243,3 @@ private class ProjectionLatLngArrayScope(values: List<LatLng>) : AutoCloseable {
     coordinates.close()
   }
 }
-
-private fun unsupportedMapProjectionCamera(): Nothing =
-  throw UnsupportedOperationException(
-    "MapProjectionHandle geometry fitting is not available until the Android geometry bridge is implemented"
-  )
