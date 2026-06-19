@@ -49,8 +49,27 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.render.EglContextDescriptor
+import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalContextDescriptor
+import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
+import org.maplibre.nativeffi.render.NativeBuffer
+import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLContextDescriptor
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.render.RenderMode
+import org.maplibre.nativeffi.render.RenderTargetExtent
+import org.maplibre.nativeffi.render.TextureImageInfo
+import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.render.WglContextDescriptor
 import org.maplibre.nativeffi.resource.ResourceErrorReason
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
@@ -1510,6 +1529,199 @@ internal object NativeAccess {
     }
   }
 
+  internal fun attachMetalOwnedTexture(
+    map: MemorySegment,
+    descriptor: MetalOwnedTextureDescriptor,
+  ): MemorySegment =
+    attachRenderSession(
+      map,
+      "mln_metal_owned_texture_attach",
+      metalOwnedTextureDescriptor(descriptor),
+    )
+
+  internal fun attachMetalBorrowedTexture(
+    map: MemorySegment,
+    descriptor: MetalBorrowedTextureDescriptor,
+  ): MemorySegment =
+    attachRenderSession(
+      map,
+      "mln_metal_borrowed_texture_attach",
+      metalBorrowedTextureDescriptor(descriptor),
+    )
+
+  internal fun attachVulkanOwnedTexture(
+    map: MemorySegment,
+    descriptor: VulkanOwnedTextureDescriptor,
+  ): MemorySegment =
+    attachRenderSession(
+      map,
+      "mln_vulkan_owned_texture_attach",
+      vulkanOwnedTextureDescriptor(descriptor),
+    )
+
+  internal fun attachVulkanBorrowedTexture(
+    map: MemorySegment,
+    descriptor: VulkanBorrowedTextureDescriptor,
+  ): MemorySegment =
+    attachRenderSession(
+      map,
+      "mln_vulkan_borrowed_texture_attach",
+      vulkanBorrowedTextureDescriptor(descriptor),
+    )
+
+  internal fun attachOpenGLOwnedTexture(
+    map: MemorySegment,
+    descriptor: OpenGLOwnedTextureDescriptor,
+  ): MemorySegment =
+    attachRenderSession(
+      map,
+      "mln_opengl_owned_texture_attach",
+      openglOwnedTextureDescriptor(descriptor),
+    )
+
+  internal fun attachOpenGLBorrowedTexture(
+    map: MemorySegment,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+  ): MemorySegment =
+    attachRenderSession(
+      map,
+      "mln_opengl_borrowed_texture_attach",
+      openglBorrowedTextureDescriptor(descriptor),
+    )
+
+  internal fun attachMetalSurface(
+    map: MemorySegment,
+    descriptor: MetalSurfaceDescriptor,
+  ): MemorySegment =
+    attachRenderSession(map, "mln_metal_surface_attach", metalSurfaceDescriptor(descriptor))
+
+  internal fun attachVulkanSurface(
+    map: MemorySegment,
+    descriptor: VulkanSurfaceDescriptor,
+  ): MemorySegment =
+    attachRenderSession(map, "mln_vulkan_surface_attach", vulkanSurfaceDescriptor(descriptor))
+
+  internal fun attachOpenGLSurface(
+    map: MemorySegment,
+    descriptor: OpenGLSurfaceDescriptor,
+  ): MemorySegment =
+    attachRenderSession(map, "mln_opengl_surface_attach", openglSurfaceDescriptor(descriptor))
+
+  internal fun destroyRenderSession(session: MemorySegment): Int =
+    renderSessionStatusFunction("mln_render_session_destroy").invokeWithArguments(session) as Int
+
+  internal fun resizeRenderSession(
+    session: MemorySegment,
+    width: Int,
+    height: Int,
+    scaleFactor: Double,
+  ) {
+    Status.check(
+      renderSessionResizeFunction().invokeWithArguments(session, width, height, scaleFactor) as Int
+    )
+  }
+
+  internal fun renderUpdate(session: MemorySegment) {
+    Status.check(
+      renderSessionStatusFunction("mln_render_session_render_update").invokeWithArguments(session)
+        as Int
+    )
+  }
+
+  internal fun detachRenderSession(session: MemorySegment) {
+    Status.check(
+      renderSessionStatusFunction("mln_render_session_detach").invokeWithArguments(session) as Int
+    )
+  }
+
+  internal fun reduceRenderSessionMemoryUse(session: MemorySegment) {
+    Status.check(
+      renderSessionStatusFunction("mln_render_session_reduce_memory_use")
+        .invokeWithArguments(session) as Int
+    )
+  }
+
+  internal fun clearRenderSessionData(session: MemorySegment) {
+    Status.check(
+      renderSessionStatusFunction("mln_render_session_clear_data").invokeWithArguments(session)
+        as Int
+    )
+  }
+
+  internal fun dumpRenderSessionDebugLogs(session: MemorySegment) {
+    Status.check(
+      renderSessionStatusFunction("mln_render_session_dump_debug_logs").invokeWithArguments(session)
+        as Int
+    )
+  }
+
+  internal fun setFeatureState(
+    session: MemorySegment,
+    selector: FeatureStateSelector,
+    value: JsonValue,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        renderSessionTwoAddressStatusFunction("mln_render_session_set_feature_state")
+          .invokeWithArguments(
+            session,
+            featureStateSelector(arena, selector),
+            jsonValue(arena, value),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun getFeatureState(session: MemorySegment, selector: FeatureStateSelector): JsonValue =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
+      outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        renderSessionTwoAddressStatusFunction("mln_render_session_get_feature_state")
+          .invokeWithArguments(session, featureStateSelector(arena, selector), outSnapshot) as Int
+      )
+      jsonSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0)) ?: JsonValue.ObjectValue(emptyList())
+    }
+
+  internal fun removeFeatureState(session: MemorySegment, selector: FeatureStateSelector) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        renderSessionAddressStatusFunction("mln_render_session_remove_feature_state")
+          .invokeWithArguments(session, featureStateSelector(arena, selector)) as Int
+      )
+    }
+  }
+
+  internal fun textureImageInfo(session: MemorySegment): TextureImageInfo =
+    Arena.ofConfined().use { arena ->
+      val outInfo = textureImageInfo(arena)
+      val status =
+        textureReadPremultipliedRgba8Function()
+          .invokeWithArguments(session, MemorySegment.NULL, 0L, outInfo) as Int
+      val info = readTextureImageInfo(outInfo)
+      if (status == 0 || (status == -1 && info.byteLength > 0L)) {
+        info
+      } else {
+        Status.check(status)
+        error("unreachable")
+      }
+    }
+
+  internal fun readPremultipliedRgba8(
+    session: MemorySegment,
+    buffer: NativeBuffer,
+  ): TextureImageInfo =
+    Arena.ofConfined().use { arena ->
+      val outInfo = textureImageInfo(arena)
+      buffer.borrow { segment, length ->
+        Status.check(
+          textureReadPremultipliedRgba8Function()
+            .invokeWithArguments(session, segment, length, outInfo) as Int
+        )
+      }
+      readTextureImageInfo(outInfo)
+    }
+
   internal fun createMapProjection(map: MemorySegment): MemorySegment =
     Arena.ofConfined().use { arena ->
       val outProjection = arena.allocate(ValueLayout.ADDRESS)
@@ -1675,6 +1887,425 @@ internal object NativeAccess {
     segment.set(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_X_OFFSET, value.x.toInt())
     segment.set(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_Y_OFFSET, value.y.toInt())
     return segment
+  }
+
+  private fun attachRenderSession(
+    map: MemorySegment,
+    functionName: String,
+    descriptor: (Arena) -> MemorySegment,
+  ): MemorySegment =
+    Arena.ofConfined().use { arena ->
+      val outSession = arena.allocate(ValueLayout.ADDRESS)
+      outSession.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        mapAddressAddressStatusFunction(functionName)
+          .invokeWithArguments(map, descriptor(arena), outSession) as Int
+      )
+      outSession.get(ValueLayout.ADDRESS, 0).also { session ->
+        require(session != MemorySegment.NULL) { "$functionName returned a null render session" }
+      }
+    }
+
+  private fun metalOwnedTextureDescriptor(
+    descriptor: MetalOwnedTextureDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
+        METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(renderTargetExtent(arena, descriptor.extent), segment, METAL_OWNED_TEXTURE_EXTENT_OFFSET)
+      copy(metalContext(arena, descriptor.context), segment, METAL_OWNED_TEXTURE_CONTEXT_OFFSET)
+    }
+  }
+
+  private fun metalBorrowedTextureDescriptor(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
+        METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(
+        renderTargetExtent(arena, descriptor.extent),
+        segment,
+        METAL_BORROWED_TEXTURE_EXTENT_OFFSET,
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        METAL_BORROWED_TEXTURE_TEXTURE_OFFSET,
+        nativePointer(descriptor.texture),
+      )
+    }
+  }
+
+  private fun vulkanOwnedTextureDescriptor(
+    descriptor: VulkanOwnedTextureDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
+        VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(
+        renderTargetExtent(arena, descriptor.extent),
+        segment,
+        VULKAN_OWNED_TEXTURE_EXTENT_OFFSET,
+      )
+      copy(vulkanContext(arena, descriptor.context), segment, VULKAN_OWNED_TEXTURE_CONTEXT_OFFSET)
+    }
+  }
+
+  private fun vulkanBorrowedTextureDescriptor(
+    descriptor: VulkanBorrowedTextureDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
+        VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(
+        renderTargetExtent(arena, descriptor.extent),
+        segment,
+        VULKAN_BORROWED_TEXTURE_EXTENT_OFFSET,
+      )
+      copy(
+        vulkanContext(arena, descriptor.context),
+        segment,
+        VULKAN_BORROWED_TEXTURE_CONTEXT_OFFSET,
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_BORROWED_TEXTURE_IMAGE_OFFSET,
+        nativePointer(descriptor.image),
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_BORROWED_TEXTURE_IMAGE_VIEW_OFFSET,
+        nativePointer(descriptor.imageView),
+      )
+      segment.set(ValueLayout.JAVA_INT, VULKAN_BORROWED_TEXTURE_FORMAT_OFFSET, descriptor.format)
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_BORROWED_TEXTURE_INITIAL_LAYOUT_OFFSET,
+        descriptor.initialLayout,
+      )
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_BORROWED_TEXTURE_FINAL_LAYOUT_OFFSET,
+        descriptor.finalLayout ?: descriptor.initialLayout,
+      )
+    }
+  }
+
+  private fun openglOwnedTextureDescriptor(
+    descriptor: OpenGLOwnedTextureDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
+        OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(
+        renderTargetExtent(arena, descriptor.extent),
+        segment,
+        OPENGL_OWNED_TEXTURE_EXTENT_OFFSET,
+      )
+      copy(openglContext(arena, descriptor.context), segment, OPENGL_OWNED_TEXTURE_CONTEXT_OFFSET)
+    }
+  }
+
+  private fun openglBorrowedTextureDescriptor(
+    descriptor: OpenGLBorrowedTextureDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
+        OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(
+        renderTargetExtent(arena, descriptor.extent),
+        segment,
+        OPENGL_BORROWED_TEXTURE_EXTENT_OFFSET,
+      )
+      copy(
+        openglContext(arena, descriptor.context),
+        segment,
+        OPENGL_BORROWED_TEXTURE_CONTEXT_OFFSET,
+      )
+      segment.set(ValueLayout.JAVA_INT, OPENGL_BORROWED_TEXTURE_TEXTURE_OFFSET, descriptor.texture)
+      segment.set(ValueLayout.JAVA_INT, OPENGL_BORROWED_TEXTURE_TARGET_OFFSET, descriptor.target)
+    }
+  }
+
+  private fun metalSurfaceDescriptor(descriptor: MetalSurfaceDescriptor): (Arena) -> MemorySegment =
+    { arena ->
+      arena.allocate(METAL_SURFACE_DESCRIPTOR_SIZE).also { segment ->
+        segment.set(
+          ValueLayout.JAVA_INT,
+          METAL_SURFACE_DESCRIPTOR_SIZE_OFFSET,
+          METAL_SURFACE_DESCRIPTOR_SIZE.toInt(),
+        )
+        copy(renderTargetExtent(arena, descriptor.extent), segment, METAL_SURFACE_EXTENT_OFFSET)
+        copy(metalContext(arena, descriptor.context), segment, METAL_SURFACE_CONTEXT_OFFSET)
+        segment.set(
+          ValueLayout.ADDRESS,
+          METAL_SURFACE_LAYER_OFFSET,
+          nativePointer(descriptor.layer),
+        )
+      }
+    }
+
+  private fun vulkanSurfaceDescriptor(
+    descriptor: VulkanSurfaceDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(VULKAN_SURFACE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_SURFACE_DESCRIPTOR_SIZE_OFFSET,
+        VULKAN_SURFACE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(renderTargetExtent(arena, descriptor.extent), segment, VULKAN_SURFACE_EXTENT_OFFSET)
+      copy(vulkanContext(arena, descriptor.context), segment, VULKAN_SURFACE_CONTEXT_OFFSET)
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_SURFACE_SURFACE_OFFSET,
+        nativePointer(descriptor.surface),
+      )
+    }
+  }
+
+  private fun openglSurfaceDescriptor(
+    descriptor: OpenGLSurfaceDescriptor
+  ): (Arena) -> MemorySegment = { arena ->
+    arena.allocate(OPENGL_SURFACE_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        OPENGL_SURFACE_DESCRIPTOR_SIZE_OFFSET,
+        OPENGL_SURFACE_DESCRIPTOR_SIZE.toInt(),
+      )
+      copy(renderTargetExtent(arena, descriptor.extent), segment, OPENGL_SURFACE_EXTENT_OFFSET)
+      copy(openglContext(arena, descriptor.context), segment, OPENGL_SURFACE_CONTEXT_OFFSET)
+      segment.set(
+        ValueLayout.ADDRESS,
+        OPENGL_SURFACE_SURFACE_OFFSET,
+        nativePointer(descriptor.surface),
+      )
+    }
+  }
+
+  private fun renderTargetExtent(arena: Arena, extent: RenderTargetExtent): MemorySegment =
+    arena.allocate(RENDER_TARGET_EXTENT_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        RENDER_TARGET_EXTENT_SIZE_OFFSET,
+        RENDER_TARGET_EXTENT_SIZE.toInt(),
+      )
+      segment.set(ValueLayout.JAVA_INT, RENDER_TARGET_EXTENT_WIDTH_OFFSET, extent.width)
+      segment.set(ValueLayout.JAVA_INT, RENDER_TARGET_EXTENT_HEIGHT_OFFSET, extent.height)
+      segment.set(
+        ValueLayout.JAVA_DOUBLE,
+        RENDER_TARGET_EXTENT_SCALE_FACTOR_OFFSET,
+        extent.scaleFactor,
+      )
+    }
+
+  private fun metalContext(arena: Arena, context: MetalContextDescriptor): MemorySegment =
+    arena.allocate(METAL_CONTEXT_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        METAL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
+        METAL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        METAL_CONTEXT_DESCRIPTOR_DEVICE_OFFSET,
+        nativePointer(context.device),
+      )
+    }
+
+  private fun vulkanContext(arena: Arena, context: VulkanContextDescriptor): MemorySegment =
+    arena.allocate(VULKAN_CONTEXT_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
+        VULKAN_CONTEXT_DESCRIPTOR_SIZE.toInt(),
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_CONTEXT_INSTANCE_OFFSET,
+        nativePointer(context.instance),
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_CONTEXT_PHYSICAL_DEVICE_OFFSET,
+        nativePointer(context.physicalDevice),
+      )
+      segment.set(ValueLayout.ADDRESS, VULKAN_CONTEXT_DEVICE_OFFSET, nativePointer(context.device))
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_CONTEXT_GRAPHICS_QUEUE_OFFSET,
+        nativePointer(context.graphicsQueue),
+      )
+      segment.set(
+        ValueLayout.JAVA_INT,
+        VULKAN_CONTEXT_GRAPHICS_QUEUE_FAMILY_INDEX_OFFSET,
+        context.graphicsQueueFamilyIndex,
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_CONTEXT_GET_INSTANCE_PROC_ADDR_OFFSET,
+        nativePointer(context.getInstanceProcAddr),
+      )
+      segment.set(
+        ValueLayout.ADDRESS,
+        VULKAN_CONTEXT_GET_DEVICE_PROC_ADDR_OFFSET,
+        nativePointer(context.getDeviceProcAddr),
+      )
+    }
+
+  private fun openglContext(arena: Arena, context: OpenGLContextDescriptor): MemorySegment =
+    arena.allocate(OPENGL_CONTEXT_DESCRIPTOR_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        OPENGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
+        OPENGL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
+      )
+      when (context) {
+        is WglContextDescriptor -> {
+          segment.set(
+            ValueLayout.JAVA_INT,
+            OPENGL_CONTEXT_DESCRIPTOR_PLATFORM_OFFSET,
+            OPENGL_CONTEXT_PLATFORM_WGL,
+          )
+          val data = segment.asSlice(OPENGL_CONTEXT_DESCRIPTOR_DATA_OFFSET)
+          data.set(
+            ValueLayout.JAVA_INT,
+            WGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
+            WGL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            WGL_CONTEXT_DESCRIPTOR_DEVICE_CONTEXT_OFFSET,
+            nativePointer(context.deviceContext),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            WGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET,
+            nativePointer(context.shareContext),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            WGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET,
+            nativePointer(context.getProcAddress),
+          )
+        }
+        is EglContextDescriptor -> {
+          segment.set(
+            ValueLayout.JAVA_INT,
+            OPENGL_CONTEXT_DESCRIPTOR_PLATFORM_OFFSET,
+            OPENGL_CONTEXT_PLATFORM_EGL,
+          )
+          val data = segment.asSlice(OPENGL_CONTEXT_DESCRIPTOR_DATA_OFFSET)
+          data.set(
+            ValueLayout.JAVA_INT,
+            EGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
+            EGL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            EGL_CONTEXT_DESCRIPTOR_DISPLAY_OFFSET,
+            nativePointer(context.display),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            EGL_CONTEXT_DESCRIPTOR_CONFIG_OFFSET,
+            nativePointer(context.config),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            EGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET,
+            nativePointer(context.shareContext),
+          )
+          data.set(
+            ValueLayout.ADDRESS,
+            EGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET,
+            nativePointer(context.getProcAddress),
+          )
+        }
+      }
+    }
+
+  private fun featureStateSelector(arena: Arena, selector: FeatureStateSelector): MemorySegment {
+    val segment = arena.allocate(FEATURE_STATE_SELECTOR_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      FEATURE_STATE_SELECTOR_SIZE_OFFSET,
+      FEATURE_STATE_SELECTOR_SIZE.toInt(),
+    )
+    segment.set(
+      ValueLayout.ADDRESS,
+      FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET,
+      stringView(arena, selector.sourceId),
+    )
+    var fields = 0
+    selector.sourceLayerId?.let {
+      fields = fields or FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+      segment.set(
+        ValueLayout.ADDRESS,
+        FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET,
+        stringView(arena, it),
+      )
+    }
+    selector.featureId?.let {
+      fields = fields or FEATURE_STATE_SELECTOR_FEATURE_ID
+      segment.set(
+        ValueLayout.ADDRESS,
+        FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET,
+        stringView(arena, it),
+      )
+    }
+    selector.stateKey?.let {
+      fields = fields or FEATURE_STATE_SELECTOR_STATE_KEY
+      segment.set(
+        ValueLayout.ADDRESS,
+        FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET,
+        stringView(arena, it),
+      )
+    }
+    segment.set(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun textureImageInfo(arena: Arena): MemorySegment =
+    arena.allocate(TEXTURE_IMAGE_INFO_SIZE).also { segment ->
+      segment.set(
+        ValueLayout.JAVA_INT,
+        TEXTURE_IMAGE_INFO_SIZE_OFFSET,
+        TEXTURE_IMAGE_INFO_SIZE.toInt(),
+      )
+    }
+
+  private fun readTextureImageInfo(segment: MemorySegment): TextureImageInfo =
+    TextureImageInfo(
+      segment.get(ValueLayout.JAVA_INT, TEXTURE_IMAGE_INFO_WIDTH_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, TEXTURE_IMAGE_INFO_HEIGHT_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, TEXTURE_IMAGE_INFO_STRIDE_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, TEXTURE_IMAGE_INFO_BYTE_LENGTH_OFFSET),
+    )
+
+  private fun nativePointer(pointer: NativePointer): MemorySegment =
+    if (pointer.isNull) MemorySegment.NULL else MemorySegment.ofAddress(pointer.address)
+
+  private fun copy(source: MemorySegment, target: MemorySegment, targetOffset: Long) {
+    MemorySegment.copy(source, 0, target, targetOffset, source.byteSize())
   }
 
   internal fun takeOfflineRegionStatusResult(
@@ -1911,6 +2542,17 @@ internal object NativeAccess {
     downcall(
       name,
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun mapAddressAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
     )
 
   private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle =
@@ -2201,6 +2843,50 @@ internal object NativeAccess {
 
   private fun projectionScreenPointAddressStatusFunction(name: String): MethodHandle =
     mapScreenPointAddressStatusFunction(name)
+
+  private fun renderSessionStatusFunction(name: String): MethodHandle =
+    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+
+  private fun renderSessionResizeFunction(): MethodHandle =
+    downcall(
+      "mln_render_session_resize",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_INT,
+        ValueLayout.JAVA_DOUBLE,
+      ),
+    )
+
+  private fun renderSessionAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun renderSessionTwoAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun textureReadPremultipliedRgba8Function(): MethodHandle =
+    downcall(
+      "mln_texture_read_premultiplied_rgba8",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
 
   private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle =
     downcall(
@@ -4670,6 +5356,120 @@ internal object NativeAccess {
   private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_BUFFER_OFFSET: Long = 60
   private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CLIP_OFFSET: Long = 64
   private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET: Long = 65
+
+  private const val RENDER_TARGET_EXTENT_SIZE: Long = 24
+  private const val RENDER_TARGET_EXTENT_SIZE_OFFSET: Long = 0
+  private const val RENDER_TARGET_EXTENT_WIDTH_OFFSET: Long = 4
+  private const val RENDER_TARGET_EXTENT_HEIGHT_OFFSET: Long = 8
+  private const val RENDER_TARGET_EXTENT_SCALE_FACTOR_OFFSET: Long = 16
+
+  private const val METAL_CONTEXT_DESCRIPTOR_SIZE: Long = 16
+  private const val METAL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val METAL_CONTEXT_DESCRIPTOR_DEVICE_OFFSET: Long = 8
+
+  private const val VULKAN_CONTEXT_DESCRIPTOR_SIZE: Long = 64
+  private const val VULKAN_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val VULKAN_CONTEXT_INSTANCE_OFFSET: Long = 8
+  private const val VULKAN_CONTEXT_PHYSICAL_DEVICE_OFFSET: Long = 16
+  private const val VULKAN_CONTEXT_DEVICE_OFFSET: Long = 24
+  private const val VULKAN_CONTEXT_GRAPHICS_QUEUE_OFFSET: Long = 32
+  private const val VULKAN_CONTEXT_GRAPHICS_QUEUE_FAMILY_INDEX_OFFSET: Long = 40
+  private const val VULKAN_CONTEXT_GET_INSTANCE_PROC_ADDR_OFFSET: Long = 48
+  private const val VULKAN_CONTEXT_GET_DEVICE_PROC_ADDR_OFFSET: Long = 56
+
+  private const val OPENGL_CONTEXT_PLATFORM_WGL: Int = 1
+  private const val OPENGL_CONTEXT_PLATFORM_EGL: Int = 2
+  private const val OPENGL_CONTEXT_DESCRIPTOR_SIZE: Long = 48
+  private const val OPENGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val OPENGL_CONTEXT_DESCRIPTOR_PLATFORM_OFFSET: Long = 4
+  private const val OPENGL_CONTEXT_DESCRIPTOR_DATA_OFFSET: Long = 8
+
+  private const val WGL_CONTEXT_DESCRIPTOR_SIZE: Long = 32
+  private const val WGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val WGL_CONTEXT_DESCRIPTOR_DEVICE_CONTEXT_OFFSET: Long = 8
+  private const val WGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET: Long = 16
+  private const val WGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET: Long = 24
+
+  private const val EGL_CONTEXT_DESCRIPTOR_SIZE: Long = 40
+  private const val EGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val EGL_CONTEXT_DESCRIPTOR_DISPLAY_OFFSET: Long = 8
+  private const val EGL_CONTEXT_DESCRIPTOR_CONFIG_OFFSET: Long = 16
+  private const val EGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET: Long = 24
+  private const val EGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET: Long = 32
+
+  private const val METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE: Long = 48
+  private const val METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val METAL_OWNED_TEXTURE_EXTENT_OFFSET: Long = 8
+  private const val METAL_OWNED_TEXTURE_CONTEXT_OFFSET: Long = 32
+
+  private const val METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE: Long = 40
+  private const val METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val METAL_BORROWED_TEXTURE_EXTENT_OFFSET: Long = 8
+  private const val METAL_BORROWED_TEXTURE_TEXTURE_OFFSET: Long = 32
+
+  private const val VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE: Long = 96
+  private const val VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val VULKAN_OWNED_TEXTURE_EXTENT_OFFSET: Long = 8
+  private const val VULKAN_OWNED_TEXTURE_CONTEXT_OFFSET: Long = 32
+
+  private const val VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE: Long = 128
+  private const val VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val VULKAN_BORROWED_TEXTURE_EXTENT_OFFSET: Long = 8
+  private const val VULKAN_BORROWED_TEXTURE_CONTEXT_OFFSET: Long = 32
+  private const val VULKAN_BORROWED_TEXTURE_IMAGE_OFFSET: Long = 96
+  private const val VULKAN_BORROWED_TEXTURE_IMAGE_VIEW_OFFSET: Long = 104
+  private const val VULKAN_BORROWED_TEXTURE_FORMAT_OFFSET: Long = 112
+  private const val VULKAN_BORROWED_TEXTURE_INITIAL_LAYOUT_OFFSET: Long = 116
+  private const val VULKAN_BORROWED_TEXTURE_FINAL_LAYOUT_OFFSET: Long = 120
+
+  private const val OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE: Long = 80
+  private const val OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val OPENGL_OWNED_TEXTURE_EXTENT_OFFSET: Long = 8
+  private const val OPENGL_OWNED_TEXTURE_CONTEXT_OFFSET: Long = 32
+
+  private const val OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE: Long = 88
+  private const val OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val OPENGL_BORROWED_TEXTURE_EXTENT_OFFSET: Long = 8
+  private const val OPENGL_BORROWED_TEXTURE_CONTEXT_OFFSET: Long = 32
+  private const val OPENGL_BORROWED_TEXTURE_TEXTURE_OFFSET: Long = 80
+  private const val OPENGL_BORROWED_TEXTURE_TARGET_OFFSET: Long = 84
+
+  private const val METAL_SURFACE_DESCRIPTOR_SIZE: Long = 56
+  private const val METAL_SURFACE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val METAL_SURFACE_EXTENT_OFFSET: Long = 8
+  private const val METAL_SURFACE_CONTEXT_OFFSET: Long = 32
+  private const val METAL_SURFACE_LAYER_OFFSET: Long = 48
+
+  private const val VULKAN_SURFACE_DESCRIPTOR_SIZE: Long = 104
+  private const val VULKAN_SURFACE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val VULKAN_SURFACE_EXTENT_OFFSET: Long = 8
+  private const val VULKAN_SURFACE_CONTEXT_OFFSET: Long = 32
+  private const val VULKAN_SURFACE_SURFACE_OFFSET: Long = 96
+
+  private const val OPENGL_SURFACE_DESCRIPTOR_SIZE: Long = 88
+  private const val OPENGL_SURFACE_DESCRIPTOR_SIZE_OFFSET: Long = 0
+  private const val OPENGL_SURFACE_EXTENT_OFFSET: Long = 8
+  private const val OPENGL_SURFACE_CONTEXT_OFFSET: Long = 32
+  private const val OPENGL_SURFACE_SURFACE_OFFSET: Long = 80
+
+  private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: Int = 1 shl 0
+  private const val FEATURE_STATE_SELECTOR_FEATURE_ID: Int = 1 shl 1
+  private const val FEATURE_STATE_SELECTOR_STATE_KEY: Int = 1 shl 2
+
+  private const val FEATURE_STATE_SELECTOR_SIZE: Long = 72
+  private const val FEATURE_STATE_SELECTOR_SIZE_OFFSET: Long = 0
+  private const val FEATURE_STATE_SELECTOR_FIELDS_OFFSET: Long = 4
+  private const val FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET: Long = 8
+  private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET: Long = 24
+  private const val FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET: Long = 40
+  private const val FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET: Long = 56
+
+  private const val TEXTURE_IMAGE_INFO_SIZE: Long = 24
+  private const val TEXTURE_IMAGE_INFO_SIZE_OFFSET: Long = 0
+  private const val TEXTURE_IMAGE_INFO_WIDTH_OFFSET: Long = 4
+  private const val TEXTURE_IMAGE_INFO_HEIGHT_OFFSET: Long = 8
+  private const val TEXTURE_IMAGE_INFO_STRIDE_OFFSET: Long = 12
+  private const val TEXTURE_IMAGE_INFO_BYTE_LENGTH_OFFSET: Long = 16
 
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE: Long = 32
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET: Long = 0

@@ -1056,3 +1056,22 @@ is being implemented.
 - Discovery: custom source lifecycle needs map/runtime coordination, not just
   direct map methods, because style URL loads drop previous style sources
   asynchronously.
+
+### JVM Render Session Core Milestone
+
+- Implemented JVM FFM render target attachment for Metal, Vulkan, and OpenGL
+  texture and surface descriptors.
+- Replaced the JVM render session placeholder with a real handle for lifecycle,
+  resize, render update, detach, renderer maintenance commands, feature state,
+  and premultiplied RGBA8 readback metadata/data.
+- Kept query result APIs and owned texture frame acquisition unsupported in this
+  slice because they need additional result-graph and active-frame ownership.
+- Added JVM coverage for unsupported-backend attach diagnostics through the new
+  descriptor bridge.
+- Discovery: render target descriptors have nested inline structs with enough
+  padding that probing offsets is less error-prone than hand-counting from
+  headers. The current ABI uses 24-byte extents, 48-byte OpenGL contexts,
+  72-byte feature-state selectors, and 24-byte texture image info.
+- Discovery: the JVM render session should retain its parent map through common
+  `HandleStateCore` child retention, matching the Kotlin Native ownership rule
+  without introducing a JVM-only lifecycle path.

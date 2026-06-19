@@ -1,6 +1,9 @@
 package org.maplibre.nativeffi.render
 
+import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureExtensionResult
@@ -10,46 +13,61 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
-/** JVM actual placeholder until the FFM render session bridge is migrated. */
-public actual class RenderSessionHandle private constructor() : AutoCloseable {
-  public actual val isClosed: Boolean
-    get() = unsupportedRenderSessionHandle()
+/** Owned JVM FFM render session handle. Close it on the map owner thread. */
+public actual class RenderSessionHandle
+internal constructor(private val map: MapHandle, private val handle: MemorySegment) :
+  AutoCloseable {
+  private val mapRetention = map.retainChild()
+  private val core = HandleStateCore("RenderSessionHandle", handle.address(), map)
 
-  public actual fun map(): MapHandle = unsupportedRenderSessionHandle()
+  public actual val isClosed: Boolean
+    get() = core.isReleased()
+
+  public actual fun map(): MapHandle = map
 
   public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.resizeRenderSession(requireLiveHandle(), width, height, scaleFactor)
   }
 
   public actual fun renderUpdate() {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.renderUpdate(requireLiveHandle())
   }
 
   public actual fun detach() {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.detachRenderSession(requireLiveHandle())
   }
 
   public actual fun reduceMemoryUse() {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.reduceRenderSessionMemoryUse(requireLiveHandle())
   }
 
   public actual fun clearData() {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.clearRenderSessionData(requireLiveHandle())
   }
 
   public actual fun dumpDebugLogs() {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.dumpRenderSessionDebugLogs(requireLiveHandle())
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setFeatureState(requireLiveHandle(), selector, value)
   }
 
-  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue =
-    unsupportedRenderSessionHandle()
+  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.getFeatureState(requireLiveHandle(), selector)
+  }
 
   public actual fun removeFeatureState(selector: FeatureStateSelector) {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.removeFeatureState(requireLiveHandle(), selector)
   }
 
   public actual fun queryRenderedFeatures(
@@ -70,10 +88,15 @@ public actual class RenderSessionHandle private constructor() : AutoCloseable {
     arguments: JsonValue?,
   ): FeatureExtensionResult = unsupportedRenderSessionHandle()
 
-  public actual fun textureImageInfo(): TextureImageInfo = unsupportedRenderSessionHandle()
+  public actual fun textureImageInfo(): TextureImageInfo {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.textureImageInfo(requireLiveHandle())
+  }
 
-  public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo =
-    unsupportedRenderSessionHandle()
+  public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.readPremultipliedRgba8(requireLiveHandle(), buffer)
+  }
 
   public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle =
     unsupportedRenderSessionHandle()
@@ -85,11 +108,22 @@ public actual class RenderSessionHandle private constructor() : AutoCloseable {
     unsupportedRenderSessionHandle()
 
   public actual override fun close() {
-    unsupportedRenderSessionHandle()
+    NativeAccess.ensureLoaded()
+    core.closeOnce(
+      destroy = { NativeAccess.destroyRenderSession(handle) },
+      afterSuccess = { mapRetention.close() },
+    )
+  }
+
+  internal fun nativeAddress(): Long = handle.address()
+
+  private fun requireLiveHandle(): MemorySegment {
+    core.requireLive()
+    return handle
   }
 }
 
 private fun unsupportedRenderSessionHandle(): Nothing =
   throw UnsupportedOperationException(
-    "RenderSessionHandle is not available until the JVM render bridge is implemented"
+    "This RenderSessionHandle operation is not available until the JVM render bridge is completed"
   )
