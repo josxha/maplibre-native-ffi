@@ -32,6 +32,8 @@ internal class HandleState<T : CPointed>(
 
   fun address(): Long = core.address()
 
+  fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+
   fun closeOnce(destroy: (CPointer<T>) -> Int) {
     closeOnce(destroy) {}
   }

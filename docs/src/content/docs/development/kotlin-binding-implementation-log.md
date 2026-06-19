@@ -305,3 +305,15 @@ is being implemented.
 - Reflection: this aligns the Kotlin lifecycle core with the Java bindings'
   deterministic destruction model while keeping actual handle ownership and
   platform native handle carriers out of `commonMain`.
+
+### Native Handle Retention Wiring Milestone
+
+- Wired the common lifecycle child-retention core into the Kotlin/Native handle
+  wrapper and the first real parent relationships: runtime-to-map and
+  map-to-render-session.
+- Kept map projections independent because they are standalone snapshots and the
+  existing Kotlin API intentionally allows them to outlive the map that created
+  them.
+- Discovery: the native runtime close test already expected live maps to block
+  runtime destruction, so wiring the common retention core tightened the
+  diagnostic without changing that public behavior.

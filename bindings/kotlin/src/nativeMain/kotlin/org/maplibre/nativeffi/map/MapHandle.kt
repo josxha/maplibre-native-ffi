@@ -146,6 +146,7 @@ import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -178,6 +179,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 @OptIn(ExperimentalForeignApi::class)
 public class MapHandle
 private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map>) : AutoCloseable {
+  private val runtimeRetention = runtime.retainChild()
   private val state = HandleState("MapHandle", handle, runtime)
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
@@ -1389,6 +1391,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     state.closeOnce(::mln_map_destroy) {
       clearCustomGeometrySources()
       runtime.unregisterMap(this)
+      runtimeRetention.close()
     }
   }
 
@@ -1400,6 +1403,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   internal fun nativeHandle(): CPointer<mln_map> = state.requireLive()
 
   internal fun nativeAddress(): Long = state.address()
+
+  internal fun retainChild(): HandleStateCore.ChildRetention = state.retainChild()
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

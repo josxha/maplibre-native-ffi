@@ -52,6 +52,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs
@@ -500,6 +501,8 @@ internal constructor(
   internal fun nativeHandle(): CPointer<mln_runtime> = state.requireLive()
 
   internal fun nativeAddress(): Long = state.address()
+
+  internal fun retainChild(): HandleStateCore.ChildRetention = state.retainChild()
 
   internal fun resourceProviderStateForTesting(): ResourceProviderState? = resourceProviderState
 
