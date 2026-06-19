@@ -424,3 +424,16 @@ is being implemented.
 - Reflection: this is the first public handle facade moved to expect/actual form
   instead of only extracting internal state, which is a step toward domain-level
   bridge facades.
+
+### Common Native Buffer Facade Milestone
+
+- Added a common `expect` facade for `NativeBuffer`, moving its public
+  allocation, byte length, byte copy, and close contract into `commonMain`.
+- Converted the existing Kotlin/Native off-heap buffer into the native actual
+  while leaving native heap allocation, pointer borrowing, and C interop helpers
+  in `nativeMain`.
+- Added explicit JVM and Android actual placeholders until their render readback
+  bridges exist.
+- Reflection: this mirrors the `ResourceRequestHandle` facade pattern for a
+  render-domain public type, making more public API visible from common code
+  without pretending the non-native bridges are finished.
