@@ -69,3 +69,15 @@ is being implemented.
 - Reflection: this is a build-shape milestone rather than an FFM migration. It
   creates the `jvmMain` destination and verifies the common API surface before
   moving Java FFM internals into Kotlin.
+
+### JVM Loader Milestone
+
+- Moved the first self-contained piece of the Java FFM bridge into Kotlin
+  `jvmMain`: the native library lookup and one-time load helper used by future
+  JVM FFM actuals.
+- Added a JVM test for explicit missing-path failures, which verifies the loader
+  reports the configured source and path without requiring a generated FFM
+  binding or a successful native load.
+- Discovery: the loader can migrate independently from jextract because it only
+  depends on JDK APIs. That makes it a useful first `jvmMain` bridge component
+  before moving symbol lookup, ABI checks, and generated/native downcalls.
