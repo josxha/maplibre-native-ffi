@@ -936,3 +936,18 @@ is being implemented.
   from small array-scope helpers on both bridges. Keeping those helpers
   primitive-specific avoids pulling in the broader geometry/GeoJSON descriptor
   graph too early.
+
+### JVM and Android Map Option Properties Milestone
+
+- Implemented JVM FFM and Android JavaCPP `viewportOptions`, `tileOptions`, and
+  `projectionMode` map properties.
+- Added platform materialization for viewport, tile, projection, and edge-inset
+  descriptors, including field masks and unknown-input rejection for wrapped
+  enum domains.
+- Added JVM coverage that round-trips viewport orientation/constrain/frustum
+  options, tile LOD options, and projection mode options through the Kotlin map
+  handle.
+- Discovery: exact FFM offsets matter for these descriptor structs because
+  `mln_map_viewport_options` and `mln_map_tile_options` both contain padding
+  before double-aligned fields. A tiny `offsetof` probe is a better source of
+  truth than hand-counting from the header.

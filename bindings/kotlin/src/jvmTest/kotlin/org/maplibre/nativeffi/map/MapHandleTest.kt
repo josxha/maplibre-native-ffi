@@ -6,6 +6,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.json.JsonValue
@@ -286,6 +287,66 @@ class MapHandleTest {
       map.requestRepaint()
       map.isFullyLoaded
       map.dumpDebugLogs()
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun mapOptionPropertiesCanBeRoundTripped() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.viewportOptions =
+        ViewportOptions().apply {
+          northOrientation = NorthOrientation.UP
+          constrainMode = ConstrainMode.HEIGHT_ONLY
+          viewportMode = ViewportMode.DEFAULT
+          frustumOffset = EdgeInsets.ZERO
+        }
+      val viewport = map.viewportOptions
+      assertEquals(NorthOrientation.UP, viewport.northOrientation)
+      assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode)
+      assertEquals(ViewportMode.DEFAULT, viewport.viewportMode)
+      assertEquals(EdgeInsets.ZERO, viewport.frustumOffset)
+
+      map.tileOptions =
+        TileOptions().apply {
+          prefetchZoomDelta = 2
+          lodMinRadius = 1.5
+          lodScale = 2.5
+          lodPitchThreshold = 30.0
+          lodZoomShift = 1.0
+          lodMode = TileLodMode.DEFAULT
+        }
+      val tile = map.tileOptions
+      assertEquals(2, tile.prefetchZoomDelta)
+      assertEquals(1.5, tile.lodMinRadius)
+      assertEquals(2.5, tile.lodScale)
+      assertEquals(30.0, tile.lodPitchThreshold)
+      assertEquals(1.0, tile.lodZoomShift)
+      assertEquals(TileLodMode.DEFAULT, tile.lodMode)
+
+      map.projectionMode =
+        ProjectionModeOptions().apply {
+          axonometric = false
+          xSkew = 0.0
+          ySkew = 0.0
+        }
+      val projectionMode = map.projectionMode
+      assertEquals(false, projectionMode.axonometric)
+      assertEquals(0.0, projectionMode.xSkew)
+      assertEquals(0.0, projectionMode.ySkew)
     } finally {
       map.close()
       runtime.close()

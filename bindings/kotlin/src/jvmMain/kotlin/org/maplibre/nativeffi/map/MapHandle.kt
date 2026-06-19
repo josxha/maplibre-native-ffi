@@ -397,15 +397,23 @@ private constructor(
   }
 
   public actual var viewportOptions: ViewportOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.viewportOptions(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setViewportOptions(requireLiveHandle(), value)
     }
 
   public actual var tileOptions: TileOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.tileOptions(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setTileOptions(requireLiveHandle(), value)
     }
 
   public actual val camera: CameraOptions
@@ -501,9 +509,13 @@ private constructor(
     }
 
   public actual var projectionMode: ProjectionModeOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.projectionMode(requireLiveHandle())
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      NativeAccess.setProjectionMode(requireLiveHandle(), value)
     }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = unsupportedMapHandle()

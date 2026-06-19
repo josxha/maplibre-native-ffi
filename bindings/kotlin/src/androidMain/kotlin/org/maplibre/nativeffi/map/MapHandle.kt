@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.GeoJson
@@ -875,15 +876,44 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual var viewportOptions: ViewportOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_map_viewport_options_default().use { outOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_get_viewport_options(map(requireLiveAddress()), outOptions)
+        )
+        return viewportOptions(outOptions)
+      }
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      ViewportOptionsScope(value).use { nativeOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_viewport_options(
+            map(requireLiveAddress()),
+            nativeOptions.options,
+          )
+        )
+      }
     }
 
   public actual var tileOptions: TileOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_map_tile_options_default().use { outOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_get_tile_options(map(requireLiveAddress()), outOptions)
+        )
+        return tileOptions(outOptions)
+      }
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      TileOptionsScope(value).use { nativeOptions ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_tile_options(map(requireLiveAddress()), nativeOptions.options)
+        )
+      }
     }
 
   public actual val camera: CameraOptions
@@ -979,9 +1009,22 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     }
 
   public actual var projectionMode: ProjectionModeOptions
-    get() = unsupportedMapHandle()
+    get() {
+      NativeAccess.ensureLoaded()
+      MaplibreNativeC.mln_projection_mode_default().use { outMode ->
+        Status.check(
+          MaplibreNativeC.mln_map_get_projection_mode(map(requireLiveAddress()), outMode)
+        )
+        return projectionModeOptions(outMode)
+      }
+    }
     set(value) {
-      unsupportedMapHandle()
+      NativeAccess.ensureLoaded()
+      ProjectionModeOptionsScope(value).use { nativeMode ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_projection_mode(map(requireLiveAddress()), nativeMode.mode)
+        )
+      }
     }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = unsupportedMapHandle()
@@ -1254,6 +1297,72 @@ private fun debugOptionMask(options: Set<DebugOption>): Int =
 private fun debugOptions(mask: Int): Set<DebugOption> =
   DebugOption.entries.filterTo(mutableSetOf()) { option -> (mask and option.nativeMask) != 0 }
 
+private fun edgeInsets(value: MaplibreNativeC.mln_edge_insets): EdgeInsets =
+  EdgeInsets(value.top(), value.left(), value.bottom(), value.right())
+
+private fun writeEdgeInsets(out: MaplibreNativeC.mln_edge_insets, value: EdgeInsets) {
+  out.top(value.top).left(value.left).bottom(value.bottom).right(value.right)
+}
+
+private fun viewportOptions(value: MaplibreNativeC.mln_map_viewport_options): ViewportOptions {
+  val fields = value.fields()
+  return ViewportOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0) {
+      northOrientation = NorthOrientation.fromNative(value.north_orientation())
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0) {
+      constrainMode = ConstrainMode.fromNative(value.constrain_mode())
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0) {
+      viewportMode = ViewportMode.fromNative(value.viewport_mode())
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0) {
+      frustumOffset = edgeInsets(value.frustum_offset())
+    }
+  }
+}
+
+private fun tileOptions(value: MaplibreNativeC.mln_map_tile_options): TileOptions {
+  val fields = value.fields()
+  return TileOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0) {
+      prefetchZoomDelta = value.prefetch_zoom_delta()
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0) {
+      lodMinRadius = value.lod_min_radius()
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE) != 0) {
+      lodScale = value.lod_scale()
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) {
+      lodPitchThreshold = value.lod_pitch_threshold()
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0) {
+      lodZoomShift = value.lod_zoom_shift()
+    }
+    if ((fields and MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE) != 0) {
+      lodMode = TileLodMode.fromNative(value.lod_mode())
+    }
+  }
+}
+
+private fun projectionModeOptions(
+  value: MaplibreNativeC.mln_projection_mode
+): ProjectionModeOptions {
+  val fields = value.fields()
+  return ProjectionModeOptions().apply {
+    if ((fields and MaplibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC) != 0) {
+      axonometric = value.axonometric()
+    }
+    if ((fields and MaplibreNativeC.MLN_PROJECTION_MODE_X_SKEW) != 0) {
+      xSkew = value.x_skew()
+    }
+    if ((fields and MaplibreNativeC.MLN_PROJECTION_MODE_Y_SKEW) != 0) {
+      ySkew = value.y_skew()
+    }
+  }
+}
+
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer
   val view: MaplibreNativeC.mln_string_view = MaplibreNativeC.mln_string_view()
@@ -1451,6 +1560,102 @@ private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable 
   override fun close() {
     options.close()
     attribution?.close()
+  }
+}
+
+private class ViewportOptionsScope(value: ViewportOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_map_viewport_options =
+    MaplibreNativeC.mln_map_viewport_options_default()
+
+  init {
+    var fields = 0
+    value.northOrientation?.let {
+      require(it.isKnown) { "Unknown north orientation cannot be used as input: ${it.nativeValue}" }
+      fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
+      options.north_orientation(it.nativeValue)
+    }
+    value.constrainMode?.let {
+      require(it.isKnown) { "Unknown constrain mode cannot be used as input: ${it.nativeValue}" }
+      fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
+      options.constrain_mode(it.nativeValue)
+    }
+    value.viewportMode?.let {
+      require(it.isKnown) { "Unknown viewport mode cannot be used as input: ${it.nativeValue}" }
+      fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
+      options.viewport_mode(it.nativeValue)
+    }
+    value.frustumOffset?.let {
+      fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
+      writeEdgeInsets(options.frustum_offset(), it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private class TileOptionsScope(value: TileOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_map_tile_options = MaplibreNativeC.mln_map_tile_options_default()
+
+  init {
+    var fields = 0
+    value.prefetchZoomDelta?.let {
+      fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
+      options.prefetch_zoom_delta(it)
+    }
+    value.lodMinRadius?.let {
+      fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS
+      options.lod_min_radius(it)
+    }
+    value.lodScale?.let {
+      fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE
+      options.lod_scale(it)
+    }
+    value.lodPitchThreshold?.let {
+      fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
+      options.lod_pitch_threshold(it)
+    }
+    value.lodZoomShift?.let {
+      fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT
+      options.lod_zoom_shift(it)
+    }
+    value.lodMode?.let {
+      require(it.isKnown) { "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}" }
+      fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE
+      options.lod_mode(it.nativeValue)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private class ProjectionModeOptionsScope(value: ProjectionModeOptions) : AutoCloseable {
+  val mode: MaplibreNativeC.mln_projection_mode = MaplibreNativeC.mln_projection_mode_default()
+
+  init {
+    var fields = 0
+    value.axonometric?.let {
+      fields = fields or MaplibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC
+      mode.axonometric(it)
+    }
+    value.xSkew?.let {
+      fields = fields or MaplibreNativeC.MLN_PROJECTION_MODE_X_SKEW
+      mode.x_skew(it)
+    }
+    value.ySkew?.let {
+      fields = fields or MaplibreNativeC.MLN_PROJECTION_MODE_Y_SKEW
+      mode.y_skew(it)
+    }
+    mode.fields(fields)
+  }
+
+  override fun close() {
+    mode.close()
   }
 }
 

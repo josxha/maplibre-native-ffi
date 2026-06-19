@@ -11,6 +11,7 @@ import java.lang.invoke.MethodHandle
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
+import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -18,11 +19,18 @@ import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.DebugOption
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.map.NorthOrientation
+import org.maplibre.nativeffi.map.ProjectionModeOptions
 import org.maplibre.nativeffi.map.RenderingStats
+import org.maplibre.nativeffi.map.TileLodMode
 import org.maplibre.nativeffi.map.TileOperation
+import org.maplibre.nativeffi.map.TileOptions
+import org.maplibre.nativeffi.map.ViewportMode
+import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -1031,6 +1039,63 @@ internal object NativeAccess {
     Status.check(mapStatusFunction("mln_map_dump_debug_logs").invokeWithArguments(map) as Int)
   }
 
+  internal fun viewportOptions(map: MemorySegment): ViewportOptions =
+    Arena.ofConfined().use { arena ->
+      val outOptions = viewportOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_viewport_options")
+          .invokeWithArguments(map, outOptions) as Int
+      )
+      readViewportOptions(outOptions)
+    }
+
+  internal fun setViewportOptions(map: MemorySegment, options: ViewportOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_viewport_options")
+          .invokeWithArguments(map, viewportOptions(arena, options)) as Int
+      )
+    }
+  }
+
+  internal fun tileOptions(map: MemorySegment): TileOptions =
+    Arena.ofConfined().use { arena ->
+      val outOptions = tileOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_tile_options").invokeWithArguments(map, outOptions)
+          as Int
+      )
+      readTileOptions(outOptions)
+    }
+
+  internal fun setTileOptions(map: MemorySegment, options: TileOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_tile_options")
+          .invokeWithArguments(map, tileOptions(arena, options)) as Int
+      )
+    }
+  }
+
+  internal fun projectionMode(map: MemorySegment): ProjectionModeOptions =
+    Arena.ofConfined().use { arena ->
+      val outMode = projectionModeDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_projection_mode").invokeWithArguments(map, outMode)
+          as Int
+      )
+      projectionModeOptions(outMode)
+    }
+
+  internal fun setProjectionMode(map: MemorySegment, mode: ProjectionModeOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_projection_mode")
+          .invokeWithArguments(map, projectionModeOptions(arena, mode)) as Int
+      )
+    }
+  }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -1802,6 +1867,186 @@ internal object NativeAccess {
     }
     segment.set(ValueLayout.JAVA_INT, TILE_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
+  }
+
+  private fun edgeInsets(segment: MemorySegment): EdgeInsets =
+    EdgeInsets(
+      segment.get(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_TOP_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_LEFT_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_BOTTOM_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_RIGHT_OFFSET),
+    )
+
+  private fun writeEdgeInsets(segment: MemorySegment, value: EdgeInsets) {
+    segment.set(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_TOP_OFFSET, value.top)
+    segment.set(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_LEFT_OFFSET, value.left)
+    segment.set(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_BOTTOM_OFFSET, value.bottom)
+    segment.set(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_RIGHT_OFFSET, value.right)
+  }
+
+  private fun viewportOptionsDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(VIEWPORT_OPTIONS_SIZE)
+    segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_SIZE_OFFSET, VIEWPORT_OPTIONS_SIZE.toInt())
+    return segment
+  }
+
+  private fun viewportOptions(arena: Arena, value: ViewportOptions): MemorySegment {
+    val segment = viewportOptionsDefault(arena)
+    var fields = 0
+    value.northOrientation?.let {
+      require(it.isKnown) { "Unknown north orientation cannot be used as input: ${it.nativeValue}" }
+      fields = fields or VIEWPORT_OPTION_NORTH_ORIENTATION
+      segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_NORTH_ORIENTATION_OFFSET, it.nativeValue)
+    }
+    value.constrainMode?.let {
+      require(it.isKnown) { "Unknown constrain mode cannot be used as input: ${it.nativeValue}" }
+      fields = fields or VIEWPORT_OPTION_CONSTRAIN_MODE
+      segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_CONSTRAIN_MODE_OFFSET, it.nativeValue)
+    }
+    value.viewportMode?.let {
+      require(it.isKnown) { "Unknown viewport mode cannot be used as input: ${it.nativeValue}" }
+      fields = fields or VIEWPORT_OPTION_VIEWPORT_MODE
+      segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_VIEWPORT_MODE_OFFSET, it.nativeValue)
+    }
+    value.frustumOffset?.let {
+      fields = fields or VIEWPORT_OPTION_FRUSTUM_OFFSET
+      writeEdgeInsets(segment.asSlice(VIEWPORT_OPTIONS_FRUSTUM_OFFSET_OFFSET, EDGE_INSETS_SIZE), it)
+    }
+    segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun readViewportOptions(segment: MemorySegment): ViewportOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_FIELDS_OFFSET)
+    return ViewportOptions().apply {
+      if ((fields and VIEWPORT_OPTION_NORTH_ORIENTATION) != 0) {
+        northOrientation =
+          NorthOrientation.fromNative(
+            segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_NORTH_ORIENTATION_OFFSET)
+          )
+      }
+      if ((fields and VIEWPORT_OPTION_CONSTRAIN_MODE) != 0) {
+        constrainMode =
+          ConstrainMode.fromNative(
+            segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_CONSTRAIN_MODE_OFFSET)
+          )
+      }
+      if ((fields and VIEWPORT_OPTION_VIEWPORT_MODE) != 0) {
+        viewportMode =
+          ViewportMode.fromNative(
+            segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_VIEWPORT_MODE_OFFSET)
+          )
+      }
+      if ((fields and VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0) {
+        frustumOffset =
+          edgeInsets(segment.asSlice(VIEWPORT_OPTIONS_FRUSTUM_OFFSET_OFFSET, EDGE_INSETS_SIZE))
+      }
+    }
+  }
+
+  private fun tileOptionsDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(TILE_OPTIONS_SIZE)
+    segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_SIZE_OFFSET, TILE_OPTIONS_SIZE.toInt())
+    return segment
+  }
+
+  private fun tileOptions(arena: Arena, value: TileOptions): MemorySegment {
+    val segment = tileOptionsDefault(arena)
+    var fields = 0
+    value.prefetchZoomDelta?.let {
+      fields = fields or TILE_OPTION_PREFETCH_ZOOM_DELTA
+      segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_PREFETCH_ZOOM_DELTA_OFFSET, it)
+    }
+    value.lodMinRadius?.let {
+      fields = fields or TILE_OPTION_LOD_MIN_RADIUS
+      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_MIN_RADIUS_OFFSET, it)
+    }
+    value.lodScale?.let {
+      fields = fields or TILE_OPTION_LOD_SCALE
+      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_SCALE_OFFSET, it)
+    }
+    value.lodPitchThreshold?.let {
+      fields = fields or TILE_OPTION_LOD_PITCH_THRESHOLD
+      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_PITCH_THRESHOLD_OFFSET, it)
+    }
+    value.lodZoomShift?.let {
+      fields = fields or TILE_OPTION_LOD_ZOOM_SHIFT
+      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_ZOOM_SHIFT_OFFSET, it)
+    }
+    value.lodMode?.let {
+      require(it.isKnown) { "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}" }
+      fields = fields or TILE_OPTION_LOD_MODE
+      segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_LOD_MODE_OFFSET, it.nativeValue)
+    }
+    segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun readTileOptions(segment: MemorySegment): TileOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, TILE_OPTIONS_FIELDS_OFFSET)
+    return TileOptions().apply {
+      if ((fields and TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0) {
+        prefetchZoomDelta =
+          segment.get(ValueLayout.JAVA_INT, TILE_OPTIONS_PREFETCH_ZOOM_DELTA_OFFSET)
+      }
+      if ((fields and TILE_OPTION_LOD_MIN_RADIUS) != 0) {
+        lodMinRadius = segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_MIN_RADIUS_OFFSET)
+      }
+      if ((fields and TILE_OPTION_LOD_SCALE) != 0) {
+        lodScale = segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_SCALE_OFFSET)
+      }
+      if ((fields and TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) {
+        lodPitchThreshold =
+          segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_PITCH_THRESHOLD_OFFSET)
+      }
+      if ((fields and TILE_OPTION_LOD_ZOOM_SHIFT) != 0) {
+        lodZoomShift = segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_ZOOM_SHIFT_OFFSET)
+      }
+      if ((fields and TILE_OPTION_LOD_MODE) != 0) {
+        lodMode =
+          TileLodMode.fromNative(segment.get(ValueLayout.JAVA_INT, TILE_OPTIONS_LOD_MODE_OFFSET))
+      }
+    }
+  }
+
+  private fun projectionModeDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(PROJECTION_MODE_SIZE)
+    segment.set(ValueLayout.JAVA_INT, PROJECTION_MODE_SIZE_OFFSET, PROJECTION_MODE_SIZE.toInt())
+    return segment
+  }
+
+  private fun projectionModeOptions(arena: Arena, value: ProjectionModeOptions): MemorySegment {
+    val segment = projectionModeDefault(arena)
+    var fields = 0
+    value.axonometric?.let {
+      fields = fields or PROJECTION_MODE_AXONOMETRIC
+      segment.set(ValueLayout.JAVA_BOOLEAN, PROJECTION_MODE_AXONOMETRIC_OFFSET, it)
+    }
+    value.xSkew?.let {
+      fields = fields or PROJECTION_MODE_X_SKEW
+      segment.set(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_X_SKEW_OFFSET, it)
+    }
+    value.ySkew?.let {
+      fields = fields or PROJECTION_MODE_Y_SKEW
+      segment.set(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_Y_SKEW_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, PROJECTION_MODE_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun projectionModeOptions(segment: MemorySegment): ProjectionModeOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, PROJECTION_MODE_FIELDS_OFFSET)
+    return ProjectionModeOptions().apply {
+      if ((fields and PROJECTION_MODE_AXONOMETRIC) != 0) {
+        axonometric = segment.get(ValueLayout.JAVA_BOOLEAN, PROJECTION_MODE_AXONOMETRIC_OFFSET)
+      }
+      if ((fields and PROJECTION_MODE_X_SKEW) != 0) {
+        xSkew = segment.get(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_X_SKEW_OFFSET)
+      }
+      if ((fields and PROJECTION_MODE_Y_SKEW) != 0) {
+        ySkew = segment.get(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_Y_SKEW_OFFSET)
+      }
+    }
   }
 
   private fun jsonValue(arena: Arena, value: JsonValue): MemorySegment {
@@ -2715,6 +2960,53 @@ internal object NativeAccess {
   private const val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long = 24
 
   private const val IMAGE_SOURCE_COORDINATE_COUNT: Int = 4
+
+  private const val EDGE_INSETS_SIZE: Long = 32
+  private const val EDGE_INSETS_TOP_OFFSET: Long = 0
+  private const val EDGE_INSETS_LEFT_OFFSET: Long = 8
+  private const val EDGE_INSETS_BOTTOM_OFFSET: Long = 16
+  private const val EDGE_INSETS_RIGHT_OFFSET: Long = 24
+
+  private const val VIEWPORT_OPTION_NORTH_ORIENTATION: Int = 1 shl 0
+  private const val VIEWPORT_OPTION_CONSTRAIN_MODE: Int = 1 shl 1
+  private const val VIEWPORT_OPTION_VIEWPORT_MODE: Int = 1 shl 2
+  private const val VIEWPORT_OPTION_FRUSTUM_OFFSET: Int = 1 shl 3
+
+  private const val VIEWPORT_OPTIONS_SIZE: Long = 56
+  private const val VIEWPORT_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val VIEWPORT_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val VIEWPORT_OPTIONS_NORTH_ORIENTATION_OFFSET: Long = 8
+  private const val VIEWPORT_OPTIONS_CONSTRAIN_MODE_OFFSET: Long = 12
+  private const val VIEWPORT_OPTIONS_VIEWPORT_MODE_OFFSET: Long = 16
+  private const val VIEWPORT_OPTIONS_FRUSTUM_OFFSET_OFFSET: Long = 24
+
+  private const val TILE_OPTION_PREFETCH_ZOOM_DELTA: Int = 1 shl 0
+  private const val TILE_OPTION_LOD_MIN_RADIUS: Int = 1 shl 1
+  private const val TILE_OPTION_LOD_SCALE: Int = 1 shl 2
+  private const val TILE_OPTION_LOD_PITCH_THRESHOLD: Int = 1 shl 3
+  private const val TILE_OPTION_LOD_ZOOM_SHIFT: Int = 1 shl 4
+  private const val TILE_OPTION_LOD_MODE: Int = 1 shl 5
+
+  private const val TILE_OPTIONS_SIZE: Long = 56
+  private const val TILE_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val TILE_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val TILE_OPTIONS_PREFETCH_ZOOM_DELTA_OFFSET: Long = 8
+  private const val TILE_OPTIONS_LOD_MIN_RADIUS_OFFSET: Long = 16
+  private const val TILE_OPTIONS_LOD_SCALE_OFFSET: Long = 24
+  private const val TILE_OPTIONS_LOD_PITCH_THRESHOLD_OFFSET: Long = 32
+  private const val TILE_OPTIONS_LOD_ZOOM_SHIFT_OFFSET: Long = 40
+  private const val TILE_OPTIONS_LOD_MODE_OFFSET: Long = 48
+
+  private const val PROJECTION_MODE_AXONOMETRIC: Int = 1 shl 0
+  private const val PROJECTION_MODE_X_SKEW: Int = 1 shl 1
+  private const val PROJECTION_MODE_Y_SKEW: Int = 1 shl 2
+
+  private const val PROJECTION_MODE_SIZE: Long = 32
+  private const val PROJECTION_MODE_SIZE_OFFSET: Long = 0
+  private const val PROJECTION_MODE_FIELDS_OFFSET: Long = 4
+  private const val PROJECTION_MODE_AXONOMETRIC_OFFSET: Long = 8
+  private const val PROJECTION_MODE_X_SKEW_OFFSET: Long = 16
+  private const val PROJECTION_MODE_Y_SKEW_OFFSET: Long = 24
 
   private const val TILE_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val TILE_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
