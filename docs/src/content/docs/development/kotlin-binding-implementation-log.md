@@ -98,3 +98,17 @@ is being implemented.
   wrapper migration still needs a clear decision about whether to keep jextract
   generated declarations in `jvmMain` or replace selected calls with
   hand-written downcall helpers.
+
+### JVM Maplibre Facade Milestone
+
+- Added the first Kotlin/JVM public `Maplibre` facade, backed by the new
+  `jvmMain` native access layer, with native library loading and C ABI version
+  entry points.
+- Discovery: JVM and Kotlin/Native can each provide a platform-specific
+  `org.maplibre.nativeffi.Maplibre` object before a common `expect` declaration
+  exists. This keeps the first JVM facade small while preserving room to promote
+  the shared shape into `commonMain` once the JVM implementation covers the same
+  member set as `nativeMain`.
+- Reflection: this is still a transitional platform facade. The destination is
+  an `expect object Maplibre` in `commonMain` with JVM FFM and Kotlin/Native
+  actuals once the JVM side has enough behavior to satisfy the common contract.

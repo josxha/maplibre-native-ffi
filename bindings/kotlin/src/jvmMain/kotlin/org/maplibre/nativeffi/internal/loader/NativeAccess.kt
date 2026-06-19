@@ -66,7 +66,7 @@ internal object NativeAccess {
     checkNativeAccessAndAbi(::cVersion)
   }
 
-  private fun cVersion(): Long =
+  internal fun cVersion(): Long =
     cVersionHandle().invokeWithArguments().let { Integer.toUnsignedLong(it as Int) }
 
   private fun cVersionHandle(): MethodHandle {
