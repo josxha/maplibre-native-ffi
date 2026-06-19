@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.render
 
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
@@ -12,7 +10,7 @@ import kotlinx.cinterop.rawValue
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 
 /** Explicit handle for a Vulkan session-owned texture frame. */
-@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public class VulkanOwnedTextureFrameHandle
 internal constructor(
   private val session: RenderSessionHandle,
@@ -20,31 +18,30 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: VulkanOwnedTextureFrame,
 ) : AutoCloseable {
-  private val leakReport = LeakReport("VulkanOwnedTextureFrameHandle")
-  @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
-  private var closed = false
+  private val core =
+    OwnedTextureFrameHandleCore(
+      "VulkanOwnedTextureFrameHandle",
+      "Vulkan owned texture frame handle is closed",
+    )
+  @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.reportLeak() }
 
   public fun frame(): VulkanOwnedTextureFrame {
-    ensureOpen()
+    core.ensureOpen()
     return frameValue
   }
 
   public val isClosed: Boolean
-    get() = closed
+    get() = core.isClosed()
 
   override fun close() {
-    FrameReleasePolicy.close(
-      isClosed = { closed },
+    core.close(
       releaseNative = { session.releaseVulkanFrame(framePointer) },
       ownerClosed = { session.isClosed },
-      closeLocal = ::closeLocal,
+      releaseLocal = ::releaseLocal,
     )
   }
 
-  private fun closeLocal() {
-    if (closed) return
-    closed = true
-    leakReport.markClosed()
+  private fun releaseLocal() {
     try {
       scope.close()
     } finally {
@@ -52,26 +49,6 @@ internal constructor(
         nativeHeap.free(framePointer.rawValue)
       } finally {
         session.finishFrameBorrow()
-      }
-    }
-  }
-
-  private fun ensureOpen() {
-    check(!closed) { "Vulkan owned texture frame handle is closed" }
-  }
-
-  private class LeakReport(private val typeName: String) {
-    private val closed = AtomicInt(0)
-
-    fun markClosed() {
-      closed.store(1)
-    }
-
-    fun report() {
-      if (closed.load() == 0) {
-        println(
-          "Leaked $typeName; close frame handles explicitly on the render session owner thread."
-        )
       }
     }
   }

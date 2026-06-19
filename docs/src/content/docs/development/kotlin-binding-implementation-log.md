@@ -396,3 +396,18 @@ is being implemented.
   global replacement policy and raw upcall materialization, so the registry can
   serve future FFM and Android actuals without changing the public log callback
   API.
+
+### Common Owned Texture Frame Core Milestone
+
+- Extracted session-owned texture frame closed-state, retryable release policy
+  integration, and leak reporting into `OwnedTextureFrameHandleCore`.
+- Rewired Metal, Vulkan, and OpenGL owned texture frame handles to use the
+  common core while keeping backend-specific native release calls, native heap
+  frame frees, frame scope cleanup, and render-session borrow completion in
+  `nativeMain`.
+- Added common tests for successful close idempotence, retry after live-owner
+  release failure, closed-owner local cleanup, configured closed messages, and
+  leak report text.
+- Reflection: this removes another set of duplicated native-only lifecycle code
+  and leaves the platform source set focused on the actual frame pointer
+  mechanics.
