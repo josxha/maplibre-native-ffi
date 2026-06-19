@@ -12,8 +12,12 @@ import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.TileScheme
+import org.maplibre.nativeffi.style.TileSourceOptions
+import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class MapHandleTest {
   @Test
@@ -71,6 +75,56 @@ class MapHandleTest {
       assertTrue(map.removeStyleSource("places"))
       assertFalse(map.styleSourceExists("places"))
       assertFalse(map.removeStyleSource("places"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun tileSourcesCanBeAddedAndInspected() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.addVectorSourceUrl(
+        "roads",
+        "https://example.com/vector.json",
+        TileSourceOptions().apply {
+          minZoom = 1.0
+          maxZoom = 12.0
+          attribution = "vector attribution"
+          scheme = TileScheme.XYZ
+          vectorEncoding = VectorTileEncoding.MVT
+        },
+      )
+      map.addRasterSourceTiles(
+        "satellite",
+        listOf("https://example.com/raster/{z}/{x}/{y}.png"),
+        TileSourceOptions().apply { tileSize = 256 },
+      )
+      map.addRasterDemSourceTiles(
+        "terrain",
+        listOf("https://example.com/terrain/{z}/{x}/{y}.png"),
+        TileSourceOptions().apply {
+          tileSize = 512
+          rasterDemEncoding = RasterDemEncoding.TERRARIUM
+        },
+      )
+
+      assertEquals(SourceType.VECTOR, map.styleSourceType("roads"))
+      assertEquals(SourceType.RASTER, map.styleSourceInfo("satellite")?.type)
+      assertEquals(SourceType.RASTER_DEM, map.styleSourceType("terrain"))
+      assertTrue(map.styleSourceIds().containsAll(listOf("roads", "satellite", "terrain")))
     } finally {
       map.close()
       runtime.close()

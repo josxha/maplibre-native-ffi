@@ -47,6 +47,7 @@ import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -444,6 +445,60 @@ internal object NativeAccess {
       Status.check(mapListStyleSourceIdsFunction().invokeWithArguments(map, outList) as Int)
       styleIdList(outList.get(ValueLayout.ADDRESS, 0))
     }
+
+  internal fun addVectorSourceUrl(
+    map: MemorySegment,
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
+    addTileSourceUrl("mln_map_add_vector_source_url", map, sourceId, url, options)
+  }
+
+  internal fun addVectorSourceTiles(
+    map: MemorySegment,
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    addTileSourceTiles("mln_map_add_vector_source_tiles", map, sourceId, tiles, options)
+  }
+
+  internal fun addRasterSourceUrl(
+    map: MemorySegment,
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
+    addTileSourceUrl("mln_map_add_raster_source_url", map, sourceId, url, options)
+  }
+
+  internal fun addRasterSourceTiles(
+    map: MemorySegment,
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    addTileSourceTiles("mln_map_add_raster_source_tiles", map, sourceId, tiles, options)
+  }
+
+  internal fun addRasterDemSourceUrl(
+    map: MemorySegment,
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
+    addTileSourceUrl("mln_map_add_raster_dem_source_url", map, sourceId, url, options)
+  }
+
+  internal fun addRasterDemSourceTiles(
+    map: MemorySegment,
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    addTileSourceTiles("mln_map_add_raster_dem_source_tiles", map, sourceId, tiles, options)
+  }
 
   internal fun setStyleImage(
     map: MemorySegment,
@@ -1226,6 +1281,19 @@ internal object NativeAccess {
       ),
     )
 
+  private fun mapStringViewAddressLongAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun mapListStyleSourceIdsFunction(): MethodHandle =
     downcall(
       "mln_map_list_style_source_ids",
@@ -1376,6 +1444,48 @@ internal object NativeAccess {
       ),
     )
 
+  private fun addTileSourceUrl(
+    functionName: String,
+    map: MemorySegment,
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsAddressStatusFunction(functionName)
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            stringView(arena, url),
+            tileSourceOptions(arena, options),
+          ) as Int
+      )
+    }
+  }
+
+  private fun addTileSourceTiles(
+    functionName: String,
+    map: MemorySegment,
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    val tileSnapshot = tiles.toList()
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressLongAddressStatusFunction(functionName)
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            stringViewArray(arena, tileSnapshot),
+            tileSnapshot.size.toLong(),
+            tileSourceOptions(arena, options),
+          ) as Int
+      )
+    }
+  }
+
   private fun startRuntimeOperation(name: String, runtime: MemorySegment): Long =
     Arena.ofConfined().use { arena ->
       val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
@@ -1495,6 +1605,66 @@ internal object NativeAccess {
     val segment = arena.allocate(STRING_VIEW_SIZE)
     segment.set(ValueLayout.ADDRESS, STRING_VIEW_DATA_OFFSET, nativeBytes(arena, bytes))
     segment.set(ValueLayout.JAVA_LONG, STRING_VIEW_SIZE_OFFSET, bytes.size.toLong())
+    return segment
+  }
+
+  private fun stringViewArray(arena: Arena, values: List<String>): MemorySegment {
+    if (values.isEmpty()) {
+      return MemorySegment.NULL
+    }
+    val array = arena.allocate(STRING_VIEW_SIZE * values.size)
+    values.forEachIndexed { index, value ->
+      array.asSlice(index * STRING_VIEW_SIZE, STRING_VIEW_SIZE).copyFrom(stringView(arena, value))
+    }
+    return array
+  }
+
+  private fun tileSourceOptions(arena: Arena, value: TileSourceOptions?): MemorySegment {
+    if (value == null) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(TILE_SOURCE_OPTIONS_SIZE)
+    var fields = 0
+    segment.set(
+      ValueLayout.JAVA_INT,
+      TILE_SOURCE_OPTIONS_SIZE_OFFSET,
+      TILE_SOURCE_OPTIONS_SIZE.toInt(),
+    )
+    value.minZoom?.let {
+      fields = fields or TILE_SOURCE_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, TILE_SOURCE_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.maxZoom?.let {
+      fields = fields or TILE_SOURCE_OPTION_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, TILE_SOURCE_OPTIONS_MAX_ZOOM_OFFSET, it)
+    }
+    value.attribution?.let {
+      fields = fields or TILE_SOURCE_OPTION_ATTRIBUTION
+      segment
+        .asSlice(TILE_SOURCE_OPTIONS_ATTRIBUTION_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
+    }
+    value.scheme?.let {
+      fields = fields or TILE_SOURCE_OPTION_SCHEME
+      segment.set(ValueLayout.JAVA_INT, TILE_SOURCE_OPTIONS_SCHEME_OFFSET, it.nativeValue)
+    }
+    value.bounds?.let {
+      fields = fields or TILE_SOURCE_OPTION_BOUNDS
+      latLngBounds(it, segment.asSlice(TILE_SOURCE_OPTIONS_BOUNDS_OFFSET))
+    }
+    value.tileSize?.let {
+      fields = fields or TILE_SOURCE_OPTION_TILE_SIZE
+      segment.set(ValueLayout.JAVA_INT, TILE_SOURCE_OPTIONS_TILE_SIZE_OFFSET, it)
+    }
+    value.vectorEncoding?.let {
+      fields = fields or TILE_SOURCE_OPTION_VECTOR_ENCODING
+      segment.set(ValueLayout.JAVA_INT, TILE_SOURCE_OPTIONS_VECTOR_ENCODING_OFFSET, it.nativeValue)
+    }
+    value.rasterDemEncoding?.let {
+      fields = fields or TILE_SOURCE_OPTION_RASTER_ENCODING
+      segment.set(ValueLayout.JAVA_INT, TILE_SOURCE_OPTIONS_RASTER_ENCODING_OFFSET, it.nativeValue)
+    }
+    segment.set(ValueLayout.JAVA_INT, TILE_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
   }
 
@@ -2382,6 +2552,27 @@ internal object NativeAccess {
   private const val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long = 16
   private const val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long = 17
   private const val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long = 24
+
+  private const val TILE_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
+  private const val TILE_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
+  private const val TILE_SOURCE_OPTION_ATTRIBUTION: Int = 1 shl 2
+  private const val TILE_SOURCE_OPTION_SCHEME: Int = 1 shl 3
+  private const val TILE_SOURCE_OPTION_BOUNDS: Int = 1 shl 4
+  private const val TILE_SOURCE_OPTION_TILE_SIZE: Int = 1 shl 5
+  private const val TILE_SOURCE_OPTION_VECTOR_ENCODING: Int = 1 shl 6
+  private const val TILE_SOURCE_OPTION_RASTER_ENCODING: Int = 1 shl 7
+
+  private const val TILE_SOURCE_OPTIONS_SIZE: Long = 96
+  private const val TILE_SOURCE_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val TILE_SOURCE_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val TILE_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long = 8
+  private const val TILE_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long = 16
+  private const val TILE_SOURCE_OPTIONS_ATTRIBUTION_OFFSET: Long = 24
+  private const val TILE_SOURCE_OPTIONS_SCHEME_OFFSET: Long = 40
+  private const val TILE_SOURCE_OPTIONS_BOUNDS_OFFSET: Long = 48
+  private const val TILE_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long = 80
+  private const val TILE_SOURCE_OPTIONS_VECTOR_ENCODING_OFFSET: Long = 84
+  private const val TILE_SOURCE_OPTIONS_RASTER_ENCODING_OFFSET: Long = 88
 
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE: Long = 32
   private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET: Long = 0

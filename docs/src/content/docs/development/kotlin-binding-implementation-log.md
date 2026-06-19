@@ -908,3 +908,16 @@ is being implemented.
 - Discovery: this slice is a useful boundary between style state and broader
   camera/render work because it removes map control placeholders without adding
   descriptor structs or render-session ownership.
+
+### JVM and Android Tile Source Milestone
+
+- Implemented JVM FFM and Android JavaCPP vector, raster, and raster DEM source
+  insertion for TileJSON URLs and inline tile URL arrays.
+- Added platform materialization for common `TileSourceOptions`, including field
+  masks, attribution string views, bounds, tile size, tile scheme, vector
+  encoding, and raster DEM encoding.
+- Added JVM coverage that inserts vector, raster, and raster DEM sources and
+  inspects their copied source metadata through the common Kotlin map API.
+- Discovery: tile sources are a clean bridge slice before GeoJSON/custom sources
+  because they exercise option structs and string-view arrays without requiring
+  the geometry and feature descriptor graph.

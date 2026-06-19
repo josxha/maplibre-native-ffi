@@ -206,7 +206,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    addTileSourceUrl(MaplibreNativeC::mln_map_add_vector_source_url, sourceId, url, options)
   }
 
   public actual fun addVectorSourceTiles(
@@ -214,11 +215,13 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    addTileSourceTiles(MaplibreNativeC::mln_map_add_vector_source_tiles, sourceId, tiles, options)
   }
 
   public actual fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    addTileSourceUrl(MaplibreNativeC::mln_map_add_raster_source_url, sourceId, url, options)
   }
 
   public actual fun addRasterSourceTiles(
@@ -226,7 +229,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    addTileSourceTiles(MaplibreNativeC::mln_map_add_raster_source_tiles, sourceId, tiles, options)
   }
 
   public actual fun addRasterDemSourceUrl(
@@ -234,7 +238,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     url: String,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    addTileSourceUrl(MaplibreNativeC::mln_map_add_raster_dem_source_url, sourceId, url, options)
   }
 
   public actual fun addRasterDemSourceTiles(
@@ -242,7 +247,13 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    addTileSourceTiles(
+      MaplibreNativeC::mln_map_add_raster_dem_source_tiles,
+      sourceId,
+      tiles,
+      options,
+    )
   }
 
   public actual fun setStyleImage(
@@ -939,6 +950,65 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     )
   }
 
+  private fun addTileSourceUrl(
+    function:
+      (
+        MaplibreNativeC.mln_map,
+        MaplibreNativeC.mln_string_view,
+        MaplibreNativeC.mln_string_view,
+        MaplibreNativeC.mln_style_tile_source_options,
+      ) -> Int,
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ) {
+    StringViewScope(sourceId).use { nativeSourceId ->
+      StringViewScope(url).use { nativeUrl ->
+        TileSourceOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            function(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeUrl.view,
+              nativeOptions.options,
+            )
+          )
+        }
+      }
+    }
+  }
+
+  private fun addTileSourceTiles(
+    function:
+      (
+        MaplibreNativeC.mln_map,
+        MaplibreNativeC.mln_string_view,
+        MaplibreNativeC.mln_string_view?,
+        Long,
+        MaplibreNativeC.mln_style_tile_source_options,
+      ) -> Int,
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions?,
+  ) {
+    val tileSnapshot = tiles.toList()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      StringViewArrayScope(tileSnapshot).use { nativeTiles ->
+        TileSourceOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            function(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeTiles.views,
+              nativeTiles.count,
+              nativeOptions.options,
+            )
+          )
+        }
+      }
+    }
+  }
+
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
       NativeAccess.ensureLoaded()
@@ -1114,6 +1184,25 @@ private class StringViewScope(value: String) : AutoCloseable {
   }
 }
 
+private class StringViewArrayScope(values: List<String>) : AutoCloseable {
+  private val strings: List<StringViewScope> = values.map(::StringViewScope)
+  val views: MaplibreNativeC.mln_string_view? =
+    if (strings.isEmpty()) null else MaplibreNativeC.mln_string_view(strings.size.toLong())
+  val count: Long = strings.size.toLong()
+
+  init {
+    strings.forEachIndexed { index, string ->
+      views?.position(index.toLong())?.put<MaplibreNativeC.mln_string_view>(string.view)
+    }
+    views?.position(0)
+  }
+
+  override fun close() {
+    views?.close()
+    strings.asReversed().forEach(StringViewScope::close)
+  }
+}
+
 private class JsonScope(value: JsonValue) : AutoCloseable {
   private val owned = mutableListOf<Pointer>()
   private val strings = mutableListOf<StringViewScope>()
@@ -1189,6 +1278,57 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
         throw IllegalArgumentException("unknown JSON values cannot be used as input")
     }
     return out
+  }
+}
+
+private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable {
+  private val attribution: StringViewScope? = value?.attribution?.let(::StringViewScope)
+  val options: MaplibreNativeC.mln_style_tile_source_options =
+    MaplibreNativeC.mln_style_tile_source_options_default()
+
+  init {
+    var fields = 0
+    value?.minZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
+      options.min_zoom(it)
+    }
+    value?.maxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
+      options.max_zoom(it)
+    }
+    attribution?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
+      options.attribution(it.view)
+    }
+    value?.scheme?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
+      options.scheme(it.nativeValue)
+    }
+    value?.bounds?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
+      options.bounds().southwest().latitude(it.southwest.latitude)
+      options.bounds().southwest().longitude(it.southwest.longitude)
+      options.bounds().northeast().latitude(it.northeast.latitude)
+      options.bounds().northeast().longitude(it.northeast.longitude)
+    }
+    value?.tileSize?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
+      options.tile_size(it)
+    }
+    value?.vectorEncoding?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+      options.vector_encoding(it.nativeValue)
+    }
+    value?.rasterDemEncoding?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
+      options.raster_encoding(it.nativeValue)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+    attribution?.close()
   }
 }
 

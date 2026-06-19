@@ -129,7 +129,8 @@ private constructor(
   }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addVectorSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addVectorSourceTiles(
@@ -137,11 +138,13 @@ private constructor(
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addVectorSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
 
   public actual fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addRasterSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addRasterSourceTiles(
@@ -149,7 +152,8 @@ private constructor(
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addRasterSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
 
   public actual fun addRasterDemSourceUrl(
@@ -157,7 +161,8 @@ private constructor(
     url: String,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addRasterDemSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
   public actual fun addRasterDemSourceTiles(
@@ -165,7 +170,8 @@ private constructor(
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addRasterDemSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
 
   public actual fun setStyleImage(
