@@ -515,7 +515,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setStyleImage(
+  public actual fun setStyleImage(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
@@ -532,7 +532,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun removeStyleImage(imageId: String): Boolean = memScoped {
+  public actual fun removeStyleImage(imageId: String): Boolean = memScoped {
     val outRemoved = alloc<BooleanVar>()
     Status.check(
       mln_map_remove_style_image(
@@ -544,7 +544,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     outRemoved.value
   }
 
-  public fun styleImageExists(imageId: String): Boolean = memScoped {
+  public actual fun styleImageExists(imageId: String): Boolean = memScoped {
     val outExists = alloc<BooleanVar>()
     Status.check(
       mln_map_style_image_exists(
@@ -556,7 +556,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     outExists.value
   }
 
-  public fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
+  public actual fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
     val outInfo = mln_style_image_info_default().getPointer(this)
     val outFound = alloc<BooleanVar>()
     Status.check(
@@ -570,7 +570,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
   }
 
-  public fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? = memScoped {
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? = memScoped {
     val info = styleImageInfo(imageId) ?: return@memScoped null
     val outPixels =
       allocArray<UByteVar>(checkedInt(info.byteLength.toULong(), "style image byte length"))
@@ -601,7 +601,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     )
   }
 
-  public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
+  public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -616,7 +616,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addImageSourceImage(
+  public actual fun addImageSourceImage(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
@@ -635,7 +635,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setImageSourceUrl(sourceId: String, url: String) {
+  public actual fun setImageSourceUrl(sourceId: String, url: String) {
     memScoped {
       Status.check(
         mln_map_set_image_source_url(
@@ -647,7 +647,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
+  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
     memScoped {
       Status.check(
         mln_map_set_image_source_image(
@@ -659,7 +659,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
+  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -673,7 +673,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
+  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
     val outCoordinates = allocArray<mln_lat_lng>(4)
     val outCoordinateCount = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()

@@ -12,10 +12,14 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.StyleImage
+import org.maplibre.nativeffi.style.StyleImageInfo
+import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** JVM actual placeholder until the FFM map bridge is migrated. */
@@ -125,6 +129,49 @@ public actual class MapHandle private constructor() : AutoCloseable {
   ) {
     unsupportedMapHandle()
   }
+
+  public actual fun setStyleImage(
+    imageId: String,
+    image: PremultipliedRgba8Image,
+    options: StyleImageOptions,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun removeStyleImage(imageId: String): Boolean = unsupportedMapHandle()
+
+  public actual fun styleImageExists(imageId: String): Boolean = unsupportedMapHandle()
+
+  public actual fun styleImageInfo(imageId: String): StyleImageInfo? = unsupportedMapHandle()
+
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? =
+    unsupportedMapHandle()
+
+  public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addImageSourceImage(
+    sourceId: String,
+    coordinates: List<LatLng>,
+    image: PremultipliedRgba8Image,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setImageSourceUrl(sourceId: String, url: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = unsupportedMapHandle()
 
   public actual fun requestRepaint() {
     unsupportedMapHandle()

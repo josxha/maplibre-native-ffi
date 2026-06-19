@@ -563,3 +563,14 @@ is being implemented.
 - Reflection: custom geometry source ownership remains platform-local because
   the native callback descriptor is bridge-specific, but the public source
   lifecycle and tile invalidation API can already be common.
+
+### Common Map Style Image Facade Milestone
+
+- Expanded the common `MapHandle` facade with style image mutation and
+  inspection plus image source creation, mutation, and coordinate reads.
+- Converted the existing Kotlin/Native style image and image source methods into
+  native actuals and added JVM and Android actual placeholders until their map
+  bridges are migrated.
+- Reflection: image byte ownership is already represented by common copied
+  values, so this slice did not need a new handle facade. Platform source sets
+  still own the native copy/readback mechanics.

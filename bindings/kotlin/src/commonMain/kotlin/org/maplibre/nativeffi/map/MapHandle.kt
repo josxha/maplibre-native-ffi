@@ -12,10 +12,14 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.StyleImage
+import org.maplibre.nativeffi.style.StyleImageInfo
+import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned map handle. Platform actuals own the native map carrier. */
@@ -83,6 +87,36 @@ public expect class MapHandle : AutoCloseable {
     tiles: List<String>,
     options: TileSourceOptions?,
   )
+
+  public fun setStyleImage(
+    imageId: String,
+    image: PremultipliedRgba8Image,
+    options: StyleImageOptions,
+  )
+
+  public fun removeStyleImage(imageId: String): Boolean
+
+  public fun styleImageExists(imageId: String): Boolean
+
+  public fun styleImageInfo(imageId: String): StyleImageInfo?
+
+  public fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage?
+
+  public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String)
+
+  public fun addImageSourceImage(
+    sourceId: String,
+    coordinates: List<LatLng>,
+    image: PremultipliedRgba8Image,
+  )
+
+  public fun setImageSourceUrl(sourceId: String, url: String)
+
+  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image)
+
+  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>)
+
+  public fun imageSourceCoordinates(sourceId: String): List<LatLng>?
 
   public fun requestRepaint()
 
