@@ -850,3 +850,16 @@ is being implemented.
 - Discovery: source and layer JSON bridges share enough mechanics that a future
   internal map/style bridge facade should expose domain operations while
   centralizing string-view, JSON descriptor, and style ID list ownership.
+
+### JVM and Android Style Layer Command Milestone
+
+- Implemented JVM FFM and Android JavaCPP commands for typed layer insertion,
+  location indicator layer updates, and style layer movement.
+- Added FFM call-shape helpers for two- and three-string-view calls, string-view
+  plus coordinate/double calls, and string-view plus enum/string-view calls.
+- Added Android JavaCPP `LatLng` materialization for map style commands.
+- Extended JVM coverage to add and update a location indicator layer, move it
+  relative to a JSON layer, and remove both layers.
+- Discovery: simple map style commands are a good bridge migration slice because
+  they reuse string-view ownership and status handling without requiring JSON
+  snapshot/result decoding.

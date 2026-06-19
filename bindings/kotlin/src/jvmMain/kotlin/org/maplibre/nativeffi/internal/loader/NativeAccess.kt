@@ -39,6 +39,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationKind
 import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 
@@ -488,6 +489,124 @@ internal object NativeAccess {
       styleIdList(outList.get(ValueLayout.ADDRESS, 0))
     }
 
+  internal fun addHillshadeLayer(
+    map: MemorySegment,
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapThreeStringViewsStatusFunction("mln_map_add_hillshade_layer")
+          .invokeWithArguments(
+            map,
+            stringView(arena, layerId),
+            stringView(arena, sourceId),
+            stringView(arena, beforeLayerId),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun addColorReliefLayer(
+    map: MemorySegment,
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapThreeStringViewsStatusFunction("mln_map_add_color_relief_layer")
+          .invokeWithArguments(
+            map,
+            stringView(arena, layerId),
+            stringView(arena, sourceId),
+            stringView(arena, beforeLayerId),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun addLocationIndicatorLayer(
+    map: MemorySegment,
+    layerId: String,
+    beforeLayerId: String,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_add_location_indicator_layer")
+          .invokeWithArguments(map, stringView(arena, layerId), stringView(arena, beforeLayerId))
+          as Int
+      )
+    }
+  }
+
+  internal fun setLocationIndicatorLocation(
+    map: MemorySegment,
+    layerId: String,
+    coordinate: LatLng,
+    altitude: Double,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewLatLngDoubleStatusFunction("mln_map_set_location_indicator_location")
+          .invokeWithArguments(map, stringView(arena, layerId), latLng(coordinate, arena), altitude)
+          as Int
+      )
+    }
+  }
+
+  internal fun setLocationIndicatorBearing(map: MemorySegment, layerId: String, bearing: Double) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewDoubleStatusFunction("mln_map_set_location_indicator_bearing")
+          .invokeWithArguments(map, stringView(arena, layerId), bearing) as Int
+      )
+    }
+  }
+
+  internal fun setLocationIndicatorAccuracyRadius(
+    map: MemorySegment,
+    layerId: String,
+    radius: Double,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewDoubleStatusFunction("mln_map_set_location_indicator_accuracy_radius")
+          .invokeWithArguments(map, stringView(arena, layerId), radius) as Int
+      )
+    }
+  }
+
+  internal fun setLocationIndicatorImageName(
+    map: MemorySegment,
+    layerId: String,
+    imageKind: LocationIndicatorImageKind,
+    imageId: String,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewIntStringViewStatusFunction("mln_map_set_location_indicator_image_name")
+          .invokeWithArguments(
+            map,
+            stringView(arena, layerId),
+            imageKind.nativeValue,
+            stringView(arena, imageId),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun moveStyleLayer(map: MemorySegment, layerId: String, beforeLayerId: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_move_style_layer")
+          .invokeWithArguments(map, stringView(arena, layerId), stringView(arena, beforeLayerId))
+          as Int
+      )
+    }
+  }
+
   internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
     Arena.ofConfined().use { arena ->
       val bytes = value.toByteArray(StandardCharsets.UTF_8)
@@ -737,6 +856,64 @@ internal object NativeAccess {
         ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS,
         ValueLayout.ADDRESS,
+        stringViewLayout,
+      ),
+    )
+
+  private fun mapTwoStringViewsStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        stringViewLayout,
+      ),
+    )
+
+  private fun mapThreeStringViewsStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        stringViewLayout,
+        stringViewLayout,
+      ),
+    )
+
+  private fun mapStringViewLatLngDoubleStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        latLngLayout,
+        ValueLayout.JAVA_DOUBLE,
+      ),
+    )
+
+  private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.JAVA_DOUBLE,
+      ),
+    )
+
+  private fun mapStringViewIntStringViewStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.JAVA_INT,
         stringViewLayout,
       ),
     )
@@ -1095,6 +1272,13 @@ internal object NativeAccess {
       is JsonValue.Unknown ->
         throw IllegalArgumentException("unknown JSON values cannot be used as input")
     }
+  }
+
+  private fun latLng(value: LatLng, arena: Arena): MemorySegment {
+    val segment = arena.allocate(latLngLayout)
+    segment.set(ValueLayout.JAVA_DOUBLE, 0, value.latitude)
+    segment.set(ValueLayout.JAVA_DOUBLE, Double.SIZE_BYTES.toLong(), value.longitude)
+    return segment
   }
 
   private fun nativeBytes(arena: Arena, bytes: ByteArray): MemorySegment {

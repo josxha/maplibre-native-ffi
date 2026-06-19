@@ -217,15 +217,18 @@ private constructor(
   }
 
   public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addHillshadeLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
   }
 
   public actual fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addColorReliefLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
   }
 
   public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.addLocationIndicatorLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
   public actual fun setLocationIndicatorLocation(
@@ -233,15 +236,18 @@ private constructor(
     coordinate: LatLng,
     altitude: Double,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLocationIndicatorLocation(requireLiveHandle(), layerId, coordinate, altitude)
   }
 
   public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLocationIndicatorBearing(requireLiveHandle(), layerId, bearing)
   }
 
   public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLocationIndicatorAccuracyRadius(requireLiveHandle(), layerId, radius)
   }
 
   public actual fun setLocationIndicatorImageName(
@@ -249,7 +255,8 @@ private constructor(
     imageKind: LocationIndicatorImageKind,
     imageId: String,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLocationIndicatorImageName(requireLiveHandle(), layerId, imageKind, imageId)
   }
 
   public actual fun removeStyleLayer(layerId: String): Boolean {
@@ -273,7 +280,8 @@ private constructor(
   }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
   public actual fun styleLayerJson(layerId: String): JsonValue? = unsupportedMapHandle()

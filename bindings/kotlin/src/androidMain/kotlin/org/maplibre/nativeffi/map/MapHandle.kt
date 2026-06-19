@@ -303,15 +303,54 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(sourceId).use { nativeSourceId ->
+        StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_hillshade_layer(
+              map(requireLiveAddress()),
+              nativeLayerId.view,
+              nativeSourceId.view,
+              nativeBeforeLayerId.view,
+            )
+          )
+        }
+      }
+    }
   }
 
   public actual fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(sourceId).use { nativeSourceId ->
+        StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_color_relief_layer(
+              map(requireLiveAddress()),
+              nativeLayerId.view,
+              nativeSourceId.view,
+              nativeBeforeLayerId.view,
+            )
+          )
+        }
+      }
+    }
   }
 
   public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_location_indicator_layer(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            nativeBeforeLayerId.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun setLocationIndicatorLocation(
@@ -319,15 +358,45 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     coordinate: LatLng,
     altitude: Double,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      latLng(coordinate).use { nativeCoordinate ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_location_indicator_location(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            nativeCoordinate,
+            altitude,
+          )
+        )
+      }
+    }
   }
 
   public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_location_indicator_bearing(
+          map(requireLiveAddress()),
+          nativeLayerId.view,
+          bearing,
+        )
+      )
+    }
   }
 
   public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_location_indicator_accuracy_radius(
+          map(requireLiveAddress()),
+          nativeLayerId.view,
+          radius,
+        )
+      )
+    }
   }
 
   public actual fun setLocationIndicatorImageName(
@@ -335,7 +404,19 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     imageKind: LocationIndicatorImageKind,
     imageId: String,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(imageId).use { nativeImageId ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_location_indicator_image_name(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            imageKind.nativeValue,
+            nativeImageId.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun removeStyleLayer(layerId: String): Boolean {
@@ -397,7 +478,18 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_move_style_layer(
+            map(requireLiveAddress()),
+            nativeLayerId.view,
+            nativeBeforeLayerId.view,
+          )
+        )
+      }
+    }
   }
 
   public actual fun styleLayerJson(layerId: String): JsonValue? = unsupportedMapHandle()
@@ -651,6 +743,9 @@ private fun map(address: Long): MaplibreNativeC.mln_map =
 
 private fun runtime(address: Long): MaplibreNativeC.mln_runtime =
   MaplibreNativeC.mln_runtime(AddressPointer(address))
+
+private fun latLng(value: LatLng): MaplibreNativeC.mln_lat_lng =
+  MaplibreNativeC.mln_lat_lng().latitude(value.latitude).longitude(value.longitude)
 
 private fun optionalCString(value: String): BytePointer {
   require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }

@@ -7,6 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
@@ -90,11 +91,19 @@ class MapHandleTest {
     try {
       map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
       map.addStyleLayerJson(backgroundLayer(), "")
+      map.addLocationIndicatorLayer("puck", "")
+      map.setLocationIndicatorLocation("puck", LatLng(12.0, 34.0), 56.0)
+      map.setLocationIndicatorBearing("puck", 78.0)
+      map.setLocationIndicatorAccuracyRadius("puck", 9.0)
+      map.moveStyleLayer("puck", "background")
 
       assertTrue(map.styleLayerExists("background"))
       assertEquals("background", map.styleLayerType("background"))
+      assertTrue(map.styleLayerExists("puck"))
       assertTrue(map.styleLayerIds().contains("background"))
+      assertTrue(map.styleLayerIds().contains("puck"))
       assertTrue(map.removeStyleLayer("background"))
+      assertTrue(map.removeStyleLayer("puck"))
       assertFalse(map.styleLayerExists("background"))
       assertFalse(map.removeStyleLayer("background"))
     } finally {
