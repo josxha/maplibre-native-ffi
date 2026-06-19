@@ -8,6 +8,7 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
+import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
@@ -242,6 +243,32 @@ internal object NativeAccess {
   internal fun discardOfflineOperation(runtime: MemorySegment, operationId: Long): Int =
     runtimeOfflineOperationDiscardFunction().invokeWithArguments(runtime, operationId) as Int
 
+  internal fun pollRuntimeEvent(runtime: MemorySegment): NativeRuntimeEvent? =
+    Arena.ofConfined().use { arena ->
+      val event = arena.allocate(RUNTIME_EVENT_SIZE)
+      event.set(ValueLayout.JAVA_INT, RUNTIME_EVENT_SIZE_OFFSET, RUNTIME_EVENT_SIZE.toInt())
+      val hasEvent = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      hasEvent.set(ValueLayout.JAVA_BOOLEAN, 0, false)
+      Status.check(runtimePollEventFunction().invokeWithArguments(runtime, event, hasEvent) as Int)
+      if (!hasEvent.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return@use null
+      }
+      val payload = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_PAYLOAD_OFFSET)
+      val payloadSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET)
+      val message = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_MESSAGE_OFFSET)
+      val messageSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
+      NativeRuntimeEvent(
+        type = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TYPE_OFFSET),
+        sourceType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
+        sourceAddress = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_SOURCE_OFFSET).address(),
+        code = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_CODE_OFFSET),
+        payloadType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET),
+        payloadSize = payloadSize,
+        payloadBytes = copyBytes(payload, payloadSize),
+        message = copyString(message, messageSize),
+      )
+    }
+
   private fun intFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT))
 
@@ -287,6 +314,17 @@ internal object NativeAccess {
     downcall(
       "mln_runtime_offline_operation_discard",
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
+    )
+
+  private fun runtimePollEventFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_poll_event",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
     )
 
   private fun startRuntimeOperation(name: String, runtime: MemorySegment): Long =
@@ -412,6 +450,16 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun copyBytes(address: MemorySegment, byteCount: Long): ByteArray {
+    if (address == MemorySegment.NULL || byteCount == 0L) {
+      return ByteArray(0)
+    }
+    return address.reinterpret(byteCount).toArray(ValueLayout.JAVA_BYTE)
+  }
+
+  private fun copyString(address: MemorySegment, byteCount: Long): String =
+    String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
+
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
     return Linker.nativeLinker().downcallHandle(symbol, descriptor)
@@ -456,4 +504,27 @@ internal object NativeAccess {
       ValueLayout.ADDRESS.withName("cache_path"),
       ValueLayout.JAVA_LONG.withName("maximum_cache_size"),
     )
+
+  private const val RUNTIME_EVENT_SIZE: Long = 64
+  private const val RUNTIME_EVENT_SIZE_OFFSET: Long = 0
+  private const val RUNTIME_EVENT_TYPE_OFFSET: Long = 4
+  private const val RUNTIME_EVENT_SOURCE_TYPE_OFFSET: Long = 8
+  private const val RUNTIME_EVENT_SOURCE_OFFSET: Long = 16
+  private const val RUNTIME_EVENT_CODE_OFFSET: Long = 24
+  private const val RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET: Long = 28
+  private const val RUNTIME_EVENT_PAYLOAD_OFFSET: Long = 32
+  private const val RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET: Long = 40
+  private const val RUNTIME_EVENT_MESSAGE_OFFSET: Long = 48
+  private const val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = 56
+
+  internal data class NativeRuntimeEvent(
+    val type: Int,
+    val sourceType: Int,
+    val sourceAddress: Long,
+    val code: Int,
+    val payloadType: Int,
+    val payloadSize: Long,
+    val payloadBytes: ByteArray,
+    val message: String,
+  )
 }

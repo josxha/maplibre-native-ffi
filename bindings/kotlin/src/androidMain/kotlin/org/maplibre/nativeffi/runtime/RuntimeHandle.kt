@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
@@ -206,7 +208,17 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     unsupportedRuntimeHandle()
   }
 
-  public actual fun pollEvent(): RuntimeEvent? = unsupportedRuntimeHandle()
+  public actual fun pollEvent(): RuntimeEvent? {
+    NativeAccess.ensureLoaded()
+    MaplibreNativeC.mln_runtime_event().use { event ->
+      event.size(event.sizeof())
+      val hasEvent = booleanArrayOf(false)
+      Status.check(
+        MaplibreNativeC.mln_runtime_poll_event(runtime(requireLiveAddress()), event, hasEvent)
+      )
+      return if (hasEvent[0]) runtimeEvent(event) else null
+    }
+  }
 
   public actual override fun close() {
     core.closeOnce(destroy = { MaplibreNativeC.mln_runtime_destroy(runtime(handleAddress)) })
@@ -270,7 +282,70 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     core.requireLive()
     return handleAddress
   }
+
+  private fun runtimeEvent(event: MaplibreNativeC.mln_runtime_event): RuntimeEvent {
+    val sourceType = RuntimeEventSourceType.fromNative(event.source_type())
+    return RuntimeEvent(
+      RuntimeEventType.fromNative(event.type()),
+      sourceType,
+      if (sourceType == RuntimeEventSourceType.RUNTIME) this else null,
+      null,
+      event.code(),
+      runtimeEventPayload(event),
+      byteString(event.message(), event.message_size()),
+    )
+  }
+
+  private fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload {
+    val payloadType = event.payload_type()
+    val payloadBytes = payloadBytes(event)
+    return when (payloadType) {
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+        if (payloadBytes.size >= OFFLINE_OPERATION_COMPLETED_SIZE) {
+          offlineOperationCompletedPayload(payloadBytes)
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
+      else -> RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+    }
+  }
 }
+
+private fun payloadBytes(event: MaplibreNativeC.mln_runtime_event): ByteArray =
+  byteArray(event.payload(), event.payload_size())
+
+private fun byteString(pointer: BytePointer?, byteCount: Long): String =
+  String(byteArray(pointer, byteCount), StandardCharsets.UTF_8)
+
+private fun byteArray(pointer: Pointer?, byteCount: Long): ByteArray {
+  if (pointer == null || pointer.isNull || byteCount == 0L) {
+    return ByteArray(0)
+  }
+  val bytes = ByteArray(Math.toIntExact(byteCount))
+  BytePointer(pointer).get(bytes, 0, bytes.size)
+  return bytes
+}
+
+private fun offlineOperationCompletedPayload(payload: ByteArray): RuntimeEventPayload {
+  val buffer = ByteBuffer.wrap(payload).order(ByteOrder.nativeOrder())
+  return RuntimeEventPayload.OfflineOperationCompleted(
+    buffer.getLong(OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET),
+    OfflineOperationKind.fromNative(buffer.getInt(OFFLINE_OPERATION_COMPLETED_KIND_OFFSET)),
+    OfflineOperationResultKind.fromNative(
+      buffer.getInt(OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET)
+    ),
+    buffer.getInt(OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
+    buffer.get(OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET) != 0.toByte(),
+  )
+}
+
+private const val OFFLINE_OPERATION_COMPLETED_SIZE: Int = 32
+private const val OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Int = 8
+private const val OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Int = 16
+private const val OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Int = 20
+private const val OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Int = 24
+private const val OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Int = 28
 
 private fun runtime(address: Long): MaplibreNativeC.mln_runtime =
   MaplibreNativeC.mln_runtime(AddressPointer(address))

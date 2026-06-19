@@ -716,3 +716,15 @@ is being implemented.
 - Discovery: merge/update are a useful boundary before offline result
   marshalling because they exercise borrowed path and byte storage without
   needing copied offline region structs yet.
+
+### JVM and Android Runtime Event Poll Milestone
+
+- Implemented `RuntimeHandle.pollEvent` on JVM and Android for runtime events
+  copied from native event storage into common Kotlin values.
+- Decoded `None` and `OfflineOperationCompleted` payloads and preserved all
+  other payloads as `RuntimeEventPayload.Unknown` with copied payload bytes.
+- Added JVM coverage for the empty event queue path on a fresh runtime.
+- Discovery: event polling can migrate incrementally before map handles because
+  runtime-originated events already copy cleanly. Map-originated event source
+  lookup and richer typed payload decoding should remain a separate map/event
+  bridge milestone.
