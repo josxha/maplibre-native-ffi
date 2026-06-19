@@ -768,3 +768,19 @@ is being implemented.
   bridge needs reusable value-struct materialization. Tile-pyramid definitions
   can migrate directly, while geometry offline definitions remain an explicit
   follow-up because the JVM/Android geometry bridge is not consolidated yet.
+
+### JVM and Android Resource Transform Milestone
+
+- Implemented `RuntimeHandle.setResourceTransform` and `clearResourceTransform`
+  for JVM and Android.
+- Added JVM FFM and Android JavaCPP `ResourceTransformState` owners that keep
+  callback descriptors live while installed, copy callback inputs into common
+  `ResourceTransformRequest` values, and use the C response helper for
+  replacement URLs.
+- Preserved the common `CallbackGate` close-after-in-flight-callback behavior
+  for both bridges and kept callback exceptions contained as native status
+  values.
+- Discovery: resource transform is the smallest runtime callback slice because
+  it has no request handle lifetime. Resource provider should remain separate so
+  `ResourceRequestHandle` completion/cancellation semantics can migrate as one
+  focused milestone.

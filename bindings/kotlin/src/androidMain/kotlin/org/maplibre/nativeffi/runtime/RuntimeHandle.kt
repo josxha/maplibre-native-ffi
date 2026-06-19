@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
+import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -29,6 +30,7 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handleAddress: Long) :
   AutoCloseable {
   private val core = HandleStateCore("RuntimeHandle", handleAddress)
+  private var resourceTransformState: ResourceTransformState? = null
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -323,11 +325,31 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
-    unsupportedRuntimeHandle()
+    val replacement = ResourceTransformState(callback)
+    val previous: ResourceTransformState?
+    try {
+      Status.check(
+        MaplibreNativeC.mln_runtime_set_resource_transform(
+          runtime(requireLiveAddress()),
+          replacement.descriptor(),
+        )
+      )
+      previous = resourceTransformState
+      resourceTransformState = replacement
+    } catch (error: Throwable) {
+      replacement.close()
+      throw error
+    }
+    previous?.close()
   }
 
   public actual fun clearResourceTransform() {
-    unsupportedRuntimeHandle()
+    Status.check(
+      MaplibreNativeC.mln_runtime_clear_resource_transform(runtime(requireLiveAddress()))
+    )
+    val previous = resourceTransformState
+    resourceTransformState = null
+    previous?.close()
   }
 
   public actual fun pollEvent(): RuntimeEvent? {
@@ -343,7 +365,13 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   }
 
   public actual override fun close() {
-    core.closeOnce(destroy = { MaplibreNativeC.mln_runtime_destroy(runtime(handleAddress)) })
+    core.closeOnce(
+      destroy = { MaplibreNativeC.mln_runtime_destroy(runtime(handleAddress)) },
+      afterSuccess = {
+        resourceTransformState?.close()
+        resourceTransformState = null
+      },
+    )
   }
 
   public actual companion object {

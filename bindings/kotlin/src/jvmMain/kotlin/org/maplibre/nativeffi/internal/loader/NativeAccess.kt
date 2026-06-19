@@ -276,6 +276,19 @@ internal object NativeAccess {
   internal fun discardOfflineOperation(runtime: MemorySegment, operationId: Long): Int =
     runtimeOfflineOperationDiscardFunction().invokeWithArguments(runtime, operationId) as Int
 
+  internal fun setResourceTransform(runtime: MemorySegment, descriptor: MemorySegment): Int =
+    runtimeSetResourceTransformFunction().invokeWithArguments(runtime, descriptor) as Int
+
+  internal fun clearResourceTransform(runtime: MemorySegment): Int =
+    runtimeClearResourceTransformFunction().invokeWithArguments(runtime) as Int
+
+  internal fun setResourceTransformResponseUrl(response: MemorySegment, value: String): Int =
+    Arena.ofConfined().use { arena ->
+      val bytes = value.toByteArray(StandardCharsets.UTF_8)
+      resourceTransformResponseSetUrlFunction()
+        .invokeWithArguments(response, nativeBytes(arena, bytes), bytes.size.toLong()) as Int
+    }
+
   internal fun takeOfflineRegionStatusResult(
     runtime: MemorySegment,
     operationId: Long,
@@ -428,6 +441,29 @@ internal object NativeAccess {
     downcall(
       "mln_runtime_offline_operation_discard",
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
+    )
+
+  private fun runtimeSetResourceTransformFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_set_resource_transform",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun runtimeClearResourceTransformFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_clear_resource_transform",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
+    )
+
+  private fun resourceTransformResponseSetUrlFunction(): MethodHandle =
+    downcall(
+      "mln_resource_transform_response_set_url",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+      ),
     )
 
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =

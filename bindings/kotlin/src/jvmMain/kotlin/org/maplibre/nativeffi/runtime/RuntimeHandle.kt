@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.runtime
 
 import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.loader.NativeAccess.NativeRuntimeEvent
@@ -17,6 +18,7 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handle: MemorySegment) :
   AutoCloseable {
   private val core = HandleStateCore("RuntimeHandle", handle.address())
+  private var resourceTransformState: ResourceTransformState? = null
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -221,11 +223,26 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
-    unsupportedRuntimeHandle()
+    NativeAccess.ensureLoaded()
+    val replacement = ResourceTransformState(callback)
+    val previous: ResourceTransformState?
+    try {
+      Status.check(NativeAccess.setResourceTransform(requireLiveHandle(), replacement.descriptor()))
+      previous = resourceTransformState
+      resourceTransformState = replacement
+    } catch (error: Throwable) {
+      replacement.close()
+      throw error
+    }
+    previous?.close()
   }
 
   public actual fun clearResourceTransform() {
-    unsupportedRuntimeHandle()
+    NativeAccess.ensureLoaded()
+    Status.check(NativeAccess.clearResourceTransform(requireLiveHandle()))
+    val previous = resourceTransformState
+    resourceTransformState = null
+    previous?.close()
   }
 
   public actual fun pollEvent(): RuntimeEvent? {
@@ -234,7 +251,13 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   }
 
   public actual override fun close() {
-    core.closeOnce(destroy = { NativeAccess.destroyRuntime(handle) })
+    core.closeOnce(
+      destroy = { NativeAccess.destroyRuntime(handle) },
+      afterSuccess = {
+        resourceTransformState?.close()
+        resourceTransformState = null
+      },
+    )
   }
 
   public actual companion object {
