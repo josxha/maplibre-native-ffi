@@ -1122,3 +1122,17 @@ is being implemented.
 - Discovery: current frame ABI sizes are 64 bytes for Metal, 72 bytes for
   Vulkan, and 64 bytes for OpenGL; all three share generation/extent/frame-id
   offsets before backend-specific handles.
+
+### Android Owned Texture Frame Milestone
+
+- Implemented Android JavaCPP owned texture frame acquisition and release for
+  Metal, Vulkan, and OpenGL render sessions.
+- Replaced the Android owned texture frame handle placeholders with real handle
+  implementations that expose scoped frame values and release native frames on
+  close.
+- Added active-frame guards to Android render-session commands so resize,
+  render, detach, readback, feature state, and destroy reject while a frame is
+  borrowed.
+- Discovery: Android JavaCPP frame handling can mirror the old JNI binding
+  closely because generated frame structs own their local native allocations and
+  close directly after native release.

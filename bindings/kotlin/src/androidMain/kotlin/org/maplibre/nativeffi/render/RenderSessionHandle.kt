@@ -24,6 +24,7 @@ public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, private val handleAddress: Long) : AutoCloseable {
   private val mapRetention = map.retainChild()
   private val core = HandleStateCore("RenderSessionHandle", handleAddress, map)
+  private val activeFrame = ActiveFrameState()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -32,6 +33,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("resize")
     Status.check(
       MaplibreNativeC.mln_render_session_resize(
         renderSession(requireLiveAddress()),
@@ -44,6 +46,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun renderUpdate() {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("render")
     Status.check(
       MaplibreNativeC.mln_render_session_render_update(renderSession(requireLiveAddress()))
     )
@@ -51,11 +54,13 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun detach() {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("detach")
     Status.check(MaplibreNativeC.mln_render_session_detach(renderSession(requireLiveAddress())))
   }
 
   public actual fun reduceMemoryUse() {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("reduce memory use")
     Status.check(
       MaplibreNativeC.mln_render_session_reduce_memory_use(renderSession(requireLiveAddress()))
     )
@@ -63,11 +68,13 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun clearData() {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("clear data")
     Status.check(MaplibreNativeC.mln_render_session_clear_data(renderSession(requireLiveAddress())))
   }
 
   public actual fun dumpDebugLogs() {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("dump debug logs")
     Status.check(
       MaplibreNativeC.mln_render_session_dump_debug_logs(renderSession(requireLiveAddress()))
     )
@@ -75,6 +82,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set feature state")
     FeatureStateSelectorScope(selector).use { nativeSelector ->
       JsonScope(value).use { nativeValue ->
         Status.check(
@@ -90,6 +98,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("get feature state")
     FeatureStateSelectorScope(selector).use { nativeSelector ->
       PointerPointer<Pointer>(1).use { outState ->
         outState.put(0, null as Pointer?)
@@ -107,6 +116,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun removeFeatureState(selector: FeatureStateSelector) {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("remove feature state")
     FeatureStateSelectorScope(selector).use { nativeSelector ->
       Status.check(
         MaplibreNativeC.mln_render_session_remove_feature_state(
@@ -137,6 +147,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun textureImageInfo(): TextureImageInfo {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("read texture data")
     val outInfo = MaplibreNativeC.mln_texture_image_info_default()
     val status =
       MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
@@ -158,6 +169,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
 
   public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("read texture data")
     val outInfo = MaplibreNativeC.mln_texture_image_info_default()
     Status.check(
       MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
@@ -170,17 +182,87 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     return textureImageInfo(outInfo)
   }
 
-  public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle =
-    unsupportedRenderSessionHandle()
+  public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {
+    NativeAccess.ensureLoaded()
+    activeFrame.beginAcquire()
+    val nativeFrame = MaplibreNativeC.mln_metal_owned_texture_frame()
+    nativeFrame.size(nativeFrame.sizeof())
+    try {
+      Status.check(
+        MaplibreNativeC.mln_metal_owned_texture_acquire_frame(
+          renderSession(requireLiveAddress()),
+          nativeFrame,
+        )
+      )
+      val scope = FrameScope()
+      return MetalOwnedTextureFrameHandle(
+        this,
+        nativeFrame,
+        scope,
+        metalOwnedTextureFrame(nativeFrame, scope),
+      )
+    } catch (error: Throwable) {
+      activeFrame.endBorrow()
+      nativeFrame.close()
+      throw error
+    }
+  }
 
-  public actual fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle =
-    unsupportedRenderSessionHandle()
+  public actual fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle {
+    NativeAccess.ensureLoaded()
+    activeFrame.beginAcquire()
+    val nativeFrame = MaplibreNativeC.mln_vulkan_owned_texture_frame()
+    nativeFrame.size(nativeFrame.sizeof())
+    try {
+      Status.check(
+        MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(
+          renderSession(requireLiveAddress()),
+          nativeFrame,
+        )
+      )
+      val scope = FrameScope()
+      return VulkanOwnedTextureFrameHandle(
+        this,
+        nativeFrame,
+        scope,
+        vulkanOwnedTextureFrame(nativeFrame, scope),
+      )
+    } catch (error: Throwable) {
+      activeFrame.endBorrow()
+      nativeFrame.close()
+      throw error
+    }
+  }
 
-  public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle =
-    unsupportedRenderSessionHandle()
+  public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
+    NativeAccess.ensureLoaded()
+    activeFrame.beginAcquire()
+    val nativeFrame = MaplibreNativeC.mln_opengl_owned_texture_frame()
+    nativeFrame.size(nativeFrame.sizeof())
+    try {
+      Status.check(
+        MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(
+          renderSession(requireLiveAddress()),
+          nativeFrame,
+        )
+      )
+      val scope = FrameScope()
+      return OpenGLOwnedTextureFrameHandle(
+        this,
+        nativeFrame,
+        scope,
+        openglOwnedTextureFrame(nativeFrame, scope),
+      )
+    } catch (error: Throwable) {
+      activeFrame.endBorrow()
+      nativeFrame.close()
+      throw error
+    }
+  }
 
   public actual override fun close() {
     NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("destroy")
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_render_session_destroy(renderSession(handleAddress)) },
       afterSuccess = { mapRetention.close() },
@@ -190,6 +272,37 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
   private fun requireLiveAddress(): Long {
     core.requireLive()
     return handleAddress
+  }
+
+  internal fun releaseMetalFrame(frame: MaplibreNativeC.mln_metal_owned_texture_frame) {
+    Status.check(
+      MaplibreNativeC.mln_metal_owned_texture_release_frame(
+        renderSession(requireLiveAddress()),
+        frame,
+      )
+    )
+  }
+
+  internal fun releaseVulkanFrame(frame: MaplibreNativeC.mln_vulkan_owned_texture_frame) {
+    Status.check(
+      MaplibreNativeC.mln_vulkan_owned_texture_release_frame(
+        renderSession(requireLiveAddress()),
+        frame,
+      )
+    )
+  }
+
+  internal fun releaseOpenGLFrame(frame: MaplibreNativeC.mln_opengl_owned_texture_frame) {
+    Status.check(
+      MaplibreNativeC.mln_opengl_owned_texture_release_frame(
+        renderSession(requireLiveAddress()),
+        frame,
+      )
+    )
+  }
+
+  internal fun finishFrameBorrow() {
+    activeFrame.endBorrow()
   }
 
   public companion object {
@@ -449,6 +562,61 @@ private fun setOpenGLContext(
 
 private fun textureImageInfo(info: MaplibreNativeC.mln_texture_image_info): TextureImageInfo =
   TextureImageInfo(info.width(), info.height(), info.stride(), info.byte_length())
+
+private fun metalOwnedTextureFrame(
+  frame: MaplibreNativeC.mln_metal_owned_texture_frame,
+  scope: FrameScope,
+): MetalOwnedTextureFrame =
+  MetalOwnedTextureFrame(
+    scope,
+    frame.generation(),
+    frame.width(),
+    frame.height(),
+    frame.scale_factor(),
+    frame.frame_id(),
+    NativePointer.scoped(address(frame.texture()), scope),
+    NativePointer.scoped(address(frame.device()), scope),
+    frame.pixel_format(),
+  )
+
+private fun vulkanOwnedTextureFrame(
+  frame: MaplibreNativeC.mln_vulkan_owned_texture_frame,
+  scope: FrameScope,
+): VulkanOwnedTextureFrame =
+  VulkanOwnedTextureFrame(
+    scope,
+    frame.generation(),
+    frame.width(),
+    frame.height(),
+    frame.scale_factor(),
+    frame.frame_id(),
+    NativePointer.scoped(address(frame.image()), scope),
+    NativePointer.scoped(address(frame.image_view()), scope),
+    NativePointer.scoped(address(frame.device()), scope),
+    frame.format(),
+    frame.layout(),
+  )
+
+private fun openglOwnedTextureFrame(
+  frame: MaplibreNativeC.mln_opengl_owned_texture_frame,
+  scope: FrameScope,
+): OpenGLOwnedTextureFrame =
+  OpenGLOwnedTextureFrame(
+    scope,
+    frame.generation(),
+    frame.width(),
+    frame.height(),
+    frame.scale_factor(),
+    frame.frame_id(),
+    frame.texture(),
+    frame.target(),
+    frame.internal_format(),
+    frame.format(),
+    frame.type(),
+  )
+
+private fun address(pointer: Pointer?): Long =
+  if (pointer == null || pointer.isNull) 0L else pointer.address()
 
 private fun jsonSnapshot(outSnapshot: PointerPointer<Pointer>): JsonValue? {
   val snapshotPointer = outSnapshot.get(Pointer::class.java, 0) ?: return null

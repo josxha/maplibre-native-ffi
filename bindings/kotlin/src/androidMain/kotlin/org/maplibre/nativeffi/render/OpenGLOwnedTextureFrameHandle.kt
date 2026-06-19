@@ -1,18 +1,46 @@
 package org.maplibre.nativeffi.render
 
-/** Android actual placeholder until the JNI OpenGL owned texture frame bridge is migrated. */
-public actual class OpenGLOwnedTextureFrameHandle private constructor() : AutoCloseable {
-  public actual fun frame(): OpenGLOwnedTextureFrame = unsupportedOpenGLOwnedTextureFrameHandle()
+import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+
+/** Explicit handle for an OpenGL session-owned texture frame. */
+public actual class OpenGLOwnedTextureFrameHandle
+internal constructor(
+  private val session: RenderSessionHandle,
+  private val nativeFrame: MaplibreNativeC.mln_opengl_owned_texture_frame,
+  private val scope: FrameScope,
+  private val frameValue: OpenGLOwnedTextureFrame,
+) : AutoCloseable {
+  private val core =
+    OwnedTextureFrameHandleCore(
+      "OpenGLOwnedTextureFrameHandle",
+      "OpenGL owned texture frame handle is closed",
+    )
+
+  public actual fun frame(): OpenGLOwnedTextureFrame {
+    core.ensureOpen()
+    return frameValue
+  }
 
   public actual val isClosed: Boolean
-    get() = unsupportedOpenGLOwnedTextureFrameHandle()
+    get() = core.isClosed()
 
   public actual override fun close() {
-    unsupportedOpenGLOwnedTextureFrameHandle()
+    core.close(
+      releaseNative = { session.releaseOpenGLFrame(nativeFrame) },
+      ownerClosed = { session.isClosed },
+      releaseLocal = ::releaseLocal,
+    )
+  }
+
+  private fun releaseLocal() {
+    try {
+      scope.close()
+    } finally {
+      try {
+        nativeFrame.close()
+      } finally {
+        session.finishFrameBorrow()
+      }
+    }
   }
 }
-
-private fun unsupportedOpenGLOwnedTextureFrameHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "OpenGLOwnedTextureFrameHandle is not available until the Android render bridge is implemented"
-  )
