@@ -475,3 +475,14 @@ is being implemented.
 - Reflection: this keeps the offline public API visible from `commonMain` and
   builds on the initial `RuntimeHandle` facade without moving native operation
   transport prematurely.
+
+### Common Render Session Facade Milestone
+
+- Added a common `expect` facade for `RenderSessionHandle`, covering the shared
+  close/isClosed surface and the render-session-to-map reference.
+- Converted the existing Kotlin/Native render session handle into the native
+  actual and added explicit JVM and Android actual placeholders until their
+  render bridges are implemented.
+- Reflection: this extends the handle facade pattern into the render domain
+  while leaving resize, render, query, texture readback, and frame acquisition
+  calls in `nativeMain` until they can sit behind bridge facades.
