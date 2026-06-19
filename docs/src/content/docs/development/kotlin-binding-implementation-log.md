@@ -879,3 +879,18 @@ is being implemented.
 - Discovery: JavaCPP generates different overload shapes for similar owned
   pointer outputs. JSON snapshot getters prefer raw pointer-pointer outputs,
   while some style ID list calls accept typed pointer-pointers.
+
+### JVM and Android Style Image Milestone
+
+- Implemented JVM FFM and Android JavaCPP runtime style image operations: set,
+  remove, exists, metadata lookup, and premultiplied RGBA8 copy.
+- Added JVM FFM struct materialization for `mln_premultiplied_rgba8_image`,
+  `mln_style_image_options`, and `mln_style_image_info`, including option field
+  masks and two-phase pixel copying.
+- Added Android JavaCPP scopes for copied pixel buffers and style image option
+  descriptors.
+- Extended JVM coverage to set a style image, inspect copied metadata, copy the
+  image back into common Kotlin values, and remove it.
+- Discovery: the common `PremultipliedRgba8Image` defensively copies its byte
+  array, so bridge calls should read `pixels` once and pass that stable snapshot
+  through the native call.

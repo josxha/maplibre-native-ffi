@@ -173,17 +173,29 @@ private constructor(
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleImage(requireLiveHandle(), imageId, image, options)
   }
 
-  public actual fun removeStyleImage(imageId: String): Boolean = unsupportedMapHandle()
+  public actual fun removeStyleImage(imageId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.removeStyleImage(requireLiveHandle(), imageId)
+  }
 
-  public actual fun styleImageExists(imageId: String): Boolean = unsupportedMapHandle()
+  public actual fun styleImageExists(imageId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleImageExists(requireLiveHandle(), imageId)
+  }
 
-  public actual fun styleImageInfo(imageId: String): StyleImageInfo? = unsupportedMapHandle()
+  public actual fun styleImageInfo(imageId: String): StyleImageInfo? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleImageInfo(requireLiveHandle(), imageId)
+  }
 
-  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? =
-    unsupportedMapHandle()
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.copyStyleImagePremultipliedRgba8(requireLiveHandle(), imageId)
+  }
 
   public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
     unsupportedMapHandle()

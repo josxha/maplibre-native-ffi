@@ -26,6 +26,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
 import org.maplibre.nativeffi.resource.ResourceKind
@@ -42,6 +43,9 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.StyleImage
+import org.maplibre.nativeffi.style.StyleImageInfo
+import org.maplibre.nativeffi.style.StyleImageOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -439,6 +443,92 @@ internal object NativeAccess {
       Status.check(mapListStyleSourceIdsFunction().invokeWithArguments(map, outList) as Int)
       styleIdList(outList.get(ValueLayout.ADDRESS, 0))
     }
+
+  internal fun setStyleImage(
+    map: MemorySegment,
+    imageId: String,
+    image: PremultipliedRgba8Image,
+    options: StyleImageOptions,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewTwoAddressStatusFunction("mln_map_set_style_image")
+          .invokeWithArguments(
+            map,
+            stringView(arena, imageId),
+            premultipliedRgba8Image(arena, image),
+            styleImageOptions(arena, options),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun removeStyleImage(map: MemorySegment, imageId: String): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_remove_style_image")
+          .invokeWithArguments(map, stringView(arena, imageId), outRemoved) as Int
+      )
+      outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun styleImageExists(map: MemorySegment, imageId: String): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_style_image_exists")
+          .invokeWithArguments(map, stringView(arena, imageId), outExists) as Int
+      )
+      outExists.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun styleImageInfo(map: MemorySegment, imageId: String): StyleImageInfo? =
+    Arena.ofConfined().use { arena ->
+      val outInfo = styleImageInfoDefault(arena)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewTwoAddressStatusFunction("mln_map_get_style_image_info")
+          .invokeWithArguments(map, stringView(arena, imageId), outInfo, outFound) as Int
+      )
+      if (outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) styleImageInfo(outInfo) else null
+    }
+
+  internal fun copyStyleImagePremultipliedRgba8(map: MemorySegment, imageId: String): StyleImage? {
+    val info = styleImageInfo(map, imageId) ?: return null
+    return Arena.ofConfined().use { arena ->
+      val outPixels = arena.allocate(info.byteLength)
+      val outByteLength = arena.allocate(ValueLayout.JAVA_LONG)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapStringViewAddressLongTwoAddressStatusFunction(
+            "mln_map_copy_style_image_premultiplied_rgba8"
+          )
+          .invokeWithArguments(
+            map,
+            stringView(arena, imageId),
+            outPixels,
+            info.byteLength,
+            outByteLength,
+            outFound,
+          ) as Int
+      )
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return@use null
+      }
+      val byteLength = outByteLength.get(ValueLayout.JAVA_LONG, 0)
+      StyleImage(
+        PremultipliedRgba8Image(
+          info.width,
+          info.height,
+          info.stride,
+          copyBytes(outPixels, byteLength),
+        ),
+        info.pixelRatio,
+        info.sdf,
+      )
+    }
+  }
 
   internal fun addStyleLayerJson(map: MemorySegment, layerJson: JsonValue, beforeLayerId: String) {
     Arena.ofConfined().use { arena ->
@@ -1053,6 +1143,20 @@ internal object NativeAccess {
       ),
     )
 
+  private fun mapStringViewAddressLongTwoAddressStatusFunction(name: String): MethodHandle =
+    downcall(
+      name,
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun mapListStyleSourceIdsFunction(): MethodHandle =
     downcall(
       "mln_map_list_style_source_ids",
@@ -1330,6 +1434,69 @@ internal object NativeAccess {
     writeJson(segment, value, arena, 0)
     return segment
   }
+
+  private fun premultipliedRgba8Image(arena: Arena, value: PremultipliedRgba8Image): MemorySegment {
+    val pixels = value.pixels
+    val segment = arena.allocate(PREMULTIPLIED_RGBA8_IMAGE_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET,
+      PREMULTIPLIED_RGBA8_IMAGE_SIZE.toInt(),
+    )
+    segment.set(ValueLayout.JAVA_INT, PREMULTIPLIED_RGBA8_IMAGE_WIDTH_OFFSET, value.width)
+    segment.set(ValueLayout.JAVA_INT, PREMULTIPLIED_RGBA8_IMAGE_HEIGHT_OFFSET, value.height)
+    segment.set(ValueLayout.JAVA_INT, PREMULTIPLIED_RGBA8_IMAGE_STRIDE_OFFSET, value.stride)
+    segment.set(
+      ValueLayout.ADDRESS,
+      PREMULTIPLIED_RGBA8_IMAGE_PIXELS_OFFSET,
+      nativeBytes(arena, pixels),
+    )
+    segment.set(
+      ValueLayout.JAVA_LONG,
+      PREMULTIPLIED_RGBA8_IMAGE_BYTE_LENGTH_OFFSET,
+      pixels.size.toLong(),
+    )
+    return segment
+  }
+
+  private fun styleImageOptions(arena: Arena, value: StyleImageOptions): MemorySegment {
+    val segment = arena.allocate(STYLE_IMAGE_OPTIONS_SIZE)
+    var fields = 0
+    segment.set(
+      ValueLayout.JAVA_INT,
+      STYLE_IMAGE_OPTIONS_SIZE_OFFSET,
+      STYLE_IMAGE_OPTIONS_SIZE.toInt(),
+    )
+    segment.set(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET, DEFAULT_PIXEL_RATIO)
+    segment.set(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_OPTIONS_SDF_OFFSET, false)
+    value.pixelRatio?.let {
+      fields = fields or STYLE_IMAGE_OPTION_PIXEL_RATIO
+      segment.set(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET, it)
+    }
+    value.sdf?.let {
+      fields = fields or STYLE_IMAGE_OPTION_SDF
+      segment.set(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_OPTIONS_SDF_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun styleImageInfoDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(STYLE_IMAGE_INFO_SIZE)
+    segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_SIZE_OFFSET, STYLE_IMAGE_INFO_SIZE.toInt())
+    segment.set(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET, DEFAULT_PIXEL_RATIO)
+    return segment
+  }
+
+  private fun styleImageInfo(segment: MemorySegment): StyleImageInfo =
+    StyleImageInfo(
+      segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_WIDTH_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_HEIGHT_OFFSET),
+      segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_STRIDE_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET),
+      segment.get(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET),
+      segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_SDF_OFFSET),
+    )
 
   private fun writeJson(segment: MemorySegment, value: JsonValue, arena: Arena, depth: Int) {
     require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
@@ -2143,6 +2310,34 @@ internal object NativeAccess {
   private const val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long = 16
   private const val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long = 17
   private const val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long = 24
+
+  private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE: Long = 32
+  private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET: Long = 0
+  private const val PREMULTIPLIED_RGBA8_IMAGE_WIDTH_OFFSET: Long = 4
+  private const val PREMULTIPLIED_RGBA8_IMAGE_HEIGHT_OFFSET: Long = 8
+  private const val PREMULTIPLIED_RGBA8_IMAGE_STRIDE_OFFSET: Long = 12
+  private const val PREMULTIPLIED_RGBA8_IMAGE_PIXELS_OFFSET: Long = 16
+  private const val PREMULTIPLIED_RGBA8_IMAGE_BYTE_LENGTH_OFFSET: Long = 24
+
+  private const val STYLE_IMAGE_OPTION_PIXEL_RATIO: Int = 1 shl 0
+  private const val STYLE_IMAGE_OPTION_SDF: Int = 1 shl 1
+
+  private const val DEFAULT_PIXEL_RATIO: Float = 1.0f
+
+  private const val STYLE_IMAGE_OPTIONS_SIZE: Long = 16
+  private const val STYLE_IMAGE_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val STYLE_IMAGE_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET: Long = 8
+  private const val STYLE_IMAGE_OPTIONS_SDF_OFFSET: Long = 12
+
+  private const val STYLE_IMAGE_INFO_SIZE: Long = 32
+  private const val STYLE_IMAGE_INFO_SIZE_OFFSET: Long = 0
+  private const val STYLE_IMAGE_INFO_WIDTH_OFFSET: Long = 4
+  private const val STYLE_IMAGE_INFO_HEIGHT_OFFSET: Long = 8
+  private const val STYLE_IMAGE_INFO_STRIDE_OFFSET: Long = 12
+  private const val STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET: Long = 16
+  private const val STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET: Long = 24
+  private const val STYLE_IMAGE_INFO_SDF_OFFSET: Long = 28
 
   private const val RUNTIME_OPTION_MAXIMUM_CACHE_SIZE: Int = 1 shl 0
   private const val RUNTIME_OPTIONS_ASSET_PATH: Long = 8

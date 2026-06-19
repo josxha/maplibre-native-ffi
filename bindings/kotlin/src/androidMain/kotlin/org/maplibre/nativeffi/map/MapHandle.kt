@@ -250,17 +250,98 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
   ) {
-    unsupportedMapHandle()
+    NativeAccess.ensureLoaded()
+    StringViewScope(imageId).use { nativeImageId ->
+      PremultipliedImageScope(image).use { nativeImage ->
+        StyleImageOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            MaplibreNativeC.mln_map_set_style_image(
+              map(requireLiveAddress()),
+              nativeImageId.view,
+              nativeImage.image,
+              nativeOptions.options,
+            )
+          )
+        }
+      }
+    }
   }
 
-  public actual fun removeStyleImage(imageId: String): Boolean = unsupportedMapHandle()
+  public actual fun removeStyleImage(imageId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    val outRemoved = booleanArrayOf(false)
+    StringViewScope(imageId).use { nativeImageId ->
+      Status.check(
+        MaplibreNativeC.mln_map_remove_style_image(
+          map(requireLiveAddress()),
+          nativeImageId.view,
+          outRemoved,
+        )
+      )
+    }
+    return outRemoved[0]
+  }
 
-  public actual fun styleImageExists(imageId: String): Boolean = unsupportedMapHandle()
+  public actual fun styleImageExists(imageId: String): Boolean {
+    NativeAccess.ensureLoaded()
+    val outExists = booleanArrayOf(false)
+    StringViewScope(imageId).use { nativeImageId ->
+      Status.check(
+        MaplibreNativeC.mln_map_style_image_exists(
+          map(requireLiveAddress()),
+          nativeImageId.view,
+          outExists,
+        )
+      )
+    }
+    return outExists[0]
+  }
 
-  public actual fun styleImageInfo(imageId: String): StyleImageInfo? = unsupportedMapHandle()
+  public actual fun styleImageInfo(imageId: String): StyleImageInfo? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(imageId).use { nativeImageId ->
+      MaplibreNativeC.mln_style_image_info_default().use { outInfo ->
+        val outFound = booleanArrayOf(false)
+        Status.check(
+          MaplibreNativeC.mln_map_get_style_image_info(
+            map(requireLiveAddress()),
+            nativeImageId.view,
+            outInfo,
+            outFound,
+          )
+        )
+        return if (outFound[0]) styleImageInfo(outInfo) else null
+      }
+    }
+  }
 
-  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? =
-    unsupportedMapHandle()
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? {
+    NativeAccess.ensureLoaded()
+    val info = styleImageInfo(imageId) ?: return null
+    val outPixels = ByteArray(Math.toIntExact(info.byteLength))
+    val outFound = booleanArrayOf(false)
+    StringViewScope(imageId).use { nativeImageId ->
+      SizeTPointer(1).use { outByteLength ->
+        Status.check(
+          MaplibreNativeC.mln_map_copy_style_image_premultiplied_rgba8(
+            map(requireLiveAddress()),
+            nativeImageId.view,
+            outPixels,
+            outPixels.size.toLong(),
+            outByteLength,
+            outFound,
+          )
+        )
+      }
+    }
+    return if (outFound[0]) {
+      StyleImage(
+        PremultipliedRgba8Image(info.width, info.height, info.stride, outPixels),
+        info.pixelRatio,
+        info.sdf,
+      )
+    } else null
+  }
 
   public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
     unsupportedMapHandle()
@@ -970,6 +1051,16 @@ private fun jsonObject(obj: MaplibreNativeC.mln_json_object): JsonValue.ObjectVa
   )
 }
 
+private fun styleImageInfo(info: MaplibreNativeC.mln_style_image_info): StyleImageInfo =
+  StyleImageInfo(
+    info.width(),
+    info.height(),
+    info.stride(),
+    info.byte_length(),
+    info.pixel_ratio(),
+    info.sdf(),
+  )
+
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer
   val view: MaplibreNativeC.mln_string_view = MaplibreNativeC.mln_string_view()
@@ -1063,6 +1154,50 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
         throw IllegalArgumentException("unknown JSON values cannot be used as input")
     }
     return out
+  }
+}
+
+private class PremultipliedImageScope(value: PremultipliedRgba8Image) : AutoCloseable {
+  private val pixels: BytePointer
+  val image: MaplibreNativeC.mln_premultiplied_rgba8_image =
+    MaplibreNativeC.mln_premultiplied_rgba8_image_default()
+
+  init {
+    val bytes = value.pixels
+    pixels = BytePointer(bytes.size.toLong())
+    pixels.put(bytes, 0, bytes.size)
+    image.width(value.width)
+    image.height(value.height)
+    image.stride(value.stride)
+    image.pixels(pixels)
+    image.byte_length(bytes.size.toLong())
+  }
+
+  override fun close() {
+    image.close()
+    pixels.close()
+  }
+}
+
+private class StyleImageOptionsScope(value: StyleImageOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_style_image_options =
+    MaplibreNativeC.mln_style_image_options_default()
+
+  init {
+    var fields = 0
+    value.pixelRatio?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
+      options.pixel_ratio(it)
+    }
+    value.sdf?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_SDF
+      options.sdf(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
   }
 }
 

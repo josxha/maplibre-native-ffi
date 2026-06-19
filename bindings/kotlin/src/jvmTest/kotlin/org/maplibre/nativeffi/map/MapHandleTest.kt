@@ -9,9 +9,11 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.StyleImageOptions
 
 class MapHandleTest {
   @Test
@@ -114,6 +116,50 @@ class MapHandleTest {
       assertTrue(map.removeStyleLayer("puck"))
       assertFalse(map.styleLayerExists("background"))
       assertFalse(map.removeStyleLayer("background"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun styleImageCanBeSetCopiedInspectedAndRemoved() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
+      val options =
+        StyleImageOptions().apply {
+          pixelRatio = 2.0f
+          sdf = true
+        }
+
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleImage("dot", image, options)
+
+      assertTrue(map.styleImageExists("dot"))
+      val info = map.styleImageInfo("dot")
+      assertEquals(1, info?.width)
+      assertEquals(1, info?.height)
+      assertEquals(4, info?.stride)
+      assertEquals(4, info?.byteLength)
+      assertEquals(2.0f, info?.pixelRatio)
+      assertEquals(true, info?.sdf)
+      assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
+      assertEquals(2.0f, map.copyStyleImagePremultipliedRgba8("dot")?.pixelRatio)
+      assertEquals(true, map.copyStyleImagePremultipliedRgba8("dot")?.sdf)
+      assertTrue(map.removeStyleImage("dot"))
+      assertFalse(map.styleImageExists("dot"))
+      assertFalse(map.removeStyleImage("dot"))
     } finally {
       map.close()
       runtime.close()
