@@ -1,0 +1,93 @@
+package org.maplibre.nativeffi.internal.loader
+
+import java.lang.foreign.FunctionDescriptor
+import java.lang.foreign.Linker
+import java.lang.foreign.SymbolLookup
+import java.lang.foreign.ValueLayout
+import java.lang.invoke.MethodHandle
+import java.nio.file.Path
+import java.util.NoSuchElementException
+import org.maplibre.nativeffi.error.AbiVersionMismatchException
+
+/** Ensures the native library is loaded before JVM FFM downcalls run. */
+internal object NativeAccess {
+  const val EXPECTED_C_ABI_VERSION: Long = 0L
+
+  private val lock = Any()
+
+  @Volatile private var initialized = false
+
+  fun ensureLoaded() {
+    if (initialized) {
+      return
+    }
+
+    synchronized(lock) {
+      if (initialized) {
+        return
+      }
+
+      NativeLibrary.load()
+      checkNativeAccessAndAbi()
+      initialized = true
+    }
+  }
+
+  fun load(libraryPath: Path) {
+    synchronized(lock) {
+      NativeLibrary.load(libraryPath)
+      checkNativeAccessAndAbi()
+      initialized = true
+    }
+  }
+
+  internal fun checkAbiVersion(version: Long) {
+    if (version != EXPECTED_C_ABI_VERSION) {
+      throw AbiVersionMismatchException(version, EXPECTED_C_ABI_VERSION)
+    }
+  }
+
+  internal fun checkNativeAccessAndAbi(cVersion: () -> Long) {
+    val version =
+      try {
+        cVersion()
+      } catch (error: IllegalCallerException) {
+        throw nativeAccessFailure(error)
+      } catch (error: NoSuchElementException) {
+        throw missingSymbols(error)
+      } catch (error: UnsatisfiedLinkError) {
+        throw missingSymbols(error)
+      }
+
+    checkAbiVersion(version)
+  }
+
+  private fun checkNativeAccessAndAbi() {
+    checkNativeAccessAndAbi(::cVersion)
+  }
+
+  private fun cVersion(): Long =
+    cVersionHandle().invokeWithArguments().let { Integer.toUnsignedLong(it as Int) }
+
+  private fun cVersionHandle(): MethodHandle {
+    val symbol =
+      SymbolLookup.loaderLookup().find("mln_c_version").orElseThrow {
+        NoSuchElementException("mln_c_version")
+      }
+    return Linker.nativeLinker().downcallHandle(symbol, FunctionDescriptor.of(ValueLayout.JAVA_INT))
+  }
+
+  private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
+    IllegalStateException(
+      "Java FFM native access is not enabled. Run the JVM with " +
+        "--enable-native-access=ALL-UNNAMED for this classpath build.",
+      cause,
+    )
+
+  private fun missingSymbols(cause: Throwable): UnsatisfiedLinkError {
+    val missing =
+      UnsatisfiedLinkError("Loaded native library does not expose the Maplibre C ABI symbols.")
+    missing.addSuppressed(cause)
+    return missing
+  }
+}

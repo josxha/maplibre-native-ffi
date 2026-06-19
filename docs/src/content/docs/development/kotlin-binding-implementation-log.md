@@ -81,3 +81,20 @@ is being implemented.
 - Discovery: the loader can migrate independently from jextract because it only
   depends on JDK APIs. That makes it a useful first `jvmMain` bridge component
   before moving symbol lookup, ABI checks, and generated/native downcalls.
+
+### JVM Native Access Milestone
+
+- Added the Kotlin/JVM native access gate that loads the C ABI library once,
+  checks the C ABI version, and converts FFM native-access and missing-symbol
+  failures into binding-owned exceptions.
+- Discovery: the ABI check does not need jextract-generated declarations. A
+  direct Java FFM downcall to `mln_c_version` is enough for the loader/access
+  boundary, which keeps this migration step independent from the larger
+  generated FFM surface.
+- Discovery: JVM tests for this layer need `--enable-native-access=ALL-UNNAMED`
+  and the mise-built native library path wired through the Kotlin module's
+  `jvmTest` task before direct FFM integration tests can be added safely.
+- Reflection: direct FFM is useful for the bootstrap path, but the broader
+  wrapper migration still needs a clear decision about whether to keep jextract
+  generated declarations in `jvmMain` or replace selected calls with
+  hand-written downcall helpers.
