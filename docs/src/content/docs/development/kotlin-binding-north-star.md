@@ -255,8 +255,8 @@ environment fixes when possible.
 
 ## Migration Plan
 
-1. Rename or replace `:bindings:kotlin-native` with `:bindings:kotlin` while
-   keeping the existing native target green.
+1. Rename or replace the Kotlin Native-only subproject with `:bindings:kotlin`
+   while keeping the existing native target green.
 2. Move pure Kotlin public values, errors, and tests from `nativeMain` to
    `commonMain`.
 3. Introduce internal native-handle wrappers and `expect` bridge objects for

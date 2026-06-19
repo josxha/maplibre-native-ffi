@@ -3,4 +3,4 @@ exclude = ["linux-arm64-egl", "linux-arm64-vulkan", "macos-arm64-egl"]
 os = ["linux", "macos"]
 
 [ci]
-build = "//bindings/kotlin-native:build"
+build = "//bindings/kotlin:build"

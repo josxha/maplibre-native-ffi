@@ -4,6 +4,6 @@ include(":bindings:java-ffm")
 
 include(":bindings:java-jni")
 
-include(":bindings:kotlin-native")
+include(":bindings:kotlin")
 
 include(":examples:lwjgl-map")
