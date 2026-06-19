@@ -329,3 +329,15 @@ is being implemented.
 - Reflection: this is a small public behavior tightening, but it aligns with the
   north-star rule that handle lifecycle state and parent retention are binding
   semantics rather than platform bridge mechanics.
+
+### Common Callback Gate Milestone
+
+- Extracted the close-during-callback state machine into a common
+  `CallbackGate`, with common tests for immediate close, deferred native
+  cleanup, and multiple active callbacks.
+- Rewired the Kotlin/Native resource transform, resource provider, and custom
+  geometry source states to use the common gate while keeping native
+  descriptors, stable references, and C trampolines in `nativeMain`.
+- Discovery: three native callback owners had already converged on the same
+  active-callback bitfield semantics, which made the extraction a direct move of
+  binding-owned lifecycle behavior rather than a new abstraction.
