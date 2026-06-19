@@ -437,3 +437,16 @@ is being implemented.
 - Reflection: this mirrors the `ResourceRequestHandle` facade pattern for a
   render-domain public type, making more public API visible from common code
   without pretending the non-native bridges are finished.
+
+### Common Owned Texture Frame Values Milestone
+
+- Moved `MetalOwnedTextureFrame`, `VulkanOwnedTextureFrame`, and
+  `OpenGLOwnedTextureFrame` to `commonMain` because they are Kotlin-owned view
+  objects over copied frame metadata and common `NativePointer` values.
+- Moved `FrameScopeTest` to `commonTest`, keeping stale-frame access behavior
+  covered across JVM, Android, and Native targets.
+- Kept the frame handle classes in `nativeMain` because they still own native
+  frame pointers and backend release calls.
+- Discovery: the previous extraction of `FrameScope`, `NativePointer`, and
+  `OwnedTextureFrameHandleCore` made these value objects platform-neutral
+  without further bridge work.
