@@ -450,3 +450,15 @@ is being implemented.
 - Discovery: the previous extraction of `FrameScope`, `NativePointer`, and
   `OwnedTextureFrameHandleCore` made these value objects platform-neutral
   without further bridge work.
+
+### Common Runtime Event Facade Milestone
+
+- Added initial common `expect` facades for `RuntimeHandle` and `MapHandle`
+  covering the shared close/isClosed surface and the map-to-runtime reference.
+- Moved `RuntimeEvent` to `commonMain`; it is copied event data plus nullable
+  handle references and no longer needs to be Kotlin/Native-only.
+- Added explicit JVM and Android handle placeholders until their FFM and JNI
+  runtime/map domains are migrated.
+- Reflection: this starts the domain-level handle facade migration described in
+  the north star, while keeping the actual runtime and map method bodies in
+  `nativeMain` until native operations are behind bridge facades.

@@ -177,7 +177,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned native map handle. Close it on the map owner thread. */
 @OptIn(ExperimentalForeignApi::class)
-public class MapHandle
+public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map>) : AutoCloseable {
   private val runtimeRetention = runtime.retainChild()
   private val state = HandleState("MapHandle", handle, runtime)
@@ -1387,7 +1387,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     )
   }
 
-  override fun close() {
+  public actual override fun close() {
     state.closeOnce(::mln_map_destroy) {
       clearCustomGeometrySources()
       runtime.unregisterMap(this)
@@ -1395,10 +1395,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = state.isReleased()
 
-  public fun runtime(): RuntimeHandle = runtime
+  public actual fun runtime(): RuntimeHandle = runtime
 
   internal fun nativeHandle(): CPointer<mln_map> = state.requireLive()
 

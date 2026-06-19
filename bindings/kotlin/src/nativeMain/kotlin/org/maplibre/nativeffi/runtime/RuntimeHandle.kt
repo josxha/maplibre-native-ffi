@@ -66,7 +66,7 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. Close it on the owner thread. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
-public class RuntimeHandle
+public actual class RuntimeHandle
 internal constructor(
   handle: CPointer<mln_runtime>,
   private val destroyer: (CPointer<mln_runtime>) -> Int = ::mln_runtime_destroy,
@@ -486,7 +486,7 @@ internal constructor(
     runtimeEvent(event)
   }
 
-  override fun close() {
+  public actual override fun close() {
     state.closeOnce(destroyer) {
       resourceProviderState?.close()
       resourceTransformState?.close()
@@ -495,7 +495,7 @@ internal constructor(
     }
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = state.isReleased()
 
   internal fun nativeHandle(): CPointer<mln_runtime> = state.requireLive()
