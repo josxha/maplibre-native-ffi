@@ -160,7 +160,7 @@ def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
             if not matches(variant, requires) or variant.name in excluded_variants:
                 continue
             for action_key, task in tasks.items():
-                build_only_native = variant.os in {"ios", "ohos"}
+                build_only_native = variant.os in {"android", "ios", "ohos"}
                 if is_native and not build_only_native and action_key == "build":
                     continue
                 # Temporary policy: mobile cross variants build only. When device
@@ -177,14 +177,14 @@ def variant_job_id(variant: Variant) -> str:
     return f"variant-{variant.name}"
 
 
-def checkout_step(*, persist_credentials: bool = True) -> dict[str, object]:
+def checkout_step(*, persist_credentials: bool = False) -> dict[str, object]:
     step: dict[str, object] = {"uses": CHECKOUT_ACTION}
     if not persist_credentials:
         step["with"] = {"persist-credentials": False}
     return step
 
 
-def setup_steps(*, persist_credentials: bool = True) -> list[dict[str, object]]:
+def setup_steps(*, persist_credentials: bool = False) -> list[dict[str, object]]:
     return [
         checkout_step(persist_credentials=persist_credentials),
         {"uses": "./.github/actions/setup-ci-deps"},
@@ -236,7 +236,7 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
             "timeout-minutes": 120,
             "env": {"MISE_ENV": variant.name},
             "steps": [
-                *setup_steps(persist_credentials=variant.os != "ohos"),
+                *setup_steps(),
                 {"run": "mise run configure"},
                 *({"run": command} for command in commands[variant.name]),
             ],

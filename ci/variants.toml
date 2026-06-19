@@ -40,6 +40,18 @@ os = "macos"
 arch = "arm64"
 backend = "opengl"
 
+[variants.android-arm64-egl]
+runner = "ubuntu-latest"
+os = "android"
+arch = "arm64"
+backend = "opengl"
+
+[variants.android-arm64-vulkan]
+runner = "ubuntu-latest"
+os = "android"
+arch = "arm64"
+backend = "vulkan"
+
 [variants.ios-arm64-metal]
 runner = "macos-latest"
 os = "ios"
