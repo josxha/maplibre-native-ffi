@@ -278,3 +278,19 @@ is being implemented.
 - Reflection: after a bridge helper moves to `commonMain`, its tests should move
   with it unless they are specifically testing the platform actual or native C
   behavior.
+
+### Common Handle Lifecycle Core Milestone
+
+- Extracted the platform-neutral handle release-state machine into `commonMain`
+  as `HandleStateCore`, leaving Kotlin/Native `CPointer` storage and cleaner
+  registration in the native `HandleState` wrapper.
+- Added common lifecycle tests for failed destroy retry, reentrant release
+  rejection, released idempotence, and leak report text.
+- Discovery: the existing Kotlin/Native handle wrapper could move lifecycle
+  transitions without changing handle call sites because every native handle
+  already funnels `requireLive`, `isReleased`, `address`, and `closeOnce`
+  through one internal class.
+- Reflection: this creates the lifecycle base needed by future common public
+  handle classes without prematurely deciding whether JVM handles are
+  `MemorySegment`, Android handles are JavaCPP pointer objects, or both use
+  address carriers internally.
