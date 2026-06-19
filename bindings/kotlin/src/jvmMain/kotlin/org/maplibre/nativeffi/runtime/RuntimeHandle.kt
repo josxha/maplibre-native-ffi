@@ -1,5 +1,8 @@
 package org.maplibre.nativeffi.runtime
 
+import java.lang.foreign.MemorySegment
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -7,13 +10,18 @@ import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
-/** JVM actual placeholder until the FFM runtime bridge is migrated. */
-public actual class RuntimeHandle private constructor() : AutoCloseable {
+/** Owned runtime handle backed by the JVM FFM bridge. */
+public actual class RuntimeHandle private constructor(private val handle: MemorySegment) :
+  AutoCloseable {
+  private val core = HandleStateCore("RuntimeHandle", handle.address())
+
   public actual val isClosed: Boolean
-    get() = unsupportedRuntimeHandle()
+    get() = core.isReleased()
 
   public actual fun runOnce() {
-    unsupportedRuntimeHandle()
+    NativeAccess.ensureLoaded()
+    core.requireLive()
+    NativeAccess.runRuntimeOnce(handle)
   }
 
   public actual fun startAmbientCacheOperation(
@@ -99,11 +107,14 @@ public actual class RuntimeHandle private constructor() : AutoCloseable {
   public actual fun pollEvent(): RuntimeEvent? = unsupportedRuntimeHandle()
 
   public actual override fun close() {
-    unsupportedRuntimeHandle()
+    core.closeOnce(destroy = { NativeAccess.destroyRuntime(handle) })
   }
 
   public actual companion object {
-    public actual fun create(options: RuntimeOptions): RuntimeHandle = unsupportedRuntimeHandle()
+    public actual fun create(options: RuntimeOptions): RuntimeHandle {
+      NativeAccess.ensureLoaded()
+      return RuntimeHandle(NativeAccess.createRuntime(options))
+    }
   }
 }
 

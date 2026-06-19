@@ -4,6 +4,7 @@ import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryLayout
+import java.lang.foreign.MemorySegment
 import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
@@ -13,6 +14,7 @@ import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -134,6 +136,24 @@ internal object NativeAccess {
       )
     }
 
+  internal fun createRuntime(options: RuntimeOptions): MemorySegment =
+    Arena.ofConfined().use { arena ->
+      val nativeOptions = runtimeOptions(options, arena)
+      val outRuntime = arena.allocate(ValueLayout.ADDRESS)
+      outRuntime.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(runtimeCreateFunction().invokeWithArguments(nativeOptions, outRuntime) as Int)
+      outRuntime.get(ValueLayout.ADDRESS, 0).also { runtime ->
+        require(runtime != MemorySegment.NULL) { "mln_runtime_create returned a null runtime" }
+      }
+    }
+
+  internal fun runRuntimeOnce(runtime: MemorySegment) {
+    Status.check(runtimeStatusFunction("mln_runtime_run_once").invokeWithArguments(runtime) as Int)
+  }
+
+  internal fun destroyRuntime(runtime: MemorySegment): Int =
+    runtimeStatusFunction("mln_runtime_destroy").invokeWithArguments(runtime) as Int
+
   private fun intFunction(name: String): MethodHandle =
     downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT))
 
@@ -154,6 +174,43 @@ internal object NativeAccess {
       "mln_lat_lng_for_projected_meters",
       FunctionDescriptor.of(ValueLayout.JAVA_INT, projectedMetersLayout, ValueLayout.ADDRESS),
     )
+
+  private fun runtimeCreateFunction(): MethodHandle =
+    downcall(
+      "mln_runtime_create",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun runtimeStatusFunction(name: String): MethodHandle =
+    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+
+  private fun runtimeOptions(options: RuntimeOptions, arena: Arena): MemorySegment {
+    val nativeOptions = arena.allocate(runtimeOptionsLayout)
+    nativeOptions.set(ValueLayout.JAVA_INT, 0, runtimeOptionsLayout.byteSize().toInt())
+    var flags = 0
+    nativeOptions.set(
+      ValueLayout.ADDRESS,
+      RUNTIME_OPTIONS_ASSET_PATH,
+      optionalCString(arena, options.assetPath),
+    )
+    nativeOptions.set(
+      ValueLayout.ADDRESS,
+      RUNTIME_OPTIONS_CACHE_PATH,
+      optionalCString(arena, options.cachePath),
+    )
+    options.maximumCacheSize?.let { maximumCacheSize ->
+      flags = flags or RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
+      nativeOptions.set(ValueLayout.JAVA_LONG, RUNTIME_OPTIONS_MAXIMUM_CACHE_SIZE, maximumCacheSize)
+    }
+    nativeOptions.set(ValueLayout.JAVA_INT, Int.SIZE_BYTES.toLong(), flags)
+    return nativeOptions
+  }
+
+  private fun optionalCString(arena: Arena, value: String?): MemorySegment =
+    value?.let {
+      require('\u0000' !in it) { "C string inputs must not contain embedded NUL characters" }
+      arena.allocateFrom(it)
+    } ?: MemorySegment.NULL
 
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
@@ -184,5 +241,19 @@ internal object NativeAccess {
     MemoryLayout.structLayout(
       ValueLayout.JAVA_DOUBLE.withName("northing"),
       ValueLayout.JAVA_DOUBLE.withName("easting"),
+    )
+
+  private const val RUNTIME_OPTION_MAXIMUM_CACHE_SIZE: Int = 1 shl 0
+  private const val RUNTIME_OPTIONS_ASSET_PATH: Long = 8
+  private const val RUNTIME_OPTIONS_CACHE_PATH: Long = 16
+  private const val RUNTIME_OPTIONS_MAXIMUM_CACHE_SIZE: Long = 24
+
+  private val runtimeOptionsLayout =
+    MemoryLayout.structLayout(
+      ValueLayout.JAVA_INT.withName("size"),
+      ValueLayout.JAVA_INT.withName("flags"),
+      ValueLayout.ADDRESS.withName("asset_path"),
+      ValueLayout.ADDRESS.withName("cache_path"),
+      ValueLayout.JAVA_LONG.withName("maximum_cache_size"),
     )
 }

@@ -647,3 +647,18 @@ is being implemented.
   because JVM FFM and Android JavaCPP need platform-specific native callback
   lifetime management, while async severity masks are plain status-returning C
   calls.
+
+### JVM Runtime Lifecycle Bridge Milestone
+
+- Replaced the JVM `RuntimeHandle` placeholder for runtime creation, `runOnce`,
+  `close`, and `isClosed` with a real FFM-backed handle.
+- Added explicit JVM `mln_runtime_options` materialization in `NativeAccess`,
+  including C string validation and the maximum-cache-size flag, while leaving
+  offline operations, event polling, maps, and runtime callbacks as dedicated
+  follow-up bridge migrations.
+- Added a JVM smoke test that creates a runtime, pumps it once, closes it
+  idempotently, and verifies post-close lifecycle rejection.
+- Discovery: JVM tests that load the process-global native library must not
+  depend on running before loader error-path tests. The missing-path loader test
+  now treats an already-loaded library as the valid no-op state for
+  `NativeLibrary.load(path)`.
