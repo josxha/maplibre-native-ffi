@@ -82,6 +82,41 @@ class HandleStateCoreTest {
   }
 
   @Test
+  fun liveChildrenBlockParentCloseUntilReleased() {
+    val state = HandleStateCore("ParentHandle", 0x1234)
+    val child = state.retainChild()
+    var attempts = 0
+
+    val error =
+      assertFailsWith<InvalidStateException> {
+        state.closeOnce(
+          destroy = {
+            attempts += 1
+            MaplibreStatus.OK.nativeCode
+          }
+        )
+      }
+
+    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+    assertEquals("ParentHandle has 1 live child handle(s)", error.diagnostic)
+    assertEquals(0, attempts)
+    assertFalse(state.isReleased())
+
+    child.close()
+    child.close()
+
+    state.closeOnce(
+      destroy = {
+        attempts += 1
+        MaplibreStatus.OK.nativeCode
+      }
+    )
+
+    assertEquals(1, attempts)
+    assertTrue(state.isReleased())
+  }
+
+  @Test
   fun leakReportReportsOnlyUnreleasedHandles() {
     val reports = mutableListOf<String>()
     val unreleased = HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add)

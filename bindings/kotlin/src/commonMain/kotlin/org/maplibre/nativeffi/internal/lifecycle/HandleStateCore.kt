@@ -14,6 +14,7 @@ internal class HandleStateCore(
   @Suppress("unused") private val parents: Array<out Any> = parents
   val leakReport: LeakReport = LeakReport(typeName, address)
   private val releaseState = AtomicInt(STATE_LIVE)
+  private val liveChildren = AtomicInt(0)
 
   fun requireLive() {
     when (releaseState.load()) {
@@ -27,6 +28,23 @@ internal class HandleStateCore(
 
   fun address(): Long = address
 
+  fun retainChild(): ChildRetention {
+    while (true) {
+      requireLive()
+      val count = liveChildren.load()
+      if (!liveChildren.compareAndSet(count, count + 1)) {
+        continue
+      }
+      try {
+        requireLive()
+        return ChildRetention(this)
+      } catch (error: Throwable) {
+        releaseChild()
+        throw error
+      }
+    }
+  }
+
   fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
     if (!releaseState.compareAndSet(STATE_LIVE, STATE_RELEASING)) {
       when (releaseState.load()) {
@@ -34,6 +52,11 @@ internal class HandleStateCore(
         STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
         else -> throw Status.released(typeName)
       }
+    }
+    val childCount = liveChildren.load()
+    if (childCount > 0) {
+      releaseState.store(STATE_LIVE)
+      throw Status.liveChildren(typeName, childCount)
     }
     try {
       Status.check(destroy())
@@ -44,6 +67,25 @@ internal class HandleStateCore(
     leakReport.markReleased()
     releaseState.store(STATE_CLOSED)
     afterSuccess()
+  }
+
+  private fun releaseChild() {
+    while (true) {
+      val count = liveChildren.load()
+      if (count == 0 || liveChildren.compareAndSet(count, count - 1)) {
+        return
+      }
+    }
+  }
+
+  internal class ChildRetention(private val owner: HandleStateCore) {
+    private val released = AtomicInt(0)
+
+    fun close() {
+      if (released.compareAndSet(0, 1)) {
+        owner.releaseChild()
+      }
+    }
   }
 
   @OptIn(ExperimentalAtomicApi::class)

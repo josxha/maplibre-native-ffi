@@ -31,6 +31,10 @@ internal object Status {
   fun invalidState(diagnostic: String): InvalidStateException =
     InvalidStateException(MaplibreStatus.INVALID_STATE.nativeCode, diagnostic)
 
+  /** Creates the binding-owned error for closing a parent with live child handles. */
+  fun liveChildren(typeName: String, childCount: Int): InvalidStateException =
+    invalidState("$typeName has $childCount live child handle(s)")
+
   /** Creates a binding-owned invalid-argument error without reading stale C diagnostics. */
   fun invalidArgument(diagnostic: String): InvalidArgumentException =
     InvalidArgumentException(MaplibreStatus.INVALID_ARGUMENT.nativeCode, diagnostic)

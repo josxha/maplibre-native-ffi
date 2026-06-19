@@ -294,3 +294,14 @@ is being implemented.
   handle classes without prematurely deciding whether JVM handles are
   `MemorySegment`, Android handles are JavaCPP pointer objects, or both use
   address carriers internally.
+
+### Common Handle Child Retention Milestone
+
+- Added parent-child retention bookkeeping to the common lifecycle core, with a
+  common `Status.liveChildren` diagnostic for attempted parent close while child
+  handles are still live.
+- Added common tests for blocking parent close, retrying after child release,
+  and idempotent child retention release.
+- Reflection: this aligns the Kotlin lifecycle core with the Java bindings'
+  deterministic destruction model while keeping actual handle ownership and
+  platform native handle carriers out of `commonMain`.
