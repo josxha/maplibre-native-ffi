@@ -341,3 +341,14 @@ is being implemented.
 - Discovery: three native callback owners had already converged on the same
   active-callback bitfield semantics, which made the extraction a direct move of
   binding-owned lifecycle behavior rather than a new abstraction.
+
+### Common Active Frame State Milestone
+
+- Moved `ActiveFrameState` and its tests to common source sets because active
+  session-owned frame tracking is render-handle lifecycle policy, not a
+  Kotlin/Native bridge concern.
+- Kept the render session and owned texture frame handles in `nativeMain`; they
+  still own native frame pointers, native heap cleanup, and C release calls.
+- Reflection: this is a small move, but it keeps the render-session API on the
+  same trajectory as handle retention and callback gating: common code owns the
+  public invalid-state behavior while actual source sets own native calls.
