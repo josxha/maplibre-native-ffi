@@ -69,7 +69,7 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
 /** Owned native render session handle. Close it on the map owner thread. */
 @OptIn(ExperimentalForeignApi::class)
-public class RenderSessionHandle
+public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, handle: CPointer<mln_render_session>) :
   AutoCloseable {
   private val mapRetention = map.retainChild()
@@ -328,15 +328,15 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
-  override fun close() {
+  public actual override fun close() {
     activeFrame.ensureInactive("destroy")
     state.closeOnce(::mln_render_session_destroy) { mapRetention.close() }
   }
 
-  public val isClosed: Boolean
+  public actual val isClosed: Boolean
     get() = state.isReleased()
 
-  public fun map(): MapHandle = map
+  public actual fun map(): MapHandle = map
 
   internal fun nativeHandle(): CPointer<mln_render_session> = state.requireLive()
 
