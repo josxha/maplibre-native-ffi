@@ -143,3 +143,15 @@ tasks.withType<Test>().configureEach {
     inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
   }
 }
+
+tasks.register("nativeTest") {
+  group = "verification"
+  description = "Runs tests for the host Kotlin/Native target."
+  dependsOn(kotlin.targets.withType<KotlinNativeTarget>().map { "${it.name}Test" })
+}
+
+tasks.register("androidBuild") {
+  group = "build"
+  description = "Builds the Android variant of the Kotlin Multiplatform binding."
+  dependsOn("assembleAndroidMain")
+}

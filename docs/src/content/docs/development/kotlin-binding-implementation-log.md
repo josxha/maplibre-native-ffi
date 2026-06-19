@@ -216,3 +216,23 @@ is being implemented.
 - Reflection: direct FFM remains productive for small process-global functions,
   but broader JVM migration still needs a deliberate generated-vs-handwritten
   bridge boundary before moving map/runtime/resource handles into common code.
+
+### Kotlin Task Shape Milestone
+
+- Added explicit `jvmTest`, `nativeTest`, and `androidBuild` mise tasks for the
+  unified Kotlin binding module, matching the task vocabulary proposed in the
+  north-star build direction.
+- Added Gradle aliases for `:bindings:kotlin:nativeTest` and
+  `:bindings:kotlin:androidBuild` so the module owns the target-specific entry
+  points instead of requiring contributors to remember generated task names.
+- Discovery: the Kotlin module still needs Android SDK discovery even when
+  running non-Android Gradle tasks because the Android KMP target participates
+  in project configuration. The mise task fallback remains shared across these
+  target-specific entries.
+- Discovery: the native-library prerequisite is not safe to run in parallel for
+  the same build directory. Parallel `jvmTest` and `nativeTest` validation can
+  race during CMake regeneration and trigger a Ninja recompaction failure, while
+  the same tasks pass when run sequentially.
+- Problem: there is no `androidTest` task yet because the module does not have
+  instrumentation test sources, packaged JNI bridge libraries, or emulator
+  wiring. That remains tied to the Android packaging milestone.
