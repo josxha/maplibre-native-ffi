@@ -249,3 +249,18 @@ is being implemented.
 - Reflection: moving tests in small dependency-closed groups is safer than
   sweeping whole directories, because some apparently model-oriented native
   tests still validate native struct materialization or live MapLibre behavior.
+
+### Common Status Facade Milestone
+
+- Moved internal C status-to-exception mapping from `nativeMain` to `commonMain`
+  and hid thread-local diagnostic copying behind a small `NativeDiagnostics`
+  expect/actual bridge.
+- Replaced duplicated JVM FFM and Android JavaCPP status checks with the shared
+  common `Status.check` path, preserving native diagnostic capture on all three
+  targets.
+- Discovery: `mln_thread_last_error_message()` is already present in the
+  generated Android JavaCPP declarations, so Android can keep JavaCPP as the
+  diagnostic bridge without adding a separate JNI helper.
+- Reflection: this is the first internal bridge facade below the public
+  `Maplibre` expect object. It keeps binding-owned status semantics common while
+  leaving raw pointer/string conversion in platform source sets.

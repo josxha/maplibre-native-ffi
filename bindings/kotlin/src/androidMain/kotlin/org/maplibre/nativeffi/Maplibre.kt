@@ -1,8 +1,7 @@
 package org.maplibre.nativeffi
 
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -80,19 +79,12 @@ private object NativeAccess {
 
   fun networkStatus(): Int {
     val outStatus = intArrayOf(0)
-    checkStatus(MaplibreNativeC.mln_network_status_get(outStatus))
+    Status.check(MaplibreNativeC.mln_network_status_get(outStatus))
     return outStatus[0]
   }
 
   fun setNetworkStatus(status: Int) {
-    checkStatus(MaplibreNativeC.mln_network_status_set(status))
-  }
-
-  private fun checkStatus(nativeStatusCode: Int) {
-    val status = MaplibreStatus.fromNative(nativeStatusCode)
-    if (status != MaplibreStatus.OK) {
-      throw MaplibreException.forStatus(status, nativeStatusCode)
-    }
+    Status.check(MaplibreNativeC.mln_network_status_set(status))
   }
 }
 

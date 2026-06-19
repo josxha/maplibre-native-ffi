@@ -9,8 +9,7 @@ import java.lang.invoke.MethodHandle
 import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -81,12 +80,14 @@ internal object NativeAccess {
   internal fun networkStatus(): Int =
     Arena.ofConfined().use { arena ->
       val outStatus = arena.allocate(ValueLayout.JAVA_INT)
-      checkStatus(statusOutFunction("mln_network_status_get").invokeWithArguments(outStatus) as Int)
+      Status.check(
+        statusOutFunction("mln_network_status_get").invokeWithArguments(outStatus) as Int
+      )
       outStatus.get(ValueLayout.JAVA_INT, 0)
     }
 
   internal fun setNetworkStatus(status: Int) {
-    checkStatus(statusInFunction("mln_network_status_set").invokeWithArguments(status) as Int)
+    Status.check(statusInFunction("mln_network_status_set").invokeWithArguments(status) as Int)
   }
 
   private fun intFunction(name: String): MethodHandle =
@@ -101,13 +102,6 @@ internal object NativeAccess {
   private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
     val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
     return Linker.nativeLinker().downcallHandle(symbol, descriptor)
-  }
-
-  private fun checkStatus(nativeStatusCode: Int) {
-    val status = MaplibreStatus.fromNative(nativeStatusCode)
-    if (status != MaplibreStatus.OK) {
-      throw MaplibreException.forStatus(status, nativeStatusCode)
-    }
   }
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
