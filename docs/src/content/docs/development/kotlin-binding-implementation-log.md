@@ -31,3 +31,28 @@ is being implemented.
 - Reflection: this is intentionally a small milestone. It makes the repository
   vocabulary match the destination module before moving code between source
   sets, which keeps later diffs easier to review.
+
+### Common Source Set Milestone
+
+- Moved the platform-neutral public model layer from `nativeMain` to
+  `commonMain`, including camera, geometry, JSON, logging, error, map option,
+  offline, query, render descriptor, resource payload, runtime payload, and
+  style payload types.
+- Discovery: most Kotlin/Native files without direct `kotlinx.cinterop` imports
+  are pure Kotlin model types and can move as dependency-closed groups without
+  changing package names or call sites.
+- Discovery: `NativePointer` looks like a native-only type by name, but its
+  public representation is an opaque address bit pattern used by common render
+  descriptors. Its small `FrameScope` lifetime guard is also pure Kotlin and can
+  live in `commonMain` as an internal helper.
+- Problem: `ResourceProviderCallback` could not move yet because it exposes the
+  native `ResourceRequestHandle`. That callback needs an `expect` facade or a
+  common handle abstraction before it can become common.
+- Problem: `RuntimeEvent` could not move yet because it currently exposes
+  concrete `RuntimeHandle` and `MapHandle` references. The payload hierarchy is
+  common, but the event envelope still needs an expect facade or a platform-free
+  source representation.
+- Problem: `mise run //bindings/kotlin:build` continues to succeed while Gradle
+  prints Kotlin/Native test-output processing exceptions. This milestone saw
+  `LifecycleTrackingTestEventReporter` report that `close()` had already been
+  called after native test output. The build still completed successfully.
