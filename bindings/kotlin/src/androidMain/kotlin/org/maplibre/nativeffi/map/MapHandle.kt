@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
@@ -172,6 +173,87 @@ public actual class MapHandle private constructor() : AutoCloseable {
   }
 
   public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = unsupportedMapHandle()
+
+  public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setLocationIndicatorLocation(
+    layerId: String,
+    coordinate: LatLng,
+    altitude: Double,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setLocationIndicatorImageName(
+    layerId: String,
+    imageKind: LocationIndicatorImageKind,
+    imageId: String,
+  ) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun removeStyleLayer(layerId: String): Boolean = unsupportedMapHandle()
+
+  public actual fun styleLayerExists(layerId: String): Boolean = unsupportedMapHandle()
+
+  public actual fun styleLayerType(layerId: String): String? = unsupportedMapHandle()
+
+  public actual fun styleLayerIds(): List<String> = unsupportedMapHandle()
+
+  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun styleLayerJson(layerId: String): JsonValue? = unsupportedMapHandle()
+
+  public actual fun setStyleLightJson(lightJson: JsonValue) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun styleLightProperty(propertyName: String): JsonValue? = unsupportedMapHandle()
+
+  public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? =
+    unsupportedMapHandle()
+
+  public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun clearLayerFilter(layerId: String) {
+    unsupportedMapHandle()
+  }
+
+  public actual fun layerFilter(layerId: String): JsonValue? = unsupportedMapHandle()
 
   public actual fun requestRepaint() {
     unsupportedMapHandle()

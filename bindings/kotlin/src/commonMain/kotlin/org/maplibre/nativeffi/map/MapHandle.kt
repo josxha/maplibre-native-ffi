@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
@@ -117,6 +118,54 @@ public expect class MapHandle : AutoCloseable {
   public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>)
 
   public fun imageSourceCoordinates(sourceId: String): List<LatLng>?
+
+  public fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String)
+
+  public fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String)
+
+  public fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String)
+
+  public fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String)
+
+  public fun setLocationIndicatorLocation(layerId: String, coordinate: LatLng, altitude: Double)
+
+  public fun setLocationIndicatorBearing(layerId: String, bearing: Double)
+
+  public fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double)
+
+  public fun setLocationIndicatorImageName(
+    layerId: String,
+    imageKind: LocationIndicatorImageKind,
+    imageId: String,
+  )
+
+  public fun removeStyleLayer(layerId: String): Boolean
+
+  public fun styleLayerExists(layerId: String): Boolean
+
+  public fun styleLayerType(layerId: String): String?
+
+  public fun styleLayerIds(): List<String>
+
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String)
+
+  public fun styleLayerJson(layerId: String): JsonValue?
+
+  public fun setStyleLightJson(lightJson: JsonValue)
+
+  public fun setStyleLightProperty(propertyName: String, value: JsonValue)
+
+  public fun styleLightProperty(propertyName: String): JsonValue?
+
+  public fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue)
+
+  public fun layerProperty(layerId: String, propertyName: String): JsonValue?
+
+  public fun setLayerFilter(layerId: String, filter: JsonValue)
+
+  public fun clearLayerFilter(layerId: String)
+
+  public fun layerFilter(layerId: String): JsonValue?
 
   public fun requestRepaint()
 

@@ -574,3 +574,15 @@ is being implemented.
 - Reflection: image byte ownership is already represented by common copied
   values, so this slice did not need a new handle facade. Platform source sets
   still own the native copy/readback mechanics.
+
+### Common Map Style Layer Facade Milestone
+
+- Expanded the common `MapHandle` facade with style layer creation, location
+  indicator mutation, layer inspection/reordering, light mutation, layer
+  property access, and layer filter access.
+- Converted the existing Kotlin/Native style layer, light, property, and filter
+  methods into native actuals and added JVM and Android actual placeholders
+  until their map bridges are migrated.
+- Discovery: the location indicator image method uses `imageKind` and `imageId`
+  in the existing Kotlin/Native API; the common facade preserves those names to
+  avoid accidental API drift during expect/actual extraction.

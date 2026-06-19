@@ -721,7 +721,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
+  public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_add_style_layer_json(
@@ -733,7 +733,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+  public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_add_hillshade_layer(
@@ -746,7 +746,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+  public actual fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_add_color_relief_layer(
@@ -759,7 +759,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
+  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_add_location_indicator_layer(
@@ -771,7 +771,11 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setLocationIndicatorLocation(layerId: String, coordinate: LatLng, altitude: Double) {
+  public actual fun setLocationIndicatorLocation(
+    layerId: String,
+    coordinate: LatLng,
+    altitude: Double,
+  ) {
     memScoped {
       Status.check(
         mln_map_set_location_indicator_location(
@@ -784,7 +788,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
+  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
     memScoped {
       Status.check(
         mln_map_set_location_indicator_bearing(
@@ -796,7 +800,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
+  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
     memScoped {
       Status.check(
         mln_map_set_location_indicator_accuracy_radius(
@@ -808,7 +812,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setLocationIndicatorImageName(
+  public actual fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
@@ -825,7 +829,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun removeStyleLayer(layerId: String): Boolean = memScoped {
+  public actual fun removeStyleLayer(layerId: String): Boolean = memScoped {
     val outRemoved = alloc<BooleanVar>()
     Status.check(
       mln_map_remove_style_layer(
@@ -837,7 +841,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     outRemoved.value
   }
 
-  public fun styleLayerExists(layerId: String): Boolean = memScoped {
+  public actual fun styleLayerExists(layerId: String): Boolean = memScoped {
     val outExists = alloc<BooleanVar>()
     Status.check(
       mln_map_style_layer_exists(
@@ -849,7 +853,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     outExists.value
   }
 
-  public fun styleLayerType(layerId: String): String? = memScoped {
+  public actual fun styleLayerType(layerId: String): String? = memScoped {
     val outType = alloc<org.maplibre.nativeffi.internal.c.mln_string_view>()
     val outFound = alloc<BooleanVar>()
     Status.check(
@@ -863,14 +867,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (outFound.value) CoreStructs.stringView(outType) else null
   }
 
-  public fun styleLayerIds(): List<String> = memScoped {
+  public actual fun styleLayerIds(): List<String> = memScoped {
     val outList = alloc<CPointerVarOf<CPointer<mln_style_id_list>>>()
     outList.value = null
     Status.check(mln_map_list_style_layer_ids(state.requireLive(), outList.ptr))
     StyleStructs.styleIdList(requireNotNull(outList.value))
   }
 
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String) {
+  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_move_style_layer(
@@ -882,7 +886,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun styleLayerJson(layerId: String): JsonValue? = memScoped {
+  public actual fun styleLayerJson(layerId: String): JsonValue? = memScoped {
     val outLayer = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
     val outFound = alloc<BooleanVar>()
     outLayer.value = null
@@ -897,7 +901,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (outFound.value) ValueStructs.jsonSnapshotHandle(outLayer.value) else null
   }
 
-  public fun setStyleLightJson(lightJson: JsonValue) {
+  public actual fun setStyleLightJson(lightJson: JsonValue) {
     memScoped {
       Status.check(
         mln_map_set_style_light_json(state.requireLive(), ValueStructs.jsonValue(lightJson, this))
@@ -905,7 +909,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun setStyleLightProperty(propertyName: String, value: JsonValue) {
+  public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
     memScoped {
       Status.check(
         mln_map_set_style_light_property(
@@ -917,7 +921,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun styleLightProperty(propertyName: String): JsonValue? = memScoped {
+  public actual fun styleLightProperty(propertyName: String): JsonValue? = memScoped {
     val outValue = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
     outValue.value = null
     Status.check(
@@ -930,7 +934,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     ValueStructs.jsonSnapshotHandle(outValue.value)
   }
 
-  public fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
+  public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
     memScoped {
       Status.check(
         mln_map_set_layer_property(
@@ -943,7 +947,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun layerProperty(layerId: String, propertyName: String): JsonValue? = memScoped {
+  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? = memScoped {
     val outValue = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
     outValue.value = null
     Status.check(
@@ -957,7 +961,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     ValueStructs.jsonSnapshotHandle(outValue.value)
   }
 
-  public fun setLayerFilter(layerId: String, filter: JsonValue) {
+  public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
     memScoped {
       Status.check(
         mln_map_set_layer_filter(
@@ -969,7 +973,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun clearLayerFilter(layerId: String) {
+  public actual fun clearLayerFilter(layerId: String) {
     memScoped {
       Status.check(
         mln_map_set_layer_filter(state.requireLive(), CoreStructs.stringView(layerId, this), null)
@@ -977,7 +981,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun layerFilter(layerId: String): JsonValue? = memScoped {
+  public actual fun layerFilter(layerId: String): JsonValue? = memScoped {
     val outFilter = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
     outFilter.value = null
     Status.check(
