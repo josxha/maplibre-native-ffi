@@ -83,12 +83,20 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> = unsupportedRenderSessionHandle()
+  ): List<QueriedFeature> {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("query rendered features")
+    return NativeAccess.queryRenderedFeatures(requireLiveHandle(), geometry, options)
+  }
 
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> = unsupportedRenderSessionHandle()
+  ): List<QueriedFeature> {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("query source features")
+    return NativeAccess.querySourceFeatures(requireLiveHandle(), sourceId, options)
+  }
 
   public actual fun queryFeatureExtension(
     sourceId: String,
@@ -96,7 +104,18 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
     extension: String,
     extensionField: String,
     arguments: JsonValue?,
-  ): FeatureExtensionResult = unsupportedRenderSessionHandle()
+  ): FeatureExtensionResult {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("query feature extension")
+    return NativeAccess.queryFeatureExtension(
+      requireLiveHandle(),
+      sourceId,
+      feature,
+      extension,
+      extensionField,
+      arguments,
+    )
+  }
 
   public actual fun textureImageInfo(): TextureImageInfo {
     NativeAccess.ensureLoaded()
@@ -202,8 +221,3 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
     return handle
   }
 }
-
-private fun unsupportedRenderSessionHandle(): Nothing =
-  throw UnsupportedOperationException(
-    "This RenderSessionHandle operation is not available until the JVM render bridge is completed"
-  )

@@ -1136,3 +1136,23 @@ is being implemented.
 - Discovery: Android JavaCPP frame handling can mirror the old JNI binding
   closely because generated frame structs own their local native allocations and
   close directly after native release.
+
+### JVM Render Query Milestone
+
+- Implemented JVM FFM rendered-feature, source-feature, and feature-extension
+  query APIs on `RenderSessionHandle`.
+- Added JVM query geometry and option materializers for screen points, boxes,
+  line strings, layer filters, source-layer filters, and JSON filters.
+- Added JVM query result copy-out for queried features, feature state JSON,
+  feature extension values, and feature extension feature collections.
+- Removed the JVM render-session unsupported placeholder now that query APIs are
+  bridged.
+- Discovery: queried feature results require read-side `Feature` and `Geometry`
+  materialization on JVM. The previous JVM bridge only needed write-side
+  descriptors for GeoJSON and style inputs.
+- Discovery: the current query ABI uses a 40-byte rendered query geometry,
+  32-byte rendered/source query options, 104-byte queried feature, 24-byte
+  feature extension result info, and 16-byte feature collection.
+- Discovery: an initial `mise run //bindings/kotlin:build` attempt stopped in
+  the root dependency prerequisite before printing CMake output, but a rerun
+  completed the native configure/build and full Kotlin build successfully.

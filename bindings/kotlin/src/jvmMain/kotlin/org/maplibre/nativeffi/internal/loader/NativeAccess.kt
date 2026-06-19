@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.Quaternion
+import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.geo.Vec3
@@ -49,7 +50,12 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
+import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
+import org.maplibre.nativeffi.query.RenderedQueryGeometry
+import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.FrameScope
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -1696,6 +1702,72 @@ internal object NativeAccess {
     }
   }
 
+  internal fun queryRenderedFeatures(
+    session: MemorySegment,
+    geometry: RenderedQueryGeometry,
+    options: RenderedFeatureQueryOptions?,
+  ): List<QueriedFeature> =
+    Arena.ofConfined().use { arena ->
+      val outResult = arena.allocate(ValueLayout.ADDRESS)
+      outResult.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        renderSessionQueryRenderedFeaturesFunction()
+          .invokeWithArguments(
+            session,
+            renderedQueryGeometry(arena, geometry),
+            renderedFeatureQueryOptions(arena, options),
+            outResult,
+          ) as Int
+      )
+      featureQueryResult(outResult.get(ValueLayout.ADDRESS, 0))
+    }
+
+  internal fun querySourceFeatures(
+    session: MemorySegment,
+    sourceId: String,
+    options: SourceFeatureQueryOptions?,
+  ): List<QueriedFeature> =
+    Arena.ofConfined().use { arena ->
+      val outResult = arena.allocate(ValueLayout.ADDRESS)
+      outResult.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        renderSessionQuerySourceFeaturesFunction()
+          .invokeWithArguments(
+            session,
+            stringView(arena, sourceId),
+            sourceFeatureQueryOptions(arena, options),
+            outResult,
+          ) as Int
+      )
+      featureQueryResult(outResult.get(ValueLayout.ADDRESS, 0))
+    }
+
+  internal fun queryFeatureExtension(
+    session: MemorySegment,
+    sourceId: String,
+    feature: Feature,
+    extension: String,
+    extensionField: String,
+    arguments: JsonValue?,
+  ): FeatureExtensionResult =
+    Arena.ofConfined().use { arena ->
+      val outResult = arena.allocate(ValueLayout.ADDRESS)
+      outResult.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        renderSessionQueryFeatureExtensionsFunction()
+          .invokeWithArguments(
+            session,
+            stringView(arena, sourceId),
+            feature(arena, feature, 0),
+            stringView(arena, extension),
+            stringView(arena, extensionField),
+            arguments?.let { jsonValue(arena, it) } ?: MemorySegment.NULL,
+            outResult,
+          ) as Int
+      )
+      featureExtensionResult(outResult.get(ValueLayout.ADDRESS, 0))
+    }
+
   internal fun textureImageInfo(session: MemorySegment): TextureImageInfo =
     Arena.ofConfined().use { arena ->
       val outInfo = textureImageInfo(arena)
@@ -2428,6 +2500,118 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun renderedQueryGeometry(arena: Arena, value: RenderedQueryGeometry): MemorySegment {
+    val segment = arena.allocate(RENDERED_QUERY_GEOMETRY_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      RENDERED_QUERY_GEOMETRY_SIZE_OFFSET,
+      RENDERED_QUERY_GEOMETRY_SIZE.toInt(),
+    )
+    when (value) {
+      is RenderedQueryGeometry.Point -> {
+        segment.set(ValueLayout.JAVA_INT, RENDERED_QUERY_GEOMETRY_TYPE_OFFSET, QUERY_GEOMETRY_POINT)
+        segment
+          .asSlice(RENDERED_QUERY_GEOMETRY_DATA_OFFSET, SCREEN_POINT_SIZE)
+          .copyFrom(screenPoint(value.point, arena))
+      }
+      is RenderedQueryGeometry.Box -> {
+        segment.set(ValueLayout.JAVA_INT, RENDERED_QUERY_GEOMETRY_TYPE_OFFSET, QUERY_GEOMETRY_BOX)
+        segment
+          .asSlice(RENDERED_QUERY_GEOMETRY_DATA_OFFSET, SCREEN_BOX_SIZE)
+          .copyFrom(screenBox(arena, value.box))
+      }
+      is RenderedQueryGeometry.LineString -> {
+        segment.set(
+          ValueLayout.JAVA_INT,
+          RENDERED_QUERY_GEOMETRY_TYPE_OFFSET,
+          QUERY_GEOMETRY_LINE_STRING,
+        )
+        segment
+          .asSlice(RENDERED_QUERY_GEOMETRY_DATA_OFFSET, SCREEN_LINE_STRING_SIZE)
+          .copyFrom(screenLineString(arena, value.points))
+      }
+    }
+    return segment
+  }
+
+  private fun renderedFeatureQueryOptions(
+    arena: Arena,
+    value: RenderedFeatureQueryOptions?,
+  ): MemorySegment {
+    if (value == null) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(RENDERED_FEATURE_QUERY_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      RENDERED_FEATURE_QUERY_OPTIONS_SIZE_OFFSET,
+      RENDERED_FEATURE_QUERY_OPTIONS_SIZE.toInt(),
+    )
+    var fields = 0
+    value.layerIds?.let { layerIds ->
+      val layerIdSnapshot = layerIds.toList()
+      fields = fields or RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
+      segment.set(
+        ValueLayout.ADDRESS,
+        RENDERED_FEATURE_QUERY_OPTIONS_LAYER_IDS_OFFSET,
+        stringViewArray(arena, layerIdSnapshot),
+      )
+      segment.set(
+        ValueLayout.JAVA_LONG,
+        RENDERED_FEATURE_QUERY_OPTIONS_LAYER_ID_COUNT_OFFSET,
+        layerIdSnapshot.size.toLong(),
+      )
+    }
+    value.filter?.let { filter ->
+      segment.set(
+        ValueLayout.ADDRESS,
+        RENDERED_FEATURE_QUERY_OPTIONS_FILTER_OFFSET,
+        jsonValue(arena, filter),
+      )
+    }
+    segment.set(ValueLayout.JAVA_INT, RENDERED_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun sourceFeatureQueryOptions(
+    arena: Arena,
+    value: SourceFeatureQueryOptions?,
+  ): MemorySegment {
+    if (value == null) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(SOURCE_FEATURE_QUERY_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      SOURCE_FEATURE_QUERY_OPTIONS_SIZE_OFFSET,
+      SOURCE_FEATURE_QUERY_OPTIONS_SIZE.toInt(),
+    )
+    var fields = 0
+    value.sourceLayerIds?.let { sourceLayerIds ->
+      val sourceLayerIdSnapshot = sourceLayerIds.toList()
+      fields = fields or SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+      segment.set(
+        ValueLayout.ADDRESS,
+        SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_IDS_OFFSET,
+        stringViewArray(arena, sourceLayerIdSnapshot),
+      )
+      segment.set(
+        ValueLayout.JAVA_LONG,
+        SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_ID_COUNT_OFFSET,
+        sourceLayerIdSnapshot.size.toLong(),
+      )
+    }
+    value.filter?.let { filter ->
+      segment.set(
+        ValueLayout.ADDRESS,
+        SOURCE_FEATURE_QUERY_OPTIONS_FILTER_OFFSET,
+        jsonValue(arena, filter),
+      )
+    }
+    segment.set(ValueLayout.JAVA_INT, SOURCE_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
   private fun textureImageInfo(arena: Arena): MemorySegment =
     arena.allocate(TEXTURE_IMAGE_INFO_SIZE).also { segment ->
       segment.set(
@@ -3024,6 +3208,45 @@ internal object NativeAccess {
       ),
     )
 
+  private fun renderSessionQueryRenderedFeaturesFunction(): MethodHandle =
+    downcall(
+      "mln_render_session_query_rendered_features",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun renderSessionQuerySourceFeaturesFunction(): MethodHandle =
+    downcall(
+      "mln_render_session_query_source_features",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun renderSessionQueryFeatureExtensionsFunction(): MethodHandle =
+    downcall(
+      "mln_render_session_query_feature_extensions",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        stringViewLayout,
+        stringViewLayout,
+        ValueLayout.ADDRESS,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
   private fun textureReadPremultipliedRgba8Function(): MethodHandle =
     downcall(
       "mln_texture_read_premultiplied_rgba8",
@@ -3195,6 +3418,35 @@ internal object NativeAccess {
 
   private fun jsonSnapshotDestroyFunction(): MethodHandle =
     downcall("mln_json_snapshot_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+
+  private fun featureQueryResultCountFunction(): MethodHandle =
+    downcall(
+      "mln_feature_query_result_count",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun featureQueryResultGetFunction(): MethodHandle =
+    downcall(
+      "mln_feature_query_result_get",
+      FunctionDescriptor.of(
+        ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS,
+        ValueLayout.JAVA_LONG,
+        ValueLayout.ADDRESS,
+      ),
+    )
+
+  private fun featureQueryResultDestroyFunction(): MethodHandle =
+    downcall("mln_feature_query_result_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+
+  private fun featureExtensionResultGetFunction(): MethodHandle =
+    downcall(
+      "mln_feature_extension_result_get",
+      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+  private fun featureExtensionResultDestroyFunction(): MethodHandle =
+    downcall("mln_feature_extension_result_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
 
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
     downcall(
@@ -4133,6 +4385,93 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun geometry(segment: MemorySegment, depth: Int = 0): Geometry {
+    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+      "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
+    }
+    return when (val type = segment.get(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET)) {
+      GEOMETRY_EMPTY -> Geometry.Empty
+      GEOMETRY_POINT ->
+        Geometry.Point(latLng(segment.asSlice(GEOMETRY_DATA_OFFSET, latLngLayout.byteSize())))
+      GEOMETRY_LINE_STRING ->
+        Geometry.LineString(
+          coordinateSpan(segment.asSlice(GEOMETRY_DATA_OFFSET, COORDINATE_SPAN_SIZE))
+        )
+      GEOMETRY_POLYGON ->
+        Geometry.Polygon(
+          polygonGeometry(segment.asSlice(GEOMETRY_DATA_OFFSET, POLYGON_GEOMETRY_SIZE))
+        )
+      GEOMETRY_MULTI_POINT ->
+        Geometry.MultiPoint(
+          coordinateSpan(segment.asSlice(GEOMETRY_DATA_OFFSET, COORDINATE_SPAN_SIZE))
+        )
+      GEOMETRY_MULTI_LINE_STRING -> {
+        val value = segment.asSlice(GEOMETRY_DATA_OFFSET, MULTI_LINE_GEOMETRY_SIZE)
+        val count =
+          checkedInt(value.get(ValueLayout.JAVA_LONG, MULTI_LINE_GEOMETRY_LINE_COUNT_OFFSET))
+        val lines = value.get(ValueLayout.ADDRESS, MULTI_LINE_GEOMETRY_LINES_OFFSET)
+        Geometry.MultiLineString(
+          List(count) { index ->
+            coordinateSpan(
+              lines
+                .reinterpret(COORDINATE_SPAN_SIZE * count)
+                .asSlice(index * COORDINATE_SPAN_SIZE, COORDINATE_SPAN_SIZE)
+            )
+          }
+        )
+      }
+      GEOMETRY_MULTI_POLYGON -> {
+        val value = segment.asSlice(GEOMETRY_DATA_OFFSET, MULTI_POLYGON_GEOMETRY_SIZE)
+        val count =
+          checkedInt(value.get(ValueLayout.JAVA_LONG, MULTI_POLYGON_GEOMETRY_POLYGON_COUNT_OFFSET))
+        val polygons = value.get(ValueLayout.ADDRESS, MULTI_POLYGON_GEOMETRY_POLYGONS_OFFSET)
+        Geometry.MultiPolygon(
+          List(count) { index ->
+            polygonGeometry(
+              polygons
+                .reinterpret(POLYGON_GEOMETRY_SIZE * count)
+                .asSlice(index * POLYGON_GEOMETRY_SIZE, POLYGON_GEOMETRY_SIZE)
+            )
+          }
+        )
+      }
+      GEOMETRY_COLLECTION -> {
+        val value = segment.asSlice(GEOMETRY_DATA_OFFSET, GEOMETRY_COLLECTION_SIZE)
+        val count =
+          checkedInt(value.get(ValueLayout.JAVA_LONG, GEOMETRY_COLLECTION_GEOMETRY_COUNT_OFFSET))
+        val geometries = value.get(ValueLayout.ADDRESS, GEOMETRY_COLLECTION_GEOMETRIES_OFFSET)
+        Geometry.Collection(
+          List(count) { index ->
+            geometry(
+              geometries
+                .reinterpret(GEOMETRY_SIZE * count)
+                .asSlice(index * GEOMETRY_SIZE, GEOMETRY_SIZE),
+              depth + 1,
+            )
+          }
+        )
+      }
+      else -> Geometry.Unknown(type, segment.get(ValueLayout.JAVA_INT, GEOMETRY_SIZE_OFFSET))
+    }
+  }
+
+  private fun coordinateSpan(segment: MemorySegment): List<LatLng> {
+    val count = checkedInt(segment.get(ValueLayout.JAVA_LONG, COORDINATE_SPAN_COUNT_OFFSET))
+    return latLngArray(segment.get(ValueLayout.ADDRESS, COORDINATE_SPAN_COORDINATES_OFFSET), count)
+  }
+
+  private fun polygonGeometry(segment: MemorySegment): List<List<LatLng>> {
+    val count = checkedInt(segment.get(ValueLayout.JAVA_LONG, POLYGON_GEOMETRY_RING_COUNT_OFFSET))
+    val rings = segment.get(ValueLayout.ADDRESS, POLYGON_GEOMETRY_RINGS_OFFSET)
+    return List(count) { index ->
+      coordinateSpan(
+        rings
+          .reinterpret(COORDINATE_SPAN_SIZE * count)
+          .asSlice(index * COORDINATE_SPAN_SIZE, COORDINATE_SPAN_SIZE)
+      )
+    }
+  }
+
   private fun feature(arena: Arena, value: Feature, depth: Int): MemorySegment {
     val segment = arena.allocate(FEATURE_SIZE)
     writeFeature(segment, value, arena, depth)
@@ -4189,6 +4528,49 @@ internal object NativeAccess {
         throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
     }
   }
+
+  private fun feature(segment: MemorySegment): Feature {
+    val properties =
+      List(checkedInt(segment.get(ValueLayout.JAVA_LONG, FEATURE_PROPERTY_COUNT_OFFSET))) { index ->
+        val members = segment.get(ValueLayout.ADDRESS, FEATURE_PROPERTIES_OFFSET)
+        val member =
+          members
+            .reinterpret(JSON_MEMBER_SIZE * (index + 1))
+            .asSlice(index * JSON_MEMBER_SIZE, JSON_MEMBER_SIZE)
+        JsonValue.Member(
+          stringView(member.asSlice(JSON_MEMBER_KEY_OFFSET, STRING_VIEW_SIZE)),
+          readJson(
+            member.get(ValueLayout.ADDRESS, JSON_MEMBER_VALUE_OFFSET).reinterpret(JSON_VALUE_SIZE),
+            0,
+          ),
+        )
+      }
+    return Feature(
+      geometry(
+        segment.get(ValueLayout.ADDRESS, FEATURE_GEOMETRY_OFFSET).reinterpret(GEOMETRY_SIZE)
+      ),
+      properties,
+      featureIdentifier(segment),
+    )
+  }
+
+  private fun featureIdentifier(segment: MemorySegment): FeatureIdentifier =
+    when (val type = segment.get(ValueLayout.JAVA_INT, FEATURE_IDENTIFIER_TYPE_OFFSET)) {
+      FEATURE_IDENTIFIER_NULL -> FeatureIdentifier.Null
+      FEATURE_IDENTIFIER_UINT ->
+        FeatureIdentifier.UInt(segment.get(ValueLayout.JAVA_LONG, FEATURE_IDENTIFIER_OFFSET))
+      FEATURE_IDENTIFIER_INT ->
+        FeatureIdentifier.Int(segment.get(ValueLayout.JAVA_LONG, FEATURE_IDENTIFIER_OFFSET))
+      FEATURE_IDENTIFIER_DOUBLE ->
+        FeatureIdentifier.DoubleValue(
+          segment.get(ValueLayout.JAVA_DOUBLE, FEATURE_IDENTIFIER_OFFSET)
+        )
+      FEATURE_IDENTIFIER_STRING ->
+        FeatureIdentifier.StringValue(
+          stringView(segment.asSlice(FEATURE_IDENTIFIER_OFFSET, STRING_VIEW_SIZE))
+        )
+      else -> FeatureIdentifier.Unknown(type)
+    }
 
   private fun geoJson(arena: Arena, value: GeoJson): MemorySegment {
     val segment = arena.allocate(GEOJSON_SIZE)
@@ -4392,6 +4774,101 @@ internal object NativeAccess {
     }
   }
 
+  private fun featureQueryResult(result: MemorySegment): List<QueriedFeature> =
+    try {
+      Arena.ofConfined().use { arena ->
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(featureQueryResultCountFunction().invokeWithArguments(result, outCount) as Int)
+        val count = checkedInt(outCount.get(ValueLayout.JAVA_LONG, 0))
+        List(count) { index ->
+          val outFeature = arena.allocate(QUERIED_FEATURE_SIZE)
+          outFeature.set(
+            ValueLayout.JAVA_INT,
+            QUERIED_FEATURE_SIZE_OFFSET,
+            QUERIED_FEATURE_SIZE.toInt(),
+          )
+          Status.check(
+            featureQueryResultGetFunction().invokeWithArguments(result, index.toLong(), outFeature)
+              as Int
+          )
+          queriedFeature(outFeature)
+        }
+      }
+    } finally {
+      featureQueryResultDestroyFunction().invokeWithArguments(result)
+    }
+
+  private fun queriedFeature(segment: MemorySegment): QueriedFeature {
+    val fields = segment.get(ValueLayout.JAVA_INT, QUERIED_FEATURE_FIELDS_OFFSET)
+    val sourceId =
+      if ((fields and QUERIED_FEATURE_SOURCE_ID) != 0)
+        stringView(segment.asSlice(QUERIED_FEATURE_SOURCE_ID_OFFSET, STRING_VIEW_SIZE))
+      else null
+    val sourceLayerId =
+      if ((fields and QUERIED_FEATURE_SOURCE_LAYER_ID) != 0)
+        stringView(segment.asSlice(QUERIED_FEATURE_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE))
+      else null
+    val state =
+      if ((fields and QUERIED_FEATURE_STATE) != 0) {
+        val value = segment.get(ValueLayout.ADDRESS, QUERIED_FEATURE_STATE_OFFSET)
+        if (value == MemorySegment.NULL) null else readJson(value.reinterpret(JSON_VALUE_SIZE), 0)
+      } else {
+        null
+      }
+    return QueriedFeature(
+      feature(segment.asSlice(QUERIED_FEATURE_FEATURE_OFFSET, FEATURE_SIZE)),
+      sourceId,
+      sourceLayerId,
+      state,
+    )
+  }
+
+  private fun featureExtensionResult(result: MemorySegment): FeatureExtensionResult =
+    try {
+      Arena.ofConfined().use { arena ->
+        val info = arena.allocate(FEATURE_EXTENSION_RESULT_INFO_SIZE)
+        info.set(
+          ValueLayout.JAVA_INT,
+          FEATURE_EXTENSION_RESULT_INFO_SIZE_OFFSET,
+          FEATURE_EXTENSION_RESULT_INFO_SIZE.toInt(),
+        )
+        Status.check(featureExtensionResultGetFunction().invokeWithArguments(result, info) as Int)
+        when (
+          val type = info.get(ValueLayout.JAVA_INT, FEATURE_EXTENSION_RESULT_INFO_TYPE_OFFSET)
+        ) {
+          FEATURE_EXTENSION_RESULT_VALUE ->
+            FeatureExtensionResult.Value(
+              readJson(
+                info
+                  .get(ValueLayout.ADDRESS, FEATURE_EXTENSION_RESULT_INFO_DATA_OFFSET)
+                  .reinterpret(JSON_VALUE_SIZE),
+                0,
+              )
+            )
+          FEATURE_EXTENSION_RESULT_FEATURE_COLLECTION ->
+            FeatureExtensionResult.FeatureCollection(
+              featureCollection(
+                info.asSlice(FEATURE_EXTENSION_RESULT_INFO_DATA_OFFSET, FEATURE_COLLECTION_SIZE)
+              )
+            )
+          else -> FeatureExtensionResult.Unknown(type)
+        }
+      }
+    } finally {
+      featureExtensionResultDestroyFunction().invokeWithArguments(result)
+    }
+
+  private fun featureCollection(segment: MemorySegment): List<Feature> {
+    val count =
+      checkedInt(segment.get(ValueLayout.JAVA_LONG, FEATURE_COLLECTION_FEATURE_COUNT_OFFSET))
+    val features = segment.get(ValueLayout.ADDRESS, FEATURE_COLLECTION_FEATURES_OFFSET)
+    return List(count) { index ->
+      feature(
+        features.reinterpret(FEATURE_SIZE * count).asSlice(index * FEATURE_SIZE, FEATURE_SIZE)
+      )
+    }
+  }
+
   private fun readJson(segment: MemorySegment, depth: Int): JsonValue {
     require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
@@ -4519,6 +4996,28 @@ internal object NativeAccess {
       screenPoint(point)
     }
 
+  private fun screenBox(arena: Arena, value: ScreenBox): MemorySegment {
+    val segment = arena.allocate(SCREEN_BOX_SIZE)
+    segment
+      .asSlice(SCREEN_BOX_MIN_OFFSET, SCREEN_POINT_SIZE)
+      .copyFrom(screenPoint(value.min, arena))
+    segment
+      .asSlice(SCREEN_BOX_MAX_OFFSET, SCREEN_POINT_SIZE)
+      .copyFrom(screenPoint(value.max, arena))
+    return segment
+  }
+
+  private fun screenLineString(arena: Arena, values: List<ScreenPoint>): MemorySegment {
+    val segment = arena.allocate(SCREEN_LINE_STRING_SIZE)
+    segment.set(
+      ValueLayout.ADDRESS,
+      SCREEN_LINE_STRING_POINTS_OFFSET,
+      screenPointArray(arena, values),
+    )
+    segment.set(ValueLayout.JAVA_LONG, SCREEN_LINE_STRING_POINT_COUNT_OFFSET, values.size.toLong())
+    return segment
+  }
+
   private fun unitBezier(value: UnitBezier, arena: Arena): MemorySegment {
     val segment = arena.allocate(unitBezierLayout)
     segment.set(ValueLayout.JAVA_DOUBLE, UNIT_BEZIER_X1_OFFSET, value.x1)
@@ -4578,6 +5077,12 @@ internal object NativeAccess {
 
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
+
+  private fun checkedInt(value: Long): Int {
+    require(value <= Int.MAX_VALUE) { "native count exceeds Int.MAX_VALUE" }
+    require(value >= 0L) { "native count must be non-negative" }
+    return value.toInt()
+  }
 
   private fun stringView(segment: MemorySegment): String =
     copyString(
@@ -5254,6 +5759,13 @@ internal object NativeAccess {
   private const val STRING_VIEW_SIZE_OFFSET: Long = 8
 
   private const val SCREEN_POINT_SIZE: Long = 16
+  private const val SCREEN_BOX_SIZE: Long = 32
+  private const val SCREEN_BOX_MIN_OFFSET: Long = 0
+  private const val SCREEN_BOX_MAX_OFFSET: Long = 16
+
+  private const val SCREEN_LINE_STRING_SIZE: Long = 16
+  private const val SCREEN_LINE_STRING_POINTS_OFFSET: Long = 0
+  private const val SCREEN_LINE_STRING_POINT_COUNT_OFFSET: Long = 8
 
   private const val UNIT_BEZIER_SIZE: Long = 32
   private const val UNIT_BEZIER_X1_OFFSET: Long = 0
@@ -5423,6 +5935,57 @@ internal object NativeAccess {
   private const val JSON_STRING: Int = 5
   private const val JSON_ARRAY: Int = 6
   private const val JSON_OBJECT: Int = 7
+
+  private const val QUERY_GEOMETRY_POINT: Int = 1
+  private const val QUERY_GEOMETRY_BOX: Int = 2
+  private const val QUERY_GEOMETRY_LINE_STRING: Int = 3
+
+  private const val RENDERED_QUERY_GEOMETRY_SIZE: Long = 40
+  private const val RENDERED_QUERY_GEOMETRY_SIZE_OFFSET: Long = 0
+  private const val RENDERED_QUERY_GEOMETRY_TYPE_OFFSET: Long = 4
+  private const val RENDERED_QUERY_GEOMETRY_DATA_OFFSET: Long = 8
+
+  private const val RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: Int = 1 shl 0
+
+  private const val RENDERED_FEATURE_QUERY_OPTIONS_SIZE: Long = 32
+  private const val RENDERED_FEATURE_QUERY_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val RENDERED_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val RENDERED_FEATURE_QUERY_OPTIONS_LAYER_IDS_OFFSET: Long = 8
+  private const val RENDERED_FEATURE_QUERY_OPTIONS_LAYER_ID_COUNT_OFFSET: Long = 16
+  private const val RENDERED_FEATURE_QUERY_OPTIONS_FILTER_OFFSET: Long = 24
+
+  private const val SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: Int = 1 shl 0
+
+  private const val SOURCE_FEATURE_QUERY_OPTIONS_SIZE: Long = 32
+  private const val SOURCE_FEATURE_QUERY_OPTIONS_SIZE_OFFSET: Long = 0
+  private const val SOURCE_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET: Long = 4
+  private const val SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_IDS_OFFSET: Long = 8
+  private const val SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_ID_COUNT_OFFSET: Long = 16
+  private const val SOURCE_FEATURE_QUERY_OPTIONS_FILTER_OFFSET: Long = 24
+
+  private const val QUERIED_FEATURE_SOURCE_ID: Int = 1 shl 0
+  private const val QUERIED_FEATURE_SOURCE_LAYER_ID: Int = 1 shl 1
+  private const val QUERIED_FEATURE_STATE: Int = 1 shl 2
+
+  private const val QUERIED_FEATURE_SIZE: Long = 104
+  private const val QUERIED_FEATURE_SIZE_OFFSET: Long = 0
+  private const val QUERIED_FEATURE_FIELDS_OFFSET: Long = 4
+  private const val QUERIED_FEATURE_FEATURE_OFFSET: Long = 8
+  private const val QUERIED_FEATURE_SOURCE_ID_OFFSET: Long = 64
+  private const val QUERIED_FEATURE_SOURCE_LAYER_ID_OFFSET: Long = 80
+  private const val QUERIED_FEATURE_STATE_OFFSET: Long = 96
+
+  private const val FEATURE_EXTENSION_RESULT_VALUE: Int = 1
+  private const val FEATURE_EXTENSION_RESULT_FEATURE_COLLECTION: Int = 2
+
+  private const val FEATURE_EXTENSION_RESULT_INFO_SIZE: Long = 24
+  private const val FEATURE_EXTENSION_RESULT_INFO_SIZE_OFFSET: Long = 0
+  private const val FEATURE_EXTENSION_RESULT_INFO_TYPE_OFFSET: Long = 4
+  private const val FEATURE_EXTENSION_RESULT_INFO_DATA_OFFSET: Long = 8
+
+  private const val FEATURE_COLLECTION_SIZE: Long = 16
+  private const val FEATURE_COLLECTION_FEATURES_OFFSET: Long = 0
+  private const val FEATURE_COLLECTION_FEATURE_COUNT_OFFSET: Long = 8
 
   private const val STYLE_SOURCE_INFO_SIZE: Long = 32
   private const val STYLE_SOURCE_INFO_SIZE_OFFSET: Long = 0
