@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins { kotlin("multiplatform") version "2.2.21" }
@@ -9,6 +10,10 @@ val hostOs = System.getProperty("os.name").lowercase()
 val hostArch = System.getProperty("os.arch").lowercase()
 
 kotlin {
+  jvmToolchain(25)
+
+  jvm { compilerOptions { jvmTarget.set(JvmTarget.JVM_24) } }
+
   when {
     hostOs.contains("mac") && (hostArch == "aarch64" || hostArch == "arm64") -> macosArm64()
     hostOs.contains("mac") -> macosX64()

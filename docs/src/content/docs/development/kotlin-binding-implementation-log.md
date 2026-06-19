@@ -56,3 +56,16 @@ is being implemented.
   prints Kotlin/Native test-output processing exceptions. This milestone saw
   `LifecycleTrackingTestEventReporter` report that `close()` had already been
   called after native test output. The build still completed successfully.
+
+### JVM Target Milestone
+
+- Added a JVM target to the unified Kotlin Multiplatform module, so the
+  extracted `commonMain` model layer now compiles for JVM as well as the host
+  Kotlin/Native target.
+- Discovery: using the Java 25 toolchain without an explicit Kotlin bytecode
+  target makes Kotlin warn and fall back from JVM 25 to JVM 24. The module now
+  keeps the Java 25 toolchain for future FFM work while explicitly targeting JVM
+  24 bytecode.
+- Reflection: this is a build-shape milestone rather than an FFM migration. It
+  creates the `jvmMain` destination and verifies the common API surface before
+  moving Java FFM internals into Kotlin.
