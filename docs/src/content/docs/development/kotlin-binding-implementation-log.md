@@ -236,3 +236,16 @@ is being implemented.
 - Problem: there is no `androidTest` task yet because the module does not have
   instrumentation test sources, packaged JNI bridge libraries, or emulator
   wiring. That remains tied to the Android packaging milestone.
+
+### Common Test Source Set Milestone
+
+- Moved pure common model tests for error mapping, geometry value snapshotting,
+  and JSON value semantics from `nativeTest` to `commonTest` so JVM and
+  Kotlin/Native both exercise those common APIs.
+- Discovery: the first common-test candidates are the tests whose production
+  types already moved to `commonMain` and whose assertions do not touch
+  cinterop, native handles, render frame implementation classes, or real C
+  calls.
+- Reflection: moving tests in small dependency-closed groups is safer than
+  sweeping whole directories, because some apparently model-oriented native
+  tests still validate native struct materialization or live MapLibre behavior.
