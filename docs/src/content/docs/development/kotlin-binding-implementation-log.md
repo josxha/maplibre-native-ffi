@@ -1196,3 +1196,20 @@ is being implemented.
   binding.
 - Discovery: the mixed Java/Kotlin example must compile Java at JVM 24 because
   Kotlin 2.2 falls back from JDK 25 to JVM 24.
+
+### Java FFM Public Module Retirement Milestone
+
+- Removed the separate `:bindings:java-ffm` Gradle subproject now that the
+  Kotlin `jvmMain` bridge owns the desktop JVM FFM implementation path.
+- Removed the Java FFM source, tests, jextract task, mise task, CI subproject
+  manifest, generated workflow steps, docs API task, sidebar reference link, and
+  language matrix row.
+- Kept the Kotlin binding and `lwjgl-map` example as the active JVM validation
+  surface.
+- Discovery: the docs API task still grouped Java FFM and Java JNI behind an
+  `api:java` aggregate. Retiring only Java FFM makes the remaining Java JNI
+  reference generation explicit until the Android JNI surface moves fully into
+  Kotlin.
+- Discovery: local `bindings/java-ffm/build` output can remain after tracked
+  source deletion. Clearing it avoids a misleading untracked module directory in
+  follow-up scans.

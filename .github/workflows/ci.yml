@@ -47,7 +47,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
@@ -68,7 +67,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
@@ -90,7 +88,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
@@ -112,7 +109,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
@@ -135,7 +131,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
@@ -159,7 +154,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
@@ -278,7 +272,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
@@ -300,7 +293,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
       - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
