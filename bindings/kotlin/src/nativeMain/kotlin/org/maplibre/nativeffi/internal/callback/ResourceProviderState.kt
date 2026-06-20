@@ -56,6 +56,8 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   override fun close() = gate.close()
 
+  internal fun checkCanClose() = gate.checkCanClose()
+
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   private fun closeNative() {

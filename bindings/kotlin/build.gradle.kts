@@ -1,32 +1,41 @@
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
-  kotlin("multiplatform") version "2.2.21"
-  id("com.android.kotlin.multiplatform.library") version "9.1.1"
+  kotlin("multiplatform")
+  id("com.android.kotlin.multiplatform.library")
 }
+
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 repositories {
   google()
   mavenCentral()
 }
 
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
-val nativeLibraryPathForTests =
-  providers.environmentVariable("MLN_FFI_BUILD_DIR").map {
-    "$it/${System.mapLibraryName("maplibre-native-c")}"
-  }
+val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val javaCppVersion = "1.5.11"
 val javaCppToolClasspath =
   configurations.detachedConfiguration(dependencies.create("org.bytedeco:javacpp:$javaCppVersion"))
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
+val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val hostOs = System.getProperty("os.name").lowercase()
 val hostArch = System.getProperty("os.arch").lowercase()
+val jextractArchive = layout.buildDirectory.file("jextract/openjdk-25-jextract.tar.gz")
+val jextractInstallDir = layout.buildDirectory.dir("jextract/tool")
+val jextractExecutable = jextractInstallDir.map { dir ->
+  dir
+    .file("jextract-25/bin/${if (hostOs.contains("windows")) "jextract.exe" else "jextract"}")
+    .asFile
+}
 
 kotlin {
   jvmToolchain(25)
@@ -53,24 +62,23 @@ kotlin {
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
-    if (nativeBuildDir != null) {
-      binaries.all {
-        linkerOpts("-L$nativeBuildDir", "-lmaplibre-native-c")
-        if (hostOs.contains("mac") || hostOs.contains("linux")) {
-          linkerOpts("-Wl,-rpath,$nativeBuildDir")
-        }
-        if (hostOs.contains("mac")) {
-          linkerOpts("-framework", "Foundation", "-framework", "Metal", "-framework", "QuartzCore")
-        }
+    binaries.all {
+      linkerOpts(maplibreNativeC.linkDirs.map { "-L$it" })
+      linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
+      if (hostOs.contains("mac") || hostOs.contains("linux")) {
+        linkerOpts(maplibreNativeC.runtimeLibraryDirs.map { "-Wl,-rpath,$it" })
+      }
+      if (hostOs.contains("mac")) {
+        linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
       }
     }
 
     compilations.getByName("main") {
       cinterops {
-        val maplibreNativeC by creating {
+        create("maplibreNativeC") {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
-          includeDirs.headerFilterOnly(rootProject.file("include"))
-          compilerOpts("-I${rootProject.file("include").absolutePath}")
+          includeDirs.headerFilterOnly(*maplibreNativeC.includeDirs.toTypedArray())
+          compilerOpts(maplibreNativeC.includeDirs.map { "-I$it" })
         }
       }
     }
@@ -89,6 +97,99 @@ androidComponents {
       generatedJavaCppSources.get().asFile.absolutePath
     )
   }
+}
+
+data class JextractDistribution(val url: String, val sha256: String)
+
+val jextractDistribution =
+  when {
+    hostOs.contains("mac") && (hostArch == "aarch64" || hostArch == "arm64") ->
+      JextractDistribution(
+        "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_macos-aarch64_bin.tar.gz",
+        "6783d2ba7f686ee636b9542525ee06b7bd096dfca294538613b877a4b5a057da",
+      )
+    hostOs.contains("mac") ->
+      JextractDistribution(
+        "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_macos-x64_bin.tar.gz",
+        "62fd0453349b8eb48f083d2fb9c5f2ab255f894eaa8c658221366f363c7e91b9",
+      )
+    hostOs.contains("linux") && (hostArch == "aarch64" || hostArch == "arm64") ->
+      JextractDistribution(
+        "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_linux-aarch64_bin.tar.gz",
+        "75a199a05e5edade798600a175f8897e711330338f7d8d2da5fff18d707d665e",
+      )
+    hostOs.contains("linux") ->
+      JextractDistribution(
+        "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_linux-x64_bin.tar.gz",
+        "d826d366b5db8edbed9cfef3779e45e43ba496ca2166b8f70cdaf81ee90c0b1e",
+      )
+    hostOs.contains("windows") ->
+      JextractDistribution(
+        "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_windows-x64_bin.tar.gz",
+        "22a853168512d5909c4dfccb1b9e8b2bffb1187b0cf98458aef989d41de995ac",
+      )
+    else -> throw GradleException("Unsupported jextract platform: $hostOs/$hostArch")
+  }
+
+val downloadJextract =
+  tasks.register<Exec>("downloadJextract") {
+    outputs.file(jextractArchive)
+    commandLine(
+      "sh",
+      "-c",
+      """
+      set -euo pipefail
+      archive="${jextractArchive.get().asFile.absolutePath}"
+      mkdir -p "$(dirname "${'$'}archive")"
+      if [ ! -f "${'$'}archive" ]; then
+        curl -fsSL "${jextractDistribution.url}" -o "${'$'}archive"
+      fi
+      printf '%s  %s\n' "${jextractDistribution.sha256}" "${'$'}archive" | shasum -a 256 -c -
+      """
+        .trimIndent(),
+    )
+  }
+
+val extractJextract =
+  tasks.register<Sync>("extractJextract") {
+    val installDir = jextractInstallDir.get().asFile
+    dependsOn(downloadJextract)
+    from(tarTree(jextractArchive))
+    into(jextractInstallDir)
+    doFirst { installDir.deleteRecursively() }
+  }
+
+val generateJvmJextractBindings =
+  tasks.register<Exec>("generateJvmJextractBindings") {
+    group = "build"
+    description = "Generates JVM FFM declarations for the MapLibre Native C ABI with jextract."
+    dependsOn(extractJextract)
+    inputs.file("src/jextract/maplibre-native-c.includes")
+    inputs.files(maplibreNativeC.includeDirs).withPropertyName("maplibreNativeCIncludeDirs")
+    outputs.dir(generatedJextractSources)
+    executable = jextractExecutable.get().absolutePath
+    args(
+      "--output",
+      generatedJextractSources.get().asFile.absolutePath,
+      "--target-package",
+      "org.maplibre.nativeffi.internal.c",
+      "--header-class-name",
+      "MapLibreNativeC",
+      "@${layout.projectDirectory.file("src/jextract/maplibre-native-c.includes").asFile.absolutePath}",
+      *maplibreNativeC.includeDirs.flatMap { listOf("-I", it.absolutePath) }.toTypedArray(),
+      rootProject.layout.projectDirectory.file("include/maplibre_native_c.h").asFile.absolutePath,
+    )
+  }
+
+tasks.named<JavaCompile>("compileJvmMainJava") {
+  dependsOn(generateJvmJextractBindings)
+  source(generatedJextractSources)
+  options.release = 24
+}
+
+tasks.named<KotlinJvmCompile>("compileKotlinJvm") {
+  dependsOn(generateJvmJextractBindings)
+  source(generatedJextractSources)
 }
 
 val compileJavaCppConfig =
@@ -111,7 +212,7 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
-      "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
+      "-Dplatform.includepath=${maplibreNativeC.includeDirs.joinToString(File.pathSeparator)}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
       "-nogenerate",
@@ -120,7 +221,7 @@ val generateJavaCppBindings =
     inputs.file(
       "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java"
     )
-    inputs.dir(rootProject.layout.projectDirectory.dir("include"))
+    inputs.files(maplibreNativeC.includeDirs).withPropertyName("maplibreNativeCIncludeDirs")
     outputs.file(
       generatedJavaCppSources.map {
         it.file("org/maplibre/nativeffi/internal/javacpp/MaplibreNativeC.java")
@@ -139,8 +240,9 @@ tasks
 tasks.withType<Test>().configureEach {
   if (name == "jvmTest") {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
-    systemProperty("org.maplibre.nativeffi.library.path", nativeLibraryPathForTests.get())
-    inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
+    systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
+    inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
+    inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
   }
 }
 

@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -105,7 +106,7 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   public actual fun startMergeOfflineRegionsDatabase(
     path: String
   ): OfflineOperationHandle<List<OfflineRegionInfo>> {
-    require('\u0000' !in path) { "C string inputs must not contain embedded NUL characters" }
+    JavaCppSupport.requireValidCString(path)
     val outOperationId = longArrayOf(0L)
     Status.check(
       MaplibreNativeC.mln_runtime_offline_regions_merge_database_start(
@@ -330,6 +331,7 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     val replacement = ResourceProviderState(callback)
     val previous: ResourceProviderState?
     try {
+      resourceProviderState?.checkCanClose()
       Status.check(
         MaplibreNativeC.mln_runtime_set_resource_provider(
           runtime(requireLiveAddress()),
@@ -342,13 +344,14 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       replacement.close()
       throw error
     }
-    previous?.close()
+    closeQuietly(previous)
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
     val replacement = ResourceTransformState(callback)
     val previous: ResourceTransformState?
     try {
+      resourceTransformState?.checkCanClose()
       Status.check(
         MaplibreNativeC.mln_runtime_set_resource_transform(
           runtime(requireLiveAddress()),
@@ -361,16 +364,17 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       replacement.close()
       throw error
     }
-    previous?.close()
+    closeQuietly(previous)
   }
 
   public actual fun clearResourceTransform() {
+    resourceTransformState?.checkCanClose()
     Status.check(
       MaplibreNativeC.mln_runtime_clear_resource_transform(runtime(requireLiveAddress()))
     )
     val previous = resourceTransformState
     resourceTransformState = null
-    previous?.close()
+    closeQuietly(previous)
   }
 
   public actual fun pollEvent(): RuntimeEvent? {
@@ -583,6 +587,12 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       Status.check(take(runtime(requireLiveAddress()), operationId, outList))
       offlineRegionList(outList)
     }
+}
+
+private fun closeQuietly(closeable: AutoCloseable?) {
+  try {
+    closeable?.close()
+  } catch (_: RuntimeException) {}
 }
 
 private fun hasPayloadSize(event: MaplibreNativeC.mln_runtime_event, requiredSize: Long): Boolean =
@@ -836,8 +846,7 @@ private class RuntimeOptionsScope(options: RuntimeOptions) : AutoCloseable {
 }
 
 private fun optionalCString(value: String?): BytePointer? = value?.let {
-  require('\u0000' !in it) { "C string inputs must not contain embedded NUL characters" }
-  BytePointer(it, StandardCharsets.UTF_8)
+  JavaCppSupport.cString(it)
 }
 
 private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : AutoCloseable {
@@ -912,8 +921,7 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
   }
 
   private fun utf8(value: String): BytePointer {
-    require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
-    return own(BytePointer(value, StandardCharsets.UTF_8))
+    return own(JavaCppSupport.cString(value))
   }
 
   private fun <T : Pointer> own(pointer: T): T {

@@ -93,7 +93,7 @@ class DescriptorValidationTest {
           this,
         )
       }
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         ResourceStructs.resourceResponse(
           ResourceResponse(ResourceResponseStatus.ERROR).apply {
             errorReason = ResourceErrorReason(905)

@@ -39,6 +39,10 @@ internal object Status {
   fun invalidArgument(diagnostic: String): InvalidArgumentException =
     InvalidArgumentException(MaplibreStatus.INVALID_ARGUMENT.nativeCode, diagnostic)
 
+  /** Creates the binding-owned error for closing a callback owner from inside its callback. */
+  fun callbackReentry(typeName: String): InvalidStateException =
+    invalidState("$typeName callback cannot be closed from inside its callback")
+
   /** Copies the current C thread-local diagnostic into a Kotlin-owned string. */
   fun currentDiagnostic(): String = NativeDiagnostics.currentDiagnostic()
 }

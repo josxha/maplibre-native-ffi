@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.callback.CallbackGate
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -1585,8 +1586,7 @@ private fun screenPoint(value: MaplibreNativeC.mln_screen_point): ScreenPoint =
 private const val IMAGE_SOURCE_COORDINATE_COUNT: Long = 4
 
 private fun optionalCString(value: String): BytePointer {
-  require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
-  return BytePointer(value, java.nio.charset.StandardCharsets.UTF_8)
+  return JavaCppSupport.cString(value)
 }
 
 private fun stringView(view: MaplibreNativeC.mln_string_view): String {

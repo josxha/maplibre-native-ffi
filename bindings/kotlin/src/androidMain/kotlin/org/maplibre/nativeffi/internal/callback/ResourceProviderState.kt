@@ -1,8 +1,8 @@
 package org.maplibre.nativeffi.internal.callback
 
-import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
@@ -53,6 +53,8 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     }
   }
 
+  fun checkCanClose() = gate.checkCanClose()
+
   override fun close() = gate.close()
 
   private fun closeNative() {
@@ -62,7 +64,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   private fun resourceRequest(request: MaplibreNativeC.mln_resource_request): ResourceRequest =
     ResourceRequest(
-      cString(request.url()),
+      JavaCppSupport.cString(request.url()),
       ResourceKind.fromNative(request.kind()),
       ResourceLoadingMethod.fromNative(request.loading_method()),
       ResourcePriority.fromNative(request.priority()),
@@ -73,35 +75,11 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
       if (request.has_prior_modified()) request.prior_modified_unix_ms() else null,
       if (request.has_prior_expires()) request.prior_expires_unix_ms() else null,
       optionalCString(request.prior_etag()),
-      byteArray(request.prior_data(), request.prior_data_size()),
+      JavaCppSupport.byteArray(request.prior_data(), request.prior_data_size()),
     )
 
-  private fun cString(pointer: BytePointer?): String {
-    if (pointer == null || pointer.isNull) {
-      return ""
-    }
-    return String(byteArray(pointer, cStringLength(pointer)), StandardCharsets.UTF_8)
-  }
-
   private fun optionalCString(pointer: BytePointer?): String? =
-    if (pointer == null || pointer.isNull) null else cString(pointer)
-
-  private fun cStringLength(pointer: BytePointer): Long {
-    var length = 0L
-    while (pointer.get(length) != 0.toByte()) {
-      length++
-    }
-    return length
-  }
-
-  private fun byteArray(pointer: Pointer?, byteCount: Long): ByteArray {
-    if (pointer == null || pointer.isNull || byteCount == 0L) {
-      return ByteArray(0)
-    }
-    val bytes = ByteArray(Math.toIntExact(byteCount))
-    BytePointer(pointer).get(bytes, 0, bytes.size)
-    return bytes
-  }
+    if (pointer == null || pointer.isNull) null else JavaCppSupport.cString(pointer)
 
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1

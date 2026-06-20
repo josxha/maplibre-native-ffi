@@ -1,10 +1,10 @@
 package org.maplibre.nativeffi.resource
 
 import java.lang.ref.Cleaner
-import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -77,8 +77,10 @@ public actual class ResourceRequestHandle internal constructor(private val handl
     private val etag: BytePointer?
 
     init {
-      require(value.errorReason.isKnown) {
-        "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+      if (!value.errorReason.isKnown) {
+        throw Status.invalidArgument(
+          "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+        )
       }
       response.size(response.sizeof())
       response.status(value.status.nativeValue)
@@ -94,7 +96,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
         } else {
           null
         }
-      errorMessage = optionalCString(value.errorMessage)
+      errorMessage = optionalCString(value.errorMessage, "error message")
       response.error_message(errorMessage)
       response.must_revalidate(value.mustRevalidate)
       value.modifiedUnixMs?.let {
@@ -105,7 +107,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
         response.has_expires(true)
         response.expires_unix_ms(it)
       }
-      etag = optionalCString(value.etag)
+      etag = optionalCString(value.etag, "ETag")
       response.etag(etag)
       value.retryAfterUnixMs?.let {
         response.has_retry_after(true)
@@ -120,9 +122,12 @@ public actual class ResourceRequestHandle internal constructor(private val handl
       etag?.close()
     }
 
-    private fun optionalCString(value: String?): BytePointer? = value?.let {
-      require('\u0000' !in it) { "C string inputs must not contain embedded NUL characters" }
-      BytePointer(it, StandardCharsets.UTF_8)
+    private fun optionalCString(value: String?, description: String): BytePointer? {
+      value ?: return null
+      if ('\u0000' in value) {
+        throw Status.invalidArgument("$description contains embedded NUL")
+      }
+      return JavaCppSupport.utf8(value)
     }
   }
 

@@ -228,6 +228,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     val replacement = ResourceProviderState(callback)
     val previous: ResourceProviderState?
     try {
+      resourceProviderState?.checkCanClose()
       Status.check(NativeAccess.setResourceProvider(requireLiveHandle(), replacement.descriptor()))
       previous = resourceProviderState
       resourceProviderState = replacement
@@ -235,7 +236,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       replacement.close()
       throw error
     }
-    previous?.close()
+    closeQuietly(previous)
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
@@ -243,6 +244,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     val replacement = ResourceTransformState(callback)
     val previous: ResourceTransformState?
     try {
+      resourceTransformState?.checkCanClose()
       Status.check(NativeAccess.setResourceTransform(requireLiveHandle(), replacement.descriptor()))
       previous = resourceTransformState
       resourceTransformState = replacement
@@ -250,15 +252,16 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       replacement.close()
       throw error
     }
-    previous?.close()
+    closeQuietly(previous)
   }
 
   public actual fun clearResourceTransform() {
     NativeAccess.ensureLoaded()
+    resourceTransformState?.checkCanClose()
     Status.check(NativeAccess.clearResourceTransform(requireLiveHandle()))
     val previous = resourceTransformState
     resourceTransformState = null
-    previous?.close()
+    closeQuietly(previous)
   }
 
   public actual fun pollEvent(): RuntimeEvent? {
@@ -353,4 +356,10 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     }
     return map
   }
+}
+
+private fun closeQuietly(closeable: AutoCloseable?) {
+  try {
+    closeable?.close()
+  } catch (_: RuntimeException) {}
 }

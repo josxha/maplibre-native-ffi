@@ -2,13 +2,15 @@ package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import org.maplibre.nativeffi.internal.status.Status
 
-/** Platform-neutral callback entry gate with close-after-last-callback cleanup. */
+/** Platform-neutral callback entry gate with blocking close-after-last-callback cleanup. */
 @OptIn(ExperimentalAtomicApi::class)
 internal class CallbackGate(private val name: String, private val closeNative: () -> Unit = {}) :
   AutoCloseable {
   private val state = AtomicInt(0)
   private val nativeClosed = AtomicInt(0)
+  private val threadState = CallbackThreadState()
 
   fun enter(): Lease? {
     while (true) {
@@ -16,19 +18,39 @@ internal class CallbackGate(private val name: String, private val closeNative: (
       if (current and (CLOSING_FLAG or CLOSED_FLAG) != 0) return null
       val activeCallbacks = current and ACTIVE_MASK
       check(activeCallbacks < ACTIVE_MASK) { "too many active $name" }
-      if (state.compareAndSet(current, current + 1)) return Lease(this)
+      if (state.compareAndSet(current, current + 1)) {
+        threadState.enter()
+        return Lease(this)
+      }
+    }
+  }
+
+  fun checkCanClose() {
+    if (threadState.isInCallback()) {
+      throw Status.callbackReentry(name)
     }
   }
 
   override fun close() {
+    val closingFromCallback = threadState.isInCallback()
     while (true) {
       val current = state.load()
       if (current and CLOSED_FLAG != 0) return
-      val activeCallbacks = current and ACTIVE_MASK
-      val next = if (activeCallbacks == 0) CLOSED_FLAG else current or CLOSING_FLAG
-      if (state.compareAndSet(current, next)) {
-        if (next and CLOSED_FLAG != 0) closeNativeOnce()
-        return
+      if (state.compareAndSet(current, current or CLOSING_FLAG)) {
+        break
+      }
+    }
+    if (closingFromCallback) return
+    while (true) {
+      val current = state.load()
+      if (current and CLOSED_FLAG != 0) return
+      if (current and ACTIVE_MASK == 0) {
+        if (state.compareAndSet(current, CLOSED_FLAG)) {
+          closeNativeOnce()
+          return
+        }
+      } else {
+        yieldCallbackClose()
       }
     }
   }
@@ -47,7 +69,8 @@ internal class CallbackGate(private val name: String, private val closeNative: (
           current - 1
         }
       if (state.compareAndSet(current, next)) {
-        if (next and CLOSED_FLAG != 0) closeNativeOnce()
+        threadState.exit()
+        if (next == CLOSED_FLAG) closeNativeOnce()
         return
       }
     }
@@ -71,3 +94,13 @@ internal class CallbackGate(private val name: String, private val closeNative: (
     private const val ACTIVE_MASK = CLOSING_FLAG - 1
   }
 }
+
+internal expect class CallbackThreadState() {
+  fun enter()
+
+  fun exit()
+
+  fun isInCallback(): Boolean
+}
+
+internal expect fun yieldCallbackClose()

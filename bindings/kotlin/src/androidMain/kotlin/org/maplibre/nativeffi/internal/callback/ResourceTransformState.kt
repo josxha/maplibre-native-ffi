@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
@@ -43,7 +44,9 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
       response.size(response.sizeof())
       response.url(null)
       val replacement =
-        callback.transform(ResourceTransformRequest(ResourceKind.fromNative(rawKind), cString(url)))
+        callback.transform(
+          ResourceTransformRequest(ResourceKind.fromNative(rawKind), JavaCppSupport.cString(url))
+        )
       if (!replacement.isNullOrEmpty()) {
         if ('\u0000' in replacement) return MaplibreStatus.INVALID_ARGUMENT.nativeCode
         return setResponseUrl(response, replacement)
@@ -58,24 +61,13 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     }
   }
 
+  fun checkCanClose() = gate.checkCanClose()
+
   override fun close() = gate.close()
 
   private fun closeNative() {
     transform.close()
     nativeCallback.close()
-  }
-
-  private fun cString(pointer: BytePointer?): String {
-    if (pointer == null || pointer.isNull) {
-      return ""
-    }
-    var length = 0L
-    while (pointer.get(length) != 0.toByte()) {
-      length++
-    }
-    val bytes = ByteArray(Math.toIntExact(length))
-    pointer.get(bytes, 0, bytes.size)
-    return String(bytes, StandardCharsets.UTF_8)
   }
 
   private fun setResponseUrl(

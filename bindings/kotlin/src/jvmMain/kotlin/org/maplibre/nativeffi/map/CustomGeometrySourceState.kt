@@ -1,12 +1,10 @@
 package org.maplibre.nativeffi.map
 
 import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
-import java.lang.foreign.MemoryLayout
 import java.lang.foreign.MemorySegment
-import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
+import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_tile_callback
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -65,13 +63,6 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   private companion object {
     private val LOOKUP = MethodHandles.lookup()
     private val LINKER = java.lang.foreign.Linker.nativeLinker()
-    private val CANONICAL_TILE_ID_LAYOUT =
-      MemoryLayout.structLayout(
-        ValueLayout.JAVA_INT.withName("z"),
-        ValueLayout.JAVA_INT.withName("x"),
-        ValueLayout.JAVA_INT.withName("y"),
-      )
-    private val CALLBACK_DESCRIPTOR =
-      FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, CANONICAL_TILE_ID_LAYOUT)
+    private val CALLBACK_DESCRIPTOR = mln_custom_geometry_source_tile_callback.descriptor()
   }
 }

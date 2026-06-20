@@ -1,10 +1,11 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
   application
-  kotlin("jvm") version "2.2.21"
+  kotlin("jvm")
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
@@ -36,6 +37,8 @@ val lwjglMapJvmArgs = buildList {
     add("-XstartOnFirstThread")
   }
 }
+
+kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_24) } }
 
 application {
   mainClass = "org.maplibre.nativeffi.examples.lwjglmap.Main"

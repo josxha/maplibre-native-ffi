@@ -1,13 +1,15 @@
 package org.maplibre.nativeffi.internal.callback
 
 import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.c.mln_resource_transform
+import org.maplibre.nativeffi.internal.c.mln_resource_transform_callback
+import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
@@ -37,14 +39,10 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
         )
         .bindTo(this)
     stub = Linker.nativeLinker().upcallStub(method, callbackDescriptor, arena)
-    descriptor = arena.allocate(RESOURCE_TRANSFORM_SIZE)
-    descriptor.set(
-      ValueLayout.JAVA_INT,
-      RESOURCE_TRANSFORM_SIZE_OFFSET,
-      RESOURCE_TRANSFORM_SIZE.toInt(),
-    )
-    descriptor.set(ValueLayout.ADDRESS, RESOURCE_TRANSFORM_CALLBACK_OFFSET, stub)
-    descriptor.set(ValueLayout.ADDRESS, RESOURCE_TRANSFORM_USER_DATA_OFFSET, MemorySegment.NULL)
+    descriptor = mln_resource_transform.allocate(arena)
+    mln_resource_transform.size(descriptor, mln_resource_transform.sizeof().toInt())
+    mln_resource_transform.callback(descriptor, stub)
+    mln_resource_transform.user_data(descriptor, MemorySegment.NULL)
   }
 
   fun descriptor(): MemorySegment = descriptor
@@ -58,16 +56,11 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     if (outResponse == MemorySegment.NULL) return MaplibreStatus.INVALID_ARGUMENT.nativeCode
     val lease = gate.enter() ?: return MaplibreStatus.INVALID_ARGUMENT.nativeCode
     return try {
-      outResponse.set(
-        ValueLayout.JAVA_INT,
-        RESOURCE_TRANSFORM_RESPONSE_SIZE_OFFSET,
-        RESOURCE_TRANSFORM_RESPONSE_SIZE.toInt(),
+      mln_resource_transform_response.size(
+        outResponse,
+        mln_resource_transform_response.sizeof().toInt(),
       )
-      outResponse.set(
-        ValueLayout.ADDRESS,
-        RESOURCE_TRANSFORM_RESPONSE_URL_OFFSET,
-        MemorySegment.NULL,
-      )
+      mln_resource_transform_response.url(outResponse, MemorySegment.NULL)
       val replacement =
         callback.transform(
           ResourceTransformRequest(ResourceKind.fromNative(rawKind), copyCString(url))
@@ -86,6 +79,8 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     }
   }
 
+  fun checkCanClose() = gate.checkCanClose()
+
   override fun close() = gate.close()
 
   private fun copyCString(address: MemorySegment): String {
@@ -100,22 +95,6 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   }
 
   private companion object {
-    private val callbackDescriptor =
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      )
-
-    private const val RESOURCE_TRANSFORM_SIZE: Long = 24
-    private const val RESOURCE_TRANSFORM_SIZE_OFFSET: Long = 0
-    private const val RESOURCE_TRANSFORM_CALLBACK_OFFSET: Long = 8
-    private const val RESOURCE_TRANSFORM_USER_DATA_OFFSET: Long = 16
-
-    private const val RESOURCE_TRANSFORM_RESPONSE_SIZE: Long = 24
-    private const val RESOURCE_TRANSFORM_RESPONSE_SIZE_OFFSET: Long = 0
-    private const val RESOURCE_TRANSFORM_RESPONSE_URL_OFFSET: Long = 8
+    private val callbackDescriptor = mln_resource_transform_callback.descriptor()
   }
 }

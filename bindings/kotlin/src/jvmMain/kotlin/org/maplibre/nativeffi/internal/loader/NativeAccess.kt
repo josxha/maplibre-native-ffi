@@ -1,11 +1,7 @@
 package org.maplibre.nativeffi.internal.loader
 
 import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
-import java.lang.foreign.Linker
-import java.lang.foreign.MemoryLayout
 import java.lang.foreign.MemorySegment
-import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
 import java.nio.charset.StandardCharsets
@@ -32,11 +28,93 @@ import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.geo.Vec3
+import org.maplibre.nativeffi.internal.c.MapLibreNativeC
+import org.maplibre.nativeffi.internal.c.mln_animation_options
+import org.maplibre.nativeffi.internal.c.mln_bound_options
+import org.maplibre.nativeffi.internal.c.mln_camera_fit_options
+import org.maplibre.nativeffi.internal.c.mln_camera_options
+import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
+import org.maplibre.nativeffi.internal.c.mln_coordinate_span
+import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options
+import org.maplibre.nativeffi.internal.c.mln_edge_insets
+import org.maplibre.nativeffi.internal.c.mln_egl_context_descriptor
+import org.maplibre.nativeffi.internal.c.mln_feature
+import org.maplibre.nativeffi.internal.c.mln_feature_collection
+import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_info
+import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
+import org.maplibre.nativeffi.internal.c.mln_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_geojson
+import org.maplibre.nativeffi.internal.c.mln_geometry
+import org.maplibre.nativeffi.internal.c.mln_geometry_collection
+import org.maplibre.nativeffi.internal.c.mln_json_member
+import org.maplibre.nativeffi.internal.c.mln_json_value
+import org.maplibre.nativeffi.internal.c.mln_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
+import org.maplibre.nativeffi.internal.c.mln_map_options
+import org.maplibre.nativeffi.internal.c.mln_map_tile_options
+import org.maplibre.nativeffi.internal.c.mln_map_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_descriptor
+import org.maplibre.nativeffi.internal.c.mln_metal_context_descriptor
+import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_descriptor
+import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
+import org.maplibre.nativeffi.internal.c.mln_metal_surface_descriptor
+import org.maplibre.nativeffi.internal.c.mln_multi_line_geometry
+import org.maplibre.nativeffi.internal.c.mln_multi_polygon_geometry
+import org.maplibre.nativeffi.internal.c.mln_offline_geometry_region_definition
+import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
+import org.maplibre.nativeffi.internal.c.mln_offline_region_info
+import org.maplibre.nativeffi.internal.c.mln_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_offline_tile_pyramid_region_definition
+import org.maplibre.nativeffi.internal.c.mln_opengl_borrowed_texture_descriptor
+import org.maplibre.nativeffi.internal.c.mln_opengl_context_descriptor
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_descriptor
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame
+import org.maplibre.nativeffi.internal.c.mln_opengl_surface_descriptor
+import org.maplibre.nativeffi.internal.c.mln_polygon_geometry
+import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
+import org.maplibre.nativeffi.internal.c.mln_projected_meters
+import org.maplibre.nativeffi.internal.c.mln_projection_mode
+import org.maplibre.nativeffi.internal.c.mln_quaternion
+import org.maplibre.nativeffi.internal.c.mln_queried_feature
+import org.maplibre.nativeffi.internal.c.mln_render_target_extent
+import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
+import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
+import org.maplibre.nativeffi.internal.c.mln_rendering_stats
+import org.maplibre.nativeffi.internal.c.mln_resource_request
+import org.maplibre.nativeffi.internal.c.mln_resource_response
+import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_frame
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_style_image_missing
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
+import org.maplibre.nativeffi.internal.c.mln_runtime_options
+import org.maplibre.nativeffi.internal.c.mln_screen_box
+import org.maplibre.nativeffi.internal.c.mln_screen_line_string
+import org.maplibre.nativeffi.internal.c.mln_screen_point
+import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
+import org.maplibre.nativeffi.internal.c.mln_string_view
+import org.maplibre.nativeffi.internal.c.mln_style_image_info
+import org.maplibre.nativeffi.internal.c.mln_style_image_options
+import org.maplibre.nativeffi.internal.c.mln_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
+import org.maplibre.nativeffi.internal.c.mln_texture_image_info
+import org.maplibre.nativeffi.internal.c.mln_tile_id
+import org.maplibre.nativeffi.internal.c.mln_unit_bezier
+import org.maplibre.nativeffi.internal.c.mln_vec3
+import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_descriptor
+import org.maplibre.nativeffi.internal.c.mln_vulkan_context_descriptor
+import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor
+import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
+import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
+import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.DebugOption
-import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.NorthOrientation
 import org.maplibre.nativeffi.map.ProjectionModeOptions
@@ -144,6 +222,15 @@ internal object NativeAccess {
     val version =
       try {
         cVersion()
+      } catch (error: ExceptionInInitializerError) {
+        val cause = deepestCause(error)
+        if (cause is IllegalCallerException) {
+          throw nativeAccessFailure(cause)
+        }
+        if (cause is NoSuchElementException || cause is UnsatisfiedLinkError) {
+          throw missingSymbols(error)
+        }
+        throw error
       } catch (error: IllegalCallerException) {
         throw nativeAccessFailure(error)
       } catch (error: NoSuchElementException) {
@@ -1800,12 +1887,8 @@ internal object NativeAccess {
 
   internal fun acquireMetalOwnedTextureFrame(session: MemorySegment): OwnedTextureFrameSegment {
     val arena = Arena.ofShared()
-    val frame = arena.allocate(METAL_OWNED_TEXTURE_FRAME_SIZE)
-    frame.set(
-      ValueLayout.JAVA_INT,
-      METAL_OWNED_TEXTURE_FRAME_SIZE_OFFSET,
-      METAL_OWNED_TEXTURE_FRAME_SIZE.toInt(),
-    )
+    val frame = mln_metal_owned_texture_frame.allocate(arena)
+    mln_metal_owned_texture_frame.size(frame, mln_metal_owned_texture_frame.sizeof().toInt())
     try {
       Status.check(
         metalOwnedTextureAcquireFrameFunction().invokeWithArguments(session, frame) as Int
@@ -1819,12 +1902,8 @@ internal object NativeAccess {
 
   internal fun acquireVulkanOwnedTextureFrame(session: MemorySegment): OwnedTextureFrameSegment {
     val arena = Arena.ofShared()
-    val frame = arena.allocate(VULKAN_OWNED_TEXTURE_FRAME_SIZE)
-    frame.set(
-      ValueLayout.JAVA_INT,
-      VULKAN_OWNED_TEXTURE_FRAME_SIZE_OFFSET,
-      VULKAN_OWNED_TEXTURE_FRAME_SIZE.toInt(),
-    )
+    val frame = mln_vulkan_owned_texture_frame.allocate(arena)
+    mln_vulkan_owned_texture_frame.size(frame, mln_vulkan_owned_texture_frame.sizeof().toInt())
     try {
       Status.check(
         vulkanOwnedTextureAcquireFrameFunction().invokeWithArguments(session, frame) as Int
@@ -1838,12 +1917,8 @@ internal object NativeAccess {
 
   internal fun acquireOpenGLOwnedTextureFrame(session: MemorySegment): OwnedTextureFrameSegment {
     val arena = Arena.ofShared()
-    val frame = arena.allocate(OPENGL_OWNED_TEXTURE_FRAME_SIZE)
-    frame.set(
-      ValueLayout.JAVA_INT,
-      OPENGL_OWNED_TEXTURE_FRAME_SIZE_OFFSET,
-      OPENGL_OWNED_TEXTURE_FRAME_SIZE.toInt(),
-    )
+    val frame = mln_opengl_owned_texture_frame.allocate(arena)
+    mln_opengl_owned_texture_frame.size(frame, mln_opengl_owned_texture_frame.sizeof().toInt())
     try {
       Status.check(
         openglOwnedTextureAcquireFrameFunction().invokeWithArguments(session, frame) as Int
@@ -1877,20 +1952,14 @@ internal object NativeAccess {
   ): MetalOwnedTextureFrame =
     MetalOwnedTextureFrame(
       scope,
-      segment.get(ValueLayout.JAVA_LONG, METAL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, METAL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, METAL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET),
-      segment.get(ValueLayout.JAVA_DOUBLE, METAL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, METAL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET),
-      scopedPointer(
-        segment.get(ValueLayout.ADDRESS, METAL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET),
-        scope,
-      ),
-      scopedPointer(
-        segment.get(ValueLayout.ADDRESS, METAL_OWNED_TEXTURE_FRAME_DEVICE_OFFSET),
-        scope,
-      ),
-      segment.get(ValueLayout.JAVA_LONG, METAL_OWNED_TEXTURE_FRAME_PIXEL_FORMAT_OFFSET),
+      mln_metal_owned_texture_frame.generation(segment),
+      mln_metal_owned_texture_frame.width(segment),
+      mln_metal_owned_texture_frame.height(segment),
+      mln_metal_owned_texture_frame.scale_factor(segment),
+      mln_metal_owned_texture_frame.frame_id(segment),
+      scopedPointer(mln_metal_owned_texture_frame.texture(segment), scope),
+      scopedPointer(mln_metal_owned_texture_frame.device(segment), scope),
+      mln_metal_owned_texture_frame.pixel_format(segment),
     )
 
   internal fun vulkanOwnedTextureFrame(
@@ -1899,25 +1968,16 @@ internal object NativeAccess {
   ): VulkanOwnedTextureFrame =
     VulkanOwnedTextureFrame(
       scope,
-      segment.get(ValueLayout.JAVA_LONG, VULKAN_OWNED_TEXTURE_FRAME_GENERATION_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_WIDTH_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET),
-      segment.get(ValueLayout.JAVA_DOUBLE, VULKAN_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, VULKAN_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET),
-      scopedPointer(
-        segment.get(ValueLayout.ADDRESS, VULKAN_OWNED_TEXTURE_FRAME_IMAGE_OFFSET),
-        scope,
-      ),
-      scopedPointer(
-        segment.get(ValueLayout.ADDRESS, VULKAN_OWNED_TEXTURE_FRAME_IMAGE_VIEW_OFFSET),
-        scope,
-      ),
-      scopedPointer(
-        segment.get(ValueLayout.ADDRESS, VULKAN_OWNED_TEXTURE_FRAME_DEVICE_OFFSET),
-        scope,
-      ),
-      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_FORMAT_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, VULKAN_OWNED_TEXTURE_FRAME_LAYOUT_OFFSET),
+      mln_vulkan_owned_texture_frame.generation(segment),
+      mln_vulkan_owned_texture_frame.width(segment),
+      mln_vulkan_owned_texture_frame.height(segment),
+      mln_vulkan_owned_texture_frame.scale_factor(segment),
+      mln_vulkan_owned_texture_frame.frame_id(segment),
+      scopedPointer(mln_vulkan_owned_texture_frame.image(segment), scope),
+      scopedPointer(mln_vulkan_owned_texture_frame.image_view(segment), scope),
+      scopedPointer(mln_vulkan_owned_texture_frame.device(segment), scope),
+      mln_vulkan_owned_texture_frame.format(segment),
+      mln_vulkan_owned_texture_frame.layout(segment),
     )
 
   internal fun openglOwnedTextureFrame(
@@ -1926,16 +1986,16 @@ internal object NativeAccess {
   ): OpenGLOwnedTextureFrame =
     OpenGLOwnedTextureFrame(
       scope,
-      segment.get(ValueLayout.JAVA_LONG, OPENGL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET),
-      segment.get(ValueLayout.JAVA_DOUBLE, OPENGL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, OPENGL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_TARGET_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_INTERNAL_FORMAT_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_FORMAT_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, OPENGL_OWNED_TEXTURE_FRAME_TYPE_OFFSET),
+      mln_opengl_owned_texture_frame.generation(segment),
+      mln_opengl_owned_texture_frame.width(segment),
+      mln_opengl_owned_texture_frame.height(segment),
+      mln_opengl_owned_texture_frame.scale_factor(segment),
+      mln_opengl_owned_texture_frame.frame_id(segment),
+      mln_opengl_owned_texture_frame.texture(segment),
+      mln_opengl_owned_texture_frame.target(segment),
+      mln_opengl_owned_texture_frame.internal_format(segment),
+      mln_opengl_owned_texture_frame.format(segment),
+      mln_opengl_owned_texture_frame.type(segment),
     )
 
   internal fun createMapProjection(map: MemorySegment): MemorySegment =
@@ -2125,339 +2185,174 @@ internal object NativeAccess {
   private fun metalOwnedTextureDescriptor(
     descriptor: MetalOwnedTextureDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
-        METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
-      )
-      copy(renderTargetExtent(arena, descriptor.extent), segment, METAL_OWNED_TEXTURE_EXTENT_OFFSET)
-      copy(metalContext(arena, descriptor.context), segment, METAL_OWNED_TEXTURE_CONTEXT_OFFSET)
+    MapLibreNativeC.mln_metal_owned_texture_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(mln_metal_owned_texture_descriptor.extent(segment), descriptor.extent)
+      fillMetalContext(mln_metal_owned_texture_descriptor.context(segment), descriptor.context)
     }
   }
 
   private fun metalBorrowedTextureDescriptor(
     descriptor: MetalBorrowedTextureDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
-        METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+    MapLibreNativeC.mln_metal_borrowed_texture_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(
+        mln_metal_borrowed_texture_descriptor.extent(segment),
+        descriptor.extent,
       )
-      copy(
-        renderTargetExtent(arena, descriptor.extent),
-        segment,
-        METAL_BORROWED_TEXTURE_EXTENT_OFFSET,
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        METAL_BORROWED_TEXTURE_TEXTURE_OFFSET,
-        nativePointer(descriptor.texture),
-      )
+      mln_metal_borrowed_texture_descriptor.texture(segment, nativePointer(descriptor.texture))
     }
   }
 
   private fun vulkanOwnedTextureDescriptor(
     descriptor: VulkanOwnedTextureDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
-        VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
-      )
-      copy(
-        renderTargetExtent(arena, descriptor.extent),
-        segment,
-        VULKAN_OWNED_TEXTURE_EXTENT_OFFSET,
-      )
-      copy(vulkanContext(arena, descriptor.context), segment, VULKAN_OWNED_TEXTURE_CONTEXT_OFFSET)
+    MapLibreNativeC.mln_vulkan_owned_texture_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(mln_vulkan_owned_texture_descriptor.extent(segment), descriptor.extent)
+      fillVulkanContext(mln_vulkan_owned_texture_descriptor.context(segment), descriptor.context)
     }
   }
 
   private fun vulkanBorrowedTextureDescriptor(
     descriptor: VulkanBorrowedTextureDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
-        VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+    MapLibreNativeC.mln_vulkan_borrowed_texture_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(
+        mln_vulkan_borrowed_texture_descriptor.extent(segment),
+        descriptor.extent,
       )
-      copy(
-        renderTargetExtent(arena, descriptor.extent),
+      fillVulkanContext(mln_vulkan_borrowed_texture_descriptor.context(segment), descriptor.context)
+      mln_vulkan_borrowed_texture_descriptor.image(segment, nativePointer(descriptor.image))
+      mln_vulkan_borrowed_texture_descriptor.image_view(
         segment,
-        VULKAN_BORROWED_TEXTURE_EXTENT_OFFSET,
-      )
-      copy(
-        vulkanContext(arena, descriptor.context),
-        segment,
-        VULKAN_BORROWED_TEXTURE_CONTEXT_OFFSET,
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_BORROWED_TEXTURE_IMAGE_OFFSET,
-        nativePointer(descriptor.image),
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_BORROWED_TEXTURE_IMAGE_VIEW_OFFSET,
         nativePointer(descriptor.imageView),
       )
-      segment.set(ValueLayout.JAVA_INT, VULKAN_BORROWED_TEXTURE_FORMAT_OFFSET, descriptor.format)
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_BORROWED_TEXTURE_INITIAL_LAYOUT_OFFSET,
-        descriptor.initialLayout,
-      )
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_BORROWED_TEXTURE_FINAL_LAYOUT_OFFSET,
-        descriptor.finalLayout ?: descriptor.initialLayout,
-      )
+      mln_vulkan_borrowed_texture_descriptor.format(segment, descriptor.format)
+      mln_vulkan_borrowed_texture_descriptor.initial_layout(segment, descriptor.initialLayout)
+      descriptor.finalLayout?.let {
+        mln_vulkan_borrowed_texture_descriptor.final_layout(segment, it)
+      }
     }
   }
 
   private fun openglOwnedTextureDescriptor(
     descriptor: OpenGLOwnedTextureDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
-        OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
-      )
-      copy(
-        renderTargetExtent(arena, descriptor.extent),
-        segment,
-        OPENGL_OWNED_TEXTURE_EXTENT_OFFSET,
-      )
-      copy(openglContext(arena, descriptor.context), segment, OPENGL_OWNED_TEXTURE_CONTEXT_OFFSET)
+    MapLibreNativeC.mln_opengl_owned_texture_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(mln_opengl_owned_texture_descriptor.extent(segment), descriptor.extent)
+      fillOpenGLContext(mln_opengl_owned_texture_descriptor.context(segment), descriptor.context)
     }
   }
 
   private fun openglBorrowedTextureDescriptor(
     descriptor: OpenGLBorrowedTextureDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET,
-        OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE.toInt(),
+    MapLibreNativeC.mln_opengl_borrowed_texture_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(
+        mln_opengl_borrowed_texture_descriptor.extent(segment),
+        descriptor.extent,
       )
-      copy(
-        renderTargetExtent(arena, descriptor.extent),
-        segment,
-        OPENGL_BORROWED_TEXTURE_EXTENT_OFFSET,
-      )
-      copy(
-        openglContext(arena, descriptor.context),
-        segment,
-        OPENGL_BORROWED_TEXTURE_CONTEXT_OFFSET,
-      )
-      segment.set(ValueLayout.JAVA_INT, OPENGL_BORROWED_TEXTURE_TEXTURE_OFFSET, descriptor.texture)
-      segment.set(ValueLayout.JAVA_INT, OPENGL_BORROWED_TEXTURE_TARGET_OFFSET, descriptor.target)
+      fillOpenGLContext(mln_opengl_borrowed_texture_descriptor.context(segment), descriptor.context)
+      mln_opengl_borrowed_texture_descriptor.texture(segment, descriptor.texture)
+      mln_opengl_borrowed_texture_descriptor.target(segment, descriptor.target)
     }
   }
 
   private fun metalSurfaceDescriptor(descriptor: MetalSurfaceDescriptor): (Arena) -> MemorySegment =
     { arena ->
-      arena.allocate(METAL_SURFACE_DESCRIPTOR_SIZE).also { segment ->
-        segment.set(
-          ValueLayout.JAVA_INT,
-          METAL_SURFACE_DESCRIPTOR_SIZE_OFFSET,
-          METAL_SURFACE_DESCRIPTOR_SIZE.toInt(),
-        )
-        copy(renderTargetExtent(arena, descriptor.extent), segment, METAL_SURFACE_EXTENT_OFFSET)
-        copy(metalContext(arena, descriptor.context), segment, METAL_SURFACE_CONTEXT_OFFSET)
-        segment.set(
-          ValueLayout.ADDRESS,
-          METAL_SURFACE_LAYER_OFFSET,
-          nativePointer(descriptor.layer),
-        )
+      MapLibreNativeC.mln_metal_surface_descriptor_default(arena).also { segment ->
+        fillRenderTargetExtent(mln_metal_surface_descriptor.extent(segment), descriptor.extent)
+        fillMetalContext(mln_metal_surface_descriptor.context(segment), descriptor.context)
+        mln_metal_surface_descriptor.layer(segment, nativePointer(descriptor.layer))
       }
     }
 
   private fun vulkanSurfaceDescriptor(
     descriptor: VulkanSurfaceDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(VULKAN_SURFACE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_SURFACE_DESCRIPTOR_SIZE_OFFSET,
-        VULKAN_SURFACE_DESCRIPTOR_SIZE.toInt(),
-      )
-      copy(renderTargetExtent(arena, descriptor.extent), segment, VULKAN_SURFACE_EXTENT_OFFSET)
-      copy(vulkanContext(arena, descriptor.context), segment, VULKAN_SURFACE_CONTEXT_OFFSET)
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_SURFACE_SURFACE_OFFSET,
-        nativePointer(descriptor.surface),
-      )
+    MapLibreNativeC.mln_vulkan_surface_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(mln_vulkan_surface_descriptor.extent(segment), descriptor.extent)
+      fillVulkanContext(mln_vulkan_surface_descriptor.context(segment), descriptor.context)
+      mln_vulkan_surface_descriptor.surface(segment, nativePointer(descriptor.surface))
     }
   }
 
   private fun openglSurfaceDescriptor(
     descriptor: OpenGLSurfaceDescriptor
   ): (Arena) -> MemorySegment = { arena ->
-    arena.allocate(OPENGL_SURFACE_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        OPENGL_SURFACE_DESCRIPTOR_SIZE_OFFSET,
-        OPENGL_SURFACE_DESCRIPTOR_SIZE.toInt(),
-      )
-      copy(renderTargetExtent(arena, descriptor.extent), segment, OPENGL_SURFACE_EXTENT_OFFSET)
-      copy(openglContext(arena, descriptor.context), segment, OPENGL_SURFACE_CONTEXT_OFFSET)
-      segment.set(
-        ValueLayout.ADDRESS,
-        OPENGL_SURFACE_SURFACE_OFFSET,
-        nativePointer(descriptor.surface),
-      )
+    MapLibreNativeC.mln_opengl_surface_descriptor_default(arena).also { segment ->
+      fillRenderTargetExtent(mln_opengl_surface_descriptor.extent(segment), descriptor.extent)
+      fillOpenGLContext(mln_opengl_surface_descriptor.context(segment), descriptor.context)
+      mln_opengl_surface_descriptor.surface(segment, nativePointer(descriptor.surface))
     }
   }
 
-  private fun renderTargetExtent(arena: Arena, extent: RenderTargetExtent): MemorySegment =
-    arena.allocate(RENDER_TARGET_EXTENT_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        RENDER_TARGET_EXTENT_SIZE_OFFSET,
-        RENDER_TARGET_EXTENT_SIZE.toInt(),
-      )
-      segment.set(ValueLayout.JAVA_INT, RENDER_TARGET_EXTENT_WIDTH_OFFSET, extent.width)
-      segment.set(ValueLayout.JAVA_INT, RENDER_TARGET_EXTENT_HEIGHT_OFFSET, extent.height)
-      segment.set(
-        ValueLayout.JAVA_DOUBLE,
-        RENDER_TARGET_EXTENT_SCALE_FACTOR_OFFSET,
-        extent.scaleFactor,
-      )
-    }
+  private fun fillRenderTargetExtent(segment: MemorySegment, extent: RenderTargetExtent) {
+    mln_render_target_extent.size(segment, mln_render_target_extent.sizeof().toInt())
+    mln_render_target_extent.width(segment, extent.width)
+    mln_render_target_extent.height(segment, extent.height)
+    mln_render_target_extent.scale_factor(segment, extent.scaleFactor)
+  }
 
-  private fun metalContext(arena: Arena, context: MetalContextDescriptor): MemorySegment =
-    arena.allocate(METAL_CONTEXT_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        METAL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
-        METAL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        METAL_CONTEXT_DESCRIPTOR_DEVICE_OFFSET,
-        nativePointer(context.device),
-      )
-    }
+  private fun fillMetalContext(segment: MemorySegment, context: MetalContextDescriptor) {
+    mln_metal_context_descriptor.size(segment, mln_metal_context_descriptor.sizeof().toInt())
+    mln_metal_context_descriptor.device(segment, nativePointer(context.device))
+  }
 
-  private fun vulkanContext(arena: Arena, context: VulkanContextDescriptor): MemorySegment =
-    arena.allocate(VULKAN_CONTEXT_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
-        VULKAN_CONTEXT_DESCRIPTOR_SIZE.toInt(),
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_CONTEXT_INSTANCE_OFFSET,
-        nativePointer(context.instance),
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_CONTEXT_PHYSICAL_DEVICE_OFFSET,
-        nativePointer(context.physicalDevice),
-      )
-      segment.set(ValueLayout.ADDRESS, VULKAN_CONTEXT_DEVICE_OFFSET, nativePointer(context.device))
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_CONTEXT_GRAPHICS_QUEUE_OFFSET,
-        nativePointer(context.graphicsQueue),
-      )
-      segment.set(
-        ValueLayout.JAVA_INT,
-        VULKAN_CONTEXT_GRAPHICS_QUEUE_FAMILY_INDEX_OFFSET,
-        context.graphicsQueueFamilyIndex,
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_CONTEXT_GET_INSTANCE_PROC_ADDR_OFFSET,
-        nativePointer(context.getInstanceProcAddr),
-      )
-      segment.set(
-        ValueLayout.ADDRESS,
-        VULKAN_CONTEXT_GET_DEVICE_PROC_ADDR_OFFSET,
-        nativePointer(context.getDeviceProcAddr),
-      )
-    }
+  private fun fillVulkanContext(segment: MemorySegment, context: VulkanContextDescriptor) {
+    mln_vulkan_context_descriptor.size(segment, mln_vulkan_context_descriptor.sizeof().toInt())
+    mln_vulkan_context_descriptor.instance(segment, nativePointer(context.instance))
+    mln_vulkan_context_descriptor.physical_device(segment, nativePointer(context.physicalDevice))
+    mln_vulkan_context_descriptor.device(segment, nativePointer(context.device))
+    mln_vulkan_context_descriptor.graphics_queue(segment, nativePointer(context.graphicsQueue))
+    mln_vulkan_context_descriptor.graphics_queue_family_index(
+      segment,
+      context.graphicsQueueFamilyIndex,
+    )
+    mln_vulkan_context_descriptor.get_instance_proc_addr(
+      segment,
+      nativePointer(context.getInstanceProcAddr),
+    )
+    mln_vulkan_context_descriptor.get_device_proc_addr(
+      segment,
+      nativePointer(context.getDeviceProcAddr),
+    )
+  }
 
-  private fun openglContext(arena: Arena, context: OpenGLContextDescriptor): MemorySegment =
-    arena.allocate(OPENGL_CONTEXT_DESCRIPTOR_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        OPENGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
-        OPENGL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
-      )
-      when (context) {
-        is WglContextDescriptor -> {
-          segment.set(
-            ValueLayout.JAVA_INT,
-            OPENGL_CONTEXT_DESCRIPTOR_PLATFORM_OFFSET,
-            OPENGL_CONTEXT_PLATFORM_WGL,
-          )
-          val data = segment.asSlice(OPENGL_CONTEXT_DESCRIPTOR_DATA_OFFSET)
-          data.set(
-            ValueLayout.JAVA_INT,
-            WGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
-            WGL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            WGL_CONTEXT_DESCRIPTOR_DEVICE_CONTEXT_OFFSET,
-            nativePointer(context.deviceContext),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            WGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET,
-            nativePointer(context.shareContext),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            WGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET,
-            nativePointer(context.getProcAddress),
-          )
-        }
-        is EglContextDescriptor -> {
-          segment.set(
-            ValueLayout.JAVA_INT,
-            OPENGL_CONTEXT_DESCRIPTOR_PLATFORM_OFFSET,
-            OPENGL_CONTEXT_PLATFORM_EGL,
-          )
-          val data = segment.asSlice(OPENGL_CONTEXT_DESCRIPTOR_DATA_OFFSET)
-          data.set(
-            ValueLayout.JAVA_INT,
-            EGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET,
-            EGL_CONTEXT_DESCRIPTOR_SIZE.toInt(),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            EGL_CONTEXT_DESCRIPTOR_DISPLAY_OFFSET,
-            nativePointer(context.display),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            EGL_CONTEXT_DESCRIPTOR_CONFIG_OFFSET,
-            nativePointer(context.config),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            EGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET,
-            nativePointer(context.shareContext),
-          )
-          data.set(
-            ValueLayout.ADDRESS,
-            EGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET,
-            nativePointer(context.getProcAddress),
-          )
-        }
+  private fun fillOpenGLContext(segment: MemorySegment, context: OpenGLContextDescriptor) {
+    mln_opengl_context_descriptor.size(segment, mln_opengl_context_descriptor.sizeof().toInt())
+    val data = mln_opengl_context_descriptor.data(segment)
+    when (context) {
+      is WglContextDescriptor -> {
+        mln_opengl_context_descriptor.platform(
+          segment,
+          MapLibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL(),
+        )
+        fillWglContext(mln_opengl_context_descriptor.data.wgl(data), context)
+      }
+      is EglContextDescriptor -> {
+        mln_opengl_context_descriptor.platform(
+          segment,
+          MapLibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_EGL(),
+        )
+        fillEglContext(mln_opengl_context_descriptor.data.egl(data), context)
       }
     }
+  }
+
+  private fun fillWglContext(segment: MemorySegment, context: WglContextDescriptor) {
+    mln_wgl_context_descriptor.size(segment, mln_wgl_context_descriptor.sizeof().toInt())
+    mln_wgl_context_descriptor.device_context(segment, nativePointer(context.deviceContext))
+    mln_wgl_context_descriptor.share_context(segment, nativePointer(context.shareContext))
+    mln_wgl_context_descriptor.get_proc_address(segment, nativePointer(context.getProcAddress))
+  }
+
+  private fun fillEglContext(segment: MemorySegment, context: EglContextDescriptor) {
+    mln_egl_context_descriptor.size(segment, mln_egl_context_descriptor.sizeof().toInt())
+    mln_egl_context_descriptor.display(segment, nativePointer(context.display))
+    mln_egl_context_descriptor.config(segment, nativePointer(context.config))
+    mln_egl_context_descriptor.share_context(segment, nativePointer(context.shareContext))
+    mln_egl_context_descriptor.get_proc_address(segment, nativePointer(context.getProcAddress))
+  }
 
   private fun featureStateSelector(arena: Arena, selector: FeatureStateSelector): MemorySegment {
     val segment = arena.allocate(FEATURE_STATE_SELECTOR_SIZE)
@@ -2613,20 +2508,16 @@ internal object NativeAccess {
   }
 
   private fun textureImageInfo(arena: Arena): MemorySegment =
-    arena.allocate(TEXTURE_IMAGE_INFO_SIZE).also { segment ->
-      segment.set(
-        ValueLayout.JAVA_INT,
-        TEXTURE_IMAGE_INFO_SIZE_OFFSET,
-        TEXTURE_IMAGE_INFO_SIZE.toInt(),
-      )
+    mln_texture_image_info.allocate(arena).also { segment ->
+      mln_texture_image_info.size(segment, mln_texture_image_info.sizeof().toInt())
     }
 
   private fun readTextureImageInfo(segment: MemorySegment): TextureImageInfo =
     TextureImageInfo(
-      segment.get(ValueLayout.JAVA_INT, TEXTURE_IMAGE_INFO_WIDTH_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, TEXTURE_IMAGE_INFO_HEIGHT_OFFSET),
-      segment.get(ValueLayout.JAVA_INT, TEXTURE_IMAGE_INFO_STRIDE_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, TEXTURE_IMAGE_INFO_BYTE_LENGTH_OFFSET),
+      mln_texture_image_info.width(segment),
+      mln_texture_image_info.height(segment),
+      mln_texture_image_info.stride(segment),
+      mln_texture_image_info.byte_length(segment),
     )
 
   private fun nativePointer(pointer: NativePointer): MemorySegment =
@@ -2635,10 +2526,6 @@ internal object NativeAccess {
   private fun scopedPointer(pointer: MemorySegment, scope: FrameScope): NativePointer =
     if (pointer == MemorySegment.NULL) NativePointer.NULL
     else NativePointer.scoped(pointer.address(), scope)
-
-  private fun copy(source: MemorySegment, target: MemorySegment, targetOffset: Long) {
-    MemorySegment.copy(source, 0, target, targetOffset, source.byteSize())
-  }
 
   internal fun takeOfflineRegionStatusResult(
     runtime: MemorySegment,
@@ -2734,441 +2621,120 @@ internal object NativeAccess {
       )
     }
 
-  private fun intFunction(name: String): MethodHandle =
-    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT))
+  private fun intFunction(name: String): MethodHandle = downcall(name)
 
-  private fun statusOutFunction(name: String): MethodHandle =
-    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+  private fun statusOutFunction(name: String): MethodHandle = downcall(name)
 
-  private fun statusInFunction(name: String): MethodHandle =
-    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT))
+  private fun statusInFunction(name: String): MethodHandle = downcall(name)
 
-  private fun logSetCallbackFunction(): MethodHandle =
-    downcall(
-      "mln_log_set_callback",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun logSetCallbackFunction(): MethodHandle = downcall("mln_log_set_callback")
 
   private fun projectedMetersForLatLngFunction(): MethodHandle =
-    downcall(
-      "mln_projected_meters_for_lat_lng",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, latLngLayout, ValueLayout.ADDRESS),
-    )
+    downcall("mln_projected_meters_for_lat_lng")
 
   private fun latLngForProjectedMetersFunction(): MethodHandle =
-    downcall(
-      "mln_lat_lng_for_projected_meters",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, projectedMetersLayout, ValueLayout.ADDRESS),
-    )
+    downcall("mln_lat_lng_for_projected_meters")
 
-  private fun runtimeCreateFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_create",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun runtimeCreateFunction(): MethodHandle = downcall("mln_runtime_create")
 
-  private fun runtimeStatusFunction(name: String): MethodHandle =
-    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+  private fun runtimeStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun runtimeAmbientCacheOperationStartFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_run_ambient_cache_operation_start",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_runtime_run_ambient_cache_operation_start")
 
   private fun runtimeOfflineRegionCreateStartFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_offline_region_create_start",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_runtime_offline_region_create_start")
 
   private fun runtimeOfflineOperationDiscardFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_offline_operation_discard",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG),
-    )
+    downcall("mln_runtime_offline_operation_discard")
 
   private fun runtimeSetResourceProviderFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_set_resource_provider",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_runtime_set_resource_provider")
 
   private fun runtimeSetResourceTransformFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_set_resource_transform",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_runtime_set_resource_transform")
 
   private fun runtimeClearResourceTransformFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_clear_resource_transform",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
-    )
+    downcall("mln_runtime_clear_resource_transform")
 
   private fun resourceTransformResponseSetUrlFunction(): MethodHandle =
-    downcall(
-      "mln_resource_transform_response_set_url",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-      ),
-    )
+    downcall("mln_resource_transform_response_set_url")
 
   private fun resourceRequestCompleteFunction(): MethodHandle =
-    downcall(
-      "mln_resource_request_complete",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_resource_request_complete")
 
   private fun resourceRequestCancelledFunction(): MethodHandle =
-    downcall(
-      "mln_resource_request_cancelled",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_resource_request_cancelled")
 
   private fun resourceRequestReleaseFunction(): MethodHandle =
-    downcall("mln_resource_request_release", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+    downcall("mln_resource_request_release")
 
-  private fun mapCreateFunction(): MethodHandle =
-    downcall(
-      "mln_map_create",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapCreateFunction(): MethodHandle = downcall("mln_map_create")
 
-  private fun mapStatusFunction(name: String): MethodHandle =
-    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+  private fun mapStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapIntStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
-    )
+  private fun mapIntStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapBooleanStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN),
-    )
+  private fun mapBooleanStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun mapAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapStringViewAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapStringViewAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapAddressStringViewStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-      ),
-    )
+  private fun mapAddressStringViewStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapTwoStringViewsStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        stringViewLayout,
-      ),
-    )
+  private fun mapTwoStringViewsStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewCanonicalTileIdStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        canonicalTileIdLayout,
-      ),
-    )
+    downcall(name)
 
   private fun mapStringViewCanonicalTileIdAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        canonicalTileIdLayout,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
-  private fun mapStringViewLatLngBoundsStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        latLngBoundsLayout,
-      ),
-    )
+  private fun mapStringViewLatLngBoundsStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapThreeStringViewsStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        stringViewLayout,
-        stringViewLayout,
-      ),
-    )
+  private fun mapThreeStringViewsStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapTwoStringViewsAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapTwoStringViewsAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapStringViewLatLngDoubleStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        latLngLayout,
-        ValueLayout.JAVA_DOUBLE,
-      ),
-    )
+  private fun mapStringViewLatLngDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE),
-    )
+  private fun mapDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleDoubleStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_DOUBLE,
-        ValueLayout.JAVA_DOUBLE,
-      ),
-    )
+  private fun mapDoubleDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_DOUBLE,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapDoubleAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleDoubleAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_DOUBLE,
-        ValueLayout.JAVA_DOUBLE,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapDoubleDoubleAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_DOUBLE,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapDoubleAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapTwoAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapTwoScreenPointsStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        screenPointLayout,
-        screenPointLayout,
-      ),
-    )
+  private fun mapTwoScreenPointsStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapTwoScreenPointsAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        screenPointLayout,
-        screenPointLayout,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapTwoScreenPointsAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapLatLngBoundsAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        latLngBoundsLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
   private fun mapAddressLongAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
   private fun projectionAddressLongEdgeInsetsStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        edgeInsetsLayout,
-      ),
-    )
+    downcall(name)
 
-  private fun projectionAddressEdgeInsetsStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        edgeInsetsLayout,
-      ),
-    )
+  private fun projectionAddressEdgeInsetsStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapLatLngAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        latLngLayout,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapLatLngAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapScreenPointAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        screenPointLayout,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapScreenPointAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapAddressLongAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapAddressLongAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun projectionLatLngAddressStatusFunction(name: String): MethodHandle =
     mapLatLngAddressStatusFunction(name)
@@ -3176,88 +2742,25 @@ internal object NativeAccess {
   private fun projectionScreenPointAddressStatusFunction(name: String): MethodHandle =
     mapScreenPointAddressStatusFunction(name)
 
-  private fun renderSessionStatusFunction(name: String): MethodHandle =
-    downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
+  private fun renderSessionStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun renderSessionResizeFunction(): MethodHandle =
-    downcall(
-      "mln_render_session_resize",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.JAVA_INT,
-        ValueLayout.JAVA_DOUBLE,
-      ),
-    )
+  private fun renderSessionResizeFunction(): MethodHandle = downcall("mln_render_session_resize")
 
-  private fun renderSessionAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun renderSessionAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun renderSessionTwoAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun renderSessionTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun renderSessionQueryRenderedFeaturesFunction(): MethodHandle =
-    downcall(
-      "mln_render_session_query_rendered_features",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_render_session_query_rendered_features")
 
   private fun renderSessionQuerySourceFeaturesFunction(): MethodHandle =
-    downcall(
-      "mln_render_session_query_source_features",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_render_session_query_source_features")
 
   private fun renderSessionQueryFeatureExtensionsFunction(): MethodHandle =
-    downcall(
-      "mln_render_session_query_feature_extensions",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_render_session_query_feature_extensions")
 
   private fun textureReadPremultipliedRgba8Function(): MethodHandle =
-    downcall(
-      "mln_texture_read_premultiplied_rgba8",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_texture_read_premultiplied_rgba8")
 
   private fun metalOwnedTextureAcquireFrameFunction(): MethodHandle =
     renderSessionAddressStatusFunction("mln_metal_owned_texture_acquire_frame")
@@ -3277,187 +2780,59 @@ internal object NativeAccess {
   private fun openglOwnedTextureReleaseFrameFunction(): MethodHandle =
     renderSessionAddressStatusFunction("mln_opengl_owned_texture_release_frame")
 
-  private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.JAVA_DOUBLE,
-      ),
-    )
+  private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapStringViewIntStringViewStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.JAVA_INT,
-        stringViewLayout,
-      ),
-    )
+  private fun mapStringViewIntStringViewStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapStringViewTwoAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun mapStringViewTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressLongTwoAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
-  private fun mapStringViewAddressLongStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-      ),
-    )
+  private fun mapStringViewAddressLongStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressLongStringViewStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        stringViewLayout,
-      ),
-    )
+    downcall(name)
 
   private fun mapStringViewAddressLongAddressStatusFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
   private fun mapListStyleSourceIdsFunction(): MethodHandle =
-    downcall(
-      "mln_map_list_style_source_ids",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_map_list_style_source_ids")
 
   private fun mapListStyleLayerIdsFunction(): MethodHandle =
-    downcall(
-      "mln_map_list_style_layer_ids",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_map_list_style_layer_ids")
 
-  private fun styleIdListCountFunction(): MethodHandle =
-    downcall(
-      "mln_style_id_list_count",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun styleIdListCountFunction(): MethodHandle = downcall("mln_style_id_list_count")
 
-  private fun styleIdListGetFunction(): MethodHandle =
-    downcall(
-      "mln_style_id_list_get",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun styleIdListGetFunction(): MethodHandle = downcall("mln_style_id_list_get")
 
-  private fun styleIdListDestroyFunction(): MethodHandle =
-    downcall("mln_style_id_list_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+  private fun styleIdListDestroyFunction(): MethodHandle = downcall("mln_style_id_list_destroy")
 
   private fun copyStyleSourceAttributionFunction(): MethodHandle =
-    downcall(
-      "mln_map_copy_style_source_attribution",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        stringViewLayout,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_map_copy_style_source_attribution")
 
-  private fun jsonSnapshotGetFunction(): MethodHandle =
-    downcall(
-      "mln_json_snapshot_get",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun jsonSnapshotGetFunction(): MethodHandle = downcall("mln_json_snapshot_get")
 
-  private fun jsonSnapshotDestroyFunction(): MethodHandle =
-    downcall("mln_json_snapshot_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+  private fun jsonSnapshotDestroyFunction(): MethodHandle = downcall("mln_json_snapshot_destroy")
 
   private fun featureQueryResultCountFunction(): MethodHandle =
-    downcall(
-      "mln_feature_query_result_count",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_feature_query_result_count")
 
   private fun featureQueryResultGetFunction(): MethodHandle =
-    downcall(
-      "mln_feature_query_result_get",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_feature_query_result_get")
 
   private fun featureQueryResultDestroyFunction(): MethodHandle =
-    downcall("mln_feature_query_result_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+    downcall("mln_feature_query_result_destroy")
 
   private fun featureExtensionResultGetFunction(): MethodHandle =
-    downcall(
-      "mln_feature_extension_result_get",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_feature_extension_result_get")
 
   private fun featureExtensionResultDestroyFunction(): MethodHandle =
-    downcall("mln_feature_extension_result_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+    downcall("mln_feature_extension_result_destroy")
 
   private fun runtimeOfflineRegionStatusTakeResultFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_offline_region_get_status_take_result",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_runtime_offline_region_get_status_take_result")
 
   private fun runtimeOfflineRegionCreateTakeResultFunction(): MethodHandle =
     runtimeOfflineOperationSnapshotTakeResultFunction(
@@ -3465,16 +2840,7 @@ internal object NativeAccess {
     )
 
   private fun runtimeOfflineRegionGetTakeResultFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_offline_region_get_take_result",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall("mln_runtime_offline_region_get_take_result")
 
   private fun runtimeOfflineRegionsListTakeResultFunction(): MethodHandle =
     runtimeOfflineOperationListTakeResultFunction("mln_runtime_offline_regions_list_take_result")
@@ -3490,58 +2856,26 @@ internal object NativeAccess {
     )
 
   private fun runtimeOfflineOperationSnapshotTakeResultFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
   private fun runtimeOfflineOperationListTakeResultFunction(name: String): MethodHandle =
     runtimeOfflineOperationSnapshotTakeResultFunction(name)
 
   private fun offlineRegionSnapshotGetFunction(): MethodHandle =
-    downcall(
-      "mln_offline_region_snapshot_get",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_offline_region_snapshot_get")
 
   private fun offlineRegionSnapshotDestroyFunction(): MethodHandle =
-    downcall("mln_offline_region_snapshot_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+    downcall("mln_offline_region_snapshot_destroy")
 
   private fun offlineRegionListCountFunction(): MethodHandle =
-    downcall(
-      "mln_offline_region_list_count",
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+    downcall("mln_offline_region_list_count")
 
-  private fun offlineRegionListGetFunction(): MethodHandle =
-    downcall(
-      "mln_offline_region_list_get",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun offlineRegionListGetFunction(): MethodHandle = downcall("mln_offline_region_list_get")
 
   private fun offlineRegionListDestroyFunction(): MethodHandle =
-    downcall("mln_offline_region_list_destroy", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+    downcall("mln_offline_region_list_destroy")
 
-  private fun runtimePollEventFunction(): MethodHandle =
-    downcall(
-      "mln_runtime_poll_event",
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun runtimePollEventFunction(): MethodHandle = downcall("mln_runtime_poll_event")
 
   private fun addTileSourceUrl(
     functionName: String,
@@ -3604,90 +2938,29 @@ internal object NativeAccess {
       outOperationId.get(ValueLayout.JAVA_LONG, 0)
     }
 
-  private fun runtimeOperationStartFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-    )
+  private fun runtimeOperationStartFunction(name: String): MethodHandle = downcall(name)
 
-  private fun runtimeLongOperationStartFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun runtimeLongOperationStartFunction(name: String): MethodHandle = downcall(name)
 
-  private fun runtimeAddressOperationStartFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun runtimeAddressOperationStartFunction(name: String): MethodHandle = downcall(name)
 
   private fun runtimeLongAddressLongOperationStartFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      ),
-    )
+    downcall(name)
 
-  private fun runtimeLongBooleanOperationStartFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.JAVA_BOOLEAN,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun runtimeLongBooleanOperationStartFunction(name: String): MethodHandle = downcall(name)
 
-  private fun runtimeLongIntOperationStartFunction(name: String): MethodHandle =
-    downcall(
-      name,
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-      ),
-    )
+  private fun runtimeLongIntOperationStartFunction(name: String): MethodHandle = downcall(name)
 
   private fun runtimeOptions(options: RuntimeOptions, arena: Arena): MemorySegment {
-    val nativeOptions = arena.allocate(runtimeOptionsLayout)
-    nativeOptions.set(ValueLayout.JAVA_INT, 0, runtimeOptionsLayout.byteSize().toInt())
-    var flags = 0
-    nativeOptions.set(
-      ValueLayout.ADDRESS,
-      RUNTIME_OPTIONS_ASSET_PATH,
-      optionalCString(arena, options.assetPath),
-    )
-    nativeOptions.set(
-      ValueLayout.ADDRESS,
-      RUNTIME_OPTIONS_CACHE_PATH,
-      optionalCString(arena, options.cachePath),
-    )
+    val nativeOptions = MapLibreNativeC.mln_runtime_options_default(arena)
+    var flags = mln_runtime_options.flags(nativeOptions)
+    mln_runtime_options.asset_path(nativeOptions, optionalCString(arena, options.assetPath))
+    mln_runtime_options.cache_path(nativeOptions, optionalCString(arena, options.cachePath))
     options.maximumCacheSize?.let { maximumCacheSize ->
-      flags = flags or RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
-      nativeOptions.set(ValueLayout.JAVA_LONG, RUNTIME_OPTIONS_MAXIMUM_CACHE_SIZE, maximumCacheSize)
+      flags = flags or MapLibreNativeC.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE()
+      mln_runtime_options.maximum_cache_size(nativeOptions, maximumCacheSize)
     }
-    nativeOptions.set(ValueLayout.JAVA_INT, Int.SIZE_BYTES.toLong(), flags)
+    mln_runtime_options.flags(nativeOptions, flags)
     return nativeOptions
   }
 
@@ -3695,7 +2968,9 @@ internal object NativeAccess {
     value?.let { cString(arena, it) } ?: MemorySegment.NULL
 
   private fun cString(arena: Arena, value: String): MemorySegment {
-    require('\u0000' !in value) { "C string inputs must not contain embedded NUL characters" }
+    if ('\u0000' in value) {
+      throw Status.invalidArgument("C string inputs cannot contain embedded NUL characters")
+    }
     return arena.allocateFrom(value)
   }
 
@@ -3788,256 +3063,226 @@ internal object NativeAccess {
     return segment
   }
 
-  private fun viewportOptionsDefault(arena: Arena): MemorySegment {
-    val segment = arena.allocate(VIEWPORT_OPTIONS_SIZE)
-    segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_SIZE_OFFSET, VIEWPORT_OPTIONS_SIZE.toInt())
-    return segment
-  }
+  private fun viewportOptionsDefault(arena: Arena): MemorySegment =
+    MapLibreNativeC.mln_map_viewport_options_default(arena)
 
   private fun viewportOptions(arena: Arena, value: ViewportOptions): MemorySegment {
     val segment = viewportOptionsDefault(arena)
     var fields = 0
     value.northOrientation?.let {
       require(it.isKnown) { "Unknown north orientation cannot be used as input: ${it.nativeValue}" }
-      fields = fields or VIEWPORT_OPTION_NORTH_ORIENTATION
-      segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_NORTH_ORIENTATION_OFFSET, it.nativeValue)
+      fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION()
+      mln_map_viewport_options.north_orientation(segment, it.nativeValue)
     }
     value.constrainMode?.let {
       require(it.isKnown) { "Unknown constrain mode cannot be used as input: ${it.nativeValue}" }
-      fields = fields or VIEWPORT_OPTION_CONSTRAIN_MODE
-      segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_CONSTRAIN_MODE_OFFSET, it.nativeValue)
+      fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE()
+      mln_map_viewport_options.constrain_mode(segment, it.nativeValue)
     }
     value.viewportMode?.let {
       require(it.isKnown) { "Unknown viewport mode cannot be used as input: ${it.nativeValue}" }
-      fields = fields or VIEWPORT_OPTION_VIEWPORT_MODE
-      segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_VIEWPORT_MODE_OFFSET, it.nativeValue)
+      fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE()
+      mln_map_viewport_options.viewport_mode(segment, it.nativeValue)
     }
     value.frustumOffset?.let {
-      fields = fields or VIEWPORT_OPTION_FRUSTUM_OFFSET
-      writeEdgeInsets(segment.asSlice(VIEWPORT_OPTIONS_FRUSTUM_OFFSET_OFFSET, EDGE_INSETS_SIZE), it)
+      fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET()
+      writeEdgeInsets(mln_map_viewport_options.frustum_offset(segment), it)
     }
-    segment.set(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_FIELDS_OFFSET, fields)
+    mln_map_viewport_options.fields(segment, fields)
     return segment
   }
 
   private fun readViewportOptions(segment: MemorySegment): ViewportOptions {
-    val fields = segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_FIELDS_OFFSET)
+    val fields = mln_map_viewport_options.fields(segment)
     return ViewportOptions().apply {
-      if ((fields and VIEWPORT_OPTION_NORTH_ORIENTATION) != 0) {
+      if ((fields and MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION()) != 0) {
         northOrientation =
-          NorthOrientation.fromNative(
-            segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_NORTH_ORIENTATION_OFFSET)
-          )
+          NorthOrientation.fromNative(mln_map_viewport_options.north_orientation(segment))
       }
-      if ((fields and VIEWPORT_OPTION_CONSTRAIN_MODE) != 0) {
-        constrainMode =
-          ConstrainMode.fromNative(
-            segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_CONSTRAIN_MODE_OFFSET)
-          )
+      if ((fields and MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE()) != 0) {
+        constrainMode = ConstrainMode.fromNative(mln_map_viewport_options.constrain_mode(segment))
       }
-      if ((fields and VIEWPORT_OPTION_VIEWPORT_MODE) != 0) {
-        viewportMode =
-          ViewportMode.fromNative(
-            segment.get(ValueLayout.JAVA_INT, VIEWPORT_OPTIONS_VIEWPORT_MODE_OFFSET)
-          )
+      if ((fields and MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE()) != 0) {
+        viewportMode = ViewportMode.fromNative(mln_map_viewport_options.viewport_mode(segment))
       }
-      if ((fields and VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0) {
-        frustumOffset =
-          edgeInsets(segment.asSlice(VIEWPORT_OPTIONS_FRUSTUM_OFFSET_OFFSET, EDGE_INSETS_SIZE))
+      if ((fields and MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET()) != 0) {
+        frustumOffset = edgeInsets(mln_map_viewport_options.frustum_offset(segment))
       }
     }
   }
 
-  private fun tileOptionsDefault(arena: Arena): MemorySegment {
-    val segment = arena.allocate(TILE_OPTIONS_SIZE)
-    segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_SIZE_OFFSET, TILE_OPTIONS_SIZE.toInt())
-    return segment
-  }
+  private fun tileOptionsDefault(arena: Arena): MemorySegment =
+    MapLibreNativeC.mln_map_tile_options_default(arena)
 
   private fun tileOptions(arena: Arena, value: TileOptions): MemorySegment {
     val segment = tileOptionsDefault(arena)
     var fields = 0
     value.prefetchZoomDelta?.let {
-      fields = fields or TILE_OPTION_PREFETCH_ZOOM_DELTA
-      segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_PREFETCH_ZOOM_DELTA_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA()
+      mln_map_tile_options.prefetch_zoom_delta(segment, it)
     }
     value.lodMinRadius?.let {
-      fields = fields or TILE_OPTION_LOD_MIN_RADIUS
-      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_MIN_RADIUS_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS()
+      mln_map_tile_options.lod_min_radius(segment, it)
     }
     value.lodScale?.let {
-      fields = fields or TILE_OPTION_LOD_SCALE
-      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_SCALE_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE()
+      mln_map_tile_options.lod_scale(segment, it)
     }
     value.lodPitchThreshold?.let {
-      fields = fields or TILE_OPTION_LOD_PITCH_THRESHOLD
-      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_PITCH_THRESHOLD_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD()
+      mln_map_tile_options.lod_pitch_threshold(segment, it)
     }
     value.lodZoomShift?.let {
-      fields = fields or TILE_OPTION_LOD_ZOOM_SHIFT
-      segment.set(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_ZOOM_SHIFT_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT()
+      mln_map_tile_options.lod_zoom_shift(segment, it)
     }
     value.lodMode?.let {
       require(it.isKnown) { "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}" }
-      fields = fields or TILE_OPTION_LOD_MODE
-      segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_LOD_MODE_OFFSET, it.nativeValue)
+      fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE()
+      mln_map_tile_options.lod_mode(segment, it.nativeValue)
     }
-    segment.set(ValueLayout.JAVA_INT, TILE_OPTIONS_FIELDS_OFFSET, fields)
+    mln_map_tile_options.fields(segment, fields)
     return segment
   }
 
   private fun readTileOptions(segment: MemorySegment): TileOptions {
-    val fields = segment.get(ValueLayout.JAVA_INT, TILE_OPTIONS_FIELDS_OFFSET)
+    val fields = mln_map_tile_options.fields(segment)
     return TileOptions().apply {
-      if ((fields and TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0) {
-        prefetchZoomDelta =
-          segment.get(ValueLayout.JAVA_INT, TILE_OPTIONS_PREFETCH_ZOOM_DELTA_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA()) != 0) {
+        prefetchZoomDelta = mln_map_tile_options.prefetch_zoom_delta(segment)
       }
-      if ((fields and TILE_OPTION_LOD_MIN_RADIUS) != 0) {
-        lodMinRadius = segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_MIN_RADIUS_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS()) != 0) {
+        lodMinRadius = mln_map_tile_options.lod_min_radius(segment)
       }
-      if ((fields and TILE_OPTION_LOD_SCALE) != 0) {
-        lodScale = segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_SCALE_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE()) != 0) {
+        lodScale = mln_map_tile_options.lod_scale(segment)
       }
-      if ((fields and TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) {
-        lodPitchThreshold =
-          segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_PITCH_THRESHOLD_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD()) != 0) {
+        lodPitchThreshold = mln_map_tile_options.lod_pitch_threshold(segment)
       }
-      if ((fields and TILE_OPTION_LOD_ZOOM_SHIFT) != 0) {
-        lodZoomShift = segment.get(ValueLayout.JAVA_DOUBLE, TILE_OPTIONS_LOD_ZOOM_SHIFT_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT()) != 0) {
+        lodZoomShift = mln_map_tile_options.lod_zoom_shift(segment)
       }
-      if ((fields and TILE_OPTION_LOD_MODE) != 0) {
-        lodMode =
-          TileLodMode.fromNative(segment.get(ValueLayout.JAVA_INT, TILE_OPTIONS_LOD_MODE_OFFSET))
+      if ((fields and MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE()) != 0) {
+        lodMode = TileLodMode.fromNative(mln_map_tile_options.lod_mode(segment))
       }
     }
   }
 
-  private fun projectionModeDefault(arena: Arena): MemorySegment {
-    val segment = arena.allocate(PROJECTION_MODE_SIZE)
-    segment.set(ValueLayout.JAVA_INT, PROJECTION_MODE_SIZE_OFFSET, PROJECTION_MODE_SIZE.toInt())
-    return segment
-  }
+  private fun projectionModeDefault(arena: Arena): MemorySegment =
+    MapLibreNativeC.mln_projection_mode_default(arena)
 
   private fun projectionModeOptions(arena: Arena, value: ProjectionModeOptions): MemorySegment {
     val segment = projectionModeDefault(arena)
     var fields = 0
     value.axonometric?.let {
-      fields = fields or PROJECTION_MODE_AXONOMETRIC
-      segment.set(ValueLayout.JAVA_BOOLEAN, PROJECTION_MODE_AXONOMETRIC_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC()
+      mln_projection_mode.axonometric(segment, it)
     }
     value.xSkew?.let {
-      fields = fields or PROJECTION_MODE_X_SKEW
-      segment.set(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_X_SKEW_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_PROJECTION_MODE_X_SKEW()
+      mln_projection_mode.x_skew(segment, it)
     }
     value.ySkew?.let {
-      fields = fields or PROJECTION_MODE_Y_SKEW
-      segment.set(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_Y_SKEW_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_PROJECTION_MODE_Y_SKEW()
+      mln_projection_mode.y_skew(segment, it)
     }
-    segment.set(ValueLayout.JAVA_INT, PROJECTION_MODE_FIELDS_OFFSET, fields)
+    mln_projection_mode.fields(segment, fields)
     return segment
   }
 
   private fun projectionModeOptions(segment: MemorySegment): ProjectionModeOptions {
-    val fields = segment.get(ValueLayout.JAVA_INT, PROJECTION_MODE_FIELDS_OFFSET)
+    val fields = mln_projection_mode.fields(segment)
     return ProjectionModeOptions().apply {
-      if ((fields and PROJECTION_MODE_AXONOMETRIC) != 0) {
-        axonometric = segment.get(ValueLayout.JAVA_BOOLEAN, PROJECTION_MODE_AXONOMETRIC_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC()) != 0) {
+        axonometric = mln_projection_mode.axonometric(segment)
       }
-      if ((fields and PROJECTION_MODE_X_SKEW) != 0) {
-        xSkew = segment.get(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_X_SKEW_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_PROJECTION_MODE_X_SKEW()) != 0) {
+        xSkew = mln_projection_mode.x_skew(segment)
       }
-      if ((fields and PROJECTION_MODE_Y_SKEW) != 0) {
-        ySkew = segment.get(ValueLayout.JAVA_DOUBLE, PROJECTION_MODE_Y_SKEW_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_PROJECTION_MODE_Y_SKEW()) != 0) {
+        ySkew = mln_projection_mode.y_skew(segment)
       }
     }
   }
 
-  private fun cameraOptionsDefault(arena: Arena): MemorySegment {
-    val segment = arena.allocate(CAMERA_OPTIONS_SIZE)
-    segment.set(ValueLayout.JAVA_INT, CAMERA_OPTIONS_SIZE_OFFSET, CAMERA_OPTIONS_SIZE.toInt())
-    return segment
-  }
+  private fun cameraOptionsDefault(arena: Arena): MemorySegment =
+    MapLibreNativeC.mln_camera_options_default(arena)
 
   private fun cameraOptions(arena: Arena, value: CameraOptions): MemorySegment {
     val segment = cameraOptionsDefault(arena)
     var fields = 0
     value.center?.let {
-      fields = fields or CAMERA_OPTION_CENTER
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LATITUDE_OFFSET, it.latitude)
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LONGITUDE_OFFSET, it.longitude)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_CENTER()
+      mln_camera_options.latitude(segment, it.latitude)
+      mln_camera_options.longitude(segment, it.longitude)
     }
     value.centerAltitude?.let {
-      fields = fields or CAMERA_OPTION_CENTER_ALTITUDE
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_CENTER_ALTITUDE_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE()
+      mln_camera_options.center_altitude(segment, it)
     }
     value.padding?.let {
-      fields = fields or CAMERA_OPTION_PADDING
-      writeEdgeInsets(segment.asSlice(CAMERA_OPTIONS_PADDING_OFFSET, EDGE_INSETS_SIZE), it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_PADDING()
+      writeEdgeInsets(mln_camera_options.padding(segment), it)
     }
     value.anchor?.let {
-      fields = fields or CAMERA_OPTION_ANCHOR
-      segment
-        .asSlice(CAMERA_OPTIONS_ANCHOR_OFFSET, SCREEN_POINT_SIZE)
-        .copyFrom(screenPoint(it, arena))
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_ANCHOR()
+      mln_camera_options.anchor(segment).copyFrom(screenPoint(it, arena))
     }
     value.zoom?.let {
-      fields = fields or CAMERA_OPTION_ZOOM
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ZOOM_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_ZOOM()
+      mln_camera_options.zoom(segment, it)
     }
     value.bearing?.let {
-      fields = fields or CAMERA_OPTION_BEARING
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_BEARING_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_BEARING()
+      mln_camera_options.bearing(segment, it)
     }
     value.pitch?.let {
-      fields = fields or CAMERA_OPTION_PITCH
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_PITCH_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_PITCH()
+      mln_camera_options.pitch(segment, it)
     }
     value.roll?.let {
-      fields = fields or CAMERA_OPTION_ROLL
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ROLL_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_ROLL()
+      mln_camera_options.roll(segment, it)
     }
     value.fieldOfView?.let {
-      fields = fields or CAMERA_OPTION_FOV
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_FOV_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_OPTION_FOV()
+      mln_camera_options.field_of_view(segment, it)
     }
-    segment.set(ValueLayout.JAVA_INT, CAMERA_OPTIONS_FIELDS_OFFSET, fields)
+    mln_camera_options.fields(segment, fields)
     return segment
   }
 
   private fun cameraOptions(segment: MemorySegment): CameraOptions {
-    val fields = segment.get(ValueLayout.JAVA_INT, CAMERA_OPTIONS_FIELDS_OFFSET)
+    val fields = mln_camera_options.fields(segment)
     return CameraOptions().apply {
-      if ((fields and CAMERA_OPTION_CENTER) != 0) {
-        center =
-          LatLng(
-            segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LATITUDE_OFFSET),
-            segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_LONGITUDE_OFFSET),
-          )
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_CENTER()) != 0) {
+        center = LatLng(mln_camera_options.latitude(segment), mln_camera_options.longitude(segment))
       }
-      if ((fields and CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
-        centerAltitude = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_CENTER_ALTITUDE_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE()) != 0) {
+        centerAltitude = mln_camera_options.center_altitude(segment)
       }
-      if ((fields and CAMERA_OPTION_PADDING) != 0) {
-        padding = edgeInsets(segment.asSlice(CAMERA_OPTIONS_PADDING_OFFSET, EDGE_INSETS_SIZE))
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_PADDING()) != 0) {
+        padding = edgeInsets(mln_camera_options.padding(segment))
       }
-      if ((fields and CAMERA_OPTION_ANCHOR) != 0) {
-        anchor = screenPoint(segment.asSlice(CAMERA_OPTIONS_ANCHOR_OFFSET, SCREEN_POINT_SIZE))
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_ANCHOR()) != 0) {
+        anchor = screenPoint(mln_camera_options.anchor(segment))
       }
-      if ((fields and CAMERA_OPTION_ZOOM) != 0) {
-        zoom = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ZOOM_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_ZOOM()) != 0) {
+        zoom = mln_camera_options.zoom(segment)
       }
-      if ((fields and CAMERA_OPTION_BEARING) != 0) {
-        bearing = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_BEARING_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_BEARING()) != 0) {
+        bearing = mln_camera_options.bearing(segment)
       }
-      if ((fields and CAMERA_OPTION_PITCH) != 0) {
-        pitch = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_PITCH_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_PITCH()) != 0) {
+        pitch = mln_camera_options.pitch(segment)
       }
-      if ((fields and CAMERA_OPTION_ROLL) != 0) {
-        roll = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_ROLL_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_ROLL()) != 0) {
+        roll = mln_camera_options.roll(segment)
       }
-      if ((fields and CAMERA_OPTION_FOV) != 0) {
-        fieldOfView = segment.get(ValueLayout.JAVA_DOUBLE, CAMERA_OPTIONS_FOV_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_CAMERA_OPTION_FOV()) != 0) {
+        fieldOfView = mln_camera_options.field_of_view(segment)
       }
     }
   }
@@ -4046,28 +3291,25 @@ internal object NativeAccess {
     if (value == null) {
       return MemorySegment.NULL
     }
-    val segment = arena.allocate(ANIMATION_OPTIONS_SIZE)
+    val segment = MapLibreNativeC.mln_animation_options_default(arena)
     var fields = 0
-    segment.set(ValueLayout.JAVA_INT, ANIMATION_OPTIONS_SIZE_OFFSET, ANIMATION_OPTIONS_SIZE.toInt())
     value.durationMs?.let {
-      fields = fields or ANIMATION_OPTION_DURATION
-      segment.set(ValueLayout.JAVA_DOUBLE, ANIMATION_OPTIONS_DURATION_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_ANIMATION_OPTION_DURATION()
+      mln_animation_options.duration_ms(segment, it)
     }
     value.velocity?.let {
-      fields = fields or ANIMATION_OPTION_VELOCITY
-      segment.set(ValueLayout.JAVA_DOUBLE, ANIMATION_OPTIONS_VELOCITY_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_ANIMATION_OPTION_VELOCITY()
+      mln_animation_options.velocity(segment, it)
     }
     value.minZoom?.let {
-      fields = fields or ANIMATION_OPTION_MIN_ZOOM
-      segment.set(ValueLayout.JAVA_DOUBLE, ANIMATION_OPTIONS_MIN_ZOOM_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_ANIMATION_OPTION_MIN_ZOOM()
+      mln_animation_options.min_zoom(segment, it)
     }
     value.easing?.let {
-      fields = fields or ANIMATION_OPTION_EASING
-      segment
-        .asSlice(ANIMATION_OPTIONS_EASING_OFFSET, UNIT_BEZIER_SIZE)
-        .copyFrom(unitBezier(it, arena))
+      fields = fields or MapLibreNativeC.MLN_ANIMATION_OPTION_EASING()
+      mln_animation_options.easing(segment).copyFrom(unitBezier(it, arena))
     }
-    segment.set(ValueLayout.JAVA_INT, ANIMATION_OPTIONS_FIELDS_OFFSET, fields)
+    mln_animation_options.fields(segment, fields)
     return segment
   }
 
@@ -4075,26 +3317,21 @@ internal object NativeAccess {
     if (value == null) {
       return MemorySegment.NULL
     }
-    val segment = arena.allocate(CAMERA_FIT_OPTIONS_SIZE)
+    val segment = MapLibreNativeC.mln_camera_fit_options_default(arena)
     var fields = 0
-    segment.set(
-      ValueLayout.JAVA_INT,
-      CAMERA_FIT_OPTIONS_SIZE_OFFSET,
-      CAMERA_FIT_OPTIONS_SIZE.toInt(),
-    )
     value.padding?.let {
-      fields = fields or CAMERA_FIT_OPTION_PADDING
-      writeEdgeInsets(segment.asSlice(CAMERA_FIT_OPTIONS_PADDING_OFFSET, EDGE_INSETS_SIZE), it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_FIT_OPTION_PADDING()
+      writeEdgeInsets(mln_camera_fit_options.padding(segment), it)
     }
     value.bearing?.let {
-      fields = fields or CAMERA_FIT_OPTION_BEARING
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_FIT_OPTIONS_BEARING_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_FIT_OPTION_BEARING()
+      mln_camera_fit_options.bearing(segment, it)
     }
     value.pitch?.let {
-      fields = fields or CAMERA_FIT_OPTION_PITCH
-      segment.set(ValueLayout.JAVA_DOUBLE, CAMERA_FIT_OPTIONS_PITCH_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_CAMERA_FIT_OPTION_PITCH()
+      mln_camera_fit_options.pitch(segment, it)
     }
-    segment.set(ValueLayout.JAVA_INT, CAMERA_FIT_OPTIONS_FIELDS_OFFSET, fields)
+    mln_camera_fit_options.fields(segment, fields)
     return segment
   }
 
@@ -4130,98 +3367,83 @@ internal object NativeAccess {
       latLngBounds(outBounds)
     }
 
-  private fun boundOptionsDefault(arena: Arena): MemorySegment {
-    val segment = arena.allocate(BOUND_OPTIONS_SIZE)
-    segment.set(ValueLayout.JAVA_INT, BOUND_OPTIONS_SIZE_OFFSET, BOUND_OPTIONS_SIZE.toInt())
-    return segment
-  }
+  private fun boundOptionsDefault(arena: Arena): MemorySegment =
+    MapLibreNativeC.mln_bound_options_default(arena)
 
   private fun boundOptions(arena: Arena, value: BoundOptions): MemorySegment {
     val segment = boundOptionsDefault(arena)
     var fields = 0
     value.bounds?.let {
-      fields = fields or BOUND_OPTION_BOUNDS
-      segment
-        .asSlice(BOUND_OPTIONS_BOUNDS_OFFSET, LAT_LNG_BOUNDS_SIZE)
-        .copyFrom(latLngBounds(arena, it))
+      fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_BOUNDS()
+      mln_bound_options.bounds(segment).copyFrom(latLngBounds(arena, it))
     }
     value.minZoom?.let {
-      fields = fields or BOUND_OPTION_MIN_ZOOM
-      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_ZOOM_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM()
+      mln_bound_options.min_zoom(segment, it)
     }
     value.maxZoom?.let {
-      fields = fields or BOUND_OPTION_MAX_ZOOM
-      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_ZOOM_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM()
+      mln_bound_options.max_zoom(segment, it)
     }
     value.minPitch?.let {
-      fields = fields or BOUND_OPTION_MIN_PITCH
-      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_PITCH_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_MIN_PITCH()
+      mln_bound_options.min_pitch(segment, it)
     }
     value.maxPitch?.let {
-      fields = fields or BOUND_OPTION_MAX_PITCH
-      segment.set(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_PITCH_OFFSET, it)
+      fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_MAX_PITCH()
+      mln_bound_options.max_pitch(segment, it)
     }
-    segment.set(ValueLayout.JAVA_INT, BOUND_OPTIONS_FIELDS_OFFSET, fields)
+    mln_bound_options.fields(segment, fields)
     return segment
   }
 
   private fun boundOptions(segment: MemorySegment): BoundOptions {
-    val fields = segment.get(ValueLayout.JAVA_INT, BOUND_OPTIONS_FIELDS_OFFSET)
+    val fields = mln_bound_options.fields(segment)
     return BoundOptions().apply {
-      if ((fields and BOUND_OPTION_BOUNDS) != 0) {
-        bounds = latLngBounds(segment.asSlice(BOUND_OPTIONS_BOUNDS_OFFSET, LAT_LNG_BOUNDS_SIZE))
+      if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_BOUNDS()) != 0) {
+        bounds = latLngBounds(mln_bound_options.bounds(segment))
       }
-      if ((fields and BOUND_OPTION_MIN_ZOOM) != 0) {
-        minZoom = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_ZOOM_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM()) != 0) {
+        minZoom = mln_bound_options.min_zoom(segment)
       }
-      if ((fields and BOUND_OPTION_MAX_ZOOM) != 0) {
-        maxZoom = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_ZOOM_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM()) != 0) {
+        maxZoom = mln_bound_options.max_zoom(segment)
       }
-      if ((fields and BOUND_OPTION_MIN_PITCH) != 0) {
-        minPitch = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MIN_PITCH_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_MIN_PITCH()) != 0) {
+        minPitch = mln_bound_options.min_pitch(segment)
       }
-      if ((fields and BOUND_OPTION_MAX_PITCH) != 0) {
-        maxPitch = segment.get(ValueLayout.JAVA_DOUBLE, BOUND_OPTIONS_MAX_PITCH_OFFSET)
+      if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_MAX_PITCH()) != 0) {
+        maxPitch = mln_bound_options.max_pitch(segment)
       }
     }
   }
 
-  private fun freeCameraOptionsDefault(arena: Arena): MemorySegment {
-    val segment = arena.allocate(FREE_CAMERA_OPTIONS_SIZE)
-    segment.set(
-      ValueLayout.JAVA_INT,
-      FREE_CAMERA_OPTIONS_SIZE_OFFSET,
-      FREE_CAMERA_OPTIONS_SIZE.toInt(),
-    )
-    return segment
-  }
+  private fun freeCameraOptionsDefault(arena: Arena): MemorySegment =
+    MapLibreNativeC.mln_free_camera_options_default(arena)
 
   private fun freeCameraOptions(arena: Arena, value: FreeCameraOptions): MemorySegment {
     val segment = freeCameraOptionsDefault(arena)
     var fields = 0
     value.position?.let {
-      fields = fields or FREE_CAMERA_OPTION_POSITION
-      segment.asSlice(FREE_CAMERA_OPTIONS_POSITION_OFFSET, VEC3_SIZE).copyFrom(vec3(it, arena))
+      fields = fields or MapLibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION()
+      mln_free_camera_options.position(segment).copyFrom(vec3(it, arena))
     }
     value.orientation?.let {
-      fields = fields or FREE_CAMERA_OPTION_ORIENTATION
-      segment
-        .asSlice(FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET, QUATERNION_SIZE)
-        .copyFrom(quaternion(it, arena))
+      fields = fields or MapLibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION()
+      mln_free_camera_options.orientation(segment).copyFrom(quaternion(it, arena))
     }
-    segment.set(ValueLayout.JAVA_INT, FREE_CAMERA_OPTIONS_FIELDS_OFFSET, fields)
+    mln_free_camera_options.fields(segment, fields)
     return segment
   }
 
   private fun readFreeCameraOptions(segment: MemorySegment): FreeCameraOptions {
-    val fields = segment.get(ValueLayout.JAVA_INT, FREE_CAMERA_OPTIONS_FIELDS_OFFSET)
+    val fields = mln_free_camera_options.fields(segment)
     return FreeCameraOptions().apply {
-      if ((fields and FREE_CAMERA_OPTION_POSITION) != 0) {
-        position = vec3(segment.asSlice(FREE_CAMERA_OPTIONS_POSITION_OFFSET, VEC3_SIZE))
+      if ((fields and MapLibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION()) != 0) {
+        position = vec3(mln_free_camera_options.position(segment))
       }
-      if ((fields and FREE_CAMERA_OPTION_ORIENTATION) != 0) {
-        orientation =
-          quaternion(segment.asSlice(FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET, QUATERNION_SIZE))
+      if ((fields and MapLibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION()) != 0) {
+        orientation = quaternion(mln_free_camera_options.orientation(segment))
       }
     }
   }
@@ -4610,25 +3832,12 @@ internal object NativeAccess {
 
   private fun premultipliedRgba8Image(arena: Arena, value: PremultipliedRgba8Image): MemorySegment {
     val pixels = value.pixels
-    val segment = arena.allocate(PREMULTIPLIED_RGBA8_IMAGE_SIZE)
-    segment.set(
-      ValueLayout.JAVA_INT,
-      PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET,
-      PREMULTIPLIED_RGBA8_IMAGE_SIZE.toInt(),
-    )
-    segment.set(ValueLayout.JAVA_INT, PREMULTIPLIED_RGBA8_IMAGE_WIDTH_OFFSET, value.width)
-    segment.set(ValueLayout.JAVA_INT, PREMULTIPLIED_RGBA8_IMAGE_HEIGHT_OFFSET, value.height)
-    segment.set(ValueLayout.JAVA_INT, PREMULTIPLIED_RGBA8_IMAGE_STRIDE_OFFSET, value.stride)
-    segment.set(
-      ValueLayout.ADDRESS,
-      PREMULTIPLIED_RGBA8_IMAGE_PIXELS_OFFSET,
-      nativeBytes(arena, pixels),
-    )
-    segment.set(
-      ValueLayout.JAVA_LONG,
-      PREMULTIPLIED_RGBA8_IMAGE_BYTE_LENGTH_OFFSET,
-      pixels.size.toLong(),
-    )
+    val segment = MapLibreNativeC.mln_premultiplied_rgba8_image_default(arena)
+    mln_premultiplied_rgba8_image.width(segment, value.width)
+    mln_premultiplied_rgba8_image.height(segment, value.height)
+    mln_premultiplied_rgba8_image.stride(segment, value.stride)
+    mln_premultiplied_rgba8_image.pixels(segment, nativeBytes(arena, pixels))
+    mln_premultiplied_rgba8_image.byte_length(segment, pixels.size.toLong())
     return segment
   }
 
@@ -5126,8 +4335,10 @@ internal object NativeAccess {
   private fun resourceResponse(response: ResourceResponse, arena: Arena): MemorySegment {
     val segment = arena.allocate(RESOURCE_RESPONSE_SIZE)
     val bytes = response.bytes
-    require(response.errorReason.isKnown) {
-      "Unknown resource error reason cannot be used as input: ${response.errorReason.nativeValue}"
+    if (!response.errorReason.isKnown) {
+      throw Status.invalidArgument(
+        "Unknown resource error reason cannot be used as input: ${response.errorReason.nativeValue}"
+      )
     }
     segment.set(ValueLayout.JAVA_INT, RESOURCE_RESPONSE_SIZE_OFFSET, RESOURCE_RESPONSE_SIZE.toInt())
     segment.set(ValueLayout.JAVA_INT, RESOURCE_RESPONSE_STATUS_OFFSET, response.status.nativeValue)
@@ -5143,7 +4354,7 @@ internal object NativeAccess {
     segment.set(
       ValueLayout.ADDRESS,
       RESOURCE_RESPONSE_ERROR_MESSAGE_OFFSET,
-      optionalCString(arena, response.errorMessage),
+      resourceResponseCString(arena, response.errorMessage, "error message"),
     )
     segment.set(
       ValueLayout.JAVA_BOOLEAN,
@@ -5161,7 +4372,7 @@ internal object NativeAccess {
     segment.set(
       ValueLayout.ADDRESS,
       RESOURCE_RESPONSE_ETAG_OFFSET,
-      optionalCString(arena, response.etag),
+      resourceResponseCString(arena, response.etag, "ETag"),
     )
     response.retryAfterUnixMs?.let {
       segment.set(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET, true)
@@ -5172,6 +4383,18 @@ internal object NativeAccess {
 
   private fun optionalCString(address: MemorySegment): String? =
     if (address == MemorySegment.NULL) null else copyCString(address)
+
+  private fun resourceResponseCString(
+    arena: Arena,
+    value: String?,
+    description: String,
+  ): MemorySegment {
+    value ?: return MemorySegment.NULL
+    if ('\u0000' in value) {
+      throw Status.invalidArgument("$description contains embedded NUL")
+    }
+    return cString(arena, value)
+  }
 
   private fun copyCString(address: MemorySegment): String {
     if (address == MemorySegment.NULL) {
@@ -5185,26 +4408,19 @@ internal object NativeAccess {
   }
 
   private fun mapOptions(options: MapOptions, arena: Arena): MemorySegment {
-    val segment = arena.allocate(MAP_OPTIONS_SIZE)
-    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_SIZE_OFFSET, MAP_OPTIONS_SIZE.toInt())
-    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_WIDTH_OFFSET, DEFAULT_MAP_WIDTH)
-    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_HEIGHT_OFFSET, DEFAULT_MAP_HEIGHT)
-    segment.set(ValueLayout.JAVA_DOUBLE, MAP_OPTIONS_SCALE_FACTOR_OFFSET, DEFAULT_SCALE_FACTOR)
-    segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_MAP_MODE_OFFSET, MapMode.CONTINUOUS.nativeValue)
+    val segment = MapLibreNativeC.mln_map_options_default(arena)
     options.width?.let {
       require(it >= 0) { "width must be non-negative" }
-      segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_WIDTH_OFFSET, it)
+      mln_map_options.width(segment, it)
     }
     options.height?.let {
       require(it >= 0) { "height must be non-negative" }
-      segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_HEIGHT_OFFSET, it)
+      mln_map_options.height(segment, it)
     }
-    options.scaleFactor?.let {
-      segment.set(ValueLayout.JAVA_DOUBLE, MAP_OPTIONS_SCALE_FACTOR_OFFSET, it)
-    }
+    options.scaleFactor?.let { mln_map_options.scale_factor(segment, it) }
     options.mapMode?.let {
       require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
-      segment.set(ValueLayout.JAVA_INT, MAP_OPTIONS_MAP_MODE_OFFSET, it.nativeValue)
+      mln_map_options.map_mode(segment, it.nativeValue)
     }
     return segment
   }
@@ -5726,10 +4942,8 @@ internal object NativeAccess {
       payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET),
     )
 
-  private fun downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
-    val symbol = SymbolLookup.loaderLookup().find(name).orElseThrow { NoSuchElementException(name) }
-    return Linker.nativeLinker().downcallHandle(symbol, descriptor)
-  }
+  private fun downcall(name: String): MethodHandle =
+    MapLibreNativeC::class.java.getMethod("${name}\$handle").invoke(null) as MethodHandle
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
     IllegalStateException(
@@ -5745,177 +4959,57 @@ internal object NativeAccess {
     return missing
   }
 
-  private val latLngLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("latitude"),
-      ValueLayout.JAVA_DOUBLE.withName("longitude"),
-    )
+  private fun deepestCause(error: Throwable): Throwable {
+    var current = error
+    while (current.cause != null) {
+      current = current.cause!!
+    }
+    return current
+  }
 
-  private val projectedMetersLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("northing"),
-      ValueLayout.JAVA_DOUBLE.withName("easting"),
-    )
+  private val latLngLayout = mln_lat_lng.layout()
+  private val projectedMetersLayout = mln_projected_meters.layout()
+  private val screenPointLayout = mln_screen_point.layout()
+  private val edgeInsetsLayout = mln_edge_insets.layout()
+  private val latLngBoundsLayout = mln_lat_lng_bounds.layout()
+  private val canonicalTileIdLayout = mln_canonical_tile_id.layout()
+  private val unitBezierLayout = mln_unit_bezier.layout()
+  private val vec3Layout = mln_vec3.layout()
+  private val quaternionLayout = mln_quaternion.layout()
+  private val stringViewLayout = mln_string_view.layout()
 
-  private val screenPointLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("x"),
-      ValueLayout.JAVA_DOUBLE.withName("y"),
-    )
+  private val STRING_VIEW_SIZE: Long = mln_string_view.sizeof()
+  private val STRING_VIEW_DATA_OFFSET: Long = mln_string_view.`data$offset`()
+  private val STRING_VIEW_SIZE_OFFSET: Long = mln_string_view.`size$offset`()
 
-  private val edgeInsetsLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("top"),
-      ValueLayout.JAVA_DOUBLE.withName("left"),
-      ValueLayout.JAVA_DOUBLE.withName("bottom"),
-      ValueLayout.JAVA_DOUBLE.withName("right"),
-    )
+  private val SCREEN_POINT_SIZE: Long = mln_screen_point.sizeof()
+  private val SCREEN_BOX_SIZE: Long = mln_screen_box.sizeof()
+  private val SCREEN_BOX_MIN_OFFSET: Long = mln_screen_box.`min$offset`()
+  private val SCREEN_BOX_MAX_OFFSET: Long = mln_screen_box.`max$offset`()
 
-  private val latLngBoundsLayout =
-    MemoryLayout.structLayout(
-      latLngLayout.withName("southwest"),
-      latLngLayout.withName("northeast"),
-    )
+  private val SCREEN_LINE_STRING_SIZE: Long = mln_screen_line_string.sizeof()
+  private val SCREEN_LINE_STRING_POINTS_OFFSET: Long = mln_screen_line_string.`points$offset`()
+  private val SCREEN_LINE_STRING_POINT_COUNT_OFFSET: Long =
+    mln_screen_line_string.`point_count$offset`()
 
-  private val canonicalTileIdLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_INT.withName("z"),
-      ValueLayout.JAVA_INT.withName("x"),
-      ValueLayout.JAVA_INT.withName("y"),
-    )
+  private val UNIT_BEZIER_SIZE: Long = mln_unit_bezier.sizeof()
+  private val UNIT_BEZIER_X1_OFFSET: Long = mln_unit_bezier.`x1$offset`()
+  private val UNIT_BEZIER_Y1_OFFSET: Long = mln_unit_bezier.`y1$offset`()
+  private val UNIT_BEZIER_X2_OFFSET: Long = mln_unit_bezier.`x2$offset`()
+  private val UNIT_BEZIER_Y2_OFFSET: Long = mln_unit_bezier.`y2$offset`()
 
-  private val unitBezierLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("x1"),
-      ValueLayout.JAVA_DOUBLE.withName("y1"),
-      ValueLayout.JAVA_DOUBLE.withName("x2"),
-      ValueLayout.JAVA_DOUBLE.withName("y2"),
-    )
+  private val VEC3_SIZE: Long = mln_vec3.sizeof()
+  private val VEC3_X_OFFSET: Long = mln_vec3.`x$offset`()
+  private val VEC3_Y_OFFSET: Long = mln_vec3.`y$offset`()
+  private val VEC3_Z_OFFSET: Long = mln_vec3.`z$offset`()
 
-  private val vec3Layout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("x"),
-      ValueLayout.JAVA_DOUBLE.withName("y"),
-      ValueLayout.JAVA_DOUBLE.withName("z"),
-    )
+  private val QUATERNION_SIZE: Long = mln_quaternion.sizeof()
+  private val QUATERNION_X_OFFSET: Long = mln_quaternion.`x$offset`()
+  private val QUATERNION_Y_OFFSET: Long = mln_quaternion.`y$offset`()
+  private val QUATERNION_Z_OFFSET: Long = mln_quaternion.`z$offset`()
+  private val QUATERNION_W_OFFSET: Long = mln_quaternion.`w$offset`()
 
-  private val quaternionLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_DOUBLE.withName("x"),
-      ValueLayout.JAVA_DOUBLE.withName("y"),
-      ValueLayout.JAVA_DOUBLE.withName("z"),
-      ValueLayout.JAVA_DOUBLE.withName("w"),
-    )
-
-  private val stringViewLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.ADDRESS.withName("data"),
-      ValueLayout.JAVA_LONG.withName("size"),
-    )
-
-  private const val STRING_VIEW_SIZE: Long = 16
-  private const val STRING_VIEW_DATA_OFFSET: Long = 0
-  private const val STRING_VIEW_SIZE_OFFSET: Long = 8
-
-  private const val SCREEN_POINT_SIZE: Long = 16
-  private const val SCREEN_BOX_SIZE: Long = 32
-  private const val SCREEN_BOX_MIN_OFFSET: Long = 0
-  private const val SCREEN_BOX_MAX_OFFSET: Long = 16
-
-  private const val SCREEN_LINE_STRING_SIZE: Long = 16
-  private const val SCREEN_LINE_STRING_POINTS_OFFSET: Long = 0
-  private const val SCREEN_LINE_STRING_POINT_COUNT_OFFSET: Long = 8
-
-  private const val UNIT_BEZIER_SIZE: Long = 32
-  private const val UNIT_BEZIER_X1_OFFSET: Long = 0
-  private const val UNIT_BEZIER_Y1_OFFSET: Long = 8
-  private const val UNIT_BEZIER_X2_OFFSET: Long = 16
-  private const val UNIT_BEZIER_Y2_OFFSET: Long = 24
-
-  private const val VEC3_SIZE: Long = 24
-  private const val VEC3_X_OFFSET: Long = 0
-  private const val VEC3_Y_OFFSET: Long = 8
-  private const val VEC3_Z_OFFSET: Long = 16
-
-  private const val QUATERNION_SIZE: Long = 32
-  private const val QUATERNION_X_OFFSET: Long = 0
-  private const val QUATERNION_Y_OFFSET: Long = 8
-  private const val QUATERNION_Z_OFFSET: Long = 16
-  private const val QUATERNION_W_OFFSET: Long = 24
-
-  private const val LAT_LNG_BOUNDS_SIZE: Long = 32
-
-  private const val CAMERA_OPTION_CENTER: Int = 1 shl 0
-  private const val CAMERA_OPTION_ZOOM: Int = 1 shl 1
-  private const val CAMERA_OPTION_BEARING: Int = 1 shl 2
-  private const val CAMERA_OPTION_PITCH: Int = 1 shl 3
-  private const val CAMERA_OPTION_CENTER_ALTITUDE: Int = 1 shl 4
-  private const val CAMERA_OPTION_PADDING: Int = 1 shl 5
-  private const val CAMERA_OPTION_ANCHOR: Int = 1 shl 6
-  private const val CAMERA_OPTION_ROLL: Int = 1 shl 7
-  private const val CAMERA_OPTION_FOV: Int = 1 shl 8
-
-  private const val CAMERA_OPTIONS_SIZE: Long = 120
-  private const val CAMERA_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val CAMERA_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val CAMERA_OPTIONS_LATITUDE_OFFSET: Long = 8
-  private const val CAMERA_OPTIONS_LONGITUDE_OFFSET: Long = 16
-  private const val CAMERA_OPTIONS_CENTER_ALTITUDE_OFFSET: Long = 24
-  private const val CAMERA_OPTIONS_PADDING_OFFSET: Long = 32
-  private const val CAMERA_OPTIONS_ANCHOR_OFFSET: Long = 64
-  private const val CAMERA_OPTIONS_ZOOM_OFFSET: Long = 80
-  private const val CAMERA_OPTIONS_BEARING_OFFSET: Long = 88
-  private const val CAMERA_OPTIONS_PITCH_OFFSET: Long = 96
-  private const val CAMERA_OPTIONS_ROLL_OFFSET: Long = 104
-  private const val CAMERA_OPTIONS_FOV_OFFSET: Long = 112
-
-  private const val ANIMATION_OPTION_DURATION: Int = 1 shl 0
-  private const val ANIMATION_OPTION_VELOCITY: Int = 1 shl 1
-  private const val ANIMATION_OPTION_MIN_ZOOM: Int = 1 shl 2
-  private const val ANIMATION_OPTION_EASING: Int = 1 shl 3
-
-  private const val ANIMATION_OPTIONS_SIZE: Long = 64
-  private const val ANIMATION_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val ANIMATION_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val ANIMATION_OPTIONS_DURATION_OFFSET: Long = 8
-  private const val ANIMATION_OPTIONS_VELOCITY_OFFSET: Long = 16
-  private const val ANIMATION_OPTIONS_MIN_ZOOM_OFFSET: Long = 24
-  private const val ANIMATION_OPTIONS_EASING_OFFSET: Long = 32
-
-  private const val CAMERA_FIT_OPTION_PADDING: Int = 1 shl 0
-  private const val CAMERA_FIT_OPTION_BEARING: Int = 1 shl 1
-  private const val CAMERA_FIT_OPTION_PITCH: Int = 1 shl 2
-
-  private const val CAMERA_FIT_OPTIONS_SIZE: Long = 56
-  private const val CAMERA_FIT_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val CAMERA_FIT_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val CAMERA_FIT_OPTIONS_PADDING_OFFSET: Long = 8
-  private const val CAMERA_FIT_OPTIONS_BEARING_OFFSET: Long = 40
-  private const val CAMERA_FIT_OPTIONS_PITCH_OFFSET: Long = 48
-
-  private const val BOUND_OPTION_BOUNDS: Int = 1 shl 0
-  private const val BOUND_OPTION_MIN_ZOOM: Int = 1 shl 1
-  private const val BOUND_OPTION_MAX_ZOOM: Int = 1 shl 2
-  private const val BOUND_OPTION_MIN_PITCH: Int = 1 shl 3
-  private const val BOUND_OPTION_MAX_PITCH: Int = 1 shl 4
-
-  private const val BOUND_OPTIONS_SIZE: Long = 72
-  private const val BOUND_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val BOUND_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val BOUND_OPTIONS_BOUNDS_OFFSET: Long = 8
-  private const val BOUND_OPTIONS_MIN_ZOOM_OFFSET: Long = 40
-  private const val BOUND_OPTIONS_MAX_ZOOM_OFFSET: Long = 48
-  private const val BOUND_OPTIONS_MIN_PITCH_OFFSET: Long = 56
-  private const val BOUND_OPTIONS_MAX_PITCH_OFFSET: Long = 64
-
-  private const val FREE_CAMERA_OPTION_POSITION: Int = 1 shl 0
-  private const val FREE_CAMERA_OPTION_ORIENTATION: Int = 1 shl 1
-
-  private const val FREE_CAMERA_OPTIONS_SIZE: Long = 64
-  private const val FREE_CAMERA_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val FREE_CAMERA_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val FREE_CAMERA_OPTIONS_POSITION_OFFSET: Long = 8
-  private const val FREE_CAMERA_OPTIONS_ORIENTATION_OFFSET: Long = 32
+  private val LAT_LNG_BOUNDS_SIZE: Long = mln_lat_lng_bounds.sizeof()
 
   private const val GEOMETRY_EMPTY: Int = 0
   private const val GEOMETRY_POINT: Int = 1
@@ -5926,30 +5020,35 @@ internal object NativeAccess {
   private const val GEOMETRY_MULTI_POLYGON: Int = 6
   private const val GEOMETRY_COLLECTION: Int = 7
 
-  private const val COORDINATE_SPAN_SIZE: Long = 16
-  private const val COORDINATE_SPAN_COORDINATES_OFFSET: Long = 0
-  private const val COORDINATE_SPAN_COUNT_OFFSET: Long = 8
+  private val COORDINATE_SPAN_SIZE: Long = mln_coordinate_span.sizeof()
+  private val COORDINATE_SPAN_COORDINATES_OFFSET: Long = mln_coordinate_span.`coordinates$offset`()
+  private val COORDINATE_SPAN_COUNT_OFFSET: Long = mln_coordinate_span.`coordinate_count$offset`()
 
-  private const val POLYGON_GEOMETRY_SIZE: Long = 16
-  private const val POLYGON_GEOMETRY_RINGS_OFFSET: Long = 0
-  private const val POLYGON_GEOMETRY_RING_COUNT_OFFSET: Long = 8
+  private val POLYGON_GEOMETRY_SIZE: Long = mln_polygon_geometry.sizeof()
+  private val POLYGON_GEOMETRY_RINGS_OFFSET: Long = mln_polygon_geometry.`rings$offset`()
+  private val POLYGON_GEOMETRY_RING_COUNT_OFFSET: Long = mln_polygon_geometry.`ring_count$offset`()
 
-  private const val MULTI_LINE_GEOMETRY_SIZE: Long = 16
-  private const val MULTI_LINE_GEOMETRY_LINES_OFFSET: Long = 0
-  private const val MULTI_LINE_GEOMETRY_LINE_COUNT_OFFSET: Long = 8
+  private val MULTI_LINE_GEOMETRY_SIZE: Long = mln_multi_line_geometry.sizeof()
+  private val MULTI_LINE_GEOMETRY_LINES_OFFSET: Long = mln_multi_line_geometry.`lines$offset`()
+  private val MULTI_LINE_GEOMETRY_LINE_COUNT_OFFSET: Long =
+    mln_multi_line_geometry.`line_count$offset`()
 
-  private const val MULTI_POLYGON_GEOMETRY_SIZE: Long = 16
-  private const val MULTI_POLYGON_GEOMETRY_POLYGONS_OFFSET: Long = 0
-  private const val MULTI_POLYGON_GEOMETRY_POLYGON_COUNT_OFFSET: Long = 8
+  private val MULTI_POLYGON_GEOMETRY_SIZE: Long = mln_multi_polygon_geometry.sizeof()
+  private val MULTI_POLYGON_GEOMETRY_POLYGONS_OFFSET: Long =
+    mln_multi_polygon_geometry.`polygons$offset`()
+  private val MULTI_POLYGON_GEOMETRY_POLYGON_COUNT_OFFSET: Long =
+    mln_multi_polygon_geometry.`polygon_count$offset`()
 
-  private const val GEOMETRY_COLLECTION_SIZE: Long = 16
-  private const val GEOMETRY_COLLECTION_GEOMETRIES_OFFSET: Long = 0
-  private const val GEOMETRY_COLLECTION_GEOMETRY_COUNT_OFFSET: Long = 8
+  private val GEOMETRY_COLLECTION_SIZE: Long = mln_geometry_collection.sizeof()
+  private val GEOMETRY_COLLECTION_GEOMETRIES_OFFSET: Long =
+    mln_geometry_collection.`geometries$offset`()
+  private val GEOMETRY_COLLECTION_GEOMETRY_COUNT_OFFSET: Long =
+    mln_geometry_collection.`geometry_count$offset`()
 
-  private const val GEOMETRY_SIZE: Long = 24
-  private const val GEOMETRY_SIZE_OFFSET: Long = 0
-  private const val GEOMETRY_TYPE_OFFSET: Long = 4
-  private const val GEOMETRY_DATA_OFFSET: Long = 8
+  private val GEOMETRY_SIZE: Long = mln_geometry.sizeof()
+  private val GEOMETRY_SIZE_OFFSET: Long = mln_geometry.`size$offset`()
+  private val GEOMETRY_TYPE_OFFSET: Long = mln_geometry.`type$offset`()
+  private val GEOMETRY_DATA_OFFSET: Long = mln_geometry.`data$offset`()
 
   private const val FEATURE_IDENTIFIER_NULL: Int = 0
   private const val FEATURE_IDENTIFIER_UINT: Int = 1
@@ -5957,35 +5056,35 @@ internal object NativeAccess {
   private const val FEATURE_IDENTIFIER_DOUBLE: Int = 3
   private const val FEATURE_IDENTIFIER_STRING: Int = 4
 
-  private const val FEATURE_SIZE: Long = 56
-  private const val FEATURE_SIZE_OFFSET: Long = 0
-  private const val FEATURE_GEOMETRY_OFFSET: Long = 8
-  private const val FEATURE_PROPERTIES_OFFSET: Long = 16
-  private const val FEATURE_PROPERTY_COUNT_OFFSET: Long = 24
-  private const val FEATURE_IDENTIFIER_TYPE_OFFSET: Long = 32
-  private const val FEATURE_IDENTIFIER_OFFSET: Long = 40
+  private val FEATURE_SIZE: Long = mln_feature.sizeof()
+  private val FEATURE_SIZE_OFFSET: Long = mln_feature.`size$offset`()
+  private val FEATURE_GEOMETRY_OFFSET: Long = mln_feature.`geometry$offset`()
+  private val FEATURE_PROPERTIES_OFFSET: Long = mln_feature.`properties$offset`()
+  private val FEATURE_PROPERTY_COUNT_OFFSET: Long = mln_feature.`property_count$offset`()
+  private val FEATURE_IDENTIFIER_TYPE_OFFSET: Long = mln_feature.`identifier_type$offset`()
+  private val FEATURE_IDENTIFIER_OFFSET: Long = mln_feature.`identifier$offset`()
 
   private const val GEOJSON_GEOMETRY: Int = 1
   private const val GEOJSON_FEATURE: Int = 2
   private const val GEOJSON_FEATURE_COLLECTION: Int = 3
 
-  private const val GEOJSON_SIZE: Long = 24
-  private const val GEOJSON_SIZE_OFFSET: Long = 0
-  private const val GEOJSON_TYPE_OFFSET: Long = 4
-  private const val GEOJSON_DATA_OFFSET: Long = 8
+  private val GEOJSON_SIZE: Long = mln_geojson.sizeof()
+  private val GEOJSON_SIZE_OFFSET: Long = mln_geojson.`size$offset`()
+  private val GEOJSON_TYPE_OFFSET: Long = mln_geojson.`type$offset`()
+  private val GEOJSON_DATA_OFFSET: Long = mln_geojson.`data$offset`()
 
-  private const val CANONICAL_TILE_ID_SIZE: Long = 12
-  private const val CANONICAL_TILE_ID_Z_OFFSET: Long = 0
-  private const val CANONICAL_TILE_ID_X_OFFSET: Long = 4
-  private const val CANONICAL_TILE_ID_Y_OFFSET: Long = 8
+  private val CANONICAL_TILE_ID_SIZE: Long = mln_canonical_tile_id.sizeof()
+  private val CANONICAL_TILE_ID_Z_OFFSET: Long = mln_canonical_tile_id.`z$offset`()
+  private val CANONICAL_TILE_ID_X_OFFSET: Long = mln_canonical_tile_id.`x$offset`()
+  private val CANONICAL_TILE_ID_Y_OFFSET: Long = mln_canonical_tile_id.`y$offset`()
 
-  private const val JSON_VALUE_SIZE: Long = 24
-  private const val JSON_VALUE_SIZE_OFFSET: Long = 0
-  private const val JSON_VALUE_TYPE_OFFSET: Long = 4
-  private const val JSON_VALUE_DATA_OFFSET: Long = 8
-  private const val JSON_MEMBER_SIZE: Long = 24
-  private const val JSON_MEMBER_KEY_OFFSET: Long = 0
-  private const val JSON_MEMBER_VALUE_OFFSET: Long = 16
+  private val JSON_VALUE_SIZE: Long = mln_json_value.sizeof()
+  private val JSON_VALUE_SIZE_OFFSET: Long = mln_json_value.`size$offset`()
+  private val JSON_VALUE_TYPE_OFFSET: Long = mln_json_value.`type$offset`()
+  private val JSON_VALUE_DATA_OFFSET: Long = mln_json_value.`data$offset`()
+  private val JSON_MEMBER_SIZE: Long = mln_json_member.sizeof()
+  private val JSON_MEMBER_KEY_OFFSET: Long = mln_json_member.`key$offset`()
+  private val JSON_MEMBER_VALUE_OFFSET: Long = mln_json_member.`value$offset`()
   private const val JSON_NULL: Int = 0
   private const val JSON_BOOL: Int = 1
   private const val JSON_UINT: Int = 2
@@ -5999,108 +5098,89 @@ internal object NativeAccess {
   private const val QUERY_GEOMETRY_BOX: Int = 2
   private const val QUERY_GEOMETRY_LINE_STRING: Int = 3
 
-  private const val RENDERED_QUERY_GEOMETRY_SIZE: Long = 40
-  private const val RENDERED_QUERY_GEOMETRY_SIZE_OFFSET: Long = 0
-  private const val RENDERED_QUERY_GEOMETRY_TYPE_OFFSET: Long = 4
-  private const val RENDERED_QUERY_GEOMETRY_DATA_OFFSET: Long = 8
+  private val RENDERED_QUERY_GEOMETRY_SIZE: Long = mln_rendered_query_geometry.sizeof()
+  private val RENDERED_QUERY_GEOMETRY_SIZE_OFFSET: Long =
+    mln_rendered_query_geometry.`size$offset`()
+  private val RENDERED_QUERY_GEOMETRY_TYPE_OFFSET: Long =
+    mln_rendered_query_geometry.`type$offset`()
+  private val RENDERED_QUERY_GEOMETRY_DATA_OFFSET: Long =
+    mln_rendered_query_geometry.`data$offset`()
 
   private const val RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: Int = 1 shl 0
 
-  private const val RENDERED_FEATURE_QUERY_OPTIONS_SIZE: Long = 32
-  private const val RENDERED_FEATURE_QUERY_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val RENDERED_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val RENDERED_FEATURE_QUERY_OPTIONS_LAYER_IDS_OFFSET: Long = 8
-  private const val RENDERED_FEATURE_QUERY_OPTIONS_LAYER_ID_COUNT_OFFSET: Long = 16
-  private const val RENDERED_FEATURE_QUERY_OPTIONS_FILTER_OFFSET: Long = 24
+  private val RENDERED_FEATURE_QUERY_OPTIONS_SIZE: Long =
+    mln_rendered_feature_query_options.sizeof()
+  private val RENDERED_FEATURE_QUERY_OPTIONS_SIZE_OFFSET: Long =
+    mln_rendered_feature_query_options.`size$offset`()
+  private val RENDERED_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET: Long =
+    mln_rendered_feature_query_options.`fields$offset`()
+  private val RENDERED_FEATURE_QUERY_OPTIONS_LAYER_IDS_OFFSET: Long =
+    mln_rendered_feature_query_options.`layer_ids$offset`()
+  private val RENDERED_FEATURE_QUERY_OPTIONS_LAYER_ID_COUNT_OFFSET: Long =
+    mln_rendered_feature_query_options.`layer_id_count$offset`()
+  private val RENDERED_FEATURE_QUERY_OPTIONS_FILTER_OFFSET: Long =
+    mln_rendered_feature_query_options.`filter$offset`()
 
   private const val SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: Int = 1 shl 0
 
-  private const val SOURCE_FEATURE_QUERY_OPTIONS_SIZE: Long = 32
-  private const val SOURCE_FEATURE_QUERY_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val SOURCE_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_IDS_OFFSET: Long = 8
-  private const val SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_ID_COUNT_OFFSET: Long = 16
-  private const val SOURCE_FEATURE_QUERY_OPTIONS_FILTER_OFFSET: Long = 24
+  private val SOURCE_FEATURE_QUERY_OPTIONS_SIZE: Long = mln_source_feature_query_options.sizeof()
+  private val SOURCE_FEATURE_QUERY_OPTIONS_SIZE_OFFSET: Long =
+    mln_source_feature_query_options.`size$offset`()
+  private val SOURCE_FEATURE_QUERY_OPTIONS_FIELDS_OFFSET: Long =
+    mln_source_feature_query_options.`fields$offset`()
+  private val SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_IDS_OFFSET: Long =
+    mln_source_feature_query_options.`source_layer_ids$offset`()
+  private val SOURCE_FEATURE_QUERY_OPTIONS_SOURCE_LAYER_ID_COUNT_OFFSET: Long =
+    mln_source_feature_query_options.`source_layer_id_count$offset`()
+  private val SOURCE_FEATURE_QUERY_OPTIONS_FILTER_OFFSET: Long =
+    mln_source_feature_query_options.`filter$offset`()
 
   private const val QUERIED_FEATURE_SOURCE_ID: Int = 1 shl 0
   private const val QUERIED_FEATURE_SOURCE_LAYER_ID: Int = 1 shl 1
   private const val QUERIED_FEATURE_STATE: Int = 1 shl 2
 
-  private const val QUERIED_FEATURE_SIZE: Long = 104
-  private const val QUERIED_FEATURE_SIZE_OFFSET: Long = 0
-  private const val QUERIED_FEATURE_FIELDS_OFFSET: Long = 4
-  private const val QUERIED_FEATURE_FEATURE_OFFSET: Long = 8
-  private const val QUERIED_FEATURE_SOURCE_ID_OFFSET: Long = 64
-  private const val QUERIED_FEATURE_SOURCE_LAYER_ID_OFFSET: Long = 80
-  private const val QUERIED_FEATURE_STATE_OFFSET: Long = 96
+  private val QUERIED_FEATURE_SIZE: Long = mln_queried_feature.sizeof()
+  private val QUERIED_FEATURE_SIZE_OFFSET: Long = mln_queried_feature.`size$offset`()
+  private val QUERIED_FEATURE_FIELDS_OFFSET: Long = mln_queried_feature.`fields$offset`()
+  private val QUERIED_FEATURE_FEATURE_OFFSET: Long = mln_queried_feature.`feature$offset`()
+  private val QUERIED_FEATURE_SOURCE_ID_OFFSET: Long = mln_queried_feature.`source_id$offset`()
+  private val QUERIED_FEATURE_SOURCE_LAYER_ID_OFFSET: Long =
+    mln_queried_feature.`source_layer_id$offset`()
+  private val QUERIED_FEATURE_STATE_OFFSET: Long = mln_queried_feature.`state$offset`()
 
   private const val FEATURE_EXTENSION_RESULT_VALUE: Int = 1
   private const val FEATURE_EXTENSION_RESULT_FEATURE_COLLECTION: Int = 2
 
-  private const val FEATURE_EXTENSION_RESULT_INFO_SIZE: Long = 24
-  private const val FEATURE_EXTENSION_RESULT_INFO_SIZE_OFFSET: Long = 0
-  private const val FEATURE_EXTENSION_RESULT_INFO_TYPE_OFFSET: Long = 4
-  private const val FEATURE_EXTENSION_RESULT_INFO_DATA_OFFSET: Long = 8
+  private val FEATURE_EXTENSION_RESULT_INFO_SIZE: Long = mln_feature_extension_result_info.sizeof()
+  private val FEATURE_EXTENSION_RESULT_INFO_SIZE_OFFSET: Long =
+    mln_feature_extension_result_info.`size$offset`()
+  private val FEATURE_EXTENSION_RESULT_INFO_TYPE_OFFSET: Long =
+    mln_feature_extension_result_info.`type$offset`()
+  private val FEATURE_EXTENSION_RESULT_INFO_DATA_OFFSET: Long =
+    mln_feature_extension_result_info.`data$offset`()
 
-  private const val FEATURE_COLLECTION_SIZE: Long = 16
-  private const val FEATURE_COLLECTION_FEATURES_OFFSET: Long = 0
-  private const val FEATURE_COLLECTION_FEATURE_COUNT_OFFSET: Long = 8
+  private val FEATURE_COLLECTION_SIZE: Long = mln_feature_collection.sizeof()
+  private val FEATURE_COLLECTION_FEATURES_OFFSET: Long = mln_feature_collection.`features$offset`()
+  private val FEATURE_COLLECTION_FEATURE_COUNT_OFFSET: Long =
+    mln_feature_collection.`feature_count$offset`()
 
-  private const val STYLE_SOURCE_INFO_SIZE: Long = 32
-  private const val STYLE_SOURCE_INFO_SIZE_OFFSET: Long = 0
-  private const val STYLE_SOURCE_INFO_TYPE_OFFSET: Long = 4
-  private const val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long = 16
-  private const val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long = 17
-  private const val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long = 24
+  private val STYLE_SOURCE_INFO_SIZE: Long = mln_style_source_info.sizeof()
+  private val STYLE_SOURCE_INFO_SIZE_OFFSET: Long = mln_style_source_info.`size$offset`()
+  private val STYLE_SOURCE_INFO_TYPE_OFFSET: Long = mln_style_source_info.`type$offset`()
+  private val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long =
+    mln_style_source_info.`is_volatile$offset`()
+  private val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long =
+    mln_style_source_info.`has_attribution$offset`()
+  private val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long =
+    mln_style_source_info.`attribution_size$offset`()
 
   private const val IMAGE_SOURCE_COORDINATE_COUNT: Int = 4
 
-  private const val EDGE_INSETS_SIZE: Long = 32
-  private const val EDGE_INSETS_TOP_OFFSET: Long = 0
-  private const val EDGE_INSETS_LEFT_OFFSET: Long = 8
-  private const val EDGE_INSETS_BOTTOM_OFFSET: Long = 16
-  private const val EDGE_INSETS_RIGHT_OFFSET: Long = 24
-
-  private const val VIEWPORT_OPTION_NORTH_ORIENTATION: Int = 1 shl 0
-  private const val VIEWPORT_OPTION_CONSTRAIN_MODE: Int = 1 shl 1
-  private const val VIEWPORT_OPTION_VIEWPORT_MODE: Int = 1 shl 2
-  private const val VIEWPORT_OPTION_FRUSTUM_OFFSET: Int = 1 shl 3
-
-  private const val VIEWPORT_OPTIONS_SIZE: Long = 56
-  private const val VIEWPORT_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val VIEWPORT_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val VIEWPORT_OPTIONS_NORTH_ORIENTATION_OFFSET: Long = 8
-  private const val VIEWPORT_OPTIONS_CONSTRAIN_MODE_OFFSET: Long = 12
-  private const val VIEWPORT_OPTIONS_VIEWPORT_MODE_OFFSET: Long = 16
-  private const val VIEWPORT_OPTIONS_FRUSTUM_OFFSET_OFFSET: Long = 24
-
-  private const val TILE_OPTION_PREFETCH_ZOOM_DELTA: Int = 1 shl 0
-  private const val TILE_OPTION_LOD_MIN_RADIUS: Int = 1 shl 1
-  private const val TILE_OPTION_LOD_SCALE: Int = 1 shl 2
-  private const val TILE_OPTION_LOD_PITCH_THRESHOLD: Int = 1 shl 3
-  private const val TILE_OPTION_LOD_ZOOM_SHIFT: Int = 1 shl 4
-  private const val TILE_OPTION_LOD_MODE: Int = 1 shl 5
-
-  private const val TILE_OPTIONS_SIZE: Long = 56
-  private const val TILE_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val TILE_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val TILE_OPTIONS_PREFETCH_ZOOM_DELTA_OFFSET: Long = 8
-  private const val TILE_OPTIONS_LOD_MIN_RADIUS_OFFSET: Long = 16
-  private const val TILE_OPTIONS_LOD_SCALE_OFFSET: Long = 24
-  private const val TILE_OPTIONS_LOD_PITCH_THRESHOLD_OFFSET: Long = 32
-  private const val TILE_OPTIONS_LOD_ZOOM_SHIFT_OFFSET: Long = 40
-  private const val TILE_OPTIONS_LOD_MODE_OFFSET: Long = 48
-
-  private const val PROJECTION_MODE_AXONOMETRIC: Int = 1 shl 0
-  private const val PROJECTION_MODE_X_SKEW: Int = 1 shl 1
-  private const val PROJECTION_MODE_Y_SKEW: Int = 1 shl 2
-
-  private const val PROJECTION_MODE_SIZE: Long = 32
-  private const val PROJECTION_MODE_SIZE_OFFSET: Long = 0
-  private const val PROJECTION_MODE_FIELDS_OFFSET: Long = 4
-  private const val PROJECTION_MODE_AXONOMETRIC_OFFSET: Long = 8
-  private const val PROJECTION_MODE_X_SKEW_OFFSET: Long = 16
-  private const val PROJECTION_MODE_Y_SKEW_OFFSET: Long = 24
+  private val EDGE_INSETS_SIZE: Long = mln_edge_insets.sizeof()
+  private val EDGE_INSETS_TOP_OFFSET: Long = mln_edge_insets.`top$offset`()
+  private val EDGE_INSETS_LEFT_OFFSET: Long = mln_edge_insets.`left$offset`()
+  private val EDGE_INSETS_BOTTOM_OFFSET: Long = mln_edge_insets.`bottom$offset`()
+  private val EDGE_INSETS_RIGHT_OFFSET: Long = mln_edge_insets.`right$offset`()
 
   private const val TILE_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val TILE_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
@@ -6111,17 +5191,26 @@ internal object NativeAccess {
   private const val TILE_SOURCE_OPTION_VECTOR_ENCODING: Int = 1 shl 6
   private const val TILE_SOURCE_OPTION_RASTER_ENCODING: Int = 1 shl 7
 
-  private const val TILE_SOURCE_OPTIONS_SIZE: Long = 96
-  private const val TILE_SOURCE_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val TILE_SOURCE_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val TILE_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long = 8
-  private const val TILE_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long = 16
-  private const val TILE_SOURCE_OPTIONS_ATTRIBUTION_OFFSET: Long = 24
-  private const val TILE_SOURCE_OPTIONS_SCHEME_OFFSET: Long = 40
-  private const val TILE_SOURCE_OPTIONS_BOUNDS_OFFSET: Long = 48
-  private const val TILE_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long = 80
-  private const val TILE_SOURCE_OPTIONS_VECTOR_ENCODING_OFFSET: Long = 84
-  private const val TILE_SOURCE_OPTIONS_RASTER_ENCODING_OFFSET: Long = 88
+  private val TILE_SOURCE_OPTIONS_SIZE: Long = mln_style_tile_source_options.sizeof()
+  private val TILE_SOURCE_OPTIONS_SIZE_OFFSET: Long = mln_style_tile_source_options.`size$offset`()
+  private val TILE_SOURCE_OPTIONS_FIELDS_OFFSET: Long =
+    mln_style_tile_source_options.`fields$offset`()
+  private val TILE_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long =
+    mln_style_tile_source_options.`min_zoom$offset`()
+  private val TILE_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long =
+    mln_style_tile_source_options.`max_zoom$offset`()
+  private val TILE_SOURCE_OPTIONS_ATTRIBUTION_OFFSET: Long =
+    mln_style_tile_source_options.`attribution$offset`()
+  private val TILE_SOURCE_OPTIONS_SCHEME_OFFSET: Long =
+    mln_style_tile_source_options.`scheme$offset`()
+  private val TILE_SOURCE_OPTIONS_BOUNDS_OFFSET: Long =
+    mln_style_tile_source_options.`bounds$offset`()
+  private val TILE_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long =
+    mln_style_tile_source_options.`tile_size$offset`()
+  private val TILE_SOURCE_OPTIONS_VECTOR_ENCODING_OFFSET: Long =
+    mln_style_tile_source_options.`vector_encoding$offset`()
+  private val TILE_SOURCE_OPTIONS_RASTER_ENCODING_OFFSET: Long =
+    mln_style_tile_source_options.`raster_encoding$offset`()
 
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
@@ -6131,268 +5220,135 @@ internal object NativeAccess {
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP: Int = 1 shl 5
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: Int = 1 shl 6
 
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE: Long = 72
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE_OFFSET: Long = 8
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE_OFFSET: Long = 16
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_USER_DATA_OFFSET: Long = 24
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long = 32
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long = 40
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_TOLERANCE_OFFSET: Long = 48
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long = 56
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_BUFFER_OFFSET: Long = 60
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CLIP_OFFSET: Long = 64
-  private const val CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET: Long = 65
-
-  private const val RENDER_TARGET_EXTENT_SIZE: Long = 24
-  private const val RENDER_TARGET_EXTENT_SIZE_OFFSET: Long = 0
-  private const val RENDER_TARGET_EXTENT_WIDTH_OFFSET: Long = 4
-  private const val RENDER_TARGET_EXTENT_HEIGHT_OFFSET: Long = 8
-  private const val RENDER_TARGET_EXTENT_SCALE_FACTOR_OFFSET: Long = 16
-
-  private const val METAL_CONTEXT_DESCRIPTOR_SIZE: Long = 16
-  private const val METAL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val METAL_CONTEXT_DESCRIPTOR_DEVICE_OFFSET: Long = 8
-
-  private const val VULKAN_CONTEXT_DESCRIPTOR_SIZE: Long = 64
-  private const val VULKAN_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val VULKAN_CONTEXT_INSTANCE_OFFSET: Long = 8
-  private const val VULKAN_CONTEXT_PHYSICAL_DEVICE_OFFSET: Long = 16
-  private const val VULKAN_CONTEXT_DEVICE_OFFSET: Long = 24
-  private const val VULKAN_CONTEXT_GRAPHICS_QUEUE_OFFSET: Long = 32
-  private const val VULKAN_CONTEXT_GRAPHICS_QUEUE_FAMILY_INDEX_OFFSET: Long = 40
-  private const val VULKAN_CONTEXT_GET_INSTANCE_PROC_ADDR_OFFSET: Long = 48
-  private const val VULKAN_CONTEXT_GET_DEVICE_PROC_ADDR_OFFSET: Long = 56
-
-  private const val OPENGL_CONTEXT_PLATFORM_WGL: Int = 1
-  private const val OPENGL_CONTEXT_PLATFORM_EGL: Int = 2
-  private const val OPENGL_CONTEXT_DESCRIPTOR_SIZE: Long = 48
-  private const val OPENGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val OPENGL_CONTEXT_DESCRIPTOR_PLATFORM_OFFSET: Long = 4
-  private const val OPENGL_CONTEXT_DESCRIPTOR_DATA_OFFSET: Long = 8
-
-  private const val WGL_CONTEXT_DESCRIPTOR_SIZE: Long = 32
-  private const val WGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val WGL_CONTEXT_DESCRIPTOR_DEVICE_CONTEXT_OFFSET: Long = 8
-  private const val WGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET: Long = 16
-  private const val WGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET: Long = 24
-
-  private const val EGL_CONTEXT_DESCRIPTOR_SIZE: Long = 40
-  private const val EGL_CONTEXT_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val EGL_CONTEXT_DESCRIPTOR_DISPLAY_OFFSET: Long = 8
-  private const val EGL_CONTEXT_DESCRIPTOR_CONFIG_OFFSET: Long = 16
-  private const val EGL_CONTEXT_DESCRIPTOR_SHARE_CONTEXT_OFFSET: Long = 24
-  private const val EGL_CONTEXT_DESCRIPTOR_GET_PROC_ADDRESS_OFFSET: Long = 32
-
-  private const val METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE: Long = 48
-  private const val METAL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val METAL_OWNED_TEXTURE_EXTENT_OFFSET: Long = 8
-  private const val METAL_OWNED_TEXTURE_CONTEXT_OFFSET: Long = 32
-
-  private const val METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE: Long = 40
-  private const val METAL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val METAL_BORROWED_TEXTURE_EXTENT_OFFSET: Long = 8
-  private const val METAL_BORROWED_TEXTURE_TEXTURE_OFFSET: Long = 32
-
-  private const val VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE: Long = 96
-  private const val VULKAN_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val VULKAN_OWNED_TEXTURE_EXTENT_OFFSET: Long = 8
-  private const val VULKAN_OWNED_TEXTURE_CONTEXT_OFFSET: Long = 32
-
-  private const val VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE: Long = 128
-  private const val VULKAN_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val VULKAN_BORROWED_TEXTURE_EXTENT_OFFSET: Long = 8
-  private const val VULKAN_BORROWED_TEXTURE_CONTEXT_OFFSET: Long = 32
-  private const val VULKAN_BORROWED_TEXTURE_IMAGE_OFFSET: Long = 96
-  private const val VULKAN_BORROWED_TEXTURE_IMAGE_VIEW_OFFSET: Long = 104
-  private const val VULKAN_BORROWED_TEXTURE_FORMAT_OFFSET: Long = 112
-  private const val VULKAN_BORROWED_TEXTURE_INITIAL_LAYOUT_OFFSET: Long = 116
-  private const val VULKAN_BORROWED_TEXTURE_FINAL_LAYOUT_OFFSET: Long = 120
-
-  private const val OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE: Long = 80
-  private const val OPENGL_OWNED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val OPENGL_OWNED_TEXTURE_EXTENT_OFFSET: Long = 8
-  private const val OPENGL_OWNED_TEXTURE_CONTEXT_OFFSET: Long = 32
-
-  private const val OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE: Long = 88
-  private const val OPENGL_BORROWED_TEXTURE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val OPENGL_BORROWED_TEXTURE_EXTENT_OFFSET: Long = 8
-  private const val OPENGL_BORROWED_TEXTURE_CONTEXT_OFFSET: Long = 32
-  private const val OPENGL_BORROWED_TEXTURE_TEXTURE_OFFSET: Long = 80
-  private const val OPENGL_BORROWED_TEXTURE_TARGET_OFFSET: Long = 84
-
-  private const val METAL_SURFACE_DESCRIPTOR_SIZE: Long = 56
-  private const val METAL_SURFACE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val METAL_SURFACE_EXTENT_OFFSET: Long = 8
-  private const val METAL_SURFACE_CONTEXT_OFFSET: Long = 32
-  private const val METAL_SURFACE_LAYER_OFFSET: Long = 48
-
-  private const val VULKAN_SURFACE_DESCRIPTOR_SIZE: Long = 104
-  private const val VULKAN_SURFACE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val VULKAN_SURFACE_EXTENT_OFFSET: Long = 8
-  private const val VULKAN_SURFACE_CONTEXT_OFFSET: Long = 32
-  private const val VULKAN_SURFACE_SURFACE_OFFSET: Long = 96
-
-  private const val OPENGL_SURFACE_DESCRIPTOR_SIZE: Long = 88
-  private const val OPENGL_SURFACE_DESCRIPTOR_SIZE_OFFSET: Long = 0
-  private const val OPENGL_SURFACE_EXTENT_OFFSET: Long = 8
-  private const val OPENGL_SURFACE_CONTEXT_OFFSET: Long = 32
-  private const val OPENGL_SURFACE_SURFACE_OFFSET: Long = 80
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE: Long =
+    mln_custom_geometry_source_options.sizeof()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE_OFFSET: Long =
+    mln_custom_geometry_source_options.`size$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_FIELDS_OFFSET: Long =
+    mln_custom_geometry_source_options.`fields$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE_OFFSET: Long =
+    mln_custom_geometry_source_options.`fetch_tile$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE_OFFSET: Long =
+    mln_custom_geometry_source_options.`cancel_tile$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_USER_DATA_OFFSET: Long =
+    mln_custom_geometry_source_options.`user_data$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long =
+    mln_custom_geometry_source_options.`min_zoom$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long =
+    mln_custom_geometry_source_options.`max_zoom$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_TOLERANCE_OFFSET: Long =
+    mln_custom_geometry_source_options.`tolerance$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long =
+    mln_custom_geometry_source_options.`tile_size$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_BUFFER_OFFSET: Long =
+    mln_custom_geometry_source_options.`buffer$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_CLIP_OFFSET: Long =
+    mln_custom_geometry_source_options.`clip$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET: Long =
+    mln_custom_geometry_source_options.`wrap$offset`()
 
   private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: Int = 1 shl 0
   private const val FEATURE_STATE_SELECTOR_FEATURE_ID: Int = 1 shl 1
   private const val FEATURE_STATE_SELECTOR_STATE_KEY: Int = 1 shl 2
 
-  private const val FEATURE_STATE_SELECTOR_SIZE: Long = 72
-  private const val FEATURE_STATE_SELECTOR_SIZE_OFFSET: Long = 0
-  private const val FEATURE_STATE_SELECTOR_FIELDS_OFFSET: Long = 4
-  private const val FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET: Long = 8
-  private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET: Long = 24
-  private const val FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET: Long = 40
-  private const val FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET: Long = 56
-
-  private const val TEXTURE_IMAGE_INFO_SIZE: Long = 24
-  private const val TEXTURE_IMAGE_INFO_SIZE_OFFSET: Long = 0
-  private const val TEXTURE_IMAGE_INFO_WIDTH_OFFSET: Long = 4
-  private const val TEXTURE_IMAGE_INFO_HEIGHT_OFFSET: Long = 8
-  private const val TEXTURE_IMAGE_INFO_STRIDE_OFFSET: Long = 12
-  private const val TEXTURE_IMAGE_INFO_BYTE_LENGTH_OFFSET: Long = 16
-
-  private const val METAL_OWNED_TEXTURE_FRAME_SIZE: Long = 64
-  private const val METAL_OWNED_TEXTURE_FRAME_SIZE_OFFSET: Long = 0
-  private const val METAL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET: Long = 8
-  private const val METAL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET: Long = 16
-  private const val METAL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET: Long = 20
-  private const val METAL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET: Long = 24
-  private const val METAL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET: Long = 32
-  private const val METAL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET: Long = 40
-  private const val METAL_OWNED_TEXTURE_FRAME_DEVICE_OFFSET: Long = 48
-  private const val METAL_OWNED_TEXTURE_FRAME_PIXEL_FORMAT_OFFSET: Long = 56
-
-  private const val VULKAN_OWNED_TEXTURE_FRAME_SIZE: Long = 72
-  private const val VULKAN_OWNED_TEXTURE_FRAME_SIZE_OFFSET: Long = 0
-  private const val VULKAN_OWNED_TEXTURE_FRAME_GENERATION_OFFSET: Long = 8
-  private const val VULKAN_OWNED_TEXTURE_FRAME_WIDTH_OFFSET: Long = 16
-  private const val VULKAN_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET: Long = 20
-  private const val VULKAN_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET: Long = 24
-  private const val VULKAN_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET: Long = 32
-  private const val VULKAN_OWNED_TEXTURE_FRAME_IMAGE_OFFSET: Long = 40
-  private const val VULKAN_OWNED_TEXTURE_FRAME_IMAGE_VIEW_OFFSET: Long = 48
-  private const val VULKAN_OWNED_TEXTURE_FRAME_DEVICE_OFFSET: Long = 56
-  private const val VULKAN_OWNED_TEXTURE_FRAME_FORMAT_OFFSET: Long = 64
-  private const val VULKAN_OWNED_TEXTURE_FRAME_LAYOUT_OFFSET: Long = 68
-
-  private const val OPENGL_OWNED_TEXTURE_FRAME_SIZE: Long = 64
-  private const val OPENGL_OWNED_TEXTURE_FRAME_SIZE_OFFSET: Long = 0
-  private const val OPENGL_OWNED_TEXTURE_FRAME_GENERATION_OFFSET: Long = 8
-  private const val OPENGL_OWNED_TEXTURE_FRAME_WIDTH_OFFSET: Long = 16
-  private const val OPENGL_OWNED_TEXTURE_FRAME_HEIGHT_OFFSET: Long = 20
-  private const val OPENGL_OWNED_TEXTURE_FRAME_SCALE_FACTOR_OFFSET: Long = 24
-  private const val OPENGL_OWNED_TEXTURE_FRAME_FRAME_ID_OFFSET: Long = 32
-  private const val OPENGL_OWNED_TEXTURE_FRAME_TEXTURE_OFFSET: Long = 40
-  private const val OPENGL_OWNED_TEXTURE_FRAME_TARGET_OFFSET: Long = 44
-  private const val OPENGL_OWNED_TEXTURE_FRAME_INTERNAL_FORMAT_OFFSET: Long = 48
-  private const val OPENGL_OWNED_TEXTURE_FRAME_FORMAT_OFFSET: Long = 52
-  private const val OPENGL_OWNED_TEXTURE_FRAME_TYPE_OFFSET: Long = 56
-
-  private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE: Long = 32
-  private const val PREMULTIPLIED_RGBA8_IMAGE_SIZE_OFFSET: Long = 0
-  private const val PREMULTIPLIED_RGBA8_IMAGE_WIDTH_OFFSET: Long = 4
-  private const val PREMULTIPLIED_RGBA8_IMAGE_HEIGHT_OFFSET: Long = 8
-  private const val PREMULTIPLIED_RGBA8_IMAGE_STRIDE_OFFSET: Long = 12
-  private const val PREMULTIPLIED_RGBA8_IMAGE_PIXELS_OFFSET: Long = 16
-  private const val PREMULTIPLIED_RGBA8_IMAGE_BYTE_LENGTH_OFFSET: Long = 24
+  private val FEATURE_STATE_SELECTOR_SIZE: Long = mln_feature_state_selector.sizeof()
+  private val FEATURE_STATE_SELECTOR_SIZE_OFFSET: Long = mln_feature_state_selector.`size$offset`()
+  private val FEATURE_STATE_SELECTOR_FIELDS_OFFSET: Long =
+    mln_feature_state_selector.`fields$offset`()
+  private val FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET: Long =
+    mln_feature_state_selector.`source_id$offset`()
+  private val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET: Long =
+    mln_feature_state_selector.`source_layer_id$offset`()
+  private val FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET: Long =
+    mln_feature_state_selector.`feature_id$offset`()
+  private val FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET: Long =
+    mln_feature_state_selector.`state_key$offset`()
 
   private const val STYLE_IMAGE_OPTION_PIXEL_RATIO: Int = 1 shl 0
   private const val STYLE_IMAGE_OPTION_SDF: Int = 1 shl 1
 
   private const val DEFAULT_PIXEL_RATIO: Float = 1.0f
 
-  private const val STYLE_IMAGE_OPTIONS_SIZE: Long = 16
-  private const val STYLE_IMAGE_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val STYLE_IMAGE_OPTIONS_FIELDS_OFFSET: Long = 4
-  private const val STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET: Long = 8
-  private const val STYLE_IMAGE_OPTIONS_SDF_OFFSET: Long = 12
+  private val STYLE_IMAGE_OPTIONS_SIZE: Long = mln_style_image_options.sizeof()
+  private val STYLE_IMAGE_OPTIONS_SIZE_OFFSET: Long = mln_style_image_options.`size$offset`()
+  private val STYLE_IMAGE_OPTIONS_FIELDS_OFFSET: Long = mln_style_image_options.`fields$offset`()
+  private val STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET: Long =
+    mln_style_image_options.`pixel_ratio$offset`()
+  private val STYLE_IMAGE_OPTIONS_SDF_OFFSET: Long = mln_style_image_options.`sdf$offset`()
 
-  private const val STYLE_IMAGE_INFO_SIZE: Long = 32
-  private const val STYLE_IMAGE_INFO_SIZE_OFFSET: Long = 0
-  private const val STYLE_IMAGE_INFO_WIDTH_OFFSET: Long = 4
-  private const val STYLE_IMAGE_INFO_HEIGHT_OFFSET: Long = 8
-  private const val STYLE_IMAGE_INFO_STRIDE_OFFSET: Long = 12
-  private const val STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET: Long = 16
-  private const val STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET: Long = 24
-  private const val STYLE_IMAGE_INFO_SDF_OFFSET: Long = 28
+  private val STYLE_IMAGE_INFO_SIZE: Long = mln_style_image_info.sizeof()
+  private val STYLE_IMAGE_INFO_SIZE_OFFSET: Long = mln_style_image_info.`size$offset`()
+  private val STYLE_IMAGE_INFO_WIDTH_OFFSET: Long = mln_style_image_info.`width$offset`()
+  private val STYLE_IMAGE_INFO_HEIGHT_OFFSET: Long = mln_style_image_info.`height$offset`()
+  private val STYLE_IMAGE_INFO_STRIDE_OFFSET: Long = mln_style_image_info.`stride$offset`()
+  private val STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET: Long =
+    mln_style_image_info.`byte_length$offset`()
+  private val STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET: Long =
+    mln_style_image_info.`pixel_ratio$offset`()
+  private val STYLE_IMAGE_INFO_SDF_OFFSET: Long = mln_style_image_info.`sdf$offset`()
 
-  private const val RUNTIME_OPTION_MAXIMUM_CACHE_SIZE: Int = 1 shl 0
-  private const val RUNTIME_OPTIONS_ASSET_PATH: Long = 8
-  private const val RUNTIME_OPTIONS_CACHE_PATH: Long = 16
-  private const val RUNTIME_OPTIONS_MAXIMUM_CACHE_SIZE: Long = 24
+  private val RUNTIME_EVENT_SIZE: Long = mln_runtime_event.sizeof()
+  private val RUNTIME_EVENT_SIZE_OFFSET: Long = mln_runtime_event.`size$offset`()
+  private val RUNTIME_EVENT_TYPE_OFFSET: Long = mln_runtime_event.`type$offset`()
+  private val RUNTIME_EVENT_SOURCE_TYPE_OFFSET: Long = mln_runtime_event.`source_type$offset`()
+  private val RUNTIME_EVENT_SOURCE_OFFSET: Long = mln_runtime_event.`source$offset`()
+  private val RUNTIME_EVENT_CODE_OFFSET: Long = mln_runtime_event.`code$offset`()
+  private val RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET: Long = mln_runtime_event.`payload_type$offset`()
+  private val RUNTIME_EVENT_PAYLOAD_OFFSET: Long = mln_runtime_event.`payload$offset`()
+  private val RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET: Long = mln_runtime_event.`payload_size$offset`()
+  private val RUNTIME_EVENT_MESSAGE_OFFSET: Long = mln_runtime_event.`message$offset`()
+  private val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = mln_runtime_event.`message_size$offset`()
 
-  private val runtimeOptionsLayout =
-    MemoryLayout.structLayout(
-      ValueLayout.JAVA_INT.withName("size"),
-      ValueLayout.JAVA_INT.withName("flags"),
-      ValueLayout.ADDRESS.withName("asset_path"),
-      ValueLayout.ADDRESS.withName("cache_path"),
-      ValueLayout.JAVA_LONG.withName("maximum_cache_size"),
-    )
+  private val RESOURCE_REQUEST_URL_OFFSET: Long = mln_resource_request.`url$offset`()
+  private val RESOURCE_REQUEST_KIND_OFFSET: Long = mln_resource_request.`kind$offset`()
+  private val RESOURCE_REQUEST_LOADING_METHOD_OFFSET: Long =
+    mln_resource_request.`loading_method$offset`()
+  private val RESOURCE_REQUEST_PRIORITY_OFFSET: Long = mln_resource_request.`priority$offset`()
+  private val RESOURCE_REQUEST_USAGE_OFFSET: Long = mln_resource_request.`usage$offset`()
+  private val RESOURCE_REQUEST_STORAGE_POLICY_OFFSET: Long =
+    mln_resource_request.`storage_policy$offset`()
+  private val RESOURCE_REQUEST_HAS_RANGE_OFFSET: Long = mln_resource_request.`has_range$offset`()
+  private val RESOURCE_REQUEST_RANGE_START_OFFSET: Long =
+    mln_resource_request.`range_start$offset`()
+  private val RESOURCE_REQUEST_RANGE_END_OFFSET: Long = mln_resource_request.`range_end$offset`()
+  private val RESOURCE_REQUEST_HAS_PRIOR_MODIFIED_OFFSET: Long =
+    mln_resource_request.`has_prior_modified$offset`()
+  private val RESOURCE_REQUEST_PRIOR_MODIFIED_OFFSET: Long =
+    mln_resource_request.`prior_modified_unix_ms$offset`()
+  private val RESOURCE_REQUEST_HAS_PRIOR_EXPIRES_OFFSET: Long =
+    mln_resource_request.`has_prior_expires$offset`()
+  private val RESOURCE_REQUEST_PRIOR_EXPIRES_OFFSET: Long =
+    mln_resource_request.`prior_expires_unix_ms$offset`()
+  private val RESOURCE_REQUEST_PRIOR_ETAG_OFFSET: Long = mln_resource_request.`prior_etag$offset`()
+  private val RESOURCE_REQUEST_PRIOR_DATA_OFFSET: Long = mln_resource_request.`prior_data$offset`()
+  private val RESOURCE_REQUEST_PRIOR_DATA_SIZE_OFFSET: Long =
+    mln_resource_request.`prior_data_size$offset`()
 
-  private const val RUNTIME_EVENT_SIZE: Long = 64
-  private const val RUNTIME_EVENT_SIZE_OFFSET: Long = 0
-  private const val RUNTIME_EVENT_TYPE_OFFSET: Long = 4
-  private const val RUNTIME_EVENT_SOURCE_TYPE_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_SOURCE_OFFSET: Long = 16
-  private const val RUNTIME_EVENT_CODE_OFFSET: Long = 24
-  private const val RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET: Long = 28
-  private const val RUNTIME_EVENT_PAYLOAD_OFFSET: Long = 32
-  private const val RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET: Long = 40
-  private const val RUNTIME_EVENT_MESSAGE_OFFSET: Long = 48
-  private const val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = 56
-
-  private const val RESOURCE_REQUEST_URL_OFFSET: Long = 8
-  private const val RESOURCE_REQUEST_KIND_OFFSET: Long = 16
-  private const val RESOURCE_REQUEST_LOADING_METHOD_OFFSET: Long = 20
-  private const val RESOURCE_REQUEST_PRIORITY_OFFSET: Long = 24
-  private const val RESOURCE_REQUEST_USAGE_OFFSET: Long = 28
-  private const val RESOURCE_REQUEST_STORAGE_POLICY_OFFSET: Long = 32
-  private const val RESOURCE_REQUEST_HAS_RANGE_OFFSET: Long = 36
-  private const val RESOURCE_REQUEST_RANGE_START_OFFSET: Long = 40
-  private const val RESOURCE_REQUEST_RANGE_END_OFFSET: Long = 48
-  private const val RESOURCE_REQUEST_HAS_PRIOR_MODIFIED_OFFSET: Long = 56
-  private const val RESOURCE_REQUEST_PRIOR_MODIFIED_OFFSET: Long = 64
-  private const val RESOURCE_REQUEST_HAS_PRIOR_EXPIRES_OFFSET: Long = 72
-  private const val RESOURCE_REQUEST_PRIOR_EXPIRES_OFFSET: Long = 80
-  private const val RESOURCE_REQUEST_PRIOR_ETAG_OFFSET: Long = 88
-  private const val RESOURCE_REQUEST_PRIOR_DATA_OFFSET: Long = 96
-  private const val RESOURCE_REQUEST_PRIOR_DATA_SIZE_OFFSET: Long = 104
-
-  private const val RESOURCE_RESPONSE_SIZE: Long = 96
-  private const val RESOURCE_RESPONSE_SIZE_OFFSET: Long = 0
-  private const val RESOURCE_RESPONSE_STATUS_OFFSET: Long = 4
-  private const val RESOURCE_RESPONSE_ERROR_REASON_OFFSET: Long = 8
-  private const val RESOURCE_RESPONSE_BYTES_OFFSET: Long = 16
-  private const val RESOURCE_RESPONSE_BYTE_COUNT_OFFSET: Long = 24
-  private const val RESOURCE_RESPONSE_ERROR_MESSAGE_OFFSET: Long = 32
-  private const val RESOURCE_RESPONSE_MUST_REVALIDATE_OFFSET: Long = 40
-  private const val RESOURCE_RESPONSE_HAS_MODIFIED_OFFSET: Long = 41
-  private const val RESOURCE_RESPONSE_MODIFIED_OFFSET: Long = 48
-  private const val RESOURCE_RESPONSE_HAS_EXPIRES_OFFSET: Long = 56
-  private const val RESOURCE_RESPONSE_EXPIRES_OFFSET: Long = 64
-  private const val RESOURCE_RESPONSE_ETAG_OFFSET: Long = 72
-  private const val RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET: Long = 80
-  private const val RESOURCE_RESPONSE_RETRY_AFTER_OFFSET: Long = 88
-
-  private const val DEFAULT_MAP_WIDTH: Int = 256
-  private const val DEFAULT_MAP_HEIGHT: Int = 256
-  private const val DEFAULT_SCALE_FACTOR: Double = 1.0
-
-  private const val MAP_OPTIONS_SIZE: Long = 32
-  private const val MAP_OPTIONS_SIZE_OFFSET: Long = 0
-  private const val MAP_OPTIONS_WIDTH_OFFSET: Long = 4
-  private const val MAP_OPTIONS_HEIGHT_OFFSET: Long = 8
-  private const val MAP_OPTIONS_SCALE_FACTOR_OFFSET: Long = 16
-  private const val MAP_OPTIONS_MAP_MODE_OFFSET: Long = 24
+  private val RESOURCE_RESPONSE_SIZE: Long = mln_resource_response.sizeof()
+  private val RESOURCE_RESPONSE_SIZE_OFFSET: Long = mln_resource_response.`size$offset`()
+  private val RESOURCE_RESPONSE_STATUS_OFFSET: Long = mln_resource_response.`status$offset`()
+  private val RESOURCE_RESPONSE_ERROR_REASON_OFFSET: Long =
+    mln_resource_response.`error_reason$offset`()
+  private val RESOURCE_RESPONSE_BYTES_OFFSET: Long = mln_resource_response.`bytes$offset`()
+  private val RESOURCE_RESPONSE_BYTE_COUNT_OFFSET: Long =
+    mln_resource_response.`byte_count$offset`()
+  private val RESOURCE_RESPONSE_ERROR_MESSAGE_OFFSET: Long =
+    mln_resource_response.`error_message$offset`()
+  private val RESOURCE_RESPONSE_MUST_REVALIDATE_OFFSET: Long =
+    mln_resource_response.`must_revalidate$offset`()
+  private val RESOURCE_RESPONSE_HAS_MODIFIED_OFFSET: Long =
+    mln_resource_response.`has_modified$offset`()
+  private val RESOURCE_RESPONSE_MODIFIED_OFFSET: Long =
+    mln_resource_response.`modified_unix_ms$offset`()
+  private val RESOURCE_RESPONSE_HAS_EXPIRES_OFFSET: Long =
+    mln_resource_response.`has_expires$offset`()
+  private val RESOURCE_RESPONSE_EXPIRES_OFFSET: Long =
+    mln_resource_response.`expires_unix_ms$offset`()
+  private val RESOURCE_RESPONSE_ETAG_OFFSET: Long = mln_resource_response.`etag$offset`()
+  private val RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET: Long =
+    mln_resource_response.`has_retry_after$offset`()
+  private val RESOURCE_RESPONSE_RETRY_AFTER_OFFSET: Long =
+    mln_resource_response.`retry_after_unix_ms$offset`()
 
   private const val PAYLOAD_NONE: Int = 0
   private const val PAYLOAD_RENDER_FRAME: Int = 1
@@ -6404,101 +5360,172 @@ internal object NativeAccess {
   private const val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int = 7
   private const val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int = 8
 
-  private const val OFFLINE_REGION_STATUS_SIZE: Long = 64
-  private const val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = 0
-  private const val OFFLINE_REGION_STATUS_DOWNLOAD_STATE_OFFSET: Long = 4
-  private const val OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_COUNT_OFFSET: Long = 8
-  private const val OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_SIZE_OFFSET: Long = 16
-  private const val OFFLINE_REGION_STATUS_COMPLETED_TILE_COUNT_OFFSET: Long = 24
-  private const val OFFLINE_REGION_STATUS_REQUIRED_TILE_COUNT_OFFSET: Long = 32
-  private const val OFFLINE_REGION_STATUS_COMPLETED_TILE_SIZE_OFFSET: Long = 40
-  private const val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_OFFSET: Long = 48
-  private const val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_IS_PRECISE_OFFSET: Long = 56
-  private const val OFFLINE_REGION_STATUS_COMPLETE_OFFSET: Long = 57
+  private val OFFLINE_REGION_STATUS_SIZE: Long = mln_offline_region_status.sizeof()
+  private val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = mln_offline_region_status.`size$offset`()
+  private val OFFLINE_REGION_STATUS_DOWNLOAD_STATE_OFFSET: Long =
+    mln_offline_region_status.`download_state$offset`()
+  private val OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_COUNT_OFFSET: Long =
+    mln_offline_region_status.`completed_resource_count$offset`()
+  private val OFFLINE_REGION_STATUS_COMPLETED_RESOURCE_SIZE_OFFSET: Long =
+    mln_offline_region_status.`completed_resource_size$offset`()
+  private val OFFLINE_REGION_STATUS_COMPLETED_TILE_COUNT_OFFSET: Long =
+    mln_offline_region_status.`completed_tile_count$offset`()
+  private val OFFLINE_REGION_STATUS_REQUIRED_TILE_COUNT_OFFSET: Long =
+    mln_offline_region_status.`required_tile_count$offset`()
+  private val OFFLINE_REGION_STATUS_COMPLETED_TILE_SIZE_OFFSET: Long =
+    mln_offline_region_status.`completed_tile_size$offset`()
+  private val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_OFFSET: Long =
+    mln_offline_region_status.`required_resource_count$offset`()
+  private val OFFLINE_REGION_STATUS_REQUIRED_RESOURCE_COUNT_IS_PRECISE_OFFSET: Long =
+    mln_offline_region_status.`required_resource_count_is_precise$offset`()
+  private val OFFLINE_REGION_STATUS_COMPLETE_OFFSET: Long =
+    mln_offline_region_status.`complete$offset`()
 
-  private const val RUNTIME_EVENT_RENDER_FRAME_SIZE: Long = 64
-  private const val RUNTIME_EVENT_RENDER_FRAME_MODE_OFFSET: Long = 4
-  private const val RUNTIME_EVENT_RENDER_FRAME_NEEDS_REPAINT_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_RENDER_FRAME_PLACEMENT_CHANGED_OFFSET: Long = 9
-  private const val RUNTIME_EVENT_RENDER_FRAME_ENCODING_TIME_OFFSET: Long = 24
-  private const val RUNTIME_EVENT_RENDER_FRAME_RENDERING_TIME_OFFSET: Long = 32
-  private const val RUNTIME_EVENT_RENDER_FRAME_FRAME_COUNT_OFFSET: Long = 40
-  private const val RUNTIME_EVENT_RENDER_FRAME_DRAW_CALL_COUNT_OFFSET: Long = 48
-  private const val RUNTIME_EVENT_RENDER_FRAME_TOTAL_DRAW_CALL_COUNT_OFFSET: Long = 56
+  private val RUNTIME_EVENT_RENDER_FRAME_SIZE: Long = mln_runtime_event_render_frame.sizeof()
+  private val RUNTIME_EVENT_RENDER_FRAME_MODE_OFFSET: Long =
+    mln_runtime_event_render_frame.`mode$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_NEEDS_REPAINT_OFFSET: Long =
+    mln_runtime_event_render_frame.`needs_repaint$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_PLACEMENT_CHANGED_OFFSET: Long =
+    mln_runtime_event_render_frame.`placement_changed$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_ENCODING_TIME_OFFSET: Long =
+    mln_runtime_event_render_frame.`stats$offset`() + mln_rendering_stats.`encoding_time$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_RENDERING_TIME_OFFSET: Long =
+    mln_runtime_event_render_frame.`stats$offset`() + mln_rendering_stats.`rendering_time$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_FRAME_COUNT_OFFSET: Long =
+    mln_runtime_event_render_frame.`stats$offset`() + mln_rendering_stats.`frame_count$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_DRAW_CALL_COUNT_OFFSET: Long =
+    mln_runtime_event_render_frame.`stats$offset`() + mln_rendering_stats.`draw_call_count$offset`()
+  private val RUNTIME_EVENT_RENDER_FRAME_TOTAL_DRAW_CALL_COUNT_OFFSET: Long =
+    mln_runtime_event_render_frame.`stats$offset`() +
+      mln_rendering_stats.`total_draw_call_count$offset`()
 
-  private const val RUNTIME_EVENT_RENDER_MAP_SIZE: Long = 8
-  private const val RUNTIME_EVENT_RENDER_MAP_MODE_OFFSET: Long = 4
+  private val RUNTIME_EVENT_RENDER_MAP_SIZE: Long = mln_runtime_event_render_map.sizeof()
+  private val RUNTIME_EVENT_RENDER_MAP_MODE_OFFSET: Long =
+    mln_runtime_event_render_map.`mode$offset`()
 
-  private const val RUNTIME_EVENT_STYLE_IMAGE_MISSING_SIZE: Long = 24
-  private const val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_SIZE_OFFSET: Long = 16
+  private val RUNTIME_EVENT_STYLE_IMAGE_MISSING_SIZE: Long =
+    mln_runtime_event_style_image_missing.sizeof()
+  private val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_OFFSET: Long =
+    mln_runtime_event_style_image_missing.`image_id$offset`()
+  private val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_SIZE_OFFSET: Long =
+    mln_runtime_event_style_image_missing.`image_id_size$offset`()
 
-  private const val RUNTIME_EVENT_TILE_ACTION_SIZE: Long = 48
-  private const val RUNTIME_EVENT_TILE_ACTION_OPERATION_OFFSET: Long = 4
-  private const val RUNTIME_EVENT_TILE_ACTION_OVERSCALED_Z_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_TILE_ACTION_WRAP_OFFSET: Long = 12
-  private const val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Z_OFFSET: Long = 16
-  private const val RUNTIME_EVENT_TILE_ACTION_CANONICAL_X_OFFSET: Long = 20
-  private const val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Y_OFFSET: Long = 24
-  private const val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_OFFSET: Long = 32
-  private const val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_SIZE_OFFSET: Long = 40
+  private val RUNTIME_EVENT_TILE_ACTION_SIZE: Long = mln_runtime_event_tile_action.sizeof()
+  private val RUNTIME_EVENT_TILE_ACTION_OPERATION_OFFSET: Long =
+    mln_runtime_event_tile_action.`operation$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_OVERSCALED_Z_OFFSET: Long =
+    mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`overscaled_z$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_WRAP_OFFSET: Long =
+    mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`wrap$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Z_OFFSET: Long =
+    mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`canonical_z$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_CANONICAL_X_OFFSET: Long =
+    mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`canonical_x$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Y_OFFSET: Long =
+    mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`canonical_y$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_OFFSET: Long =
+    mln_runtime_event_tile_action.`source_id$offset`()
+  private val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_SIZE_OFFSET: Long =
+    mln_runtime_event_tile_action.`source_id_size$offset`()
 
-  private const val RUNTIME_EVENT_OFFLINE_REGION_STATUS_SIZE: Long = 80
-  private const val RUNTIME_EVENT_OFFLINE_REGION_STATUS_REGION_ID_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_OFFLINE_REGION_STATUS_STATUS_OFFSET: Long = 16
+  private val RUNTIME_EVENT_OFFLINE_REGION_STATUS_SIZE: Long =
+    mln_runtime_event_offline_region_status.sizeof()
+  private val RUNTIME_EVENT_OFFLINE_REGION_STATUS_REGION_ID_OFFSET: Long =
+    mln_runtime_event_offline_region_status.`region_id$offset`()
+  private val RUNTIME_EVENT_OFFLINE_REGION_STATUS_STATUS_OFFSET: Long =
+    mln_runtime_event_offline_region_status.`status$offset`()
 
-  private const val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_SIZE: Long = 24
-  private const val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REGION_ID_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REASON_OFFSET: Long = 16
+  private val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_SIZE: Long =
+    mln_runtime_event_offline_region_response_error.sizeof()
+  private val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REGION_ID_OFFSET: Long =
+    mln_runtime_event_offline_region_response_error.`region_id$offset`()
+  private val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REASON_OFFSET: Long =
+    mln_runtime_event_offline_region_response_error.`reason$offset`()
 
-  private const val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_SIZE: Long = 24
-  private const val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_REGION_ID_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET: Long = 16
+  private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_SIZE: Long =
+    mln_runtime_event_offline_region_tile_count_limit.sizeof()
+  private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_REGION_ID_OFFSET: Long =
+    mln_runtime_event_offline_region_tile_count_limit.`region_id$offset`()
+  private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET: Long =
+    mln_runtime_event_offline_region_tile_count_limit.`limit$offset`()
 
-  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE: Long = 32
-  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Long = 8
-  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Long = 16
-  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Long = 20
-  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long = 24
-  private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long = 28
+  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE: Long =
+    mln_runtime_event_offline_operation_completed.sizeof()
+  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Long =
+    mln_runtime_event_offline_operation_completed.`operation_id$offset`()
+  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Long =
+    mln_runtime_event_offline_operation_completed.`operation_kind$offset`()
+  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Long =
+    mln_runtime_event_offline_operation_completed.`result_kind$offset`()
+  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long =
+    mln_runtime_event_offline_operation_completed.`result_status$offset`()
+  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long =
+    mln_runtime_event_offline_operation_completed.`found$offset`()
 
   private const val OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID: Int = 1
   private const val OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY: Int = 2
 
-  private const val LAT_LNG_BOUNDS_SOUTHWEST_LATITUDE_OFFSET: Long = 0
-  private const val LAT_LNG_BOUNDS_SOUTHWEST_LONGITUDE_OFFSET: Long = 8
-  private const val LAT_LNG_BOUNDS_NORTHEAST_LATITUDE_OFFSET: Long = 16
-  private const val LAT_LNG_BOUNDS_NORTHEAST_LONGITUDE_OFFSET: Long = 24
+  private val LAT_LNG_BOUNDS_SOUTHWEST_LATITUDE_OFFSET: Long =
+    mln_lat_lng_bounds.`southwest$offset`() + mln_lat_lng.`latitude$offset`()
+  private val LAT_LNG_BOUNDS_SOUTHWEST_LONGITUDE_OFFSET: Long =
+    mln_lat_lng_bounds.`southwest$offset`() + mln_lat_lng.`longitude$offset`()
+  private val LAT_LNG_BOUNDS_NORTHEAST_LATITUDE_OFFSET: Long =
+    mln_lat_lng_bounds.`northeast$offset`() + mln_lat_lng.`latitude$offset`()
+  private val LAT_LNG_BOUNDS_NORTHEAST_LONGITUDE_OFFSET: Long =
+    mln_lat_lng_bounds.`northeast$offset`() + mln_lat_lng.`longitude$offset`()
 
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_SIZE: Long = 72
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_SIZE_OFFSET: Long = 0
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_STYLE_URL_OFFSET: Long = 8
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_BOUNDS_OFFSET: Long = 16
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_MIN_ZOOM_OFFSET: Long = 48
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_MAX_ZOOM_OFFSET: Long = 56
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_PIXEL_RATIO_OFFSET: Long = 64
-  private const val OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long = 68
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_SIZE: Long =
+    mln_offline_tile_pyramid_region_definition.sizeof()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_SIZE_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`size$offset`()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_STYLE_URL_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`style_url$offset`()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_BOUNDS_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`bounds$offset`()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_MIN_ZOOM_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`min_zoom$offset`()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_MAX_ZOOM_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`max_zoom$offset`()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_PIXEL_RATIO_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`pixel_ratio$offset`()
+  private val OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long =
+    mln_offline_tile_pyramid_region_definition.`include_ideographs$offset`()
 
-  private const val OFFLINE_GEOMETRY_DEFINITION_SIZE: Long = 48
-  private const val OFFLINE_GEOMETRY_DEFINITION_SIZE_OFFSET: Long = 0
-  private const val OFFLINE_GEOMETRY_DEFINITION_STYLE_URL_OFFSET: Long = 8
-  private const val OFFLINE_GEOMETRY_DEFINITION_GEOMETRY_OFFSET: Long = 16
-  private const val OFFLINE_GEOMETRY_DEFINITION_MIN_ZOOM_OFFSET: Long = 24
-  private const val OFFLINE_GEOMETRY_DEFINITION_MAX_ZOOM_OFFSET: Long = 32
-  private const val OFFLINE_GEOMETRY_DEFINITION_PIXEL_RATIO_OFFSET: Long = 40
-  private const val OFFLINE_GEOMETRY_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long = 44
+  private val OFFLINE_GEOMETRY_DEFINITION_SIZE: Long =
+    mln_offline_geometry_region_definition.sizeof()
+  private val OFFLINE_GEOMETRY_DEFINITION_SIZE_OFFSET: Long =
+    mln_offline_geometry_region_definition.`size$offset`()
+  private val OFFLINE_GEOMETRY_DEFINITION_STYLE_URL_OFFSET: Long =
+    mln_offline_geometry_region_definition.`style_url$offset`()
+  private val OFFLINE_GEOMETRY_DEFINITION_GEOMETRY_OFFSET: Long =
+    mln_offline_geometry_region_definition.`geometry$offset`()
+  private val OFFLINE_GEOMETRY_DEFINITION_MIN_ZOOM_OFFSET: Long =
+    mln_offline_geometry_region_definition.`min_zoom$offset`()
+  private val OFFLINE_GEOMETRY_DEFINITION_MAX_ZOOM_OFFSET: Long =
+    mln_offline_geometry_region_definition.`max_zoom$offset`()
+  private val OFFLINE_GEOMETRY_DEFINITION_PIXEL_RATIO_OFFSET: Long =
+    mln_offline_geometry_region_definition.`pixel_ratio$offset`()
+  private val OFFLINE_GEOMETRY_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long =
+    mln_offline_geometry_region_definition.`include_ideographs$offset`()
 
-  private const val OFFLINE_REGION_DEFINITION_SIZE: Long = 80
-  private const val OFFLINE_REGION_DEFINITION_SIZE_OFFSET: Long = 0
-  private const val OFFLINE_REGION_DEFINITION_TYPE_OFFSET: Long = 4
-  private const val OFFLINE_REGION_DEFINITION_DATA_OFFSET: Long = 8
+  private val OFFLINE_REGION_DEFINITION_SIZE: Long = mln_offline_region_definition.sizeof()
+  private val OFFLINE_REGION_DEFINITION_SIZE_OFFSET: Long =
+    mln_offline_region_definition.`size$offset`()
+  private val OFFLINE_REGION_DEFINITION_TYPE_OFFSET: Long =
+    mln_offline_region_definition.`type$offset`()
+  private val OFFLINE_REGION_DEFINITION_DATA_OFFSET: Long =
+    mln_offline_region_definition.`data$offset`()
 
-  private const val OFFLINE_REGION_INFO_SIZE: Long = 112
-  private const val OFFLINE_REGION_INFO_SIZE_OFFSET: Long = 0
-  private const val OFFLINE_REGION_INFO_ID_OFFSET: Long = 8
-  private const val OFFLINE_REGION_INFO_DEFINITION_OFFSET: Long = 16
-  private const val OFFLINE_REGION_INFO_METADATA_OFFSET: Long = 96
-  private const val OFFLINE_REGION_INFO_METADATA_SIZE_OFFSET: Long = 104
+  private val OFFLINE_REGION_INFO_SIZE: Long = mln_offline_region_info.sizeof()
+  private val OFFLINE_REGION_INFO_SIZE_OFFSET: Long = mln_offline_region_info.`size$offset`()
+  private val OFFLINE_REGION_INFO_ID_OFFSET: Long = mln_offline_region_info.`id$offset`()
+  private val OFFLINE_REGION_INFO_DEFINITION_OFFSET: Long =
+    mln_offline_region_info.`definition$offset`()
+  private val OFFLINE_REGION_INFO_METADATA_OFFSET: Long =
+    mln_offline_region_info.`metadata$offset`()
+  private val OFFLINE_REGION_INFO_METADATA_SIZE_OFFSET: Long =
+    mln_offline_region_info.`metadata_size$offset`()
 
   internal data class NativeRuntimeEvent(
     val type: Int,

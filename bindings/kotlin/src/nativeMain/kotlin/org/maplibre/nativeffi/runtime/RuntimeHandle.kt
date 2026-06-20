@@ -429,6 +429,7 @@ internal constructor(
     callback: ResourceProviderCallback,
     install: (ResourceProviderState) -> Int,
   ) {
+    resourceProviderState?.checkCanClose()
     val replacement = ResourceProviderState(callback)
     val previous: ResourceProviderState?
     try {
@@ -459,6 +460,7 @@ internal constructor(
     callback: ResourceTransformCallback,
     install: (ResourceTransformState) -> Int,
   ) {
+    resourceTransformState?.checkCanClose()
     val replacement = ResourceTransformState(callback)
     val previous: ResourceTransformState?
     try {
@@ -473,6 +475,7 @@ internal constructor(
   }
 
   public actual fun clearResourceTransform() {
+    resourceTransformState?.checkCanClose()
     Status.check(mln_runtime_clear_resource_transform(state.requireLive()))
     val previous = resourceTransformState
     resourceTransformState = null

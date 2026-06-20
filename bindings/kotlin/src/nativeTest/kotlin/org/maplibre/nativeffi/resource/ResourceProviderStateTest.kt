@@ -133,6 +133,41 @@ class ResourceProviderStateTest {
     }
   }
 
+  @Test
+  fun resourceResponseMaterializerRejectsEmbeddedNulWithBindingInvalidArgument() {
+    memScoped {
+      val response =
+        ResourceResponse(ResourceResponseStatus.ERROR).apply {
+          errorReason = ResourceErrorReason.OTHER
+          etag = "bad\u0000etag"
+        }
+
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          ResourceStructs.resourceResponse(response, this)
+        }
+
+      assertEquals("ETag contains embedded NUL", error.diagnostic)
+    }
+  }
+
+  @Test
+  fun resourceResponseMaterializerRejectsUnknownErrorReasonWithBindingInvalidArgument() {
+    memScoped {
+      val response =
+        ResourceResponse(ResourceResponseStatus.ERROR).apply {
+          errorReason = ResourceErrorReason(999)
+        }
+
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          ResourceStructs.resourceResponse(response, this)
+        }
+
+      assertEquals("Unknown resource error reason cannot be used as input: 999", error.diagnostic)
+    }
+  }
+
   // BND-142, BND-150, BND-151: provider decision ownership and stale-handle behavior.
 
   @Test

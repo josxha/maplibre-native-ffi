@@ -11,6 +11,7 @@ import kotlinx.cinterop.toCValues
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
 import org.maplibre.nativeffi.resource.ResourcePriority
@@ -54,15 +55,19 @@ internal object ResourceStructs {
     val native = scope.alloc<mln_resource_response>()
     native.size = kotlinx.cinterop.sizeOf<mln_resource_response>().toUInt()
     native.status = value.status.nativeValue.toUInt()
-    require(value.errorReason.isKnown) {
-      "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+    if (!value.errorReason.isKnown) {
+      throw Status.invalidArgument(
+        "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+      )
     }
     native.error_reason = value.errorReason.nativeValue.toUInt()
     if (bytes.isNotEmpty()) {
       native.bytes = bytes.toUByteArray().toCValues().getPointer(scope)
       native.byte_count = bytes.size.toULong()
     }
-    value.errorMessage?.let { native.error_message = MemoryUtil.cString(scope, it) }
+    value.errorMessage?.let {
+      native.error_message = resourceResponseCString(scope, it, "error message")
+    }
     native.must_revalidate = value.mustRevalidate
     value.modifiedUnixMs?.let {
       native.has_modified = true
@@ -72,7 +77,7 @@ internal object ResourceStructs {
       native.has_expires = true
       native.expires_unix_ms = it
     }
-    value.etag?.let { native.etag = MemoryUtil.cString(scope, it) }
+    value.etag?.let { native.etag = resourceResponseCString(scope, it, "ETag") }
     value.retryAfterUnixMs?.let {
       native.has_retry_after = true
       native.retry_after_unix_ms = it
@@ -85,6 +90,17 @@ internal object ResourceStructs {
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
     return value.toInt()
+  }
+
+  private fun resourceResponseCString(
+    scope: MemScope,
+    value: String,
+    description: String,
+  ): CPointer<ByteVar> {
+    if ('\u0000' in value) {
+      throw Status.invalidArgument("$description contains embedded NUL")
+    }
+    return MemoryUtil.cString(scope, value)
   }
 
   private fun optionalCString(value: CPointer<ByteVar>?): String? =

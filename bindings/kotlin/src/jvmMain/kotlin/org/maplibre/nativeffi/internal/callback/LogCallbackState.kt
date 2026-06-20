@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.callback
 
 import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
@@ -10,6 +9,7 @@ import java.lang.invoke.MethodType
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import org.maplibre.nativeffi.internal.c.mln_log_callback
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
@@ -22,7 +22,7 @@ import org.maplibre.nativeffi.log.LogSeverity
 internal class LogCallbackState private constructor(private val callback: LogCallback) :
   AutoCloseable {
   private val arena = Arena.ofShared()
-  private val closed = AtomicInt(0)
+  private val gate = CallbackGate("log callbacks") { arena.close() }
   private val stub: MemorySegment
 
   init {
@@ -52,7 +52,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     code: Long,
     message: MemorySegment,
   ): Int {
-    if (closed.load() != 0) return 0
+    val lease = gate.enter() ?: return 0
     return try {
       val record =
         LogRecord(
@@ -64,13 +64,14 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       if (callback.log(record)) 1 else 0
     } catch (_: Throwable) {
       0
+    } finally {
+      lease.close()
     }
   }
 
-  override fun close() {
-    closed.store(1)
-    arena.close()
-  }
+  fun checkCanClose() = gate.checkCanClose()
+
+  override fun close() = gate.close()
 
   private fun copyCString(address: MemorySegment): String {
     if (address == MemorySegment.NULL) {
@@ -93,6 +94,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       var previous: LogCallbackState? = null
       try {
         withUpdateLock {
+          current.load()?.checkCanClose()
           Status.check(NativeAccess.setLogCallback(replacement.stub))
           previous = current.exchange(replacement)
         }
@@ -100,20 +102,27 @@ internal class LogCallbackState private constructor(private val callback: LogCal
         replacement.close()
         throw error
       }
-      previous?.close()
+      closeQuietly(previous)
     }
 
     fun clear() {
       NativeAccess.ensureLoaded()
       var previous: LogCallbackState? = null
       withUpdateLock {
+        current.load()?.checkCanClose()
         Status.check(NativeAccess.clearLogCallback())
         previous = current.exchange(null)
       }
-      previous?.close()
+      closeQuietly(previous)
     }
 
     fun currentForTesting(): LogCallbackState? = current.load()
+
+    private fun closeQuietly(state: LogCallbackState?) {
+      try {
+        state?.close()
+      } catch (_: RuntimeException) {}
+    }
 
     private inline fun <R> withUpdateLock(block: () -> R): R {
       while (!updateLock.compareAndSet(0, 1)) {}
@@ -124,14 +133,6 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       }
     }
 
-    private val callbackDescriptor =
-      FunctionDescriptor.of(
-        ValueLayout.JAVA_INT,
-        ValueLayout.ADDRESS,
-        ValueLayout.JAVA_INT,
-        ValueLayout.JAVA_INT,
-        ValueLayout.JAVA_LONG,
-        ValueLayout.ADDRESS,
-      )
+    private val callbackDescriptor = mln_log_callback.descriptor()
   }
 }

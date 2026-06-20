@@ -40,4 +40,24 @@ class ResourceTransformStateTest {
         }
       }
   }
+
+  @Test
+  fun invalidRewriteUrlReturnsInvalidArgument() {
+    ResourceTransformState(ResourceTransformCallback { "bad\u0000url" }).use { state ->
+      Arena.ofConfined().use { arena ->
+        val response = arena.allocate(24)
+        val status =
+          state.invoke(
+            MemorySegment.NULL,
+            ResourceKind.STYLE.nativeValue,
+            arena.allocateFrom("https://example.com/style.json"),
+            response,
+          )
+
+        assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, status)
+        assertEquals(24, response.get(ValueLayout.JAVA_INT, 0))
+        assertEquals(MemorySegment.NULL, response.get(ValueLayout.ADDRESS, 8))
+      }
+    }
+  }
 }
