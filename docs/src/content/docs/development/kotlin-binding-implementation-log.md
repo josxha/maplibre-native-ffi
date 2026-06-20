@@ -1213,3 +1213,19 @@ is being implemented.
 - Discovery: local `bindings/java-ffm/build` output can remain after tracked
   source deletion. Clearing it avoids a misleading untracked module directory in
   follow-up scans.
+
+### Java JNI Public Module Retirement Milestone
+
+- Removed the separate `:bindings:java-jni` Gradle subproject after the Kotlin
+  `androidMain` JavaCPP bridge became the active JNI implementation surface.
+- Removed the Java JNI source, tests, mise task, CI subproject manifest,
+  generated workflow steps, docs API task, sidebar reference link, and remaining
+  project-map references.
+- Left Android JNI ownership in `bindings/kotlin/src/androidMain`, including
+  JavaCPP configuration and Android actual bridge implementations.
+- Discovery: the retired Java JNI module was a desktop Java module under
+  `org.maplibre.nativejni`, while the target architecture keeps JNI Android-only
+  under the Kotlin package root.
+- Discovery: removing Java JNI also removes the last docs `api:java-*` task, so
+  docs API generation now covers C, Rust, and Zig until Kotlin API reference
+  generation is introduced.
