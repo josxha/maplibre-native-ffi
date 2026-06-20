@@ -51,7 +51,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 # Java/Kotlin ecosystem
 "core:java" = "temurin-25.0.3+9.0.LTS"
 "aqua:facebook/ktfmt" = "0.62"
-"github:google/google-java-format" = "1.35.0"
+"aqua:google/google-java-format" = "1.35.0"
 
 # Python ecosystem
 "core:python" = "3.14.4"
@@ -59,7 +59,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 # Swift ecosystem
 "core:swift" = { version = "6.3.1", os = ["macos"] }
-"github:nicklockwood/SwiftFormat" = "0.61.1"
+swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
 "core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy" }
@@ -70,8 +70,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 [env]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_REPO_ROOT = "{{config_root}}"
-MLN_FFI_VARIANT = { required = true }
-MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
@@ -79,7 +77,6 @@ MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
-MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
@@ -91,10 +88,6 @@ postinstall = [
   { task = "sync-submodules" },
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
-  # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
-  # https://github.com/KyleMayes/clang-sys/issues/213
-  # https://github.com/conda-forge/llvmdev-feedstock/issues/376
-  '{% if os() == "windows" %}libclang_bin="$(dirname "$MLN_FFI_DEPENDENCY_LIBRARY_DIR")/bin"; cp "$libclang_bin/libclang-13.dll" "$libclang_bin/libclang.dll"{% endif %}',
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
   "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
@@ -151,7 +144,7 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 [tasks.deps]
 description = "Install variant-specific managed dependencies."
 run = '''
-if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
+if [[ "${MISE_ENV%-*}" == "macos-arm64" ]]; then
   mise run deps:angle
 fi
 '''
