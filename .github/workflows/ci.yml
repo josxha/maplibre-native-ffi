@@ -115,7 +115,7 @@ jobs:
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-metal:
     name: variant / macos-arm64-metal
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       MISE_ENV: macos-arm64-metal
@@ -137,7 +137,7 @@ jobs:
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-vulkan:
     name: variant / macos-arm64-vulkan
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       MISE_ENV: macos-arm64-vulkan
@@ -159,7 +159,7 @@ jobs:
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-egl:
     name: variant / macos-arm64-egl
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       MISE_ENV: macos-arm64-egl
@@ -200,7 +200,7 @@ jobs:
       - run: mise run build
   variant-ios-arm64-metal:
     name: variant / ios-arm64-metal
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       MISE_ENV: ios-arm64-metal
@@ -213,7 +213,7 @@ jobs:
       - run: mise run build
   variant-ios-simulator-arm64-metal:
     name: variant / ios-simulator-arm64-metal
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       MISE_ENV: ios-simulator-arm64-metal
