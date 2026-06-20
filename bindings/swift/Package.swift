@@ -1,10 +1,22 @@
 // swift-tools-version: 6.0
 
+import Foundation
 import PackageDescription
 
-let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] ?? {
-  fatalError("MLN_FFI_BUILD_DIR is required")
-}()
+func nativeLinkerFlags() -> [String] {
+  guard let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] else {
+    fatalError("MLN_FFI_BUILD_DIR is required")
+  }
+  let flagsFile = "\(nativeBuildDir)/maplibre-native-c.swift-linker-flags"
+
+  do {
+    return try String(contentsOfFile: flagsFile, encoding: .utf8)
+      .split { $0.isNewline }
+      .map(String.init)
+  } catch {
+    fatalError("failed to read native linker flags from \(flagsFile): \(error)")
+  }
+}
 
 let package = Package(
   name: "maplibre-native-swift",
@@ -20,14 +32,7 @@ let package = Package(
       name: "MaplibreNative",
       dependencies: ["CMaplibreNativeC"],
       linkerSettings: [
-        .unsafeFlags([
-          "-L\(nativeBuildDir)",
-          "-lmaplibre-native-c",
-          "-Xlinker",
-          "-rpath",
-          "-Xlinker",
-          nativeBuildDir,
-        ]),
+        .unsafeFlags(nativeLinkerFlags()),
       ]
     ),
     .testTarget(

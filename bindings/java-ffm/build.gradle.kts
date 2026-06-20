@@ -1,14 +1,18 @@
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
   `java-library`
   id("de.infolektuell.jextract") version "1.4.0"
 }
 
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
+
 repositories { mavenCentral() }
 
 val lwjglVersion = "3.4.1"
+val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 
 fun lwjglNativeClassifier(): String {
   val os = System.getProperty("os.name").lowercase()
@@ -29,7 +33,9 @@ val lwjglTestJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 jextract.libraries {
   val maplibreNativeC by registering {
     header = rootProject.layout.projectDirectory.file("include/maplibre_native_c.h")
-    includes.add(rootProject.layout.projectDirectory.dir("include"))
+    maplibreNativeC.includeDirs.forEach { includeDir ->
+      includes.add(rootProject.layout.dir(providers.provider { includeDir }))
+    }
     headerClassName = "MapLibreNativeC"
     targetPackage = "org.maplibre.nativeffi.internal.c"
     whitelist.argFile = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
@@ -70,14 +76,12 @@ tasks.named<Javadoc>("javadoc") {
 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeBuildDirForTests = providers.environmentVariable("MLN_FFI_BUILD_DIR")
-val nativeLibraryPathForTests = nativeBuildDirForTests.map {
-  "$it/${System.mapLibraryName("maplibre-native-c")}"
-}
+val nativeLibraryPathForTests = maplibreNativeC.libraryPath
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
   jvmArgs(lwjglTestJvmArgs)
-  systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.get())
+  systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.absolutePath)
   inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
+  inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
 }

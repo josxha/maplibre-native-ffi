@@ -1,10 +1,13 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins { kotlin("multiplatform") version "2.2.21" }
 
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
+
 repositories { mavenCentral() }
 
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
+val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val hostOs = System.getProperty("os.name").lowercase()
 val hostArch = System.getProperty("os.arch").lowercase()
 
@@ -17,24 +20,23 @@ kotlin {
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
-    if (nativeBuildDir != null) {
-      binaries.all {
-        linkerOpts("-L$nativeBuildDir", "-lmaplibre-native-c")
-        if (hostOs.contains("mac") || hostOs.contains("linux")) {
-          linkerOpts("-Wl,-rpath,$nativeBuildDir")
-        }
-        if (hostOs.contains("mac")) {
-          linkerOpts("-framework", "Foundation", "-framework", "Metal", "-framework", "QuartzCore")
-        }
+    binaries.all {
+      linkerOpts(maplibreNativeC.linkDirs.map { "-L$it" })
+      linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
+      if (hostOs.contains("mac") || hostOs.contains("linux")) {
+        linkerOpts(maplibreNativeC.runtimeLibraryDirs.map { "-Wl,-rpath,$it" })
+      }
+      if (hostOs.contains("mac")) {
+        linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
       }
     }
 
     compilations.getByName("main") {
       cinterops {
-        val maplibreNativeC by creating {
+        create("maplibreNativeC") {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
-          includeDirs.headerFilterOnly(rootProject.file("include"))
-          compilerOpts("-I${rootProject.file("include").absolutePath}")
+          includeDirs.headerFilterOnly(*maplibreNativeC.includeDirs.toTypedArray())
+          compilerOpts(maplibreNativeC.includeDirs.map { "-I$it" })
         }
       }
     }

@@ -2,12 +2,16 @@ import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainService
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins { `java-library` }
+
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 repositories { mavenCentral() }
 
 val lwjglVersion = "3.4.1"
+val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 
 fun lwjglNativeClassifier(): String {
   val os = System.getProperty("os.name").lowercase()
@@ -95,7 +99,7 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
-      "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
+      "-Dplatform.includepath=${maplibreNativeC.includeDirs.joinToString(File.pathSeparator)}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
       "-nogenerate",
@@ -112,7 +116,7 @@ val generateJavaCppBindings =
 
 tasks.named<JavaCompile>("compileJava") { dependsOn(generateJavaCppBindings) }
 
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
+val nativeLibraryPath = maplibreNativeC.libraryPath
 val javaCppPlatformName = javaCppPlatform()
 val jniBridgeLibrary =
   layout.buildDirectory.file(
@@ -129,12 +133,13 @@ val buildJavaCppNative =
     args(
       "-classpath",
       sourceSets.main.get().runtimeClasspath.asPath,
-      "-Dplatform.linkpath=${nativeBuildDir.get()}",
+      "-Dplatform.linkpath=${maplibreNativeC.linkDirs.joinToString(File.pathSeparator)}",
       "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
     )
     inputs.files(sourceSets.main.get().output.classesDirs)
     inputs.dir(rootProject.layout.projectDirectory.dir("include"))
-    inputs.dir(nativeBuildDir)
+    inputs.file(nativeLibraryPath)
+    inputs.file(maplibreNativeC.propertiesFile)
     outputs.file(jniBridgeLibrary)
     mustRunAfter(tasks.named("compileTestJava"))
   }

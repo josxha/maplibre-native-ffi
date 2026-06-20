@@ -1,11 +1,15 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins { application }
+
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 repositories { mavenCentral() }
 
 val lwjglVersion = "3.4.1"
+val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 
 fun lwjglNativeClassifier(): String {
   val os = System.getProperty("os.name").lowercase()
@@ -55,11 +59,11 @@ dependencies {
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
-val nativeLibraryPath = nativeBuildDir.map { "$it/${System.mapLibraryName("maplibre-native-c")}" }
+val nativeLibraryPath = maplibreNativeC.libraryPath
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(lwjglMapJvmArgs)
-  systemProperty(nativeLibraryPathProperty, nativeLibraryPath.get())
-  inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary").optional()
+  systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)
+  inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary")
+  inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
 }

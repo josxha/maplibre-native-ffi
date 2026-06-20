@@ -1,10 +1,10 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
@@ -16,22 +16,173 @@ pub const RenderBackend = enum {
     vulkan,
 };
 
+const ArtifactShape = enum {
+    shared_private,
+    static_monolithic,
+};
+
+const NativeArtifactConfig = struct {
+    render_backend: []const u8 = "",
+    artifact_shape: []const u8 = "",
+    library_path: []const u8 = "",
+    import_library_path: []const u8 = "",
+    include_dirs: []const []const u8 = &.{},
+    library_dirs: []const []const u8 = &.{},
+    link_dirs: []const []const u8 = &.{},
+    runtime_library_dirs: []const []const u8 = &.{},
+    link_libraries: []const []const u8 = &.{},
+    frameworks: []const []const u8 = &.{},
+};
+
+const NativeArtifactConfigCache = struct {
+    path: ?std.Build.LazyPath = null,
+    path_loaded: bool = false,
+    config: ?NativeArtifactConfig = null,
+    config_loaded: bool = false,
+};
+
+var native_artifact_config_caches = std.AutoArrayHashMapUnmanaged(*std.Build, NativeArtifactConfigCache){};
+
+fn nativeArtifactConfigCache(b: *std.Build) *NativeArtifactConfigCache {
+    const result = native_artifact_config_caches.getOrPut(b.allocator, b) catch @panic("out of memory");
+    if (!result.found_existing) {
+        result.value_ptr.* = .{};
+    }
+    return result.value_ptr;
+}
+
+fn parseRenderBackend(value: []const u8) RenderBackend {
+    return std.meta.stringToEnum(RenderBackend, value) orelse
+        std.debug.panic("unsupported render backend in native artifact config: {s}", .{value});
+}
+
+fn parseArtifactShape(value: []const u8) ArtifactShape {
+    if (std.mem.eql(u8, value, "shared-private")) return .shared_private;
+    if (std.mem.eql(u8, value, "static-monolithic")) return .static_monolithic;
+    std.debug.panic("unsupported artifact shape in native artifact config: {s}", .{value});
+}
+
+fn maybeNativeArtifactConfigPath(b: *std.Build) ?std.Build.LazyPath {
+    const cache = nativeArtifactConfigCache(b);
+    if (!cache.path_loaded) {
+        cache.path = b.option(
+            std.Build.LazyPath,
+            "native-config",
+            "Generated native artifact config from the CMake build directory",
+        );
+        cache.path_loaded = true;
+    }
+    return cache.path;
+}
+
+pub fn nativeArtifactConfigPath(b: *std.Build) std.Build.LazyPath {
+    return maybeNativeArtifactConfigPath(b) orelse @panic("missing required -Dnative-config=<path-to-maplibre-native-c.zig-config>");
+}
+
+fn pathListSeparator() u8 {
+    return if (builtin.os.tag == .windows) ';' else ':';
+}
+
+fn parsePathList(b: *std.Build, value: []const u8) []const []const u8 {
+    if (value.len == 0) return &.{};
+
+    var count: usize = 0;
+    var counter = std.mem.tokenizeScalar(u8, value, pathListSeparator());
+    while (counter.next() != null) count += 1;
+
+    const paths = b.allocator.alloc([]const u8, count) catch @panic("out of memory");
+    var index: usize = 0;
+    var tokens = std.mem.tokenizeScalar(u8, value, pathListSeparator());
+    while (tokens.next()) |path| {
+        paths[index] = path;
+        index += 1;
+    }
+    return paths;
+}
+
+fn parseNativeArtifactConfig(b: *std.Build, config_path: std.Build.LazyPath) NativeArtifactConfig {
+    const config_bytes = std.Io.Dir.cwd().readFileAlloc(
+        b.graph.io,
+        config_path.getPath(b),
+        b.allocator,
+        .limited(1024 * 1024),
+    ) catch |err| std.debug.panic("failed to read native artifact config: {s}: {}", .{ config_path.getPath(b), err });
+
+    var config = NativeArtifactConfig{};
+    var lines = std.mem.splitScalar(u8, config_bytes, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r");
+        if (line.len == 0) continue;
+        const separator = std.mem.indexOfScalar(u8, line, '=') orelse
+            std.debug.panic("invalid native artifact config line: {s}", .{line});
+        const key = line[0..separator];
+        const value = line[separator + 1 ..];
+
+        if (std.mem.eql(u8, key, "render_backend")) {
+            config.render_backend = value;
+        } else if (std.mem.eql(u8, key, "artifact_shape")) {
+            config.artifact_shape = value;
+        } else if (std.mem.eql(u8, key, "library_path")) {
+            config.library_path = value;
+        } else if (std.mem.eql(u8, key, "import_library_path")) {
+            config.import_library_path = value;
+        } else if (std.mem.eql(u8, key, "include_dirs")) {
+            config.include_dirs = parsePathList(b, value);
+        } else if (std.mem.eql(u8, key, "library_dirs")) {
+            config.library_dirs = parsePathList(b, value);
+        } else if (std.mem.eql(u8, key, "link_dirs")) {
+            config.link_dirs = parsePathList(b, value);
+        } else if (std.mem.eql(u8, key, "runtime_library_dirs")) {
+            config.runtime_library_dirs = parsePathList(b, value);
+        } else if (std.mem.eql(u8, key, "link_libraries")) {
+            config.link_libraries = parsePathList(b, value);
+        } else if (std.mem.eql(u8, key, "frameworks")) {
+            config.frameworks = parsePathList(b, value);
+        }
+    }
+
+    if (config.render_backend.len == 0 or config.artifact_shape.len == 0 or config.library_path.len == 0) {
+        std.debug.panic("native artifact config is incomplete: {s}", .{config_path.getPath(b)});
+    }
+    if (config.import_library_path.len == 0) config.import_library_path = config.library_path;
+    return config;
+}
+
+fn maybeNativeArtifactConfig(b: *std.Build) ?NativeArtifactConfig {
+    const cache = nativeArtifactConfigCache(b);
+    if (cache.config_loaded) return cache.config;
+    const config_path = maybeNativeArtifactConfigPath(b) orelse return null;
+    cache.config = parseNativeArtifactConfig(b, config_path);
+    cache.config_loaded = true;
+    return cache.config;
+}
+
+fn nativeArtifactConfig(b: *std.Build) NativeArtifactConfig {
+    return maybeNativeArtifactConfig(b) orelse @panic("missing required -Dnative-config=<path-to-maplibre-native-c.zig-config>");
+}
+
+fn lazyPath(path: []const u8) std.Build.LazyPath {
+    return .{ .cwd_relative = path };
+}
+
+fn lazyPathsFromStrings(b: *std.Build, paths: []const []const u8) []const std.Build.LazyPath {
+    const lazy_paths = b.allocator.alloc(std.Build.LazyPath, paths.len) catch @panic("out of memory");
+    for (paths, lazy_paths) |path, *lazy_path_| {
+        lazy_path_.* = lazyPath(path);
+    }
+    return lazy_paths;
+}
+
 pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir: std.Build.LazyPath,
-    render_backend: RenderBackend,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dirs: []const std.Build.LazyPath = &.{},
 };
 
 pub const DependencyOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir: std.Build.LazyPath,
-    include_dirs: []const std.Build.LazyPath,
-    render_backend: RenderBackend,
-    dependency_library_dirs: []const std.Build.LazyPath = &.{},
+    native_config_path: std.Build.LazyPath,
 };
 
 pub const RenderBackendLinkOptions = struct {
@@ -41,27 +192,11 @@ pub const RenderBackendLinkOptions = struct {
 };
 
 pub fn renderBackend(b: *std.Build) RenderBackend {
-    return b.option(
-        RenderBackend,
-        "render-backend",
-        "Render backend built into the CMake artifact: metal, opengl, or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|opengl|vulkan");
-}
-
-pub fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    return b.option(
-        std.Build.LazyPath,
-        "cmake-artifact-dir",
-        "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
+    return parseRenderBackend(nativeArtifactConfig(b).render_backend);
 }
 
 pub fn includeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option(
-        []const std.Build.LazyPath,
-        "include-dir",
-        "Include directory. Repeat for project, dependency, and backend headers.",
-    ) orelse @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
+    return lazyPathsFromStrings(b, nativeArtifactConfig(b).include_dirs);
 }
 
 pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
@@ -159,11 +294,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
 }
 
 pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option(
-        []const std.Build.LazyPath,
-        "dependency-library-dir",
-        "Dependency library directory. Repeat for backend runtime libraries.",
-    ) orelse &.{};
+    return lazyPathsFromStrings(b, nativeArtifactConfig(b).library_dirs);
 }
 
 fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
@@ -195,6 +326,30 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib" }) });
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib64" }) });
+    }
+}
+
+fn linkSystemLibraries(module: *std.Build.Module, libraries: []const []const u8) void {
+    for (libraries) |library| {
+        module.linkSystemLibrary(library, .{});
+    }
+}
+
+fn linkFrameworks(module: *std.Build.Module, frameworks: []const []const u8) void {
+    for (frameworks) |framework| {
+        module.linkFramework(framework, .{});
+    }
+}
+
+fn addLibraryPaths(module: *std.Build.Module, library_dirs: []const std.Build.LazyPath) void {
+    for (library_dirs) |library_dir| {
+        module.addLibraryPath(library_dir);
+    }
+}
+
+fn addRPaths(module: *std.Build.Module, library_dirs: []const std.Build.LazyPath) void {
+    for (library_dirs) |library_dir| {
+        module.addRPath(library_dir);
     }
 }
 
@@ -238,7 +393,7 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             },
             .macos => {
                 if (options.dependency_library_dirs.len == 0) {
-                    @panic("macOS OpenGL builds require -Ddependency-library-dir=<path> containing EGL and GLESv2");
+                    @panic("macOS OpenGL builds require native artifact config with a library_dirs entry containing EGL and GLESv2");
                 }
                 addDependencyLibraryPaths(module, options.dependency_library_dirs);
                 module.linkSystemLibrary("EGL", .{});
@@ -257,18 +412,12 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
 fn dependencyArgs(options: DependencyOptions) struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    @"cmake-artifact-dir": std.Build.LazyPath,
-    @"include-dir": []const std.Build.LazyPath,
-    @"render-backend": RenderBackend,
-    @"dependency-library-dir": []const std.Build.LazyPath,
+    @"native-config": std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
         .optimize = options.optimize,
-        .@"cmake-artifact-dir" = options.cmake_artifact_dir,
-        .@"include-dir" = options.include_dirs,
-        .@"render-backend" = options.render_backend,
-        .@"dependency-library-dir" = options.dependency_library_dirs,
+        .@"native-config" = options.native_config_path,
     };
 }
 
@@ -284,10 +433,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
     return .{
         .target = options.target,
         .optimize = options.optimize,
-        .cmake_artifact_dir = options.cmake_artifact_dir,
-        .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
-        .dependency_library_dirs = options.dependency_library_dirs,
     };
 }
 
@@ -319,48 +465,37 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .optimize = options.optimize,
     });
-    if (options.target.result.os.tag == .windows) {
-        module_.addObjectFile(options.cmake_artifact_dir.path(b, "maplibre-native-c.lib"));
-    } else if (isIosSimulator(options.target)) {
-        module_.addLibraryPath(options.cmake_artifact_dir);
-        module_.addRPath(options.cmake_artifact_dir);
-        module_.linkSystemLibrary("maplibre-native-c", .{});
-    } else if (options.target.result.os.tag == .ios) {
-        module_.addLibraryPath(options.cmake_artifact_dir);
-        module_.addLibraryPath(options.cmake_artifact_dir.path(b, "maplibre-native"));
-        module_.addLibraryPath(options.cmake_artifact_dir.path(b, "maplibre-native/vendor/maplibre-tile-spec/cpp"));
-        module_.linkSystemLibrary("maplibre-native-c", .{});
-        module_.linkSystemLibrary("mbgl-core", .{});
-        module_.linkSystemLibrary("mbgl-freetype", .{});
-        module_.linkSystemLibrary("mbgl-harfbuzz", .{});
-        module_.linkSystemLibrary("mbgl-vendor-csscolorparser", .{});
-        module_.linkSystemLibrary("mbgl-vendor-nunicode", .{});
-        module_.linkSystemLibrary("mbgl-vendor-parsedate", .{});
-        module_.linkSystemLibrary("mbgl-vendor-sqlite", .{});
-        module_.linkSystemLibrary("mlt-cpp", .{});
-        if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
-            if (system_root.len != 0) {
-                module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
+    const config = nativeArtifactConfig(b);
+    const dependency_library_dirs = lazyPathsFromStrings(b, config.library_dirs);
+    const link_dirs = lazyPathsFromStrings(b, config.link_dirs);
+    const runtime_library_dirs = lazyPathsFromStrings(b, config.runtime_library_dirs);
+    switch (parseArtifactShape(config.artifact_shape)) {
+        .shared_private => {
+            if (options.target.result.os.tag == .windows) {
+                module_.addObjectFile(lazyPath(config.import_library_path));
+            } else {
+                addLibraryPaths(module_, link_dirs);
+                addRPaths(module_, runtime_library_dirs);
+                module_.linkSystemLibrary("maplibre-native-c", .{});
             }
-        }
-        module_.linkSystemLibrary("objc", .{});
-        module_.linkSystemLibrary("sqlite3", .{});
-        module_.linkSystemLibrary("z", .{});
-        module_.linkFramework("CoreFoundation", .{});
-        module_.linkFramework("CoreGraphics", .{});
-        module_.linkFramework("CoreText", .{});
-        module_.linkFramework("Foundation", .{});
-        module_.linkFramework("ImageIO", .{});
-        module_.linkFramework("MetalKit", .{});
-    } else {
-        module_.addLibraryPath(options.cmake_artifact_dir);
-        module_.addRPath(options.cmake_artifact_dir);
-        module_.linkSystemLibrary("maplibre-native-c", .{});
+        },
+        .static_monolithic => {
+            addLibraryPaths(module_, link_dirs);
+            linkSystemLibraries(module_, config.link_libraries);
+            if (options.target.result.os.tag == .ios) {
+                if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
+                    if (system_root.len != 0) {
+                        module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
+                    }
+                }
+            }
+            linkFrameworks(module_, config.frameworks);
+        },
     }
     linkRenderBackend(b, module_, .{
         .target = options.target,
-        .render_backend = options.render_backend,
-        .dependency_library_dirs = options.dependency_library_dirs,
+        .render_backend = parseRenderBackend(config.render_backend),
+        .dependency_library_dirs = dependency_library_dirs,
     });
 }
 
@@ -499,21 +634,13 @@ pub fn build(b: *std.Build) void {
         include_dirs_from_cli orelse defaultDocIncludeDirs(b),
     );
 
-    const cmake_artifact_dir = b.option(
-        std.Build.LazyPath,
-        "cmake-artifact-dir",
-        "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse return;
-
-    const include_dirs = include_dirs_from_cli orelse
-        @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
+    _ = maybeNativeArtifactConfigPath(b) orelse return;
 
     const backend = renderBackend(b);
     const options = BuildOptions{
         .target = target,
         .optimize = testOptimize(target, optimize),
-        .cmake_artifact_dir = cmake_artifact_dir,
-        .include_dirs = include_dirs,
+        .include_dirs = includeDirs(b),
         .dependency_library_dirs = dependencyLibraryDirs(b),
         .render_backend = backend,
     };
