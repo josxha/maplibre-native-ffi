@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.map.GeometryScope
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
@@ -841,6 +842,7 @@ private fun optionalCString(value: String?): BytePointer? = value?.let {
 
 private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : AutoCloseable {
   private val owned = mutableListOf<Pointer>()
+  private val closeables = mutableListOf<AutoCloseable>()
 
   val definition: MaplibreNativeC.mln_offline_region_definition =
     own(MaplibreNativeC.mln_offline_region_definition())
@@ -852,16 +854,19 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
         definition.type(MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID)
         definition.data_tile_pyramid(tilePyramid(value))
       }
-      is OfflineRegionDefinition.GeometryRegion ->
-        throw UnsupportedOperationException(
-          "Geometry offline region definitions are not available until the Android geometry bridge is migrated"
-        )
+      is OfflineRegionDefinition.GeometryRegion -> {
+        definition.type(MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY)
+        definition.data_geometry(geometry(value))
+      }
       is OfflineRegionDefinition.Unknown ->
         throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
     }
   }
 
   override fun close() {
+    for (index in closeables.lastIndex downTo 0) {
+      closeables[index].close()
+    }
     for (index in owned.lastIndex downTo 0) {
       owned[index].close()
     }
@@ -874,6 +879,22 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
     out.size(out.sizeof())
     out.style_url(utf8(value.styleUrl))
     out.bounds(bounds(value.bounds))
+    out.min_zoom(value.minZoom)
+    out.max_zoom(value.maxZoom)
+    out.pixel_ratio(value.pixelRatio)
+    out.include_ideographs(value.includeIdeographs)
+    return out
+  }
+
+  private fun geometry(
+    value: OfflineRegionDefinition.GeometryRegion
+  ): MaplibreNativeC.mln_offline_geometry_region_definition {
+    val out = own(MaplibreNativeC.mln_offline_geometry_region_definition())
+    val geometry = GeometryScope(value.geometry)
+    closeables += geometry
+    out.size(out.sizeof())
+    out.style_url(utf8(value.styleUrl))
+    out.geometry(geometry.value)
     out.min_zoom(value.minZoom)
     out.max_zoom(value.maxZoom)
     out.pixel_ratio(value.pixelRatio)

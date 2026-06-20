@@ -1229,3 +1229,17 @@ is being implemented.
 - Discovery: removing Java JNI also removes the last docs `api:java-*` task, so
   docs API generation now covers C, Rust, and Zig until Kotlin API reference
   generation is introduced.
+
+### Offline Geometry Region Bridge Milestone
+
+- Implemented JVM FFM and Android JavaCPP materialization for
+  `OfflineRegionDefinition.GeometryRegion`.
+- Added JVM read-side geometry offline region materialization so offline region
+  snapshots and lists preserve geometry definitions across the Kotlin API.
+- Corrected JVM offline region definition type constants to match the public C
+  enum values.
+- Discovery: nativeMain already supported geometry offline regions through
+  `ValueStructs.geometry`, so the remaining unsupported paths were JVM and
+  Android bridge gaps rather than public API gaps.
+- Discovery: the current `mln_offline_geometry_region_definition` ABI is 48
+  bytes with the borrowed geometry pointer at offset 16.

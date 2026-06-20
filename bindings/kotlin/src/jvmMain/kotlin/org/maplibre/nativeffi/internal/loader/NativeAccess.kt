@@ -5248,8 +5248,10 @@ internal object NativeAccess {
         )
       }
       is OfflineRegionDefinition.GeometryRegion ->
-        throw UnsupportedOperationException(
-          "Geometry offline region definitions are not available until the JVM geometry bridge is migrated"
+        offlineGeometryDefinition(
+          value,
+          segment.asSlice(OFFLINE_REGION_DEFINITION_DATA_OFFSET),
+          arena,
         )
       is OfflineRegionDefinition.Unknown ->
         throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
@@ -5291,6 +5293,40 @@ internal object NativeAccess {
     segment.set(
       ValueLayout.JAVA_BOOLEAN,
       OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET,
+      value.includeIdeographs,
+    )
+  }
+
+  private fun offlineGeometryDefinition(
+    value: OfflineRegionDefinition.GeometryRegion,
+    segment: MemorySegment,
+    arena: Arena,
+  ) {
+    segment.set(
+      ValueLayout.JAVA_INT,
+      OFFLINE_GEOMETRY_DEFINITION_SIZE_OFFSET,
+      OFFLINE_GEOMETRY_DEFINITION_SIZE.toInt(),
+    )
+    segment.set(
+      ValueLayout.ADDRESS,
+      OFFLINE_GEOMETRY_DEFINITION_STYLE_URL_OFFSET,
+      cString(arena, value.styleUrl),
+    )
+    segment.set(
+      ValueLayout.ADDRESS,
+      OFFLINE_GEOMETRY_DEFINITION_GEOMETRY_OFFSET,
+      geometry(arena, value.geometry, 0),
+    )
+    segment.set(ValueLayout.JAVA_DOUBLE, OFFLINE_GEOMETRY_DEFINITION_MIN_ZOOM_OFFSET, value.minZoom)
+    segment.set(ValueLayout.JAVA_DOUBLE, OFFLINE_GEOMETRY_DEFINITION_MAX_ZOOM_OFFSET, value.maxZoom)
+    segment.set(
+      ValueLayout.JAVA_FLOAT,
+      OFFLINE_GEOMETRY_DEFINITION_PIXEL_RATIO_OFFSET,
+      value.pixelRatio,
+    )
+    segment.set(
+      ValueLayout.JAVA_BOOLEAN,
+      OFFLINE_GEOMETRY_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET,
       value.includeIdeographs,
     )
   }
@@ -5460,6 +5496,8 @@ internal object NativeAccess {
     when (val type = segment.get(ValueLayout.JAVA_INT, OFFLINE_REGION_DEFINITION_TYPE_OFFSET)) {
       OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID ->
         offlineTilePyramidDefinition(segment.asSlice(OFFLINE_REGION_DEFINITION_DATA_OFFSET))
+      OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY ->
+        offlineGeometryDefinition(segment.asSlice(OFFLINE_REGION_DEFINITION_DATA_OFFSET))
       else ->
         OfflineRegionDefinition.Unknown(
           type,
@@ -5485,6 +5523,27 @@ internal object NativeAccess {
         ValueLayout.JAVA_BOOLEAN,
         OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET,
       ),
+    )
+
+  private fun offlineGeometryDefinition(
+    segment: MemorySegment
+  ): OfflineRegionDefinition.GeometryRegion =
+    OfflineRegionDefinition.GeometryRegion(
+      copyString(
+        segment.get(ValueLayout.ADDRESS, OFFLINE_GEOMETRY_DEFINITION_STYLE_URL_OFFSET),
+        cStringLength(
+          segment.get(ValueLayout.ADDRESS, OFFLINE_GEOMETRY_DEFINITION_STYLE_URL_OFFSET)
+        ),
+      ),
+      geometry(
+        segment
+          .get(ValueLayout.ADDRESS, OFFLINE_GEOMETRY_DEFINITION_GEOMETRY_OFFSET)
+          .reinterpret(GEOMETRY_SIZE)
+      ),
+      segment.get(ValueLayout.JAVA_DOUBLE, OFFLINE_GEOMETRY_DEFINITION_MIN_ZOOM_OFFSET),
+      segment.get(ValueLayout.JAVA_DOUBLE, OFFLINE_GEOMETRY_DEFINITION_MAX_ZOOM_OFFSET),
+      segment.get(ValueLayout.JAVA_FLOAT, OFFLINE_GEOMETRY_DEFINITION_PIXEL_RATIO_OFFSET),
+      segment.get(ValueLayout.JAVA_BOOLEAN, OFFLINE_GEOMETRY_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET),
     )
 
   private fun cStringLength(address: MemorySegment): Long {
@@ -6403,8 +6462,8 @@ internal object NativeAccess {
   private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long = 24
   private const val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long = 28
 
-  private const val OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID: Int = 0
-  private const val OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY: Int = 1
+  private const val OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID: Int = 1
+  private const val OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY: Int = 2
 
   private const val LAT_LNG_BOUNDS_SOUTHWEST_LATITUDE_OFFSET: Long = 0
   private const val LAT_LNG_BOUNDS_SOUTHWEST_LONGITUDE_OFFSET: Long = 8
@@ -6419,6 +6478,15 @@ internal object NativeAccess {
   private const val OFFLINE_TILE_PYRAMID_DEFINITION_MAX_ZOOM_OFFSET: Long = 56
   private const val OFFLINE_TILE_PYRAMID_DEFINITION_PIXEL_RATIO_OFFSET: Long = 64
   private const val OFFLINE_TILE_PYRAMID_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long = 68
+
+  private const val OFFLINE_GEOMETRY_DEFINITION_SIZE: Long = 48
+  private const val OFFLINE_GEOMETRY_DEFINITION_SIZE_OFFSET: Long = 0
+  private const val OFFLINE_GEOMETRY_DEFINITION_STYLE_URL_OFFSET: Long = 8
+  private const val OFFLINE_GEOMETRY_DEFINITION_GEOMETRY_OFFSET: Long = 16
+  private const val OFFLINE_GEOMETRY_DEFINITION_MIN_ZOOM_OFFSET: Long = 24
+  private const val OFFLINE_GEOMETRY_DEFINITION_MAX_ZOOM_OFFSET: Long = 32
+  private const val OFFLINE_GEOMETRY_DEFINITION_PIXEL_RATIO_OFFSET: Long = 40
+  private const val OFFLINE_GEOMETRY_DEFINITION_INCLUDE_IDEOGRAPHS_OFFSET: Long = 44
 
   private const val OFFLINE_REGION_DEFINITION_SIZE: Long = 80
   private const val OFFLINE_REGION_DEFINITION_SIZE_OFFSET: Long = 0

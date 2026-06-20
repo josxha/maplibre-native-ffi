@@ -5,7 +5,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.Geometry
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 
 class RuntimeHandleTest {
   @Test
@@ -40,5 +44,24 @@ class RuntimeHandleTest {
     assertTrue(operation.isClosed)
     runtime.close()
     assertTrue(runtime.isClosed)
+  }
+
+  @Test
+  fun geometryOfflineRegionDefinitionReachesNativeValidation() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      assertFailsWith<InvalidArgumentException> {
+        runtime.startCreateOfflineRegion(
+          OfflineRegionDefinition.GeometryRegion(
+            "asset://style.json",
+            Geometry.Point(LatLng(1.0, 2.0)),
+            0.0,
+            1.0,
+            1.0f,
+            false,
+          ),
+          ByteArray(0),
+        )
+      }
+    }
   }
 }
