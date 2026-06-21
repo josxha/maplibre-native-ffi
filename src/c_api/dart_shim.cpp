@@ -77,7 +77,7 @@ auto request_matches_route(
   std::span<const DartQueuedResourceProviderRoute> routes,
   const mln_resource_request& request
 ) -> bool {
-  return std::ranges::any_of(routes, [&request](const auto& route) {
+  return std::ranges::any_of(routes, [&request](const auto& route) -> bool {
     return matches_rule(route.kind, request.kind) &&
            string_equals(route.url, request.url);
   });
@@ -190,11 +190,13 @@ extern "C" MLN_API void mln_dart_handle_leak_token_destroy(
 extern "C" MLN_API void mln_dart_handle_leak_report(void* token) noexcept {
   auto* leak = static_cast<DartHandleLeakToken*>(token);
   if (leak != nullptr) {
-    const auto message = std::string{"maplibre_native_ffi: leaked "} +
-                         leak->type_name +
-                         " native handle; call close() on the owner isolate "
-                         "before releasing the Dart object\n";
-    static_cast<void>(std::fputs(message.c_str(), stderr));
+    static_cast<void>(std::fputs("maplibre_native_ffi: leaked ", stderr));
+    static_cast<void>(std::fputs(leak->type_name.c_str(), stderr));
+    static_cast<void>(std::fputs(
+      " native handle; call close() on the owner isolate before releasing the "
+      "Dart object\n",
+      stderr
+    ));
   }
   destroy_handle_leak_token(token);
 }

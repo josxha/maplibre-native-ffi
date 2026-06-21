@@ -13,6 +13,8 @@ extern "C" {
 #define MLN_DART_SHIM_NOEXCEPT
 #endif
 
+// NOLINTBEGIN(modernize-use-using,modernize-use-trailing-return-type)
+
 typedef struct mln_dart_resource_rewrite_rule {
   uint32_t kind;
   const char* url;
@@ -117,6 +119,8 @@ MLN_API void mln_dart_test_invoke_custom_geometry_tile_callback(
   mln_custom_geometry_source_tile_callback callback, void* user_data,
   mln_canonical_tile_id tile_id
 ) MLN_DART_SHIM_NOEXCEPT;
+
+// NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)
 
 #ifdef __cplusplus
 }
