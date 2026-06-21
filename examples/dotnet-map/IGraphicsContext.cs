@@ -32,12 +32,12 @@ internal static class GraphicsContext
         RenderBackend backends
     )
     {
-        if (OperatingSystem.IsMacOS() && backends.HasFlag(RenderBackend.Metal))
+        if (backends.HasFlag(RenderBackend.Metal))
         {
             return MetalContext.Create(title, width, height);
         }
 
-        if (!OperatingSystem.IsMacOS() && backends.HasFlag(RenderBackend.OpenGL))
+        if (backends.HasFlag(RenderBackend.OpenGL))
         {
             return OpenGLContext.Create(title, width, height);
         }
@@ -48,7 +48,7 @@ internal static class GraphicsContext
         }
 
         throw new InvalidOperationException(
-            "The loaded MapLibre native library does not support a backend usable by dotnet-map on this platform."
+            "The loaded MapLibre native library does not support a backend usable by dotnet-map."
         );
     }
 }
