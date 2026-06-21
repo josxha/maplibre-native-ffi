@@ -5,7 +5,7 @@ import org.bytedeco.javacpp.annotation.Name;
 import org.bytedeco.javacpp.annotation.Properties;
 import org.bytedeco.javacpp.annotation.Raw;
 
-/** Android-only JavaCPP bridge helpers that need direct JNI call context. */
+/** Android-only JavaCPP helpers that need direct JNI call context. */
 @Properties(inherit = MaplibreNativeCConfig.class)
 public final class AndroidNativeBridge {
   private AndroidNativeBridge() {}

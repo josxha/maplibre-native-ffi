@@ -289,12 +289,14 @@ final class MetalMapView: UIView {
         return false
       }
       guard recognizer.state == .changed else { return false }
-      let deltaDegrees = Double(recognizer.rotation * 180.0 / .pi)
+      let deltaRadians = recognizer.rotation
       recognizer.rotation = 0
-      guard deltaDegrees != 0 else { return false }
+      guard deltaRadians != 0 else { return false }
+      let location = recognizer.location(in: self)
       let camera = try map.camera()
       try map.jump(to: CameraOptions(
-        bearing: (camera.bearing ?? 0) - deltaDegrees
+        bearing: (camera.bearing ?? 0) - Double(deltaRadians * 180 / .pi),
+        anchor: screenPoint(location)
       ))
       return true
     }

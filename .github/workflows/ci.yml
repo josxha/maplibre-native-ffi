@@ -202,6 +202,7 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
+      - run: mise run //examples/android-map:build
   variant-android-arm64-vulkan:
     name: variant / android-arm64-vulkan
     runs-on: ubuntu-latest
