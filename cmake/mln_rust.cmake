@@ -4,7 +4,8 @@ function(mln_link_rust_platform target)
   set(rust_target "$ENV{CARGO_BUILD_TARGET}")
   if(rust_target STREQUAL "")
     message(
-      FATAL_ERROR "CARGO_BUILD_TARGET must be set for Rust platform builds")
+      FATAL_ERROR
+        "CARGO_BUILD_TARGET must be set for Rust platform builds (see .mise/config.*.toml)")
   endif()
 
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
@@ -86,4 +87,7 @@ function(mln_link_rust_platform target)
                    maplibre_native_platform_rust_build)
 
   target_link_libraries(${target} PRIVATE maplibre_native_platform_rust)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_libraries(${target} PRIVATE dl m)
+  endif()
 endfunction()
