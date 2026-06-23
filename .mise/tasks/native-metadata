@@ -200,10 +200,41 @@ def write_swift_linker_flags(artifact: Artifact, out_dir: Path) -> None:
     write_lines(out_dir / f"{LIBRARY_NAME}.swift-linker-flags", linker_flags(artifact))
 
 
+def ohos_cargo_target() -> str | None:
+    cargo_target = os.environ.get("CARGO_BUILD_TARGET", "")
+    if cargo_target.endswith("-linux-ohos"):
+        return cargo_target
+    return None
+
+
+def ohos_clang_target() -> str | None:
+    cargo_target = ohos_cargo_target()
+    if cargo_target is None:
+        return None
+    return cargo_target.replace("-unknown-", "-")
+
+
+def ohos_cargo_link_rustflags() -> list[str]:
+    ohos_sdk = os.environ.get("OHOS_SDK_NATIVE", "")
+    clang_target = ohos_clang_target()
+    if not ohos_sdk or clang_target is None:
+        return []
+
+    sysroot = Path(ohos_sdk) / "sysroot"
+    return [
+        f"-Clink-arg=--target={clang_target}",
+        f"-Clink-arg=--sysroot={sysroot}",
+        "-Clink-arg=-fuse-ld=lld",
+    ]
+
+
 def write_cargo_rustflags(artifact: Artifact, out_dir: Path) -> None:
     flags = [
-        f"-Clink-arg=-Wl,-rpath,{runtime_dir}"
-        for runtime_dir in artifact.runtime_library_dirs
+        *ohos_cargo_link_rustflags(),
+        *(
+            f"-Clink-arg=-Wl,-rpath,{runtime_dir}"
+            for runtime_dir in artifact.runtime_library_dirs
+        ),
     ]
     encoded_flags = "\x1f".join(flags)
     lines = []
@@ -239,6 +270,23 @@ def write_zig_config(metadata: dict, artifact: Artifact, out_dir: Path) -> None:
 
 def write_zig_libc_config(out_dir: Path) -> None:
     path = out_dir / f"{LIBRARY_NAME}.zig-libc"
+    ohos_sdk = os.environ.get("OHOS_SDK_NATIVE", "")
+    ohos_arch = ohos_clang_target()
+    if ohos_sdk and ohos_arch is not None:
+        sysroot = Path(ohos_sdk) / "sysroot"
+        write_lines(
+            path,
+            [
+                f"include_dir={sysroot / 'usr' / 'include' / ohos_arch}",
+                f"sys_include_dir={sysroot / 'usr' / 'include'}",
+                f"crt_dir={sysroot / 'usr' / 'lib' / ohos_arch}",
+                "msvc_lib_dir=",
+                "kernel32_lib_dir=",
+                "gcc_dir=",
+            ],
+        )
+        return
+
     system_root = os.environ.get("MLN_FFI_SYSTEM_ROOT", "")
     if not system_root:
         path.unlink(missing_ok=True)
