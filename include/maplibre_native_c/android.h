@@ -40,3 +40,14 @@ MLN_API mln_status mln_android_init(void* jni_env, void* context) MLN_NOEXCEPT;
 #endif
 
 #endif  // MAPLIBRE_NATIVE_C_ANDROID_H
+
+typedef struct {
+    void* display;
+    void* config;
+    void* context;
+} mln_android_egl_context;
+
+
+MLN_API
+mln_android_egl_context
+mln_android_create_egl_context(void);
