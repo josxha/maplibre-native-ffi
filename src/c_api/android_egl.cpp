@@ -9,24 +9,32 @@
 
 extern "C"
 mln_android_egl_context
-mln_android_create_egl_context(void) {
+mln_android_create_egl_context(void) noexcept {
+
     EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+
     if (display == EGL_NO_DISPLAY) {
         return {};
     }
 
-    EGLint major, minor;
+    EGLint major = 0;
+    EGLint minor = 0;
+
     if (!eglInitialize(display, &major, &minor)) {
         return {};
     }
 
     const EGLint configAttribs[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_SURFACE_TYPE,    EGL_PBUFFER_BIT,
+        EGL_RENDERABLE_TYPE,
+        EGL_OPENGL_ES2_BIT,
+
+        EGL_SURFACE_TYPE,
+        EGL_PBUFFER_BIT,
+
         EGL_NONE
     };
 
-    EGLConfig config;
+    EGLConfig config = nullptr;
     EGLint numConfigs = 0;
 
     if (!eglChooseConfig(
@@ -36,11 +44,13 @@ mln_android_create_egl_context(void) {
             1,
             &numConfigs) ||
         numConfigs == 0) {
+        eglTerminate(display);
         return {};
     }
 
     const EGLint contextAttribs[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_CONTEXT_CLIENT_VERSION,
+        2,
         EGL_NONE
     };
 
@@ -48,25 +58,63 @@ mln_android_create_egl_context(void) {
         display,
         config,
         EGL_NO_CONTEXT,
-        contextAttribs);
+        contextAttribs
+    );
 
     if (context == EGL_NO_CONTEXT) {
+        eglTerminate(display);
         return {};
     }
 
-    mln_android_egl_context result{};
-    result.display = display;
-    result.config = config;
-    result.context = context;
-    return result;
+    return {
+        .display = display,
+        .config = config,
+        .context = context,
+    };
 }
+
+
+extern "C"
+void
+mln_android_destroy_egl_context(
+    mln_android_egl_context value
+) noexcept {
+
+    EGLDisplay display =
+        reinterpret_cast<EGLDisplay>(value.display);
+
+    EGLContext context =
+        reinterpret_cast<EGLContext>(value.context);
+
+    if (display == EGL_NO_DISPLAY) {
+        return;
+    }
+
+    if (context != EGL_NO_CONTEXT) {
+        eglDestroyContext(
+            display,
+            context
+        );
+    }
+
+    eglTerminate(display);
+}
+
 
 #else
 
 extern "C"
 mln_android_egl_context
-mln_android_create_egl_context(void) {
+mln_android_create_egl_context(void) noexcept {
     return {};
+}
+
+
+extern "C"
+void
+mln_android_destroy_egl_context(
+    mln_android_egl_context
+) noexcept {
 }
 
 #endif
