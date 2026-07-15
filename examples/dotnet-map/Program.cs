@@ -27,7 +27,7 @@ internal static class Program
             if (!SupportsUsableBackend(backends))
             {
                 Console.Error.WriteLine(
-                    "The loaded MapLibre native library does not support a backend usable by dotnet-map on this platform."
+                    "The loaded MapLibre native library does not support a backend usable by dotnet-map."
                 );
                 return 1;
             }
@@ -89,12 +89,9 @@ internal static class Program
 
     private static bool SupportsUsableBackend(RenderBackend backends)
     {
-        if (OperatingSystem.IsMacOS())
-        {
-            return backends.HasFlag(RenderBackend.Metal) || backends.HasFlag(RenderBackend.Vulkan);
-        }
-
-        return backends.HasFlag(RenderBackend.OpenGL) || backends.HasFlag(RenderBackend.Vulkan);
+        return backends.HasFlag(RenderBackend.Metal)
+            || backends.HasFlag(RenderBackend.OpenGL)
+            || backends.HasFlag(RenderBackend.Vulkan);
     }
 
     private static bool PrintNativeLog(LogRecord record)

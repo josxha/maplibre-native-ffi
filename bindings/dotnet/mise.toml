@@ -2,6 +2,7 @@
 run = "scripts/generate-clangsharp.sh"
 
 [tasks.build]
+depends = ["//:ensure-native-library"]
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = 'dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"'
@@ -10,6 +11,3 @@ run = 'dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"'
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = 'dotnet test bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj -p:Platform="Any CPU"'
-
-[tasks.ci]
-depends = [":test"]

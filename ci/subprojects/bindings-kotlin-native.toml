@@ -1,6 +1,9 @@
+label = "Kotlin/Native"
+source_directory = "bindings/kotlin"
+
 [requires]
-exclude = ["linux-arm64-egl", "linux-arm64-vulkan", "macos-arm64-egl"]
+exclude = ["linux-arm64-egl", "linux-arm64-vulkan"]
 os = ["linux", "macos"]
 
 [ci]
-build = "//bindings/kotlin-native:build"
+test = "//bindings/kotlin:nativeTest"

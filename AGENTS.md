@@ -9,7 +9,7 @@ interop or the popular MapLibre Android/iOS SDKs.
 - `include/` — Public C API headers (the stable ABI surface).
 - `src/` — C++ implementation behind the C headers, plus render backend adapters
   (Vulkan, Metal, OpenGL) and the Zig test support shim.
-- `bindings/` — Language bindings (Zig, Rust, Java FFM, Java JNI) that wrap the
+- `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET) that wrap the
   C API in idiomatic target-language interfaces.
 - `examples/` — Small demo apps per language/backend (`zig-map`, `rust-map`,
   `zig-readback`, `lwjgl-map`, `swift-map`).
@@ -33,13 +33,13 @@ mise run build
 mise run test
 
 # Build and run Rust binding tests (also runs build)
-mise run //bindings/rust:ci
+mise run //bindings/rust:test
 
 # Headless smoke test — no display needed
 mise run //examples/zig-readback:run
 
 # GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 
 # Build and test for a different variant (override auto-detected env)
 mise -E linux-x64-egl run test
@@ -53,8 +53,9 @@ hk fix [FILES...]
 
 Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
 `linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`,
-`windows-x64-vulkan`, `windows-x64-wgl`. The host-matching variant is selected
-automatically via `.miserc.toml`.
+`windows-x64-vulkan`, `windows-x64-wgl`, `android-arm64-egl`,
+`android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan`. The
+host-matching variant is selected automatically via `.miserc.toml`.
 
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.

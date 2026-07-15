@@ -23,13 +23,18 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 
 ## Implementations
 
-| Example               | Profile | Binding  | Toolkit         | Platforms             | Backends              |
-| --------------------- | ------- | -------- | --------------- | --------------------- | --------------------- |
-| `examples/zig-map`    | Desktop | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`   | Desktop | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/lwjgl-map`  | Desktop | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/dotnet-map` | Desktop | C#       | GLFW            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/swift-map`  | Desktop | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+| Example                | Profile | Binding    | Toolkit         | Platforms             | Backends              |
+| ---------------------- | ------- | ---------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`     | Desktop | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`    | Desktop | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/lwjgl-map`   | Desktop | Kotlin/JVM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/android-map` | Mobile  | Kotlin     | Android view    | Android               | OpenGL/EGL            |
+| `examples/dotnet-map`  | Desktop | C#         | GLFW            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/swift-map`   | Desktop | Swift      | AppKit, SwiftUI | macOS                 | Metal                 |
+| `examples/swift-map`   | Mobile  | Swift      | UIKit           | iOS                   | Metal                 |
+
+The Compose map example follows the broad strokes of this specification, but
+uses its own renderer-integration architecture for Skiko texture sharing.
 
 For examples built by native render-backend variant, “Backends” is the union of
 supported configured variants. Each native library artifact includes one render
@@ -155,8 +160,11 @@ Graphics API selection follows one of these patterns:
   matches the active native build variant (for example `zig-map`, `rust-map`,
   `swift-map`).
 - **Multi-context examples** ship a graphics context per targeted API and select
-  the active API at startup from `supportedRenderBackends()` and platform policy
-  (for example `lwjgl-map`, `dotnet-map`).
+  the active API at startup from `supportedRenderBackends()` (for example
+  `lwjgl-map`, `dotnet-map`).
+
+OpenGL examples that can run with multiple context providers select EGL or WGL
+from `supportedOpenGLContextProviders()`.
 
 Each process run uses one graphics API. Render-target mode selection follows the
 active profile ([Entry](#entry) or [Entry and shell](#entry-and-shell)).
@@ -621,21 +629,25 @@ surface is available.
 
 ### Input
 
-Use separate pan, pinch-scale, rotation, and shove recognizers. Pinch and
-rotation MAY recognize simultaneously. Shove MUST NOT recognize simultaneously
-with pinch or rotation.
+Translate platform touch input into distinct one-finger pan, two-finger
+scale-rotate, two-finger shove, and double-tap gesture states. Platform gesture
+recognizers and custom touch trackers are both valid implementations when they
+produce the required camera operations. Scale and rotation share one two-finger
+state so a single gesture can zoom and rotate in the same update. Shove is an
+exclusive two-finger vertical state selected only when vertical centroid motion
+dominates before scale or rotation begins.
 
 #### Control scheme
 
 Implementations MUST provide the following touch interactions:
 
-| Interaction                      | Behavior                                                                                                                                                                                                |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                                                                    |
-| Pinch                            | On begin, record `zoom₀`. On change, `jump_to` zoom `zoom₀ + log₂(S)` about the gesture centroid, where `S` is the scale recognizer's cumulative scale factor since the gesture began (`1.0` at begin). |
-| Two-finger rotate                | Adjust bearing by `−Δθ` degrees, where `Δθ` is the rotation recognizer's delta in degrees since the last update.                                                                                        |
-| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in average touch Y in logical coordinates since the last update.                                                             |
-| Double-tap                       | Zoom `1.25` about the tap location with animation (~`160` ms).                                                                                                                                          |
+| Interaction                      | Behavior                                                                                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                                   |
+| Pinch                            | Apply incremental scale deltas while preserving the geographic coordinate under the current two-touch centroid, resetting the scale baseline after each applied delta. |
+| Two-finger rotate                | Apply incremental bearing deltas from the change in the two-touch vector angle while preserving the geographic coordinate under the current two-touch centroid.        |
+| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in two-touch centroid Y in logical coordinates since the last applied update.               |
+| Double-tap                       | Zoom to `round(zoom₀) + 1.0` about the tap location with animation (~`160` ms).                                                                                        |
 
 On any gesture begin, cancel in-flight camera transitions before applying
 deltas.

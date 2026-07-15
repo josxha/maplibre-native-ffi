@@ -2,7 +2,10 @@
 build/
 target/
 bindings/*/bin/
+examples/*/bin/
+examples/*/.cxx/
 docs/doxygen/gen/
+docs/src/generated/
 docs/public/reference/
 .zig-cache/
 .ruff_cache/

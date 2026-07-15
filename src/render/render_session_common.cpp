@@ -898,9 +898,7 @@ auto attach_render_session(
     return attach_status;
   }
   try {
-    if (auto* native_map = map_native(map); native_map != nullptr) {
-      native_map->setSize(mbgl::Size{session->width, session->height});
-    }
+    map_native(map)->setSize(mbgl::Size{session->width, session->height});
     session->kind = kind;
     register_render_session(handle, std::move(session));
   } catch (...) {
@@ -966,9 +964,7 @@ auto render_session_resize(
     session->texture.acquired_native_texture = nullptr;
     session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
-  if (auto* native_map = map_native(session->map); native_map != nullptr) {
-    native_map->setSize(mbgl::Size{width, height});
-  }
+  map_native(session->map)->setSize(mbgl::Size{width, height});
   session->renderer.reset();
   session->rendered_generation = 0;
   session->width = width;
@@ -1006,9 +1002,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
     set_thread_error("render session renderer backend is not available");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
     try {
@@ -1099,9 +1093,7 @@ auto render_session_reduce_memory_use(mln_render_session* session)
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->reduceMemoryUse();
   return MLN_STATUS_OK;
 }
@@ -1115,9 +1107,7 @@ auto render_session_clear_data(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->clearData();
   return MLN_STATUS_OK;
 }
@@ -1131,9 +1121,7 @@ auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->dumpDebugLogs();
   return MLN_STATUS_OK;
 }
@@ -1165,17 +1153,13 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->setFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     string_from_view(selector->feature_id), *state_object
   );
-  if (auto* native_map = map_native(session->map); native_map != nullptr) {
-    native_map->triggerRepaint();
-  }
+  map_native(session->map)->triggerRepaint();
   return MLN_STATUS_OK;
 }
 
@@ -1197,9 +1181,7 @@ auto render_session_get_feature_state(
   }
 
   auto state = mbgl::FeatureState{};
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->getFeatureState(
     state, string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1224,9 +1206,7 @@ auto render_session_remove_feature_state(
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->removeFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1237,9 +1217,7 @@ auto render_session_remove_feature_state(
       *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
     )
   );
-  if (auto* native_map = map_native(session->map); native_map != nullptr) {
-    native_map->triggerRepaint();
-  }
+  map_native(session->map)->triggerRepaint();
   return MLN_STATUS_OK;
 }
 
@@ -1299,9 +1277,7 @@ auto render_session_query_rendered_features(
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   auto features = std::vector<mbgl::Feature>{};
   switch (geometry->type) {
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
@@ -1362,9 +1338,7 @@ auto render_session_query_source_features(
   }
 
   auto native_source_id = string_from_view(source_id);
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   auto features =
     session->renderer->querySourceFeatures(native_source_id, *native_options);
   return create_feature_query_result(
@@ -1407,9 +1381,7 @@ auto render_session_query_feature_extensions(
   }
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   auto result = session->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),
     string_from_view(extension_field), std::move(*native_arguments)

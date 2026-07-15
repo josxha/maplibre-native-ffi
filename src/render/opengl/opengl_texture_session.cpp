@@ -369,7 +369,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context) {}
 
@@ -392,9 +392,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       context.reset();
     };
     if (has_native_context()) {
-      auto guard = mbgl::gfx::BackendScope{
-        *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-      };
+      auto guard = mbgl::gfx::BackendScope{*this};
       cleanup();
     } else {
       cleanup();
