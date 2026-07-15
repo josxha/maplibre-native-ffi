@@ -4,7 +4,7 @@ name: CI
   push:
     branches:
       - main
-      - test
+      - dart
   pull_request:
     branches:
       - main
