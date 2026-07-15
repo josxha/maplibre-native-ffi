@@ -4,6 +4,7 @@ name: CI
   push:
     branches:
       - main
+      - test
   pull_request:
     branches:
       - main
@@ -270,6 +271,11 @@ jobs:
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
       - run: mise run //examples/android-map:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maplibre-native-android-arm64-egl
+          path: |
+            build/**
   variant-android-arm64-vulkan:
     name: variant / android-arm64-vulkan
     runs-on: ubuntu-latest
