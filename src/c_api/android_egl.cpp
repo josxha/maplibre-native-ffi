@@ -1,6 +1,6 @@
 #define MLN_BUILDING_C
 
-#include "maplibre_native_c/android.h"
+#include "maplibre_native_c/android_egl.h"
 
 #ifdef __ANDROID__
 
