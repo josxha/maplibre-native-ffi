@@ -3,11 +3,11 @@ name: CI
 'on':
   push:
     branches:
-      - main
+      #- main
       - dart
-  pull_request:
-    branches:
-      - main
+  #pull_request:
+  #  branches:
+      #- main
 permissions:
   contents: read
 concurrency:
