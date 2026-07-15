@@ -5,6 +5,10 @@
 #include "maplibre_native_c.h"
 
 #ifdef __ANDROID__
+
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+
 extern "C" auto mlnffi_rust_android_init_tls_verifier(
   void* jni_env, void* context
 ) -> char*;
